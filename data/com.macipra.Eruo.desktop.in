@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=eruo-data-studio
+Exec=eruo-data-studio
+Icon=com.macipra.Eruo
+Terminal=false
+Type=Application
+Categories=Utility;
+Keywords=GTK;
+StartupNotify=true
+DBusActivatable=true

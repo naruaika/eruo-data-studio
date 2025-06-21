@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="eruo-data-studio">
+	<schema id="com.macipra.Eruo" path="/com/macipra/Eruo/">
+	</schema>
+</schemalist>

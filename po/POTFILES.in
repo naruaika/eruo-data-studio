@@ -1,0 +1,8 @@
+# List of source files containing translatable strings.
+# Please keep this file sorted alphabetically.
+data/com.macipra.Eruo.desktop.in
+data/com.macipra.Eruo.metainfo.xml.in
+data/com.macipra.Eruo.gschema.xml
+src/main.py
+src/window.py
+src/window.ui
