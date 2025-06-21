@@ -23,9 +23,12 @@
         "*.a"
     ],
     "modules" : [
+        "python3-meson-python.json",
+        "python3-numpy.json",
+        "python3-versioneer.json",
+        "python3-pandas.json",
         {
             "name" : "eruo-data-studio",
-            "builddir" : true,
             "buildsystem" : "meson",
             "sources" : [
                 {
@@ -37,8 +40,5 @@
                 "--libdir=lib"
             ]
         }
-    ],
-    "build-options" : {
-        "env" : {        }
-    }
+    ]
 }
