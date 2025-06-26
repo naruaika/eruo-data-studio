@@ -1,3 +1,12 @@
+.main-content scrollbar.vertical {
+    padding-left: 5px;
+    margin-bottom: 24px;
+}
+.main-content scrollbar.horizontal {
+    padding-top: 5px;
+    margin-right: 24px;
+}
+
 .status-bar {
     font-size: 12px;
     padding: 3px 15px;

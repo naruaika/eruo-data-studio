@@ -257,13 +257,25 @@ class Selection(GObject.Object):
         Returns the name of the currently active cell.
 
         The name is constructed based on the active cell's row and column indices.
-        For example, if the active cell is at (0, 0), the name will be "A1".
+        For example, if the active cell is at (0, 0), the name will be "A1"; at (0, 1)
+        the name will be "B1"; and at (1, 0) the name will be "A2". When reaching
+        the end of the alphabet, the next column will be prepended with a letter.
+        For example, if the active cell is at (0, 26), the name will be "AA1". In other
+        words, following this pattern: A ^ B ^ C ... Z ^ AA ... AZ ^ BA ... ZZ ^ AAA ...
+
+        Args:
+            index: A tuple containing the row and column indices of the active cell.
 
         Returns:
             A string representing the name of the active cell.
         """
         row, col = index
-        return f"{chr(65 + col)}{row + 1}"
+        name = ''
+        while col >= 0:
+            name = chr(65 + col % 26) + name
+            col //= 26
+            col -= 1
+        return name + str(row + 1)
 
     def coordinate_to_index(self, coordinate: tuple[float, float]) -> tuple[int, int]:
         """

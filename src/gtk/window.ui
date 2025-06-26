@@ -32,7 +32,7 @@
                 <property name="valign">fill</property>
                 <child>
                   <object class="GtkEntry" id="name_box">
-                    <property name="placeholder-text">Enter range</property>
+                    <property name="placeholder-text">Enter range...</property>
                     <property name="tooltip-text">Name Box</property>
                     <property name="halign">fill</property>
                     <property name="valign">fill</property>
@@ -41,7 +41,7 @@
                 </child>
                 <child>
                   <object class="GtkEntry" id="formula_bar">
-                    <property name="placeholder-text">Enter formula or anything</property>
+                    <property name="placeholder-text">Enter formula or anything...</property>
                     <property name="tooltip-text">Formula Bar</property>
                     <property name="halign">fill</property>
                     <property name="valign">fill</property>
@@ -60,46 +60,42 @@
               </object>
             </child>
             <child>
-              <object class="GtkGrid">
+              <object class="GtkOverlay">
                 <property name="vexpand">True</property>
                 <property name="hexpand">True</property>
                 <child>
-                  <object class="GtkDrawingArea" id="main_canvas">
-                    <property name="halign">fill</property>
-                    <property name="valign">fill</property>
+                  <object class="GtkOverlay">
                     <property name="vexpand">True</property>
                     <property name="hexpand">True</property>
-                    <layout>
-                      <property name="column">0</property>
-                      <property name="row">0</property>
-                    </layout>
-                    <style>
-                      <class name="main-canvas"/>
-                    </style>
+                    <child>
+                      <object class="GtkDrawingArea" id="main_canvas">
+                        <property name="halign">fill</property>
+                        <property name="valign">fill</property>
+                        <property name="vexpand">True</property>
+                        <property name="hexpand">True</property>
+                        <style>
+                          <class name="main-canvas"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child type="overlay">
+                      <object class="GtkScrollbar" id="horizontal_scrollbar">
+                        <property name="orientation">horizontal</property>
+                        <property name="valign">end</property>
+                        <style>
+                          <class name="bottom"/>
+                          <class name="overlay-indicator"/>
+                        </style>
+                      </object>
+                    </child>
                   </object>
                 </child>
-                <child>
+                <child type="overlay">
                   <object class="GtkScrollbar" id="vertical_scrollbar">
                     <property name="orientation">vertical</property>
-                    <layout>
-                      <property name="column">1</property>
-                      <property name="row">0</property>
-                    </layout>
+                    <property name="halign">end</property>
                     <style>
                       <class name="right"/>
-                      <class name="overlay-indicator"/>
-                    </style>
-                  </object>
-                </child>
-                <child>
-                  <object class="GtkScrollbar" id="horizontal_scrollbar">
-                    <property name="orientation">horizontal</property>
-                    <layout>
-                      <property name="column">0</property>
-                      <property name="row">1</property>
-                    </layout>
-                    <style>
-                      <class name="bottom"/>
                       <class name="overlay-indicator"/>
                     </style>
                   </object>

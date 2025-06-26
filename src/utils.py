@@ -58,8 +58,6 @@ def print_log(message: str, type: Log = Log.INFO, context: str = '') -> None:
         message (str): message
         type (str, optional): log type. Defaults to Log.INFO.
         context (str, optional): log context. Defaults to ''.
-            It is useful for example to locate the origin of the warning by passing:
-            f'{__file__.split('/')[-1].split('.')[0]}:{sys._getframe().f_lineno}'
     """
     if not is_debug_mode_enabled():
         return

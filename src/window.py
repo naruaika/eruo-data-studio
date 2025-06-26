@@ -34,6 +34,8 @@ from .selection import Selection
 class EruoDataStudioWindow(Adw.ApplicationWindow):
     __gtype_name__ = 'EruoDataStudioWindow'
 
+    SCROLL_MULTIPLIER: float = 60
+
     name_box: Gtk.Widget = Gtk.Template.Child()
     formula_bar: Gtk.Widget = Gtk.Template.Child()
     main_canvas: Gtk.Widget = Gtk.Template.Child()
@@ -64,21 +66,25 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.selection = Selection(self.display)
         self.renderer = Renderer(self.display, self.selection, self.dbms)
 
+        self.SCROLL_MULTIPLIER = 3.0 * self.display.CELL_DEFAULT_HEIGHT
+
         self.formula_bar.connect('changed', self.on_formula_bar_changed)
-        self.formula_bar.x_text = ''
         self.formula_bar.x_is_dirty = False
 
         self.main_canvas.set_draw_func(self.renderer.draw)
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
 
-        # Setup the initial state of the selection and name box
+        # Setup the application initial states
         self.selection.set_active_cell((0, 0))
         self.selection.set_selected_cells(((0, 0), (0, 0)))
         self.name_box.set_text(self.selection.index_to_name((0, 0)))
 
-        # Clicking the name box while not in focus will select all texts inside
-        # and make it focus for editing
+        self.vertical_adjustment = Gtk.Adjustment.new(0, 0, 100, 3, 33, 75)
+        self.horizontal_adjustment = Gtk.Adjustment.new(0, 0, 100, 3, 33, 75)
+        self.vertical_scrollbar.set_adjustment(self.vertical_adjustment)
+        self.horizontal_scrollbar.set_adjustment(self.horizontal_adjustment)
+
         self.name_box.get_first_child().set_focus_on_click(False)
         click_event_controller = Gtk.GestureClick()
         click_event_controller.connect('pressed', self.on_name_box_pressed)
@@ -86,16 +92,14 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         focus_event_controller = Gtk.EventControllerFocus()
         focus_event_controller.connect('leave', self.on_name_box_unfocused)
         self.name_box.add_controller(focus_event_controller)
+        key_event_controller = Gtk.EventControllerKey()
+        key_event_controller.connect('key-pressed', self.on_name_box_key_pressed)
+        self.name_box.add_controller(key_event_controller)
 
-        # Pressing tab key while focusing on the formula bar will apply the new value
-        focus_event_controller = Gtk.EventControllerFocus()
-        focus_event_controller.connect('enter', self.on_formula_bar_focused)
-        self.formula_bar.add_controller(focus_event_controller)
         key_event_controller = Gtk.EventControllerKey()
         key_event_controller.connect('key-pressed', self.on_formula_bar_key_pressed)
         self.formula_bar.add_controller(key_event_controller)
 
-        # Clicking the main canvas will select the cell at the clicked position
         click_event_controller = Gtk.GestureClick()
         click_event_controller.connect('pressed', self.on_main_canvas_pressed)
         self.main_canvas.add_controller(click_event_controller)
@@ -103,24 +107,27 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         focus_event_controller.connect('leave', self.on_main_canvas_unfocused)
         self.main_canvas.add_controller(focus_event_controller)
 
-        # Dragging the main canvas will select a range of cells
         drag_event_controller = Gtk.GestureDrag()
         drag_event_controller.connect('drag_update', self.on_main_canvas_drag_update)
         self.main_canvas.add_controller(drag_event_controller)
 
-        # Pressing tab key while focusing on the main canvas will select the next cell
         key_event_controller = Gtk.EventControllerKey()
         key_event_controller.connect('key-pressed', self.on_main_canvas_key_pressed)
         self.main_canvas.add_controller(key_event_controller)
 
+        scroll_event_controller = Gtk.EventControllerScroll()
+        scroll_event_controller.set_flags(Gtk.EventControllerScrollFlags.BOTH_AXES)
+        scroll_event_controller.connect('scroll', self.on_main_canvas_scrolled)
+        self.main_canvas.add_controller(scroll_event_controller)
+
         motion_event_controller = Gtk.EventControllerMotion()
         motion_event_controller.connect('enter', self.on_scrollbar_entered)
-        motion_event_controller.connect('leave', self.on_scrollbar_leaved)
+        motion_event_controller.connect('leave', self.on_scrollbar_left)
         self.vertical_scrollbar.add_controller(motion_event_controller)
 
         motion_event_controller = Gtk.EventControllerMotion()
         motion_event_controller.connect('enter', self.on_scrollbar_entered)
-        motion_event_controller.connect('leave', self.on_scrollbar_leaved)
+        motion_event_controller.connect('leave', self.on_scrollbar_left)
         self.horizontal_scrollbar.add_controller(motion_event_controller)
 
         if file is not None:
@@ -142,11 +149,11 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         and updates the selection accordingly. If the input is invalid, it resets the name box to
         the currently active cell's name.
 
-        The expected format for the input is either a single cell name (e.g., "A1") or a range of cells
-        (e.g., "A1:B2"). The input is case-insensitive and will be converted to uppercase.
+        The expected format for the input is either a single cell name (e.g. "A1") or a range of cells
+        (e.g. "A1:B2"). The input is case-insensitive and will be converted to uppercase.
 
-        If the input is valid, it updates the selection to the specified cell(s) and schedule the main canvas
-        to redraw.
+        If the input is valid, it updates the selection to the specified cell(s) and schedule the main
+        canvas to redraw.
 
         Args:
             widget: The Gtk.Widget that triggered the callback, typically the name box.
@@ -157,15 +164,14 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             return
 
         self.selection.set_selected_cells_by_name(widget.get_text())
-        self.main_canvas.queue_draw()
-
         widget.set_text(self.selection.get_active_cell_name().upper())
         widget.set_position(len(widget.get_text()))
         self.formula_bar.set_text(self.get_cell_data())
-        self.main_canvas.grab_focus()
 
-    def on_formula_bar_changed(self, widget: Gtk.Widget) -> None:
-        self.formula_bar.x_is_dirty = True
+        self.scroll_to_active_cell()
+        self.main_canvas.set_focusable(True)
+        self.main_canvas.grab_focus()
+        self.main_canvas.queue_draw()
 
     def on_name_box_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         """
@@ -173,10 +179,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
         This function selects all text in the name box and sets it to be focused for editing.
         """
-        widget = event.get_widget()
-        widget.select_region(0, len(widget.get_text()))
-        widget.get_first_child().set_focus_on_click(True)
-        widget.get_first_child().grab_focus()
+        self.name_box.select_region(0, len(self.name_box.get_text()))
+        self.name_box.get_first_child().set_focus_on_click(True)
+        self.name_box.get_first_child().grab_focus()
 
     def on_name_box_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         """
@@ -185,9 +190,16 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         This function sets the position of the cursor in the name box to the end of the text
         when it loses focus, allowing the user to continue editing from the end of the text.
         """
-        widget = event.get_widget()
-        widget.set_position(len(widget.get_text()))
-        widget.get_first_child().set_focus_on_click(False)
+        self.name_box.get_first_child().set_focus_on_click(False)
+
+    def on_name_box_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+        """Callback function for when a key is pressed on the name box."""
+        if keyval == Gdk.KEY_Tab:
+            self.on_name_box_activated(self.name_box)
+        elif keyval == Gdk.KEY_Escape:
+            self.name_box.set_text(self.selection.get_active_cell_name())
+            self.main_canvas.set_focusable(True)
+            self.main_canvas.grab_focus()
 
     @Gtk.Template.Callback()
     def on_formula_bar_activated(self, widget: Gtk.Widget, direction: Gtk.DirectionType = Gtk.DirectionType.DOWN) -> None:
@@ -211,16 +223,20 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.main_canvas.grab_focus()
         self.main_canvas.queue_draw()
 
-    def on_formula_bar_focused(self, event: Gtk.EventControllerFocus) -> None:
-        """Callback function for when the formula bar gains focus."""
-        self.formula_bar.x_text = self.formula_bar.get_text()
+    def on_formula_bar_changed(self, widget: Gtk.Widget) -> None:
+        self.formula_bar.x_is_dirty = True
 
     def on_formula_bar_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
         """Callback function for when a key is pressed on the formula bar."""
         if keyval == Gdk.KEY_Tab:
-            if not self.formula_bar.x_is_dirty or self.formula_bar.x_text == self.formula_bar.get_text():
+            if not self.formula_bar.x_is_dirty or self.get_cell_data() == self.formula_bar.get_text():
                 return
             self.on_formula_bar_activated(self.formula_bar, Gtk.DirectionType.RIGHT)
+        elif keyval == Gdk.KEY_Escape:
+            self.formula_bar.set_text(self.get_cell_data())
+            self.formula_bar.x_is_dirty = False
+            self.main_canvas.set_focusable(True)
+            self.main_canvas.grab_focus()
 
     def on_main_canvas_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         """
@@ -233,7 +249,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         """
         if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.CELL_DEFAULT_HEIGHT:
             return # TODO: implement clicking on the worksheet header
-        self.selection.set_active_cell_by_coordinate((x, y))
+        self.selection.set_active_cell_by_coordinate((x + self.display.scroll_horizontal_position, y + self.display.scroll_vertical_position))
         self.name_box.set_text(self.selection.get_active_cell_name())
         self.formula_bar.set_text(self.get_cell_data())
         self.selection.set_selected_cells(((self.selection.get_active_cell()), (self.selection.get_active_cell())))
@@ -259,7 +275,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         _, *start_coord = event.get_start_point()
         if start_coord[0] <= self.display.ROW_HEADER_WIDTH or start_coord[1] <= self.display.CELL_DEFAULT_HEIGHT:
             return # prevent from dragging the worksheet header cells
-        start_coord = tuple(start_coord)
+        start_coord = (start_coord[0] + self.display.scroll_horizontal_position, start_coord[1] + self.display.scroll_vertical_position)
         end_coord = (start_coord[0] + offset_x, start_coord[1] + offset_y)
         if (self.selection.get_opposite_active_cell() == self.selection.coordinate_to_index(end_coord)):
             return # skip redraw if the opposite active cell is being selected
@@ -277,6 +293,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         TODO: change the selection range when using arrow keys with modifiers
         """
         active_cell = self.selection.get_active_cell()
+
         match keyval:
             case Gdk.KEY_Tab | Gdk.KEY_ISO_Left_Tab:
                 if state == Gdk.ModifierType.SHIFT_MASK:
@@ -314,16 +331,37 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                     self.formula_bar.set_text('')
                     self.formula_bar.set_position(1)
                 return
+
         self.selection.set_selected_cells(((active_cell), (active_cell)))
         self.name_box.set_text(self.selection.get_active_cell_name())
         self.formula_bar.set_text(self.get_cell_data())
-        self.main_canvas.grab_focus()
+
+        self.scroll_to_active_cell()
         self.main_canvas.queue_draw()
 
+    def on_main_canvas_scrolled(self, event: Gtk.EventControllerScroll, dx: float, dy: float) -> bool:
+        """
+        Callback function for when the main canvas is scrolled.
+
+        This function updates the scroll positions based on the scroll offsets and modifier keys.
+        """
+        if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and dy != 0:
+            dx, dy = dy, 0
+        if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and dx != 0:
+            dy, dx = dx, 0
+        dx = int(dx * self.SCROLL_MULTIPLIER)
+        dy = int(dy * self.SCROLL_MULTIPLIER)
+        self.display.scroll_vertical_position = max(0, self.display.scroll_vertical_position + dy)
+        self.display.scroll_horizontal_position = max(0, self.display.scroll_horizontal_position + dx)
+        self.main_canvas.queue_draw()
+        return True
+
     def on_scrollbar_entered(self, event: Gtk.EventControllerMotion, x: float, y: float) -> None:
+        """Callback function for when the scrollbar is entered."""
         event.get_widget().add_css_class('hovering')
 
-    def on_scrollbar_leaved(self, event: Gtk.EventControllerMotion) -> None:
+    def on_scrollbar_left(self, event: Gtk.EventControllerMotion) -> None:
+        """Callback function for when the scrollbar is left."""
         event.get_widget().remove_css_class('hovering')
 
     def get_cell_data(self) -> str:
@@ -351,11 +389,19 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         Returns:
             bool: True if the cell data is successfully set, False otherwise.
         """
+        print_log(f"Updating cell data at index ({row}, {col}) to: {value}")
         df_shape = self.dbms.data_frame.shape
         if df_shape[0] <= row or df_shape[1] <= col:
+            print_log(f"Cannot update cell data at index ({row}, {col}) is out of bounds", Log.NOTICE)
             return False # TODO
         self.dbms.data_frame[row, col] = value
+        print_log(f"Cell data at index ({row}, {col}) is updated")
         return True
+
+    def scroll_to_active_cell(self) -> None:
+        viewport_height = self.main_canvas.get_height() - self.display.CELL_DEFAULT_HEIGHT
+        viewport_width = self.main_canvas.get_width() - self.display.ROW_HEADER_WIDTH
+        self.display.scroll_to_cell(self.selection.get_active_cell(), viewport_height, viewport_width)
 
     def load_file(self, file: Gio.File) -> None:
         """
