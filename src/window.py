@@ -154,9 +154,6 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
         If the input is valid, it updates the selection to the specified cell(s) and schedule the main
         canvas to redraw.
-
-        Args:
-            widget: The Gtk.Widget that triggered the callback, typically the name box.
         """
         if not re.fullmatch(r'([A-Za-z]+\d+):([A-Za-z]+\d+)|([A-Za-z]+\d+)', widget.get_text()):
             widget.set_text(self.selection.get_active_cell_name())
@@ -247,7 +244,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         the name of the active cell. It also updates the selection to include the active cell
         and schedules the main canvas to redraw.
         """
-        if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.CELL_DEFAULT_HEIGHT:
+        if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.COLUMN_HEADER_HEIGHT:
             return # TODO: implement clicking on the worksheet header
         self.selection.set_active_cell_by_coordinate((x + self.display.scroll_horizontal_position, y + self.display.scroll_vertical_position))
         self.name_box.set_text(self.selection.get_active_cell_name())
@@ -273,7 +270,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         It calculates the new selection range based on the initial click coordinates and the drag offsets.
         """
         _, *start_coord = event.get_start_point()
-        if start_coord[0] <= self.display.ROW_HEADER_WIDTH or start_coord[1] <= self.display.CELL_DEFAULT_HEIGHT:
+        if start_coord[0] <= self.display.ROW_HEADER_WIDTH or start_coord[1] <= self.display.COLUMN_HEADER_HEIGHT:
             return # prevent from dragging the worksheet header cells
         start_coord = (start_coord[0] + self.display.scroll_horizontal_position, start_coord[1] + self.display.scroll_vertical_position)
         end_coord = (start_coord[0] + offset_x, start_coord[1] + offset_y)
@@ -289,8 +286,6 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         This function defines the behavior when a key is pressed on the main canvas.
         It updates the active cell based on the pressed key and modifier keys.
         It also updates the selection to include the active cell and schedules the main canvas to redraw.
-
-        TODO: change the selection range when using arrow keys with modifiers
         """
         active_cell = self.selection.get_active_cell()
 
@@ -311,14 +306,20 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 else:
                     active_cell = (active_cell[0], max(0, active_cell[1] - 1))
             case Gdk.KEY_Right:
-                active_cell = (active_cell[0], active_cell[1] + 1)
+                if state == Gdk.ModifierType.CONTROL_MASK:
+                    active_cell = (active_cell[0], max(0, self.dbms.data_frame.shape[1] - 1))
+                else:
+                    active_cell = (active_cell[0], active_cell[1] + 1)
             case Gdk.KEY_Up:
                 if state == Gdk.ModifierType.CONTROL_MASK:
                     active_cell = (0, active_cell[1])
                 else:
                     active_cell = (max(0, active_cell[0] - 1), active_cell[1])
             case Gdk.KEY_Down:
-                active_cell = (active_cell[0] + 1, active_cell[1])
+                if state == Gdk.ModifierType.CONTROL_MASK:
+                    active_cell = (max(0, self.dbms.data_frame.shape[0] - 1), active_cell[1])
+                else:
+                    active_cell = (active_cell[0] + 1, active_cell[1])
             case _:
                 if state == Gdk.ModifierType.CONTROL_MASK:
                     return
@@ -345,9 +346,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
         This function updates the scroll positions based on the scroll offsets and modifier keys.
         """
-        if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and dy != 0:
+        if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dy > 0 or dy < 0):
             dx, dy = dy, 0
-        if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and dx != 0:
+        elif event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dx > 0 or dx < 0):
             dy, dx = dx, 0
         dx = int(dx * self.SCROLL_MULTIPLIER)
         dy = int(dy * self.SCROLL_MULTIPLIER)
@@ -389,17 +390,18 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         Returns:
             bool: True if the cell data is successfully set, False otherwise.
         """
-        print_log(f"Updating cell data at index ({row}, {col}) to: {value}")
+        print_log(f"Updating cell data at index ({format(row, ",d")}, {format(col, ",d")}) to: {value}")
         df_shape = self.dbms.data_frame.shape
         if df_shape[0] <= row or df_shape[1] <= col:
-            print_log(f"Cannot update cell data at index ({row}, {col}) is out of bounds", Log.NOTICE)
-            return False # TODO
+            print_log(f"Cannot update cell data at index ({format(row, ",d")}, {format(col, ",d")}) due to out of bounds", Log.NOTICE)
+            return False # TODO: implement dynamic data frame(?)
         self.dbms.data_frame[row, col] = value
-        print_log(f"Cell data at index ({row}, {col}) is updated")
+        print_log(f"Cell data at index ({format(row, ",d")}, {format(col, ",d")}) is updated")
         return True
 
     def scroll_to_active_cell(self) -> None:
-        viewport_height = self.main_canvas.get_height() - self.display.CELL_DEFAULT_HEIGHT
+        """Scroll the main canvas to the active cell."""
+        viewport_height = self.main_canvas.get_height() - self.display.COLUMN_HEADER_HEIGHT
         viewport_width = self.main_canvas.get_width() - self.display.ROW_HEADER_WIDTH
         self.display.scroll_to_cell(self.selection.get_active_cell(), viewport_height, viewport_width)
 
@@ -427,10 +429,19 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             Assigns the given file to the window's file attribute.
 
             This method is used inside a background thread to load and parse a file.
-            It assigns the file to the window's file attribute after the file has been
-            loaded and parsed successfully.
+            It assigns the file after the file has been loaded and parsed successfully.
             """
             self.dbms.file = file
+
+        def expand_column_header_height() -> None:
+            """
+            Expands the column header height to fit the header of the data frame.
+
+            This method is used inside a background thread to load and parse a file.
+            It expands the column header height after the file has been loaded and
+            parsed successfully.
+            """
+            self.display.COLUMN_HEADER_HEIGHT += self.display.CELL_DEFAULT_HEIGHT
 
         def load_file_thread() -> None:
             """
@@ -464,6 +475,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self.set_title, f'{file.get_basename()} – Eruo Data Studio')
                 GLib.idle_add(self.main_canvas.set_focusable, True)
                 GLib.idle_add(self.main_canvas.grab_focus)
+                GLib.idle_add(expand_column_header_height)
 
         threading.Thread(target=load_file_thread, daemon=True).start()
         print_log(f'Loading file {file.get_path()} in background...', Log.DEBUG)

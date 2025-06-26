@@ -25,6 +25,7 @@ class Display(GObject.Object):
     __gtype_name__ = 'Display'
 
     ROW_HEADER_WIDTH: int = 40
+    COLUMN_HEADER_HEIGHT: int = 20
     CELL_DEFAULT_HEIGHT: int = 20
     CELL_DEFAULT_WIDTH: int = 60
 
@@ -53,7 +54,7 @@ class Display(GObject.Object):
             viewport_height: The height of the viewport excluding the column header.
             viewport_width: The width of the viewport excluding the row header.
         """
-        print_log(f'Scrolling to the target cell at index {cell}...')
+        print_log(f'Scrolling to the target cell at index ({format(cell[0], ",d")}, {format(cell[1], ",d")})...')
 
         # Skip if the target cell is already visible
         if self.scroll_vertical_position < cell[0] * self.CELL_DEFAULT_HEIGHT + self.CELL_DEFAULT_HEIGHT < self.scroll_vertical_position + viewport_height and \

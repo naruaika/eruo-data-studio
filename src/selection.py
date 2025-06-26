@@ -291,6 +291,6 @@ class Selection(GObject.Object):
             A tuple containing the row and column indices of the cell.
         """
         x, y = coordinate
-        row = int((y - self._display.CELL_DEFAULT_HEIGHT) // self._display.CELL_DEFAULT_HEIGHT)
+        row = int((y - self._display.COLUMN_HEADER_HEIGHT) // self._display.CELL_DEFAULT_HEIGHT)
         col = int((x - self._display.ROW_HEADER_WIDTH) // self._display.CELL_DEFAULT_WIDTH)
         return (row, col)

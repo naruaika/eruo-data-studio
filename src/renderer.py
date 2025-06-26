@@ -91,13 +91,11 @@ class Renderer(GObject.Object):
             context.set_source_rgb(0.9, 0.9, 0.9)
 
         # Draw column header background
-        cell_height = self._display.CELL_DEFAULT_HEIGHT
-        context.rectangle(0, 0, width, cell_height)
+        context.rectangle(0, 0, width, self._display.COLUMN_HEADER_HEIGHT)
         context.fill()
 
         # Draw row header background
-        cell_width = self._display.ROW_HEADER_WIDTH
-        context.rectangle(0, cell_height, cell_width, height)
+        context.rectangle(0, self._display.COLUMN_HEADER_HEIGHT, self._display.ROW_HEADER_WIDTH, height)
         context.fill()
 
         # Get the selected cell range
@@ -110,22 +108,22 @@ class Renderer(GObject.Object):
 
         # Draw column headers background within the selected cell range
         context.save()
-        context.rectangle(self._display.ROW_HEADER_WIDTH, 0, width, self._display.CELL_DEFAULT_HEIGHT)
+        context.rectangle(self._display.ROW_HEADER_WIDTH, 0, width, self._display.COLUMN_HEADER_HEIGHT)
         context.clip()
         col_min, col_max = min(start_col, end_col), max(start_col, end_col)
         num_cols = col_max - col_min + 1
         x_start = self._display.ROW_HEADER_WIDTH + col_min * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
-        context.rectangle(x_start, 0, num_cols * self._display.CELL_DEFAULT_WIDTH, cell_height)
+        context.rectangle(x_start, 0, num_cols * self._display.CELL_DEFAULT_WIDTH, self._display.COLUMN_HEADER_HEIGHT)
         context.fill()
         context.restore()
 
         # Draw row headers background within the selected cell range
         context.save()
-        context.rectangle(0, self._display.CELL_DEFAULT_HEIGHT, self._display.ROW_HEADER_WIDTH, height)
+        context.rectangle(0, self._display.COLUMN_HEADER_HEIGHT, self._display.ROW_HEADER_WIDTH, height)
         context.clip()
         row_min, row_max = min(start_row, end_row), max(start_row, end_row)
         num_rows = row_max - row_min + 1
-        y_start = self._display.CELL_DEFAULT_HEIGHT + row_min * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
+        y_start = self._display.COLUMN_HEADER_HEIGHT + row_min * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
         context.rectangle(0, y_start, self._display.ROW_HEADER_WIDTH, num_rows * self._display.CELL_DEFAULT_HEIGHT)
         context.fill()
         context.restore()
@@ -149,7 +147,7 @@ class Renderer(GObject.Object):
         """
         context.save()
 
-        context.rectangle(self._display.ROW_HEADER_WIDTH, self._display.CELL_DEFAULT_HEIGHT, width, height)
+        context.rectangle(self._display.ROW_HEADER_WIDTH, self._display.COLUMN_HEADER_HEIGHT, width, height)
         context.clip()
 
         # Set the accent color with reduced opacity for selected column header
@@ -160,7 +158,7 @@ class Renderer(GObject.Object):
         # Calculate the position and size of the selection rectangle
         (start_row, start_col), (end_row, end_col) = self._selection.get_selected_cells()
         x_start = self._display.ROW_HEADER_WIDTH + min(start_col, end_col) * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
-        y_start = self._display.CELL_DEFAULT_HEIGHT + min(start_row, end_row) * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
+        y_start = self._display.COLUMN_HEADER_HEIGHT + min(start_row, end_row) * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
         width_sel = (abs(end_col - start_col) + 1) * self._display.CELL_DEFAULT_WIDTH
         height_sel = (abs(end_row - start_row) + 1) * self._display.CELL_DEFAULT_HEIGHT
 
@@ -176,7 +174,7 @@ class Renderer(GObject.Object):
         # Calculate the position and size of the active cell
         active_row, active_col = self._selection.get_active_cell()
         x = self._display.ROW_HEADER_WIDTH + active_col * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
-        y = self._display.CELL_DEFAULT_HEIGHT + active_row * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
+        y = self._display.COLUMN_HEADER_HEIGHT + active_row * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
         cell_width = self._display.CELL_DEFAULT_WIDTH
         cell_height = self._display.CELL_DEFAULT_HEIGHT
 
@@ -205,13 +203,21 @@ class Renderer(GObject.Object):
             context.set_source_rgb(0.25, 0.25, 0.25)
         else:
             context.set_source_rgb(0.75, 0.75, 0.75)
-        context.set_hairline(True)
 
         x_start = self._display.ROW_HEADER_WIDTH
-        y_start = self._display.CELL_DEFAULT_HEIGHT
+        y_start = self._display.COLUMN_HEADER_HEIGHT
         cell_width = self._display.CELL_DEFAULT_WIDTH
         cell_height = self._display.CELL_DEFAULT_HEIGHT
 
+        # Draw separator line between column header and the worksheet cells
+        context.move_to(0, y_start)
+        context.line_to(width, y_start)
+        context.move_to(x_start, 0)
+        context.line_to(x_start, height)
+        context.stroke()
+
+        # Draw vertical and horizontal lines
+        context.set_hairline(True)
         for y in range(y_start, height, cell_height):
             context.move_to(0, y)
             context.line_to(width, y)
@@ -219,6 +225,12 @@ class Renderer(GObject.Object):
             context.move_to(x, 0)
             context.line_to(x, height)
         context.stroke()
+
+        # Draw separator line between the worksheet column header and the data frame column header
+        if not self._dbms.data_frame.is_empty():
+            context.move_to(x_start, cell_height)
+            context.line_to(width, cell_height)
+            context.stroke()
 
         context.restore()
 
@@ -239,7 +251,7 @@ class Renderer(GObject.Object):
         """
         context.save()
 
-        context.rectangle(self._display.ROW_HEADER_WIDTH - 1, self._display.CELL_DEFAULT_HEIGHT - 1, width, height)
+        context.rectangle(self._display.ROW_HEADER_WIDTH - 1, self._display.COLUMN_HEADER_HEIGHT - 1, width, height)
         context.clip()
 
         context.set_source_rgba(*self._color_accent)
@@ -247,7 +259,7 @@ class Renderer(GObject.Object):
         # Calculate the position and size of the selection rectangle
         (start_row, start_col), (end_row, end_col) = self._selection.get_selected_cells()
         x_start = self._display.ROW_HEADER_WIDTH + min(start_col, end_col) * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
-        y_start = self._display.CELL_DEFAULT_HEIGHT + min(start_row, end_row) * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
+        y_start = self._display.COLUMN_HEADER_HEIGHT + min(start_row, end_row) * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
         width_sel = (abs(end_col - start_col) + 1) * self._display.CELL_DEFAULT_WIDTH
         height_sel = (abs(end_row - start_row) + 1) * self._display.CELL_DEFAULT_HEIGHT
 
@@ -255,16 +267,13 @@ class Renderer(GObject.Object):
         context.rectangle(x_start, y_start, width_sel, height_sel)
         context.stroke()
 
-        cell_width = self._display.ROW_HEADER_WIDTH
-        cell_height = self._display.CELL_DEFAULT_HEIGHT
-
         # Draw column header decoration
-        context.move_to(x_start, cell_height)
+        context.move_to(x_start, self._display.COLUMN_HEADER_HEIGHT)
         context.rel_line_to(width_sel, 0)
         context.stroke()
 
         # Draw row header decoration
-        context.move_to(cell_width, y_start)
+        context.move_to(self._display.ROW_HEADER_WIDTH, y_start)
         context.rel_line_to(0, height_sel)
         context.stroke()
 
@@ -288,6 +297,7 @@ class Renderer(GObject.Object):
         """
         context.save()
 
+        # Use monospace font family for drawing text
         context.select_font_face('Monospace', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         context.set_font_size(12)
 
@@ -301,7 +311,6 @@ class Renderer(GObject.Object):
         x_start = self._display.ROW_HEADER_WIDTH
         y_start = 0
         cell_width = self._display.CELL_DEFAULT_WIDTH
-        cell_height = self._display.CELL_DEFAULT_HEIGHT
 
         # Determine the starting column label based on the scroll position
         # TODO: I think this algorithm is not very efficient for large tables with thousands of columns,
@@ -322,8 +331,7 @@ class Renderer(GObject.Object):
             xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(cell_text)
             x = x + (cell_width - text_width) / 2 - xbearing
 
-            # If the current column header is within the selected cell range,
-            # use the current system accent color
+            # If the current column header is within the selected cell range, use the current system accent color
             if col_min <= col <= col_max:
                 context.set_source_rgb(*accent_color)
             else:
@@ -334,7 +342,7 @@ class Renderer(GObject.Object):
             cell_text = self.next_column_label(cell_text)
 
         x_start = 0
-        y_start = self._display.CELL_DEFAULT_HEIGHT
+        y_start = self._display.COLUMN_HEADER_HEIGHT
         cell_width = self._display.ROW_HEADER_WIDTH
         cell_height = self._display.CELL_DEFAULT_HEIGHT
 
@@ -346,8 +354,7 @@ class Renderer(GObject.Object):
             xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(cell_text))
             x = x_start + cell_width - text_width - xbearing - 6
 
-            # If the current row header is within the selected cell range,
-            # use the current system accent color
+            # If the current row header is within the selected cell range, use the current system accent color
             if row_min <= row <= row_max:
                 context.set_source_rgb(*accent_color)
             else:
@@ -356,6 +363,47 @@ class Renderer(GObject.Object):
             context.move_to(x, 14 + y)
             context.show_text(str(cell_text))
             cell_text += 1
+
+        # Use system default font family for drawing text
+        font_desc = Gtk.Widget.create_pango_context(area).get_font_description()
+        font_family = font_desc.get_family() if font_desc else 'Sans'
+        context.select_font_face(font_family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        context.set_font_size(12)
+
+        cell_width = self._display.CELL_DEFAULT_WIDTH
+        cell_height = self._display.CELL_DEFAULT_HEIGHT
+        horizontal_offset = self._display.scroll_horizontal_position
+        df_shape = self._dbms.data_frame.shape
+
+        # Draw data frame header texts (centered)
+        x = self._display.ROW_HEADER_WIDTH
+        while x < width:
+            col = (x - self._display.ROW_HEADER_WIDTH) // cell_width + horizontal_offset // cell_width
+            if df_shape[1] <= col:
+                width = x # prevent iteration over empty cells
+                break
+
+            context.save()
+            context.rectangle(x, self._display.CELL_DEFAULT_HEIGHT, cell_width, cell_height)
+            context.clip()
+
+            # Align text to the center, or back to the left if the column name is too long
+            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(self._dbms.data_frame.columns[col]))
+            if (text_width + 6 * 2) > cell_width:
+                context.move_to(6 + x, 14 + self._display.CELL_DEFAULT_HEIGHT)
+            else:
+                context.move_to(x + (cell_width - text_width) / 2 - xbearing, 14 + self._display.CELL_DEFAULT_HEIGHT)
+
+            # If the current column header is within the selected cell range, use the current system accent color
+            if col_min <= col <= col_max:
+                context.set_source_rgb(*accent_color)
+            else:
+                context.set_source_rgb(*text_color)
+
+            context.show_text(str(self._dbms.data_frame.columns[col]))
+            x += cell_width
+
+            context.restore()
 
         context.restore()
 
@@ -398,9 +446,9 @@ class Renderer(GObject.Object):
 
         x = self._display.ROW_HEADER_WIDTH
         while x < width:
-            y = cell_height
+            y = self._display.COLUMN_HEADER_HEIGHT
             while y < height:
-                row = (y - cell_height) // cell_height + vertical_offset // cell_height
+                row = (y - self._display.COLUMN_HEADER_HEIGHT) // cell_height + vertical_offset // cell_height
                 col = (x - self._display.ROW_HEADER_WIDTH) // cell_width + horizontal_offset // cell_width
                 if df_shape[0] <= row:
                     height = y # prevent iteration over empty cells
