@@ -468,25 +468,15 @@ class Renderer(GObject.Object):
 
         context.restore()
 
-    def draw(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
+    def setup_cairo_context(self, area: Gtk.DrawingArea, context: cairo.Context, height: int, width: int) -> None:
         """
-        Draws the main canvas by calling all the necessary draw methods.
-
-        The draw process starts by setting the style manager properties for the dark theme
-        and accent color. It then sets the font options to FAST antialiasing and disables
-        antialiasing for the context. The drawing process then proceeds in this order:
-        1. Backgrounds of row and column headers
-        2. Backgrounds of the selected cell range
-        3. Lines of the cells
-        4. Texts of the row and column headers
-        5. Texts of the cells
-        6. Border of the selected cell range
+        Sets up global Cairo context settings for drawing operations.
 
         Args:
-            area: The Gtk.DrawingArea where the drawing is done.
-            context: The Cairo context used for drawing.
-            width: The width of the drawing area.
+            area: The Gtk.DrawingArea where the drawing operations are performed.
+            context: The Cairo context used for drawing operations.
             height: The height of the drawing area.
+            width: The width of the drawing area.
         """
         self._prefer_dark = Adw.StyleManager().get_dark()
         self._color_accent = Adw.StyleManager().get_accent_color_rgba()
@@ -495,6 +485,42 @@ class Renderer(GObject.Object):
         context.set_font_options(font_options)
         context.set_antialias(cairo.Antialias.NONE)
 
+    def adjust_row_header_width(self, area: Gtk.DrawingArea, context: cairo.Context, height: int, width: int) -> None:
+        """
+        Adjusts the width of the row header to fit the maximum row number.
+
+        Args:
+            area: The Gtk.DrawingArea where the row header is drawn.
+            context: The Cairo context used for drawing operations.
+            height: The height of the drawing area.
+            width: The width of the drawing area.
+        """
+        context.save()
+        context.select_font_face('Monospace', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        context.set_font_size(12)
+        cell_height = self._display.CELL_DEFAULT_HEIGHT
+        y_start = self._display.COLUMN_HEADER_HEIGHT
+        max_row_number = (self._display.scroll_vertical_position // cell_height) + 1 + ((height - y_start) // cell_height)
+        text_metrics = context.text_extents(str(max_row_number))
+        self._display.ROW_HEADER_WIDTH = max(40, int(text_metrics[2] + 2 * 6 + 0.5))
+        context.restore()
+
+    def draw(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
+        """
+        Draws the main canvas by calling all the necessary draw methods.
+
+        The draw process starts by setting the style manager properties for the dark theme
+        and accent color. It then sets the font options to FAST antialiasing and disables
+        antialiasing for the context.
+
+        Args:
+            area: The Gtk.DrawingArea where the drawing is done.
+            context: The Cairo context used for drawing.
+            width: The width of the drawing area.
+            height: The height of the drawing area.
+        """
+        self.setup_cairo_context(area, context, width, height)
+        self.adjust_row_header_width(area, context, width, height)
         self.draw_headers_backgrounds(area, context, width, height)
         self.draw_selection_background(area, context, width, height)
         self.draw_cells_lines(area, context, width, height)
