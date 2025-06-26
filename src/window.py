@@ -17,14 +17,409 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from gi.repository import Adw
-from gi.repository import Gtk
+import polars
+import re
+import time
+import threading
 
-@Gtk.Template(resource_path='/com/macipra/Eruo/window.ui')
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+
+from .utils import Log, print_log
+from .dbms import DBMS
+from .display import Display
+from .renderer import Renderer
+from .selection import Selection
+
+@Gtk.Template(resource_path='/com/macipra/Eruo/gtk/window.ui')
 class EruoDataStudioWindow(Adw.ApplicationWindow):
     __gtype_name__ = 'EruoDataStudioWindow'
 
-    label = Gtk.Template.Child()
+    name_box: Gtk.Widget = Gtk.Template.Child()
+    formula_bar: Gtk.Widget = Gtk.Template.Child()
+    main_canvas: Gtk.Widget = Gtk.Template.Child()
+    vertical_scrollbar: Gtk.Widget = Gtk.Template.Child()
+    horizontal_scrollbar: Gtk.Widget = Gtk.Template.Child()
+    status_message: Gtk.Widget = Gtk.Template.Child()
 
-    def __init__(self, **kwargs):
+    dbms: DBMS
+    display: Display
+    selection: Selection
+    renderer: Renderer
+
+    def __init__(self, file: Gio.File | None = None, **kwargs) -> None:
+        """
+        Creates a new EruoDataStudioWindow.
+
+        The constructor takes an optional Gio.File argument, which if present,
+        initiates the loading and parsing of the file. The file is loaded
+        asynchronously using a background thread to keep the UI responsive.
+
+        Args:
+            file: An optional Gio.File object specifying the file to be loaded.
+        """
         super().__init__(**kwargs)
+
+        self.dbms = DBMS()
+        self.display = Display()
+        self.selection = Selection(self.display)
+        self.renderer = Renderer(self.display, self.selection, self.dbms)
+
+        self.formula_bar.connect('changed', self.on_formula_bar_changed)
+        self.formula_bar.x_text = ''
+        self.formula_bar.x_is_dirty = False
+
+        self.main_canvas.set_draw_func(self.renderer.draw)
+        self.main_canvas.set_focusable(True)
+        self.main_canvas.grab_focus()
+
+        # Setup the initial state of the selection and name box
+        self.selection.set_active_cell((0, 0))
+        self.selection.set_selected_cells(((0, 0), (0, 0)))
+        self.name_box.set_text(self.selection.index_to_name((0, 0)))
+
+        # Clicking the name box while not in focus will select all texts inside
+        # and make it focus for editing
+        self.name_box.get_first_child().set_focus_on_click(False)
+        click_event_controller = Gtk.GestureClick()
+        click_event_controller.connect('pressed', self.on_name_box_pressed)
+        self.name_box.add_controller(click_event_controller)
+        focus_event_controller = Gtk.EventControllerFocus()
+        focus_event_controller.connect('leave', self.on_name_box_unfocused)
+        self.name_box.add_controller(focus_event_controller)
+
+        # Pressing tab key while focusing on the formula bar will apply the new value
+        focus_event_controller = Gtk.EventControllerFocus()
+        focus_event_controller.connect('enter', self.on_formula_bar_focused)
+        self.formula_bar.add_controller(focus_event_controller)
+        key_event_controller = Gtk.EventControllerKey()
+        key_event_controller.connect('key-pressed', self.on_formula_bar_key_pressed)
+        self.formula_bar.add_controller(key_event_controller)
+
+        # Clicking the main canvas will select the cell at the clicked position
+        click_event_controller = Gtk.GestureClick()
+        click_event_controller.connect('pressed', self.on_main_canvas_pressed)
+        self.main_canvas.add_controller(click_event_controller)
+        focus_event_controller = Gtk.EventControllerFocus()
+        focus_event_controller.connect('leave', self.on_main_canvas_unfocused)
+        self.main_canvas.add_controller(focus_event_controller)
+
+        # Dragging the main canvas will select a range of cells
+        drag_event_controller = Gtk.GestureDrag()
+        drag_event_controller.connect('drag_update', self.on_main_canvas_drag_update)
+        self.main_canvas.add_controller(drag_event_controller)
+
+        # Pressing tab key while focusing on the main canvas will select the next cell
+        key_event_controller = Gtk.EventControllerKey()
+        key_event_controller.connect('key-pressed', self.on_main_canvas_key_pressed)
+        self.main_canvas.add_controller(key_event_controller)
+
+        motion_event_controller = Gtk.EventControllerMotion()
+        motion_event_controller.connect('enter', self.on_scrollbar_entered)
+        motion_event_controller.connect('leave', self.on_scrollbar_leaved)
+        self.vertical_scrollbar.add_controller(motion_event_controller)
+
+        motion_event_controller = Gtk.EventControllerMotion()
+        motion_event_controller.connect('enter', self.on_scrollbar_entered)
+        motion_event_controller.connect('leave', self.on_scrollbar_leaved)
+        self.horizontal_scrollbar.add_controller(motion_event_controller)
+
+        if file is not None:
+            self.load_file(file)
+
+    def do_focus(self, direction: Gtk.DirectionType) -> bool:
+        if self.main_canvas.has_focus():
+            # When focusing on the main canvas, pressing tab key will keep the focus
+            # on the main canvas
+            return False
+        return Gtk.Window.do_focus(self, direction)
+
+    @Gtk.Template.Callback()
+    def on_name_box_activated(self, widget: Gtk.Widget) -> None:
+        """
+        Callback function for when the name box is activated (e.g., when the user presses Enter).
+
+        This function validates the input in the name box to ensure it follows the expected format
+        and updates the selection accordingly. If the input is invalid, it resets the name box to
+        the currently active cell's name.
+
+        The expected format for the input is either a single cell name (e.g., "A1") or a range of cells
+        (e.g., "A1:B2"). The input is case-insensitive and will be converted to uppercase.
+
+        If the input is valid, it updates the selection to the specified cell(s) and schedule the main canvas
+        to redraw.
+
+        Args:
+            widget: The Gtk.Widget that triggered the callback, typically the name box.
+        """
+        if not re.fullmatch(r'([A-Za-z]+\d+):([A-Za-z]+\d+)|([A-Za-z]+\d+)', widget.get_text()):
+            widget.set_text(self.selection.get_active_cell_name())
+            widget.set_position(len(widget.get_text()))
+            return
+
+        self.selection.set_selected_cells_by_name(widget.get_text())
+        self.main_canvas.queue_draw()
+
+        widget.set_text(self.selection.get_active_cell_name().upper())
+        widget.set_position(len(widget.get_text()))
+        self.formula_bar.set_text(self.get_cell_data())
+        self.main_canvas.grab_focus()
+
+    def on_formula_bar_changed(self, widget: Gtk.Widget) -> None:
+        self.formula_bar.x_is_dirty = True
+
+    def on_name_box_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        """
+        Callback function for when the name box is pressed.
+
+        This function selects all text in the name box and sets it to be focused for editing.
+        """
+        widget = event.get_widget()
+        widget.select_region(0, len(widget.get_text()))
+        widget.get_first_child().set_focus_on_click(True)
+        widget.get_first_child().grab_focus()
+
+    def on_name_box_unfocused(self, event: Gtk.EventControllerFocus) -> None:
+        """
+        Callback function for when the name box loses focus.
+
+        This function sets the position of the cursor in the name box to the end of the text
+        when it loses focus, allowing the user to continue editing from the end of the text.
+        """
+        widget = event.get_widget()
+        widget.set_position(len(widget.get_text()))
+        widget.get_first_child().set_focus_on_click(False)
+
+    @Gtk.Template.Callback()
+    def on_formula_bar_activated(self, widget: Gtk.Widget, direction: Gtk.DirectionType = Gtk.DirectionType.DOWN) -> None:
+        """
+        Callback function for when the formula bar is activated (e.g., when the user presses Enter).
+
+        This function sets the data in the selected cell to the value in the formula bar,
+        advances the selection to the next cell, and redraws the main canvas.
+        """
+        row, col = self.selection.get_active_cell()
+        self.set_cell_data(row, col, widget.get_text())
+        if direction == Gtk.DirectionType.DOWN:
+            active_cell = (row + 1, col)
+        else:
+            active_cell = (row, col + 1)
+        self.selection.set_selected_cells(((active_cell), (active_cell)))
+        self.name_box.set_text(self.selection.get_active_cell_name())
+        self.formula_bar.set_text(self.get_cell_data())
+        self.formula_bar.x_is_dirty = False
+        self.main_canvas.set_focusable(True)
+        self.main_canvas.grab_focus()
+        self.main_canvas.queue_draw()
+
+    def on_formula_bar_focused(self, event: Gtk.EventControllerFocus) -> None:
+        """Callback function for when the formula bar gains focus."""
+        self.formula_bar.x_text = self.formula_bar.get_text()
+
+    def on_formula_bar_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+        """Callback function for when a key is pressed on the formula bar."""
+        if keyval == Gdk.KEY_Tab:
+            if not self.formula_bar.x_is_dirty or self.formula_bar.x_text == self.formula_bar.get_text():
+                return
+            self.on_formula_bar_activated(self.formula_bar, Gtk.DirectionType.RIGHT)
+
+    def on_main_canvas_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        """
+        Callback function for when the main canvas is pressed.
+
+        This function checks if the click coordinates are within the bounds of the main canvas.
+        It sets the active cell based on the clicked coordinates and updates the name box with
+        the name of the active cell. It also updates the selection to include the active cell
+        and schedules the main canvas to redraw.
+        """
+        if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.CELL_DEFAULT_HEIGHT:
+            return # TODO: implement clicking on the worksheet header
+        self.selection.set_active_cell_by_coordinate((x, y))
+        self.name_box.set_text(self.selection.get_active_cell_name())
+        self.formula_bar.set_text(self.get_cell_data())
+        self.selection.set_selected_cells(((self.selection.get_active_cell()), (self.selection.get_active_cell())))
+        self.main_canvas.set_focusable(True)
+        self.main_canvas.grab_focus()
+        self.main_canvas.queue_draw()
+
+    def on_main_canvas_unfocused(self, event: Gtk.EventControllerFocus) -> None:
+        """
+        Callback function for when the main canvas loses focus.
+
+        This function prevents the main canvas from being focused by keyboard navigation when it loses focus.
+        """
+        self.main_canvas.set_focusable(False)
+
+    def on_main_canvas_drag_update(self, event: Gtk.GestureDrag, offset_x: float, offset_y: float) -> None:
+        """
+        Callback function for when the main canvas is dragged.
+
+        This function updates the selection based on the drag offset from the initial click position.
+        It calculates the new selection range based on the initial click coordinates and the drag offsets.
+        """
+        _, *start_coord = event.get_start_point()
+        if start_coord[0] <= self.display.ROW_HEADER_WIDTH or start_coord[1] <= self.display.CELL_DEFAULT_HEIGHT:
+            return # prevent from dragging the worksheet header cells
+        start_coord = tuple(start_coord)
+        end_coord = (start_coord[0] + offset_x, start_coord[1] + offset_y)
+        if (self.selection.get_opposite_active_cell() == self.selection.coordinate_to_index(end_coord)):
+            return # skip redraw if the opposite active cell is being selected
+        self.selection.set_selected_cells_by_coordinates((start_coord, end_coord))
+        self.main_canvas.queue_draw()
+
+    def on_main_canvas_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+        """
+        Callback function for when a key is pressed on the main canvas.
+
+        This function defines the behavior when a key is pressed on the main canvas.
+        It updates the active cell based on the pressed key and modifier keys.
+        It also updates the selection to include the active cell and schedules the main canvas to redraw.
+
+        TODO: change the selection range when using arrow keys with modifiers
+        """
+        active_cell = self.selection.get_active_cell()
+        match keyval:
+            case Gdk.KEY_Tab | Gdk.KEY_ISO_Left_Tab:
+                if state == Gdk.ModifierType.SHIFT_MASK:
+                    active_cell = (active_cell[0], max(0, active_cell[1] - 1))
+                else:
+                    active_cell = (active_cell[0], active_cell[1] + 1)
+            case Gdk.KEY_Return:
+                if state == Gdk.ModifierType.SHIFT_MASK:
+                    active_cell = (max(0, active_cell[0] - 1), active_cell[1])
+                else:
+                    active_cell = (active_cell[0] + 1, active_cell[1])
+            case Gdk.KEY_Left:
+                if state == Gdk.ModifierType.CONTROL_MASK:
+                    active_cell = (active_cell[0], 0)
+                else:
+                    active_cell = (active_cell[0], max(0, active_cell[1] - 1))
+            case Gdk.KEY_Right:
+                active_cell = (active_cell[0], active_cell[1] + 1)
+            case Gdk.KEY_Up:
+                if state == Gdk.ModifierType.CONTROL_MASK:
+                    active_cell = (0, active_cell[1])
+                else:
+                    active_cell = (max(0, active_cell[0] - 1), active_cell[1])
+            case Gdk.KEY_Down:
+                active_cell = (active_cell[0] + 1, active_cell[1])
+            case _:
+                if state == Gdk.ModifierType.CONTROL_MASK:
+                    return
+                if Gdk.KEY_space <= keyval <= Gdk.KEY_asciitilde:
+                    self.formula_bar.grab_focus()
+                    self.formula_bar.set_text(chr(keyval))
+                    self.formula_bar.set_position(1)
+                elif keyval == Gdk.KEY_BackSpace:
+                    self.formula_bar.grab_focus()
+                    self.formula_bar.set_text('')
+                    self.formula_bar.set_position(1)
+                return
+        self.selection.set_selected_cells(((active_cell), (active_cell)))
+        self.name_box.set_text(self.selection.get_active_cell_name())
+        self.formula_bar.set_text(self.get_cell_data())
+        self.main_canvas.grab_focus()
+        self.main_canvas.queue_draw()
+
+    def on_scrollbar_entered(self, event: Gtk.EventControllerMotion, x: float, y: float) -> None:
+        event.get_widget().add_css_class('hovering')
+
+    def on_scrollbar_leaved(self, event: Gtk.EventControllerMotion) -> None:
+        event.get_widget().remove_css_class('hovering')
+
+    def get_cell_data(self) -> str:
+        """
+        Retrieve the data from the selected cell.
+
+        Returns:
+            str: The data from the selected cell, or an empty string if the selected cell is out of bounds.
+        """
+        df_shape = self.dbms.data_frame.shape
+        row, col = self.selection.get_active_cell()
+        if df_shape[0] <= row or df_shape[1] <= col:
+            return ""
+        return str(self.dbms.data_frame[row, col])
+
+    def set_cell_data(self, row: int, col: int, value: any) -> bool:
+        """
+        Set the data in the selected cell.
+
+        Args:
+            row: The row index of the cell.
+            col: The column index of the cell.
+            value: The value to be set in the cell.
+
+        Returns:
+            bool: True if the cell data is successfully set, False otherwise.
+        """
+        df_shape = self.dbms.data_frame.shape
+        if df_shape[0] <= row or df_shape[1] <= col:
+            return False # TODO
+        self.dbms.data_frame[row, col] = value
+        return True
+
+    def load_file(self, file: Gio.File) -> None:
+        """
+        Load a file asynchronously using a background thread.
+
+        This method initiates the loading and parsing of a CSV file specified
+        by the 'file' argument. It provides real-time feedback by updating the
+        status message while the file is being processed. The actual parsing
+        is done in a separate thread to keep the UI responsive, and upon
+        successful parsing, the resulting DataFrame is stored in data_frame.
+        The method also handles any exceptions during the process and logs
+        relevant information and errors.
+
+        TODO: Implement data selection feature before loading the entire file.
+              See https://docs.pola.rs/api/python/stable/reference/api/polars.scan_csv.html
+        TODO: Handle parsing errors, e.g. if some rows are not complete or consistent
+
+        Args:
+            file: A Gio.File object representing the file to be loaded.
+        """
+        def assign_file() -> None:
+            """
+            Assigns the given file to the window's file attribute.
+
+            This method is used inside a background thread to load and parse a file.
+            It assigns the file to the window's file attribute after the file has been
+            loaded and parsed successfully.
+            """
+            self.dbms.file = file
+
+        def load_file_thread() -> None:
+            """
+            A background thread to load and parse a file.
+
+            This method is responsible for loading a CSV file specified by the
+            'file' argument in a separate thread, providing real-time feedback by
+            updating the status message while the file is being processed. The
+            actual parsing is done in a separate thread to keep the UI responsive,
+            and upon successful parsing, the resulting DataFrame is stored in
+            dbms.data_frame. The method also handles any exceptions during the
+            process and logs relevant information and errors.
+            """
+            try:
+                start_time = time.time()
+                self.dbms.data_frame = polars.read_csv(file.get_path())
+                end_time = time.time()
+                file_size = file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, None).get_size() / (1024 * 1024)
+                print_log(f'Loaded and parsed file {file.get_path()} of size {format(file_size, ",.2f")} MB in {end_time - start_time:.6f} seconds')
+                print_log(f'Quick preview of the file: {self.dbms.data_frame.head()}', Log.DEBUG)
+            except Exception as e:
+                print_log(f'Failed to load file: {e}', Log.WARNING)
+
+            if self.dbms.data_frame.is_empty():
+                GLib.idle_add(self.status_message.set_text, 'We\'re sorry, we couldn\'t load your workbook.')
+            else:
+                frame_shape = f'({format(self.dbms.data_frame.shape[0], ",d")}, {format(self.dbms.data_frame.shape[1], ",d")})'
+                GLib.idle_add(self.status_message.set_text, f'File: {file.get_basename()} | Size: {format(file_size, ",.2f")} MB | Shape: {frame_shape}')
+                GLib.idle_add(self.formula_bar.set_text, self.get_cell_data())
+                GLib.idle_add(self.main_canvas.queue_draw)
+                GLib.idle_add(self.set_title, f'{file.get_basename()} – Eruo Data Studio')
+                GLib.idle_add(self.main_canvas.set_focusable, True)
+                GLib.idle_add(self.main_canvas.grab_focus)
+
+        threading.Thread(target=load_file_thread, daemon=True).start()
+        print_log(f'Loading file {file.get_path()} in background...', Log.DEBUG)
+        GLib.idle_add(self.status_message.set_text, 'Loading your workbook...')
+        GLib.idle_add(assign_file)

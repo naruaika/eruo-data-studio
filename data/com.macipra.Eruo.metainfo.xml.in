@@ -4,14 +4,14 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
 
-  <name>Eruo-data-studio</name>
+  <name>Eruo Data Studio</name>
   <summary>Keep the summary shorter, between 10 and 35 characters</summary>
   <description>
     <p>No description</p>
   </description>
 
   <developer id="tld.vendor">
-    <name>Developer name</name>
+    <name>Naufan Rusyda Faikar</name>
   </developer>
 
   <!-- Required: Should be a link to the upstream homepage for the component -->

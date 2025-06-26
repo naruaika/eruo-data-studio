@@ -28,6 +28,13 @@ configure_file(
 
 eruo_data_studio_sources = [
   '__init__.py',
+  'utils.py',
+
+  'dbms.py',
+  'display.py',
+  'renderer.py',
+  'selection.py',
+
   'main.py',
   'window.py',
 ]

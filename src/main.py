@@ -17,62 +17,185 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import sys
 import gi
+import sys
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 
-from gi.repository import Gtk, Gio, Adw
-from .window import EruoDataStudioWindow
+from gi.repository import Adw, Gio, Gtk
 
+from .utils import Log, print_log
+from .window import EruoDataStudioWindow
 
 class EruoDataStudioApplication(Adw.Application):
     """The main application singleton class."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """
+        Creates a new EruoDataStudioApplication.
+
+        Sets up the application's unique ID and resource base path,
+        and creates several actions that can be activated by the user.
+        """
         super().__init__(application_id='com.macipra.Eruo',
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
                          resource_base_path='/com/macipra/Eruo')
-        self.create_action('quit', lambda *_: self.quit(), ['<primary>q'])
+
+        print_log('Registering application actions...', Log.DEBUG)
+        self.create_action('quit', self.on_quit_action, ['<primary>q'])
         self.create_action('about', self.on_about_action)
-        self.create_action('preferences', self.on_preferences_action)
+        self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
+        self.create_action('open-file', self.on_open_file_action, ['<primary>o'])
 
-    def do_activate(self):
-        """Called when the application is activated.
-
-        We raise the application's main window, creating it if
-        necessary.
+    def do_activate(self) -> None:
         """
-        win = self.props.active_window
-        if not win:
-            win = EruoDataStudioWindow(application=self)
-        win.present()
+        Activates the application.
 
-    def on_about_action(self, *args):
-        """Callback for the app.about action."""
-        about = Adw.AboutDialog(application_name='eruo-data-studio',
-                                application_icon='com.macipra.Eruo',
-                                developer_name='Naufan Rusyda Faikar',
-                                version='0.1.0',
-                                developers=['Naufan Rusyda Faikar'],
-                                copyright='© 2025 Naufan Rusyda Faikar')
+        This method is called when the application is activated,
+        e.g. when the user clicks on its desktop icon or searches for it
+        in their application launcher.
+
+        The method opens a new window if none is already open.
+        """
+        self.open_new_window(None)
+
+    def on_quit_action(self, *args) -> None:
+        """
+        Closes the currently active window.
+
+        This method is activated when the user uses the "Quit" action,
+        usually by clicking on the "Quit" menu item or pressing the
+        shortcut key combination Ctrl+Q.
+        """
+        self.get_active_window().close()
+
+    def on_about_action(self, *args) -> None:
+        """
+        Shows the about dialog for the application.
+
+        This method is activated when the user uses the "About" action,
+        usually by clicking on the "About" menu item or pressing the
+        shortcut key combination Ctrl+?. The about dialog shows the
+        name, icon, version, and copyright information of the application,
+        as well as a list of developers and translators.
+        """
+        dialog = Adw.AboutDialog(application_name='Eruo Data Studio',
+                                 application_icon='com.macipra.Eruo',
+                                 developer_name='Naufan Rusyda Faikar',
+                                 version='0.1.0',
+                                 developers=['Naufan Rusyda Faikar'],
+                                 copyright='© 2025 Naufan Rusyda Faikar')
         # Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
-        about.set_translator_credits(_('translator-credits'))
-        about.present(self.props.active_window)
+        dialog.set_translator_credits(_('translator-credits'))
+        dialog.present(self.get_active_window())
 
-    def on_preferences_action(self, widget, _):
-        """Callback for the app.preferences action."""
-        print('app.preferences action activated')
+    def on_open_file_action(self, *args) -> None:
+        """
+        Opens a file dialog for the user to select a file to open.
 
-    def create_action(self, name, callback, shortcuts=None):
-        """Add an application action.
+        This method presents a file dialog to the user, allowing them to
+        select a file to be opened in the application window. The dialog
+        filters files to show only text and CSV files by default, although
+        all files can be displayed with the "All Files" option. This method
+        is triggered by the "open-file" action and utilizes a callback to
+        handle the dialog dismissal.
 
         Args:
-            name: the name of the action
-            callback: the function to be called when the action is
-              activated
-            shortcuts: an optional list of accelerators
+            *args: Variable length argument list. Currently unused.
+
+        Note:
+            At the moment, only text and CSV files are supported.
+        """
+        FILTER_TXT = Gtk.FileFilter()
+        FILTER_TXT.set_name(name='Text Files')
+        FILTER_TXT.add_pattern(pattern='*.txt')
+        FILTER_TXT.add_pattern(pattern='*.csv')
+        FILTER_TXT.add_mime_type(mime_type='text/plain')
+        FILTER_TXT.add_mime_type(mime_type='text/csv')
+
+        FILTER_ALL = Gtk.FileFilter()
+        FILTER_ALL.set_name(name='All Files')
+        FILTER_ALL.add_pattern(pattern='*')
+
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(item=FILTER_TXT)
+        filters.append(item=FILTER_ALL)
+
+        dialog = Gtk.FileDialog.new()
+        dialog.set_title(title='Open File')
+        dialog.set_modal(True)
+        dialog.set_filters(filters)
+
+        print_log('Opening a file dialog...', Log.DEBUG)
+        dialog.open(parent=self.get_active_window(), callback=self.on_file_dialog_dismissed)
+
+    def on_file_dialog_dismissed(self, dialog: Gtk.FileDialog, response: Gio.Task) -> None:
+        """
+        Handles the dismissal of the file dialog and processes the selected file.
+
+        This method is invoked when the file dialog is dismissed. It attempts to
+        retrieve the file selected by the user. If the file is successfully located,
+        it checks if the file is already open in any existing window. If the file is
+        already open, it brings that window to the foreground. Otherwise, it opens
+        the file in a new window. Logs relevant status messages during the process.
+
+        Args:
+            dialog: The Gtk.FileDialog that was dismissed.
+            response: The Gio.Task containing the result of the dialog operation.
+        """
+        def finish() -> None:
+            print_log('File dialog dismissed', Log.DEBUG)
+
+        file = None
+        try:
+            print_log('Trying to locate file...', Log.DEBUG)
+            file = dialog.open_finish(response)
+            print_log(f'Located file {file.get_path()}')
+        except Exception as e:
+            print_log(f'Failed to locate file: {e}', Log.WARNING)
+
+        if file is None:
+            finish()
+            return
+
+        for window in self.get_windows():
+            if window.dbms.file and window.dbms.file.get_path() == file.get_path():
+                print_log('File is already open in a window', Log.DEBUG)
+                window.present()
+                finish()
+                return
+
+        self.open_new_window(file)
+        finish()
+
+    def on_preferences_action(self, *args) -> None:
+        """
+        Opens the preferences dialog for the application.
+
+        This method is triggered when the user selects the "Preferences"
+        action, typically through a menu item or a keyboard shortcut.
+        It is intended to present a dialog or window where users can
+        configure application-specific settings.
+
+        Args:
+            *args: Variable length argument list. Currently unused.
+        """
+        raise NotImplementedError # TODO
+
+    def create_action(self, name: str, callback: callable, shortcuts: list | None = None) -> None:
+        """
+        Creates an action for the application.
+
+        This method creates a new action with the given name, connects the
+        given callback to the action's activate signal, and adds the action
+        to the application. If shortcuts are provided, the action is also
+        associated with the given shortcuts.
+
+        Args:
+            name: The name of the action to create.
+            callback: The callback to connect to the action's activate signal.
+            shortcuts: An optional list of shortcuts to associate with the action.
         """
         action = Gio.SimpleAction.new(name, None)
         action.connect("activate", callback)
@@ -80,6 +203,25 @@ class EruoDataStudioApplication(Adw.Application):
         if shortcuts:
             self.set_accels_for_action(f"app.{name}", shortcuts)
 
+    def open_new_window(self, file: Gio.File | None) -> None:
+        """
+        Opens a new window for the application.
+
+        This method opens a new window for the application, loading the given file
+        if specified. If the application already has a window with no associated
+        file, it will be reused instead of opening a new window.
+
+        Args:
+            file: An optional Gio.File object to load into the new window.
+        """
+        window = self.get_active_window()
+        if window and not window.dbms.file:
+            print_log('Reusing the active window...', Log.DEBUG)
+            window.load_file(file)
+            return
+
+        print_log(f'Opening a new window...', Log.DEBUG)
+        EruoDataStudioWindow(application=self, file=file).present()
 
 def main(version):
     """The application's entry point."""

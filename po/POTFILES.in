@@ -3,6 +3,6 @@
 data/com.macipra.Eruo.desktop.in
 data/com.macipra.Eruo.metainfo.xml.in
 data/com.macipra.Eruo.gschema.xml
+src/gtk/window.ui
 src/main.py
 src/window.py
-src/window.ui
