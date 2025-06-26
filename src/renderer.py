@@ -383,6 +383,12 @@ class Renderer(GObject.Object):
                 width = x # prevent iteration over empty cells
                 break
 
+            # If the current column header is within the selected cell range, use the current system accent color
+            if col_min <= (col - horizontal_offset // cell_width) <= col_max:
+                context.set_source_rgb(*accent_color)
+            else:
+                context.set_source_rgb(*text_color)
+
             context.save()
             context.rectangle(x, self._display.CELL_DEFAULT_HEIGHT, cell_width, cell_height)
             context.clip()
@@ -394,16 +400,9 @@ class Renderer(GObject.Object):
             else:
                 context.move_to(x + (cell_width - text_width) / 2 - xbearing, 14 + self._display.CELL_DEFAULT_HEIGHT)
 
-            # If the current column header is within the selected cell range, use the current system accent color
-            if col_min <= col <= col_max:
-                context.set_source_rgb(*accent_color)
-            else:
-                context.set_source_rgb(*text_color)
-
             context.show_text(str(self._dbms.data_frame.columns[col]))
-            x += cell_width
-
             context.restore()
+            x += cell_width
 
         context.restore()
 
