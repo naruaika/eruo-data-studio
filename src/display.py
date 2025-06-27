@@ -27,7 +27,7 @@ class Display(GObject.Object):
     ROW_HEADER_WIDTH: int = 40
     COLUMN_HEADER_HEIGHT: int = 20
     CELL_DEFAULT_HEIGHT: int = 20
-    CELL_DEFAULT_WIDTH: int = 60
+    CELL_DEFAULT_WIDTH: int = 65
 
     scroll_vertical_position: int = 0
     scroll_horizontal_position: int = 0

@@ -34,7 +34,8 @@ from .selection import Selection
 class EruoDataStudioWindow(Adw.ApplicationWindow):
     __gtype_name__ = 'EruoDataStudioWindow'
 
-    SCROLL_MULTIPLIER: float = 60
+    SCROLL_X_MULTIPLIER: int = 20
+    SCROLL_Y_MULTIPLIER: int = 20
 
     name_box: Gtk.Widget = Gtk.Template.Child()
     formula_bar: Gtk.Widget = Gtk.Template.Child()
@@ -66,7 +67,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.selection = Selection(self.display)
         self.renderer = Renderer(self.display, self.selection, self.dbms)
 
-        self.SCROLL_MULTIPLIER = 3.0 * self.display.CELL_DEFAULT_HEIGHT
+        self.SCROLL_X_MULTIPLIER = 1 * self.display.CELL_DEFAULT_WIDTH
+        self.SCROLL_Y_MULTIPLIER = 3 * self.display.CELL_DEFAULT_HEIGHT
 
         self.formula_bar.connect('changed', self.on_formula_bar_changed)
         self.formula_bar.x_is_dirty = False
@@ -350,8 +352,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             dx, dy = dy, 0
         elif event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dx > 0 or dx < 0):
             dy, dx = dx, 0
-        dx = int(dx * self.SCROLL_MULTIPLIER)
-        dy = int(dy * self.SCROLL_MULTIPLIER)
+        dx = int(dx * self.SCROLL_X_MULTIPLIER)
+        dy = int(dy * self.SCROLL_Y_MULTIPLIER)
         self.display.scroll_vertical_position = max(0, self.display.scroll_vertical_position + dy)
         self.display.scroll_horizontal_position = max(0, self.display.scroll_horizontal_position + dx)
         self.main_canvas.queue_draw()
@@ -441,7 +443,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             It expands the column header height after the file has been loaded and
             parsed successfully.
             """
-            self.display.COLUMN_HEADER_HEIGHT += self.display.CELL_DEFAULT_HEIGHT
+            self.display.COLUMN_HEADER_HEIGHT += self.display.CELL_DEFAULT_HEIGHT * 2
 
         def load_file_thread() -> None:
             """

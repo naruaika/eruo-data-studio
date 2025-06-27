@@ -390,17 +390,24 @@ class Renderer(GObject.Object):
                 context.set_source_rgb(*text_color)
 
             context.save()
-            context.rectangle(x, self._display.CELL_DEFAULT_HEIGHT, cell_width, cell_height)
+            context.rectangle(x, cell_height, cell_width, cell_height * 2)
             context.clip()
 
             # Align text to the center, or back to the left if the column name is too long
             xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(self._dbms.data_frame.columns[col]))
             if (text_width + 6 * 2) > cell_width:
-                context.move_to(6 + x, 14 + self._display.CELL_DEFAULT_HEIGHT)
+                context.move_to(6 + x, 14 + self._display.CELL_DEFAULT_HEIGHT + 2)
             else:
-                context.move_to(x + (cell_width - text_width) / 2 - xbearing, 14 + self._display.CELL_DEFAULT_HEIGHT)
-
+                context.move_to(x + (cell_width - text_width) / 2 - xbearing, 14 + self._display.CELL_DEFAULT_HEIGHT + 2)
             context.show_text(str(self._dbms.data_frame.columns[col]))
+
+            # Always align text to the center for the column data type
+            context.select_font_face(font_family, cairo.FONT_SLANT_ITALIC, cairo.FONT_WEIGHT_NORMAL)
+            context.set_font_size(11)
+            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(self._dbms.data_frame.dtypes[col]))
+            context.move_to(x + (cell_width - text_width) / 2 - xbearing, 14 + self._display.CELL_DEFAULT_HEIGHT * 2 - 2)
+            context.show_text(str(self._dbms.data_frame.dtypes[col]))
+
             context.restore()
             x += cell_width
 
