@@ -17,6 +17,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import polars
+
 from gi.repository import GObject
 
 from .utils import print_log, Log
@@ -28,9 +30,14 @@ class Display(GObject.Object):
     COLUMN_HEADER_HEIGHT: int = 20
     CELL_DEFAULT_HEIGHT: int = 20
     CELL_DEFAULT_WIDTH: int = 65
+    CELL_DEFAULT_PADDING: int = 6
+    ICON_DEFAULT_SIZE: int = 16
 
     scroll_vertical_position: int = 0
     scroll_horizontal_position: int = 0
+
+    column_widths: polars.Series = polars.Series()
+    cumulative_column_widths: polars.Series = polars.Series()
 
     def __init__(self) -> None:
         """
@@ -56,24 +63,85 @@ class Display(GObject.Object):
         """
         print_log(f'Scrolling to the target cell at index ({format(cell[0], ",d")}, {format(cell[1], ",d")})...')
 
+        bottom_offset = (cell[0] + 1) * self.CELL_DEFAULT_HEIGHT
+        top_offset = cell[0] * self.CELL_DEFAULT_HEIGHT
+        right_offset = (cell[1] + 1) * self.CELL_DEFAULT_WIDTH
+        left_offset = cell[1] * self.CELL_DEFAULT_WIDTH
+
+        if not self.cumulative_column_widths.is_empty():
+            right_offset = self.get_column_position(cell[1] + 1)
+            left_offset = self.get_column_position(cell[1])
+
         # Skip if the target cell is already visible
-        if self.scroll_vertical_position < cell[0] * self.CELL_DEFAULT_HEIGHT + self.CELL_DEFAULT_HEIGHT < self.scroll_vertical_position + viewport_height and \
-                self.scroll_horizontal_position < cell[1] * self.CELL_DEFAULT_WIDTH + self.CELL_DEFAULT_WIDTH < self.scroll_horizontal_position + viewport_width:
+        if self.scroll_vertical_position < top_offset and bottom_offset < self.scroll_vertical_position + viewport_height and \
+                self.scroll_horizontal_position < left_offset and right_offset < self.scroll_horizontal_position + viewport_width:
             print_log('Target cell is already visible in the viewport', Log.DEBUG)
             return
 
         # Scroll down when the target cell is below the viewport so that the target cell is near the bottom of the viewport
-        if cell[0] * self.CELL_DEFAULT_HEIGHT + self.CELL_DEFAULT_HEIGHT > self.scroll_vertical_position + viewport_height:
-            self.scroll_vertical_position = cell[0] * self.CELL_DEFAULT_HEIGHT - (viewport_height - (viewport_height % self.CELL_DEFAULT_HEIGHT)) + self.CELL_DEFAULT_HEIGHT
+        if bottom_offset > self.scroll_vertical_position + viewport_height:
+            self.scroll_vertical_position = top_offset - (viewport_height - (viewport_height % self.CELL_DEFAULT_HEIGHT)) + self.CELL_DEFAULT_HEIGHT
 
         # Scroll up when the target cell is above the viewport so that the target cell is exactly at the top of the viewport
-        if cell[0] * self.CELL_DEFAULT_HEIGHT < self.scroll_vertical_position:
-            self.scroll_vertical_position = cell[0] * self.CELL_DEFAULT_HEIGHT
+        if top_offset < self.scroll_vertical_position:
+            self.scroll_vertical_position = top_offset
 
         # Scroll to the right when the target cell is to the right of the viewport so that the target cell is near the right of the viewport
-        if cell[1] * self.CELL_DEFAULT_WIDTH + self.CELL_DEFAULT_WIDTH > self.scroll_horizontal_position + viewport_width:
-            self.scroll_horizontal_position = cell[1] * self.CELL_DEFAULT_WIDTH - (viewport_width - (viewport_width % self.CELL_DEFAULT_WIDTH)) + self.CELL_DEFAULT_WIDTH
+        if right_offset > self.scroll_horizontal_position + viewport_width:
+            self.scroll_horizontal_position = left_offset - (viewport_width - (viewport_width % self.CELL_DEFAULT_WIDTH)) + self.get_column_width(cell[1])
 
         # Scroll to the left when the target cell is to the left of the viewport so that the target cell is exactly at the left of the viewport
-        if cell[1] * self.CELL_DEFAULT_WIDTH < self.scroll_horizontal_position:
-            self.scroll_horizontal_position = cell[1] * self.CELL_DEFAULT_WIDTH
+        if left_offset < self.scroll_horizontal_position:
+            self.scroll_horizontal_position = left_offset
+
+    def get_column_position(self, col_index) -> int:
+        """Calculates the x-coordinate for the start of a given column."""
+        if col_index == 0:
+            return 0
+        elif col_index < self.cumulative_column_widths.shape[0]:
+            return self.cumulative_column_widths[col_index - 1]
+        else:
+            return self.cumulative_column_widths[-1] + (col_index - self.cumulative_column_widths.shape[0]) * self.CELL_DEFAULT_WIDTH
+
+    def get_column_width(self, col_index) -> int:
+        """Retrieves the width of a single column."""
+        if col_index < self.column_widths.shape[0]:
+            return self.column_widths[col_index]
+        else:
+            return self.CELL_DEFAULT_WIDTH
+
+    def coordinate_to_column(self, x: int) -> int:
+        """
+        Returns the index of the column at the specified x-coordinate.
+
+        Args:
+            x: The x-coordinate of the column.
+
+        Returns:
+            int: The index of the column at the specified x-coordinate.
+        """
+        if self.cumulative_column_widths.is_empty():
+            return x // self.CELL_DEFAULT_WIDTH
+
+        if x >= self.cumulative_column_widths[-1]:
+            return len(self.cumulative_column_widths) + (x - self.cumulative_column_widths[-1]) // self.CELL_DEFAULT_WIDTH
+
+        return self.cumulative_column_widths.search_sorted(x, 'left')
+
+    def coordinate_to_index(self, coordinate: tuple[float, float]) -> tuple[int, int]:
+        """
+        Converts a coordinate to its corresponding row and column indices.
+
+        The coordinate is expected to be in the format (x, y), where x is the horizontal position
+        and y is the vertical position relative to the display's cell dimensions.
+
+        Args:
+            coordinate: A tuple containing the x and y coordinates of the cell.
+
+        Returns:
+            A tuple containing the row and column indices of the cell.
+        """
+        x, y = coordinate
+        row = int((y - self.COLUMN_HEADER_HEIGHT) // self.CELL_DEFAULT_HEIGHT)
+        col = self.coordinate_to_column(int(x) - self.ROW_HEADER_WIDTH)
+        return (row, col)

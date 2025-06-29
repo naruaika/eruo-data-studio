@@ -17,10 +17,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+
+import cairo
 import polars
 import re
-import time
 import threading
+import time
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
@@ -276,7 +278,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             return # prevent from dragging the worksheet header cells
         start_coord = (start_coord[0] + self.display.scroll_horizontal_position, start_coord[1] + self.display.scroll_vertical_position)
         end_coord = (start_coord[0] + offset_x, start_coord[1] + offset_y)
-        if (self.selection.get_opposite_active_cell() == self.selection.coordinate_to_index(end_coord)):
+        if (self.selection.get_opposite_active_cell() == self.display.coordinate_to_index(end_coord)):
             return # skip redraw if the opposite active cell is being selected
         self.selection.set_selected_cells_by_coordinates((start_coord, end_coord))
         self.main_canvas.queue_draw()
@@ -427,23 +429,47 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             file: A Gio.File object representing the file to be loaded.
         """
         def assign_file() -> None:
-            """
-            Assigns the given file to the window's file attribute.
-
-            This method is used inside a background thread to load and parse a file.
-            It assigns the file after the file has been loaded and parsed successfully.
-            """
+            """Assigns the given file to the window's file attribute."""
             self.dbms.file = file
 
-        def expand_column_header_height() -> None:
-            """
-            Expands the column header height to fit the header of the data frame.
+        def update_ui() -> None:
+            """Updates the UI to reflect the loaded file."""
+            GLib.idle_add(self.set_title, f'{file.get_basename()} – Eruo Data Studio')
+            GLib.idle_add(self.formula_bar.set_text, self.get_cell_data())
+            file_size = file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, None).get_size() / (1024 * 1024)
+            GLib.idle_add(self.status_message.set_text, f'File: {file.get_basename()} | Size: {format(file_size, ",.2f")} MB | '
+                                                        f'Rows: {format(self.dbms.data_frame.shape[0], ",d")} | Columns: {format(self.dbms.data_frame.shape[1], ",d")}')
 
-            This method is used inside a background thread to load and parse a file.
-            It expands the column header height after the file has been loaded and
-            parsed successfully.
-            """
+        def expand_column_header_height() -> None:
+            """Expands the column header height to fit the header of the data frame."""
+            print_log('Calculating column header height...', Log.DEBUG)
             self.display.COLUMN_HEADER_HEIGHT += self.display.CELL_DEFAULT_HEIGHT * 2
+
+        def calculate_column_widths() -> None:
+            """
+            Automatically fits the column header width to the content.
+
+            It starts by reading the first 200 rows of the data frame, using Cairo to measure
+            the width of the longest column header, and stores the result in display.cell_sizes.
+            """
+            print_log('Calculating preferred column widths...', Log.DEBUG)
+            display = Gdk.Display.get_default()
+            monitor = display.get_monitors()[0]
+            max_width = monitor.get_geometry().width // 8
+            sample_data = self.dbms.data_frame.head(200)
+            self.display.column_widths = polars.Series([self.display.CELL_DEFAULT_WIDTH] * self.dbms.data_frame.shape[1])
+            for index, col_name in enumerate(sample_data.columns):
+                sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
+                max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
+                context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0))
+                text_extents = context.text_extents('0' * max_length)[2]
+                preferred_width = text_extents + 3 * self.display.CELL_DEFAULT_PADDING + self.display.ICON_DEFAULT_SIZE
+                self.display.column_widths[index] = max(self.display.CELL_DEFAULT_WIDTH, min(max_width, int(preferred_width)))
+
+        def calculate_cumulative_column_widths() -> None:
+            """Calculates the cumulative column widths."""
+            print_log('Calculating cumulative column widths...', Log.DEBUG)
+            self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
 
         def load_file_thread() -> None:
             """
@@ -468,18 +494,15 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 print_log(f'Failed to load file: {e}', Log.WARNING)
 
             if self.dbms.data_frame.is_empty():
-                GLib.idle_add(self.status_message.set_text, 'We\'re sorry, we couldn\'t load your workbook.')
+                self.status_message.set_text('We\'re sorry, we couldn\'t load your workbook.')
             else:
-                frame_shape = f'({format(self.dbms.data_frame.shape[0], ",d")}, {format(self.dbms.data_frame.shape[1], ",d")})'
-                GLib.idle_add(self.status_message.set_text, f'File: {file.get_basename()} | Size: {format(file_size, ",.2f")} MB | Shape: {frame_shape}')
-                GLib.idle_add(self.formula_bar.set_text, self.get_cell_data())
-                GLib.idle_add(self.main_canvas.queue_draw)
-                GLib.idle_add(self.set_title, f'{file.get_basename()} – Eruo Data Studio')
-                GLib.idle_add(self.main_canvas.set_focusable, True)
-                GLib.idle_add(self.main_canvas.grab_focus)
-                GLib.idle_add(expand_column_header_height)
+                update_ui()
+                expand_column_header_height()
+                calculate_column_widths()
+                calculate_cumulative_column_widths()
+                assign_file()
+                self.main_canvas.queue_draw()
 
         threading.Thread(target=load_file_thread, daemon=True).start()
         print_log(f'Loading file {file.get_path()} in background...', Log.DEBUG)
         GLib.idle_add(self.status_message.set_text, 'Loading your workbook...')
-        GLib.idle_add(assign_file)

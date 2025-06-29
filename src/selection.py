@@ -114,7 +114,7 @@ class Selection(GObject.Object):
         Args:
             coordinate: A tuple containing the x and y coordinates of the cell.
         """
-        row, col = self.coordinate_to_index(coordinate)
+        row, col = self._display.coordinate_to_index(coordinate)
         if row < 0 or col < 0:
             return False
         self.set_active_cell((row, col))
@@ -163,7 +163,7 @@ class Selection(GObject.Object):
         end = (max(range[0][0], range[1][0]), max(range[0][1], range[1][1]))
         range = (start, end)
         self._selected_cells = range
-        self._active_cell = range[0]
+        self.set_active_cell(start)
 
     def set_selected_cells_by_name(self, range: str) -> bool:
         """
@@ -200,7 +200,7 @@ class Selection(GObject.Object):
 
         return False
 
-    def set_selected_cells_by_coordinates(self, range: tuple[tuple[float, float], tuple[float, float]]) -> bool:
+    def set_selected_cells_by_coordinates(self, range: tuple[tuple[float, float], tuple[float, float]]) -> None:
         """
         Sets the currently selected cells based on a range of coordinates.
 
@@ -209,23 +209,18 @@ class Selection(GObject.Object):
 
         Args:
             range: A tuple containing two tuples, each representing the start and end coordinates of the selection.
-
-        Returns:
-            True if the coordinates are valid and the selected cells are set successfully,
-            False if the coordinates are invalid.
         """
         start_coord, end_coord = range
-        start_row, start_col = self.coordinate_to_index(start_coord)
-        if start_row < 0 or start_col < 0:
-            return False
-        end_row, end_col = self.coordinate_to_index(end_coord)
+        start_row, start_col = self._display.coordinate_to_index(start_coord)
+        end_row, end_col = self._display.coordinate_to_index(end_coord)
+        start_row = max(start_row, 0)
+        start_col = max(start_col, 0)
         end_row = max(end_row, 0)
         end_col = max(end_col, 0)
         range = ((start_row, start_col), (end_row, end_col))
-        self._selected_cells = range
-        self._active_cell = range[0]
+        self.set_selected_cells(range)
+        self.set_active_cell(range[0])
         self._opposite_active_cell = range[1]
-        return True
 
     def name_to_index(self, name: str) -> tuple[int, int]:
         """
@@ -276,21 +271,3 @@ class Selection(GObject.Object):
             col //= 26
             col -= 1
         return name + str(row + 1)
-
-    def coordinate_to_index(self, coordinate: tuple[float, float]) -> tuple[int, int]:
-        """
-        Converts a coordinate to its corresponding row and column indices.
-
-        The coordinate is expected to be in the format (x, y), where x is the horizontal position
-        and y is the vertical position relative to the display's cell dimensions.
-
-        Args:
-            coordinate: A tuple containing the x and y coordinates of the cell.
-
-        Returns:
-            A tuple containing the row and column indices of the cell.
-        """
-        x, y = coordinate
-        row = int((y - self._display.COLUMN_HEADER_HEIGHT) // self._display.CELL_DEFAULT_HEIGHT)
-        col = int((x - self._display.ROW_HEADER_WIDTH) // self._display.CELL_DEFAULT_WIDTH)
-        return (row, col)

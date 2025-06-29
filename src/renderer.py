@@ -32,6 +32,9 @@ class Renderer(GObject.Object):
     _display: Display
     _selection: Selection
 
+    _prefer_dark = Adw.StyleManager().get_dark()
+    _color_accent = Adw.StyleManager().get_accent_color_rgba()
+
     def __init__(self, display: Display, selection: Selection, dbms: DBMS) -> None:
         """
         Initializes the Renderer class.
@@ -49,27 +52,6 @@ class Renderer(GObject.Object):
         self._display = display
         self._selection = selection
 
-    def next_column_label(self, label: str) -> str:
-        """
-        Returns the next column label in alphabetical order.
-
-        The pattern starts with a single character ('A'), then increments the last character ('B', 'C', ...),
-        wrapping around to 'A' when it reaches 'Z' and prepending a new character ('AA', 'AB', ...). In other
-        words, following this pattern: A ^ B ^ C ... Z ^ AA ... AZ ^ BA ... ZZ ^ AAA ...
-
-        Args:
-            label: The current column label.
-
-        Returns:
-            The next column label in alphabetical order.
-        """
-        i = len(label) - 1
-        while i >= 0 and label[i] == 'Z':
-            i -= 1
-        if i == -1:
-            return 'A' * (len(label) + 1)
-        return label[:i] + chr(ord(label[i]) + 1) + 'A' * (len(label) - i - 1)
-
     def draw_headers_backgrounds(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
         Draws the backgrounds of the row and column headers.
@@ -85,35 +67,41 @@ class Renderer(GObject.Object):
         """
         context.save()
 
+        # Set the background color
         if self._prefer_dark:
             context.set_source_rgb(0.15, 0.15, 0.15)
         else:
             context.set_source_rgb(0.9, 0.9, 0.9)
 
-        # Draw column header background
+        # Draw header backgrounds
         context.rectangle(0, 0, width, self._display.COLUMN_HEADER_HEIGHT)
-        context.fill()
-
-        # Draw row header background
         context.rectangle(0, self._display.COLUMN_HEADER_HEIGHT, self._display.ROW_HEADER_WIDTH, height)
         context.fill()
-
-        # Get the selected cell range
-        (start_row, start_col), (end_row, end_col) = self._selection.get_selected_cells()
 
         # Set the accent color with reduced opacity for selected column header
         accent_rgba = list(self._color_accent)
         accent_rgba[3] = 0.25
         context.set_source_rgba(*accent_rgba)
 
+        # Get the selected cell range
+        (start_row, start_col), (end_row, end_col) = self._selection.get_selected_cells()
+        x_start = self._display.ROW_HEADER_WIDTH + start_col * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
+        y_start = self._display.COLUMN_HEADER_HEIGHT + start_row * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
+        width_sel = (end_col - start_col + 1) * self._display.CELL_DEFAULT_WIDTH
+        height_sel = (end_row - start_row + 1) * self._display.CELL_DEFAULT_HEIGHT
+
+        if not self._display.cumulative_column_widths.is_empty():
+            x_start = self._display.get_column_position(start_col) + self._display.ROW_HEADER_WIDTH - self._display.scroll_horizontal_position
+            if start_col == end_col:
+                width_sel = self._display.get_column_width(start_col)
+            else:
+                width_sel = self._display.get_column_position(end_col + 1) - self._display.get_column_position(start_col)
+
         # Draw column headers background within the selected cell range
         context.save()
         context.rectangle(self._display.ROW_HEADER_WIDTH, 0, width, self._display.COLUMN_HEADER_HEIGHT)
         context.clip()
-        col_min, col_max = min(start_col, end_col), max(start_col, end_col)
-        num_cols = col_max - col_min + 1
-        x_start = self._display.ROW_HEADER_WIDTH + col_min * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
-        context.rectangle(x_start, 0, num_cols * self._display.CELL_DEFAULT_WIDTH, self._display.COLUMN_HEADER_HEIGHT)
+        context.rectangle(x_start, 0, width_sel, self._display.COLUMN_HEADER_HEIGHT)
         context.fill()
         context.restore()
 
@@ -121,16 +109,13 @@ class Renderer(GObject.Object):
         context.save()
         context.rectangle(0, self._display.COLUMN_HEADER_HEIGHT, self._display.ROW_HEADER_WIDTH, height)
         context.clip()
-        row_min, row_max = min(start_row, end_row), max(start_row, end_row)
-        num_rows = row_max - row_min + 1
-        y_start = self._display.COLUMN_HEADER_HEIGHT + row_min * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
-        context.rectangle(0, y_start, self._display.ROW_HEADER_WIDTH, num_rows * self._display.CELL_DEFAULT_HEIGHT)
+        context.rectangle(0, y_start, self._display.ROW_HEADER_WIDTH, height_sel)
         context.fill()
         context.restore()
 
         context.restore()
 
-    def draw_selection_background(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
+    def draw_selection_backgrounds(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
         Draws the background for the selected cell range and the active cell.
 
@@ -146,7 +131,6 @@ class Renderer(GObject.Object):
             height: The height of the drawing area.
         """
         context.save()
-
         context.rectangle(self._display.ROW_HEADER_WIDTH, self._display.COLUMN_HEADER_HEIGHT, width, height)
         context.clip()
 
@@ -157,10 +141,17 @@ class Renderer(GObject.Object):
 
         # Calculate the position and size of the selection rectangle
         (start_row, start_col), (end_row, end_col) = self._selection.get_selected_cells()
-        x_start = self._display.ROW_HEADER_WIDTH + min(start_col, end_col) * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
-        y_start = self._display.COLUMN_HEADER_HEIGHT + min(start_row, end_row) * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
-        width_sel = (abs(end_col - start_col) + 1) * self._display.CELL_DEFAULT_WIDTH
-        height_sel = (abs(end_row - start_row) + 1) * self._display.CELL_DEFAULT_HEIGHT
+        x_start = self._display.ROW_HEADER_WIDTH + start_col * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
+        y_start = self._display.COLUMN_HEADER_HEIGHT + start_row * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
+        width_sel = ((end_col - start_col) + 1) * self._display.CELL_DEFAULT_WIDTH
+        height_sel = ((end_row - start_row) + 1) * self._display.CELL_DEFAULT_HEIGHT
+
+        if not self._display.cumulative_column_widths.is_empty():
+            x_start = self._display.get_column_position(start_col) + self._display.ROW_HEADER_WIDTH - self._display.scroll_horizontal_position
+            if start_col == end_col:
+                width_sel = self._display.get_column_width(start_col)
+            else:
+                width_sel = self._display.get_column_position(end_col + 1) - self._display.get_column_position(start_col)
 
         # Draw selection box around the selected cell range
         context.rectangle(x_start, y_start, width_sel, height_sel)
@@ -172,19 +163,276 @@ class Renderer(GObject.Object):
             context.set_source_rgb(1.0, 1.0, 1.0)
 
         # Calculate the position and size of the active cell
-        active_row, active_col = self._selection.get_active_cell()
-        x = self._display.ROW_HEADER_WIDTH + active_col * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
-        y = self._display.COLUMN_HEADER_HEIGHT + active_row * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
-        cell_width = self._display.CELL_DEFAULT_WIDTH
-        cell_height = self._display.CELL_DEFAULT_HEIGHT
+        row, col = self._selection.get_active_cell()
+        x = self._display.ROW_HEADER_WIDTH + col * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
+        y = self._display.COLUMN_HEADER_HEIGHT + row * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
+        width_sel = self._display.CELL_DEFAULT_WIDTH
+        height_sel = self._display.CELL_DEFAULT_HEIGHT
+
+        if not self._display.cumulative_column_widths.is_empty():
+            x = self._display.get_column_position(col) + self._display.ROW_HEADER_WIDTH - self._display.scroll_horizontal_position
+            width_sel = self._display.get_column_width(col)
 
         # Draw active cell background with a different color
-        context.rectangle(x, y, cell_width, cell_height)
+        context.rectangle(x, y, width_sel, height_sel)
         context.fill()
 
         context.restore()
 
-    def draw_cells_lines(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
+    def draw_headers_texts(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
+        """
+        Draws the text labels for the column and row headers in the main canvas.
+
+        This method draws the text labels for the column and row headers in the main canvas.
+        The text labels are drawn using a bold font with a size of 12 points. The method also
+        handles the drawing of the text labels for the selected cell range using the current system
+        accent color. The method also draws the column and row headers texts centered and right-aligned
+        respectively.
+
+        Args:
+            area: The Gtk.DrawingArea where the cells are drawn.
+            context: The Cairo context used for drawing operations.
+            width: The width of the drawing area.
+            height: The height of the drawing area.
+        """
+        def next_column_label(label: str) -> str:
+            """
+            Returns the next column label in alphabetical order.
+
+            The pattern starts with a single character ('A'), then increments the last character ('B', 'C', ...),
+            wrapping around to 'A' when it reaches 'Z' and prepending a new character ('AA', 'AB', ...). In other
+            words, following this pattern: A ^ B ^ C ... Z ^ AA ... AZ ^ BA ... ZZ ^ AAA ...
+
+            Args:
+                label: The current column label.
+
+            Returns:
+                The next column label in alphabetical order.
+            """
+            i = len(label) - 1
+            while i >= 0 and label[i] == 'Z':
+                i -= 1
+            if i == -1:
+                return 'A' * (len(label) + 1)
+            return label[:i] + chr(ord(label[i]) + 1) + 'A' * (len(label) - i - 1)
+
+        context.save()
+
+        # Get system default font family for drawing text
+        font_desc = Gtk.Widget.create_pango_context(area).get_font_description()
+        system_font = font_desc.get_family() if font_desc else 'Sans'
+
+        text_color = (0.0, 0.0, 0.0)
+        if self._prefer_dark:
+            text_color = (1.0, 1.0, 1.0)
+        *accent_color, _ = self._color_accent
+
+        # Get the selected cell range
+        (start_row, start_col), (end_row, end_col) = self._selection.get_selected_cells()
+        n_data_frame_cols = self._display.column_widths.shape[0]
+
+        # Determine the starting column label based on the scroll position
+        # TODO: I think this algorithm is not very efficient for large tables with thousands of columns,
+        #       but it just works for now, so I'll leave it for now
+        col_index = self._display.coordinate_to_column(self._display.scroll_horizontal_position)
+        text_index = col_index + 1
+        cell_text = ''
+        while text_index > 0:
+            cell_text = next_column_label(cell_text) if cell_text else 'A'
+            text_index -= 1
+
+        # Calculate the starting column width and offset
+        x_offset = 0
+        cell_width = self._display.CELL_DEFAULT_WIDTH
+        if not self._display.cumulative_column_widths.is_empty():
+            if 0 <= col_index - 1 < self._display.cumulative_column_widths.shape[0]:
+                x_offset = self._display.cumulative_column_widths[col_index - 1]
+            x_offset -= self._display.scroll_horizontal_position
+            if col_index < n_data_frame_cols:
+                cell_width = self._display.column_widths[col_index] + x_offset
+            else:
+                scroll_position = self._display.scroll_horizontal_position - self._display.cumulative_column_widths[-1]
+                x_offset = scroll_position % self._display.CELL_DEFAULT_WIDTH
+                cell_width = self._display.CELL_DEFAULT_WIDTH - x_offset
+
+        # Draw column headers texts
+        x = self._display.ROW_HEADER_WIDTH
+        while x < width:
+            # Use the current system accent color, if the current column header is within the selected cell range
+            if start_col <= col_index <= end_col:
+                context.set_source_rgb(*accent_color)
+            else:
+                context.set_source_rgb(*text_color)
+
+            # Align the text to the center of the cell
+            cell_actual_width = self._display.CELL_DEFAULT_WIDTH
+            if col_index < n_data_frame_cols:
+                cell_actual_width = self._display.column_widths[col_index]
+            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(cell_text)
+            if x == self._display.ROW_HEADER_WIDTH:
+                if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
+                    x_offset = 0
+                x_text = x + (cell_actual_width - text_width) / 2 - xbearing - abs(x_offset)
+            else:
+                x_text = x + (cell_actual_width - text_width) / 2 - xbearing
+
+            context.save()
+            context.rectangle(x, 0, cell_width, self._display.COLUMN_HEADER_HEIGHT)
+            context.clip()
+
+            #
+            context.select_font_face('Monospace', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            context.set_font_size(12)
+            context.move_to(x_text, 14)
+            context.show_text(cell_text)
+            cell_text = next_column_label(cell_text)
+
+            #
+            if col_index < self._dbms.data_frame.shape[1]:
+                context.select_font_face(system_font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+                cell_text_2 = str(self._dbms.data_frame.columns[col_index])
+                xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(cell_text_2)
+                if cell_actual_width < text_width + self._display.CELL_DEFAULT_PADDING * 2:
+                    x_text = x + self._display.CELL_DEFAULT_PADDING
+                else:
+                    if x == self._display.ROW_HEADER_WIDTH:
+                        if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
+                            x_offset = 0
+                        x_text = x + (cell_actual_width - text_width) / 2 - xbearing - abs(x_offset)
+                    else:
+                        x_text = x + (cell_actual_width - text_width) / 2 - xbearing
+                context.move_to(x_text, 14 + self._display.CELL_DEFAULT_HEIGHT + 2)
+                context.show_text(cell_text_2)
+
+            #
+            if col_index < self._dbms.data_frame.shape[1]:
+                context.select_font_face(system_font, cairo.FONT_SLANT_ITALIC, cairo.FONT_WEIGHT_NORMAL)
+                context.set_font_size(11)
+                cell_text_2 = str(self._dbms.data_frame.dtypes[col_index])
+                xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(cell_text_2)
+                if x == self._display.ROW_HEADER_WIDTH:
+                    if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
+                        x_offset = 0
+                    x_text = x + (cell_actual_width - text_width) / 2 - xbearing - abs(x_offset)
+                else:
+                    x_text = x + (cell_actual_width - text_width) / 2 - xbearing
+                context.move_to(x_text, 14 + self._display.CELL_DEFAULT_HEIGHT * 2 - 2)
+                context.show_text(cell_text_2)
+
+            context.restore()
+
+            x += cell_width
+            col_index += 1
+            if col_index < n_data_frame_cols:
+                cell_width = self._display.column_widths[col_index]
+            else:
+                cell_width = self._display.CELL_DEFAULT_WIDTH
+
+        # Determine the starting row label based on the scroll position
+        cell_text = self._display.scroll_vertical_position // self._display.CELL_DEFAULT_HEIGHT + 1
+
+        # Draw row headers texts (right-aligned)
+        for y in range(self._display.COLUMN_HEADER_HEIGHT, height, self._display.CELL_DEFAULT_HEIGHT):
+            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(cell_text))
+            x = self._display.ROW_HEADER_WIDTH - text_width - xbearing - self._display.CELL_DEFAULT_PADDING
+
+            # Use the current system accent color, if the current row header is within the selected cell range
+            if start_row <= cell_text - 1 <= end_row:
+                context.set_source_rgb(*accent_color)
+            else:
+                context.set_source_rgb(*text_color)
+
+            context.move_to(x, 14 + y)
+            context.show_text(str(cell_text))
+            cell_text += 1
+
+        context.restore()
+
+    def draw_cells_texts(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
+        """
+        Draws the text contents of the cells within the visible area of the main canvas.
+
+        This method iterates over the cells within the current view, extracts their data from the
+        data frame, and renders the text within the specified drawing area. It adjusts the text color
+        based on the display mode (dark or light) and uses the system's default font settings. The
+        drawing takes into account the current scroll position to determine which cells are visible.
+
+        Args:
+            area: The Gtk.DrawingArea where the cell texts are drawn.
+            context: The Cairo context used for drawing operations.
+            width: The width of the drawing area.
+            height: The height of the drawing area.
+        """
+        if self._display.cumulative_column_widths.is_empty():
+            return # TODO
+
+        context.save()
+
+        if self._prefer_dark:
+            context.set_source_rgb(1.0, 1.0, 1.0)
+        else:
+            context.set_source_rgb(0.0, 0.0, 0.0)
+
+        # Use system default font family for drawing text
+        font_desc = Gtk.Widget.create_pango_context(area).get_font_description()
+        font_family = font_desc.get_family() if font_desc else 'Sans'
+        context.select_font_face(font_family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        context.set_font_size(12)
+
+        x_start = self._display.ROW_HEADER_WIDTH
+        cell_width = self._display.CELL_DEFAULT_WIDTH
+        cell_height = self._display.CELL_DEFAULT_HEIGHT
+        df_shape = self._dbms.data_frame.shape
+
+        # TODO: Docstring.
+        col_index = self._display.coordinate_to_column(self._display.scroll_horizontal_position)
+        x_offset = 0
+        if 0 <= col_index - 1 < self._display.cumulative_column_widths.shape[0]:
+            x_offset = self._display.cumulative_column_widths[col_index - 1]
+        x_offset -= self._display.scroll_horizontal_position
+        if col_index < self._display.column_widths.shape[0]:
+            cell_width = self._display.column_widths[col_index] + x_offset
+        else:
+            scroll_position = self._display.scroll_horizontal_position - self._display.cumulative_column_widths[-1]
+            x_offset = scroll_position % self._display.CELL_DEFAULT_WIDTH
+            cell_width = self._display.CELL_DEFAULT_WIDTH - x_offset
+
+        x = x_start
+        while x < width:
+            y = self._display.COLUMN_HEADER_HEIGHT
+            row_index = 0
+            while y < height:
+                row_index = (y - self._display.COLUMN_HEADER_HEIGHT) // cell_height + self._display.scroll_vertical_position // cell_height
+                if df_shape[0] <= row_index:
+                    height = y # prevent iteration over empty cells
+                    break
+                if df_shape[1] <= col_index:
+                    width = x # prevent iteration over empty cells
+                    break
+                if x == x_start:
+                    if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
+                        x_offset = 0
+                    x_text = x + self._display.CELL_DEFAULT_PADDING - abs(x_offset)
+                else:
+                    x_text = x + self._display.CELL_DEFAULT_PADDING
+                cell_text = str(self._dbms.data_frame[row_index, col_index])
+                context.save()
+                context.rectangle(x, y, cell_width, cell_height)
+                context.clip()
+                context.move_to(x_text, 14 + y)
+                context.show_text(cell_text)
+                context.restore()
+                y += cell_height
+            x += cell_width
+            col_index += 1
+            if col_index < self._display.column_widths.shape[0]:
+                cell_width = self._display.column_widths[col_index]
+            else:
+                cell_width = self._display.CELL_DEFAULT_WIDTH
+
+        context.restore()
+
+    def draw_cells_borders(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
         Draws the lines separating the cells in the main canvas.
 
@@ -209,32 +457,62 @@ class Renderer(GObject.Object):
         cell_width = self._display.CELL_DEFAULT_WIDTH
         cell_height = self._display.CELL_DEFAULT_HEIGHT
 
-        # Draw separator line between column header and the worksheet cells
+        # Draw separator line between column header and the worksheet content
         context.move_to(0, y_start)
         context.line_to(width, y_start)
         context.move_to(x_start, 0)
         context.line_to(x_start, height)
         context.stroke()
 
-        # Draw vertical and horizontal lines
         context.set_hairline(True)
+
+        # Draw horizontal lines
         for y in range(y_start, height, cell_height):
             context.move_to(0, y)
             context.line_to(width, y)
-        for x in range(x_start, width, cell_width):
-            context.move_to(x, 0)
-            context.line_to(x, height)
         context.stroke()
 
+        # Draw vertical lines
+        if self._display.cumulative_column_widths.is_empty():
+            for x in range(x_start, width, cell_width):
+                context.move_to(x, 0)
+                context.line_to(x, height)
+            context.stroke()
+        else:
+            # TODO: Docstring.
+            col_index = self._display.coordinate_to_column(self._display.scroll_horizontal_position)
+            x_offset = 0
+            if 0 <= col_index - 1 < self._display.cumulative_column_widths.shape[0]:
+                x_offset = self._display.cumulative_column_widths[col_index - 1]
+            x_offset -= self._display.scroll_horizontal_position
+            cell_width = self._display.CELL_DEFAULT_WIDTH
+            if col_index < self._display.column_widths.shape[0]:
+                cell_width = self._display.column_widths[col_index] + x_offset
+            else:
+                scroll_position = self._display.scroll_horizontal_position - self._display.cumulative_column_widths[-1]
+                x_offset = scroll_position % self._display.CELL_DEFAULT_WIDTH
+                cell_width = self._display.CELL_DEFAULT_WIDTH - x_offset
+            x = x_start
+            while x < width:
+                context.move_to(x, 0)
+                context.line_to(x, height)
+                x += cell_width
+                col_index += 1
+                if col_index < self._display.column_widths.shape[0]:
+                    cell_width = self._display.column_widths[col_index]
+                else:
+                    cell_width = self._display.CELL_DEFAULT_WIDTH
+            context.stroke()
+
         # Draw separator line between the worksheet column header and the data frame column header
-        if not self._dbms.data_frame.is_empty():
+        if not self._display.cumulative_column_widths.is_empty():
             context.move_to(x_start, cell_height)
             context.line_to(width, cell_height)
             context.stroke()
 
         context.restore()
 
-    def draw_selection_border(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
+    def draw_selection_borders(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
         Draws a border around the currently selected cell range in the main canvas.
 
@@ -258,10 +536,17 @@ class Renderer(GObject.Object):
 
         # Calculate the position and size of the selection rectangle
         (start_row, start_col), (end_row, end_col) = self._selection.get_selected_cells()
-        x_start = self._display.ROW_HEADER_WIDTH + min(start_col, end_col) * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
-        y_start = self._display.COLUMN_HEADER_HEIGHT + min(start_row, end_row) * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
-        width_sel = (abs(end_col - start_col) + 1) * self._display.CELL_DEFAULT_WIDTH
-        height_sel = (abs(end_row - start_row) + 1) * self._display.CELL_DEFAULT_HEIGHT
+        x_start = self._display.ROW_HEADER_WIDTH + start_col * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
+        y_start = self._display.COLUMN_HEADER_HEIGHT + start_row * self._display.CELL_DEFAULT_HEIGHT - self._display.scroll_vertical_position
+        width_sel = (end_col - start_col + 1) * self._display.CELL_DEFAULT_WIDTH
+        height_sel = (end_row - start_row + 1) * self._display.CELL_DEFAULT_HEIGHT
+
+        if not self._display.cumulative_column_widths.is_empty():
+            x_start = self._display.get_column_position(start_col) + self._display.ROW_HEADER_WIDTH - self._display.scroll_horizontal_position
+            if start_col == end_col:
+                width_sel = self._display.get_column_width(start_col)
+            else:
+                width_sel = self._display.get_column_position(end_col + 1) - self._display.get_column_position(start_col)
 
         # Draw selection box around the selected cell range
         context.rectangle(x_start, y_start, width_sel, height_sel)
@@ -276,201 +561,6 @@ class Renderer(GObject.Object):
         context.move_to(self._display.ROW_HEADER_WIDTH, y_start)
         context.rel_line_to(0, height_sel)
         context.stroke()
-
-        context.restore()
-
-    def draw_headers_texts(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
-        """
-        Draws the text labels for the column and row headers in the main canvas.
-
-        This method draws the text labels for the column and row headers in the main canvas.
-        The text labels are drawn using a bold font with a size of 12 points. The method also
-        handles the drawing of the text labels for the selected cell range using the current system
-        accent color. The method also draws the column and row headers texts centered and right-aligned
-        respectively.
-
-        Args:
-            area: The Gtk.DrawingArea where the cells are drawn.
-            context: The Cairo context used for drawing operations.
-            width: The width of the drawing area.
-            height: The height of the drawing area.
-        """
-        context.save()
-
-        # Use monospace font family for drawing text
-        context.select_font_face('Monospace', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        context.set_font_size(12)
-
-        # Get the selected cell range
-        (start_row, start_col), (end_row, end_col) = self._selection.get_selected_cells()
-        col_min = min(start_col, end_col) - self._display.scroll_horizontal_position // self._display.CELL_DEFAULT_WIDTH
-        col_max = max(start_col, end_col) - self._display.scroll_horizontal_position // self._display.CELL_DEFAULT_WIDTH
-        row_min = min(start_row, end_row) - self._display.scroll_vertical_position // self._display.CELL_DEFAULT_HEIGHT
-        row_max = max(start_row, end_row) - self._display.scroll_vertical_position // self._display.CELL_DEFAULT_HEIGHT
-
-        x_start = self._display.ROW_HEADER_WIDTH
-        y_start = 0
-        cell_width = self._display.CELL_DEFAULT_WIDTH
-
-        # Determine the starting column label based on the scroll position
-        # TODO: I think this algorithm is not very efficient for large tables with thousands of columns,
-        #       but it just works for now, so I'll leave it for now
-        initial_col = self._display.scroll_horizontal_position // self._display.CELL_DEFAULT_WIDTH + 1
-        cell_text = ''
-        while initial_col > 0:
-            cell_text = self.next_column_label(cell_text) if cell_text else 'A'
-            initial_col -= 1
-
-        text_color = (0.0, 0.0, 0.0)
-        if self._prefer_dark:
-            text_color = (1.0, 1.0, 1.0)
-        *accent_color, _ = self._color_accent
-
-        # Draw column headers texts (centered)
-        for col, x in enumerate(range(x_start, width, cell_width)):
-            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(cell_text)
-            x = x + (cell_width - text_width) / 2 - xbearing
-
-            # If the current column header is within the selected cell range, use the current system accent color
-            if col_min <= col <= col_max:
-                context.set_source_rgb(*accent_color)
-            else:
-                context.set_source_rgb(*text_color)
-
-            context.move_to(x, 14 + y_start)
-            context.show_text(cell_text)
-            cell_text = self.next_column_label(cell_text)
-
-        x_start = 0
-        y_start = self._display.COLUMN_HEADER_HEIGHT
-        cell_width = self._display.ROW_HEADER_WIDTH
-        cell_height = self._display.CELL_DEFAULT_HEIGHT
-
-        # Adjust the starting row label based on the scroll position
-        cell_text = self._display.scroll_vertical_position // self._display.CELL_DEFAULT_HEIGHT + 1
-
-        # Draw row headers texts (right-aligned)
-        for row, y in enumerate(range(y_start, height, cell_height)):
-            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(cell_text))
-            x = x_start + cell_width - text_width - xbearing - 6
-
-            # If the current row header is within the selected cell range, use the current system accent color
-            if row_min <= row <= row_max:
-                context.set_source_rgb(*accent_color)
-            else:
-                context.set_source_rgb(*text_color)
-
-            context.move_to(x, 14 + y)
-            context.show_text(str(cell_text))
-            cell_text += 1
-
-        # Use system default font family for drawing text
-        font_desc = Gtk.Widget.create_pango_context(area).get_font_description()
-        font_family = font_desc.get_family() if font_desc else 'Sans'
-        context.select_font_face(font_family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        context.set_font_size(12)
-
-        cell_width = self._display.CELL_DEFAULT_WIDTH
-        cell_height = self._display.CELL_DEFAULT_HEIGHT
-        horizontal_offset = self._display.scroll_horizontal_position
-        df_shape = self._dbms.data_frame.shape
-
-        # Draw data frame header texts (centered)
-        x = self._display.ROW_HEADER_WIDTH
-        while x < width:
-            col = (x - self._display.ROW_HEADER_WIDTH) // cell_width + horizontal_offset // cell_width
-            if df_shape[1] <= col:
-                width = x # prevent iteration over empty cells
-                break
-
-            # If the current column header is within the selected cell range, use the current system accent color
-            if col_min <= (col - horizontal_offset // cell_width) <= col_max:
-                context.set_source_rgb(*accent_color)
-            else:
-                context.set_source_rgb(*text_color)
-
-            context.save()
-            context.rectangle(x, cell_height, cell_width, cell_height * 2)
-            context.clip()
-
-            # Align text to the center, or back to the left if the column name is too long
-            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(self._dbms.data_frame.columns[col]))
-            if (text_width + 6 * 2) > cell_width:
-                context.move_to(6 + x, 14 + self._display.CELL_DEFAULT_HEIGHT + 2)
-            else:
-                context.move_to(x + (cell_width - text_width) / 2 - xbearing, 14 + self._display.CELL_DEFAULT_HEIGHT + 2)
-            context.show_text(str(self._dbms.data_frame.columns[col]))
-
-            # Always align text to the center for the column data type
-            context.select_font_face(font_family, cairo.FONT_SLANT_ITALIC, cairo.FONT_WEIGHT_NORMAL)
-            context.set_font_size(11)
-            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(self._dbms.data_frame.dtypes[col]))
-            context.move_to(x + (cell_width - text_width) / 2 - xbearing, 14 + self._display.CELL_DEFAULT_HEIGHT * 2 - 2)
-            context.show_text(str(self._dbms.data_frame.dtypes[col]))
-
-            context.restore()
-            x += cell_width
-
-        context.restore()
-
-    def draw_cells_texts(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
-        """
-        Draws the text contents of the cells within the visible area of the main canvas.
-
-        This method iterates over the cells within the current view, extracts their data from the
-        data frame, and renders the text within the specified drawing area. It adjusts the text color
-        based on the display mode (dark or light) and uses the system's default font settings. The
-        drawing takes into account the current scroll position to determine which cells are visible.
-
-        Args:
-            area: The Gtk.DrawingArea where the cell texts are drawn.
-            context: The Cairo context used for drawing operations.
-            width: The width of the drawing area.
-            height: The height of the drawing area.
-        """
-        if self._dbms.data_frame.is_empty():
-            return
-
-        context.save()
-
-        if self._prefer_dark:
-            context.set_source_rgb(1.0, 1.0, 1.0)
-        else:
-            context.set_source_rgb(0.0, 0.0, 0.0)
-
-        # Use system default font family for drawing text
-        font_desc = Gtk.Widget.create_pango_context(area).get_font_description()
-        font_family = font_desc.get_family() if font_desc else 'Sans'
-        context.select_font_face(font_family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        context.set_font_size(12)
-
-        cell_width = self._display.CELL_DEFAULT_WIDTH
-        cell_height = self._display.CELL_DEFAULT_HEIGHT
-        vertical_offset = self._display.scroll_vertical_position
-        horizontal_offset = self._display.scroll_horizontal_position
-        df_shape = self._dbms.data_frame.shape
-
-        x = self._display.ROW_HEADER_WIDTH
-        while x < width:
-            y = self._display.COLUMN_HEADER_HEIGHT
-            while y < height:
-                row = (y - self._display.COLUMN_HEADER_HEIGHT) // cell_height + vertical_offset // cell_height
-                col = (x - self._display.ROW_HEADER_WIDTH) // cell_width + horizontal_offset // cell_width
-                if df_shape[0] <= row:
-                    height = y # prevent iteration over empty cells
-                    break
-                if df_shape[1] <= col:
-                    width = x # prevent iteration over empty cells
-                    break
-                context.save()
-                context.rectangle(x, y, cell_width, cell_height)
-                context.clip()
-                context.move_to(6 + x, 14 + y)
-                text = str(self._dbms.data_frame[row, col])
-                context.show_text(text)
-                context.restore()
-                y += cell_height
-            x += cell_width
 
         context.restore()
 
@@ -508,8 +598,20 @@ class Renderer(GObject.Object):
         y_start = self._display.COLUMN_HEADER_HEIGHT
         max_row_number = (self._display.scroll_vertical_position // cell_height) + 1 + ((height - y_start) // cell_height)
         text_metrics = context.text_extents(str(max_row_number))
-        self._display.ROW_HEADER_WIDTH = max(40, int(text_metrics[2] + 2 * 6 + 0.5))
+        self._display.ROW_HEADER_WIDTH = max(40, int(text_metrics[2] + 2 * self._display.CELL_DEFAULT_PADDING + 0.5))
         context.restore()
+
+    def adjust_column_header_width(self, area: Gtk.DrawingArea, context: cairo.Context, height: int, width: int) -> None:
+        """
+        Adjusts the width of the column header to fit the maximum column label.
+
+        Args:
+            area: The Gtk.DrawingArea where the row header is drawn.
+            context: The Cairo context used for drawing operations.
+            height: The height of the drawing area.
+            width: The width of the drawing area.
+        """
+        raise NotImplementedError # TODO
 
     def draw(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
@@ -528,8 +630,8 @@ class Renderer(GObject.Object):
         self.setup_cairo_context(area, context, width, height)
         self.adjust_row_header_width(area, context, width, height)
         self.draw_headers_backgrounds(area, context, width, height)
-        self.draw_selection_background(area, context, width, height)
-        self.draw_cells_lines(area, context, width, height)
+        self.draw_selection_backgrounds(area, context, width, height)
         self.draw_headers_texts(area, context, width, height)
         self.draw_cells_texts(area, context, width, height)
-        self.draw_selection_border(area, context, width, height)
+        self.draw_cells_borders(area, context, width, height)
+        self.draw_selection_borders(area, context, width, height)
