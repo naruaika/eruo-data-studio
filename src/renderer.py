@@ -19,7 +19,7 @@
 
 import cairo
 
-from gi.repository import Adw, GObject, Gtk
+from gi.repository import Adw, GObject, Gtk, Pango, PangoCairo
 
 from .dbms import DBMS
 from .display import Display
@@ -27,6 +27,8 @@ from .selection import Selection
 
 class Renderer(GObject.Object):
     __gtype_name__ = 'Renderer'
+
+    FONT_SIZE: float = 9
 
     _dbms: DBMS
     _display: Display
@@ -184,7 +186,7 @@ class Renderer(GObject.Object):
         Draws the text labels for the column and row headers in the main canvas.
 
         This method draws the text labels for the column and row headers in the main canvas.
-        The text labels are drawn using a bold font with a size of 12 points. The method also
+        The text labels are drawn using a bold font with a size of FONT_SIZE. The method also
         handles the drawing of the text labels for the selected cell range using the current system
         accent color. The method also draws the column and row headers texts centered and right-aligned
         respectively.
@@ -221,6 +223,9 @@ class Renderer(GObject.Object):
         # Get system default font family for drawing text
         font_desc = Gtk.Widget.create_pango_context(area).get_font_description()
         system_font = font_desc.get_family() if font_desc else 'Sans'
+        index_font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {self.FONT_SIZE}')
+        name_font_desc = Pango.font_description_from_string(f'{system_font} Normal Bold {self.FONT_SIZE}')
+        type_font_desc = Pango.font_description_from_string(f'{system_font} Italic Regular {self.FONT_SIZE - 1}')
 
         text_color = (0.0, 0.0, 0.0)
         if self._prefer_dark:
@@ -232,14 +237,12 @@ class Renderer(GObject.Object):
         n_data_frame_cols = self._display.column_widths.shape[0]
 
         # Determine the starting column label based on the scroll position
-        # TODO: I think this algorithm is not very efficient for large tables with thousands of columns,
-        #       but it just works for now, so I'll leave it for now
         col_index = self._display.coordinate_to_column(self._display.scroll_horizontal_position)
-        text_index = col_index + 1
+        text_index = col_index
         cell_text = ''
-        while text_index > 0:
-            cell_text = next_column_label(cell_text) if cell_text else 'A'
-            text_index -= 1
+        while text_index >= 0:
+            cell_text = chr(65 + text_index % 26) + cell_text
+            text_index = text_index // 26 - 1
 
         # Calculate the starting column width and offset
         x_offset = 0
@@ -264,60 +267,65 @@ class Renderer(GObject.Object):
             else:
                 context.set_source_rgb(*text_color)
 
-            # Align the text to the center of the cell
-            cell_actual_width = self._display.CELL_DEFAULT_WIDTH
-            if col_index < n_data_frame_cols:
-                cell_actual_width = self._display.column_widths[col_index]
-            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(cell_text)
-            if x == self._display.ROW_HEADER_WIDTH:
-                if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
-                    x_offset = 0
-                x_text = x + (cell_actual_width - text_width) / 2 - xbearing - abs(x_offset)
-            else:
-                x_text = x + (cell_actual_width - text_width) / 2 - xbearing
-
             context.save()
             context.rectangle(x, 0, cell_width, self._display.COLUMN_HEADER_HEIGHT)
             context.clip()
 
+            layout = PangoCairo.create_layout(context)
+            layout.set_text(cell_text, -1)
+            layout.set_font_description(index_font_desc)
+
+            # Align the text to the center of the cell
+            cell_actual_width = self._display.CELL_DEFAULT_WIDTH
+            if col_index < n_data_frame_cols:
+                cell_actual_width = self._display.column_widths[col_index]
+            text_width = layout.get_size()[0] / Pango.SCALE
+            if x == self._display.ROW_HEADER_WIDTH:
+                if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
+                    x_offset = 0
+                x_text = x + (cell_actual_width - text_width) / 2 - abs(x_offset)
+            else:
+                x_text = x + (cell_actual_width - text_width) / 2
+
             #
-            context.select_font_face('Monospace', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-            context.set_font_size(12)
-            context.move_to(x_text, 14)
-            context.show_text(cell_text)
+            context.move_to(x_text, 2)
+            PangoCairo.show_layout(context, layout)
             cell_text = next_column_label(cell_text)
 
             #
             if col_index < self._dbms.data_frame.shape[1]:
-                context.select_font_face(system_font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
                 cell_text_2 = str(self._dbms.data_frame.columns[col_index])
-                xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(cell_text_2)
+                layout = PangoCairo.create_layout(context)
+                layout.set_text(cell_text_2, -1)
+                layout.set_font_description(name_font_desc)
+                text_width = layout.get_size()[0] / Pango.SCALE
                 if cell_actual_width < text_width + self._display.CELL_DEFAULT_PADDING * 2:
                     x_text = x + self._display.CELL_DEFAULT_PADDING
                 else:
                     if x == self._display.ROW_HEADER_WIDTH:
                         if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
                             x_offset = 0
-                        x_text = x + (cell_actual_width - text_width) / 2 - xbearing - abs(x_offset)
+                        x_text = x + (cell_actual_width - text_width) / 2 - abs(x_offset)
                     else:
-                        x_text = x + (cell_actual_width - text_width) / 2 - xbearing
-                context.move_to(x_text, 14 + self._display.CELL_DEFAULT_HEIGHT + 2)
-                context.show_text(cell_text_2)
+                        x_text = x + (cell_actual_width - text_width) / 2
+                context.move_to(x_text, 2 + self._display.CELL_DEFAULT_HEIGHT + 2)
+                PangoCairo.show_layout(context, layout)
 
             #
             if col_index < self._dbms.data_frame.shape[1]:
-                context.select_font_face(system_font, cairo.FONT_SLANT_ITALIC, cairo.FONT_WEIGHT_NORMAL)
-                context.set_font_size(11)
                 cell_text_2 = str(self._dbms.data_frame.dtypes[col_index])
-                xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(cell_text_2)
+                layout = PangoCairo.create_layout(context)
+                layout.set_text(cell_text_2, -1)
+                layout.set_font_description(type_font_desc)
+                text_width = layout.get_size()[0] / Pango.SCALE
                 if x == self._display.ROW_HEADER_WIDTH:
                     if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
                         x_offset = 0
-                    x_text = x + (cell_actual_width - text_width) / 2 - xbearing - abs(x_offset)
+                    x_text = x + (cell_actual_width - text_width) / 2 - abs(x_offset)
                 else:
-                    x_text = x + (cell_actual_width - text_width) / 2 - xbearing
-                context.move_to(x_text, 14 + self._display.CELL_DEFAULT_HEIGHT * 2 - 2)
-                context.show_text(cell_text_2)
+                    x_text = x + (cell_actual_width - text_width) / 2
+                context.move_to(x_text, self._display.CELL_DEFAULT_HEIGHT * 2)
+                PangoCairo.show_layout(context, layout)
 
             context.restore()
 
@@ -333,8 +341,13 @@ class Renderer(GObject.Object):
 
         # Draw row headers texts (right-aligned)
         for y in range(self._display.COLUMN_HEADER_HEIGHT, height, self._display.CELL_DEFAULT_HEIGHT):
-            xbearing, ybearing, text_width, text_height, xadvance, yadvance = context.text_extents(str(cell_text))
-            x = self._display.ROW_HEADER_WIDTH - text_width - xbearing - self._display.CELL_DEFAULT_PADDING
+            layout = PangoCairo.create_layout(context)
+            layout.set_text(str(cell_text), -1)
+            layout.set_font_description(index_font_desc)
+
+            # Align the text to the right of the cell
+            text_width = layout.get_size()[0] / Pango.SCALE
+            x = self._display.ROW_HEADER_WIDTH - text_width - self._display.CELL_DEFAULT_PADDING
 
             # Use the current system accent color, if the current row header is within the selected cell range
             if start_row <= cell_text - 1 <= end_row:
@@ -342,8 +355,8 @@ class Renderer(GObject.Object):
             else:
                 context.set_source_rgb(*text_color)
 
-            context.move_to(x, 14 + y)
-            context.show_text(str(cell_text))
+            context.move_to(x, 2 + y)
+            PangoCairo.show_layout(context, layout)
             cell_text += 1
 
         context.restore()
@@ -376,8 +389,7 @@ class Renderer(GObject.Object):
         # Use system default font family for drawing text
         font_desc = Gtk.Widget.create_pango_context(area).get_font_description()
         font_family = font_desc.get_family() if font_desc else 'Sans'
-        context.select_font_face(font_family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        context.set_font_size(12)
+        font_desc = Pango.font_description_from_string(f'{font_family} Normal Regular {self.FONT_SIZE}')
 
         x_start = self._display.ROW_HEADER_WIDTH
         cell_width = self._display.CELL_DEFAULT_WIDTH
@@ -419,8 +431,11 @@ class Renderer(GObject.Object):
                 context.save()
                 context.rectangle(x, y, cell_width, cell_height)
                 context.clip()
-                context.move_to(x_text, 14 + y)
-                context.show_text(cell_text)
+                context.move_to(x_text, 2 + y)
+                layout = PangoCairo.create_layout(context)
+                layout.set_text(cell_text, -1)
+                layout.set_font_description(font_desc)
+                PangoCairo.show_layout(context, layout)
                 context.restore()
                 y += cell_height
             x += cell_width
@@ -577,7 +592,7 @@ class Renderer(GObject.Object):
         self._prefer_dark = Adw.StyleManager().get_dark()
         self._color_accent = Adw.StyleManager().get_accent_color_rgba()
         font_options = cairo.FontOptions()
-        font_options.set_antialias(cairo.Antialias.FAST)
+        font_options.set_antialias(cairo.Antialias.GOOD)
         context.set_font_options(font_options)
         context.set_antialias(cairo.Antialias.NONE)
 
@@ -593,7 +608,7 @@ class Renderer(GObject.Object):
         """
         context.save()
         context.select_font_face('Monospace', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        context.set_font_size(12)
+        context.set_font_size(self.FONT_SIZE)
         cell_height = self._display.CELL_DEFAULT_HEIGHT
         y_start = self._display.COLUMN_HEADER_HEIGHT
         max_row_number = (self._display.scroll_vertical_position // cell_height) + 1 + ((height - y_start) // cell_height)
