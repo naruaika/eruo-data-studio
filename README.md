@@ -6,9 +6,21 @@ A powerful yet friendly ETL (Extract, Transform, Load) tool powered by [Polars](
 
 <!-- TODO: describe the project more accurately -->
 
-<!-- TODO: list all features in the software -->
+## Status
 
-<!-- TODO: add background/motivation section -->
+Currently in early development. Stay tuned for updates.
+
+## Use Cases
+
+[TODO]
+
+## Features
+
+[TODO]
+
+## Backgrounds
+
+[TODO]
 
 ## Limitations
 
@@ -16,7 +28,26 @@ Currently we only support x86_64 architectures and Linux distributions using `gl
 
 Since we started developing the proof-of-concept with Libadwaita, a building blocks for GNOME applications, so it's supposed to be compatible only with GNOME desktop environment. I think it's possible that the application will still look correct and good on other distributions. Anyway, we'll add support for Windows in the future and hopefully for macOS as well.
 
-## Contributing
+## Designing
+
+Here are some of the resources used in making decisions and planning application development:
+
+- [The ONLY Data Cleaning Framework You Need | Ep. 3](https://www.youtube.com/watch?v=y9wFFD2bXQM)
+- [How to NAIL Exploratory Data Analysis (Lead Analyst Demo)](https://www.youtube.com/watch?v=deS6lETubdU)
+
+We've done some research on similar applications as follows:
+
+- Excel
+- Google Sheets
+- Power BI
+- Tableau
+- Alteryx Designer
+
+## Planning
+
+[TODO]
+
+## Development
 
 The recommended way to build and run this project is using [GNOME Builder](https://apps.gnome.org/Builder/).
 
@@ -55,10 +86,8 @@ Here are some useful references for the project development:
 - Libadwaita: https://gnome.pages.gitlab.gnome.org/libadwaita/doc/1.4/index.html
 - Polars: https://docs.pola.rs/api/python/stable/reference/index.html
 
-Please bear with me, most of the docstrings are AI-generated, though sometimes under my supervision. Your help will be greatly appreciated.
+Please bear with us, most of the docstrings are AI-generated, though sometimes under my supervision. Your help will be greatly appreciated.
 
 ## Licenses
 
 This project is distributed under the [GNU General Public License Version 3](https://www.gnu.org/licenses/gpl-3.0.en.html). We use GTK and [Libadwaita](https://gitlab.gnome.org/GNOME/libadwaita) to build the user interface, which are licensed under the [GNU Lesser General Public License Version 2.1](https://www.gnu.org/licenses/lgpl-2.1.en.html). The backend for data manipulation uses [Polars](https://pola.rs/), which is distributed under the [MIT License](https://opensource.org/license/mit). For other dependencies, see the `requirements.txt` file.
-
-<!-- TODO: list all softwares and related publications which are being studied during the development -->

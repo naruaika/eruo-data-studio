@@ -24,7 +24,7 @@ import re
 import threading
 import time
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango, PangoCairo
 
 from .utils import Log, print_log
 from .dbms import DBMS
@@ -51,6 +51,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
     selection: Selection
     renderer: Renderer
 
+    _main_canvas_size: tuple[int, int] = (0, 0)
+
     def __init__(self, file: Gio.File | None = None, **kwargs) -> None:
         """
         Creates a new EruoDataStudioWindow.
@@ -75,6 +77,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.formula_bar.connect('changed', self.on_formula_bar_changed)
         self.formula_bar.x_is_dirty = False
 
+        self.main_canvas.connect('resize', self.on_main_canvas_resized)
         self.main_canvas.set_draw_func(self.renderer.draw)
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
@@ -172,6 +175,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.scroll_to_active_cell()
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
+        self.renderer.reset_cache()
         self.main_canvas.queue_draw()
 
     def on_name_box_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
@@ -222,6 +226,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.formula_bar.x_is_dirty = False
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
+        self.renderer.reset_cache()
         self.main_canvas.queue_draw()
 
     def on_formula_bar_changed(self, widget: Gtk.Widget) -> None:
@@ -239,6 +244,19 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             self.main_canvas.set_focusable(True)
             self.main_canvas.grab_focus()
 
+    def on_main_canvas_resized(self, widget: Gtk.Widget, width: int, height: int) -> None:
+        """
+        Callback function for when the main canvas is resized.
+
+        This function resets the renderer cache if necessary.
+        """
+        if self._main_canvas_size == (0, 0):
+            self._main_canvas_size = (width, height)
+            return
+
+        if self._main_canvas_size[0] < width or self._main_canvas_size[1] < height:
+            self.renderer.reset_cache()
+
     def on_main_canvas_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         """
         Callback function for when the main canvas is pressed.
@@ -249,13 +267,23 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         and schedules the main canvas to redraw.
         """
         if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.COLUMN_HEADER_HEIGHT:
-            return # TODO: implement clicking on the worksheet header
+            if x <= self.display.ROW_HEADER_WIDTH and y <= self.display.COLUMN_HEADER_HEIGHT:
+                raise NotImplementedError # TODO: handle clicking on the top left corner area
+            if x <= self.display.ROW_HEADER_WIDTH and self.display.CELL_DEFAULT_HEIGHT <= y:
+                raise NotImplementedError # TODO: handle clicking on the row index cell
+            if y <= self.display.CELL_DEFAULT_HEIGHT and self.display.ROW_HEADER_WIDTH <= x:
+                raise NotImplementedError # TODO: handle clicking on the column index cell
+            if self.display.CELL_DEFAULT_HEIGHT <= y:
+                raise NotImplementedError # TODO: handle clicking on the column header cell
+
+        # Set active cell
         self.selection.set_active_cell_by_coordinate((x + self.display.scroll_horizontal_position, y + self.display.scroll_vertical_position))
         self.name_box.set_text(self.selection.get_active_cell_name())
         self.formula_bar.set_text(self.get_cell_data())
         self.selection.set_selected_cells(((self.selection.get_active_cell()), (self.selection.get_active_cell())))
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
+        self.renderer.reset_cache()
         self.main_canvas.queue_draw()
 
     def on_main_canvas_unfocused(self, event: Gtk.EventControllerFocus) -> None:
@@ -341,7 +369,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.name_box.set_text(self.selection.get_active_cell_name())
         self.formula_bar.set_text(self.get_cell_data())
 
-        self.scroll_to_active_cell()
+        if self.scroll_to_active_cell():
+            self.renderer.reset_cache()
         self.main_canvas.queue_draw()
 
     def on_main_canvas_scrolled(self, event: Gtk.EventControllerScroll, dx: float, dy: float) -> bool:
@@ -356,9 +385,31 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             dy, dx = dx, 0
         dx = int(dx * self.SCROLL_X_MULTIPLIER)
         dy = int(dy * self.SCROLL_Y_MULTIPLIER)
+
+        if dy < 0 and self.display.scroll_vertical_position == 0:
+            return False
+        if dx < 0 and self.display.scroll_horizontal_position == 0:
+            return False
+
         self.display.scroll_vertical_position = max(0, self.display.scroll_vertical_position + dy)
         self.display.scroll_horizontal_position = max(0, self.display.scroll_horizontal_position + dx)
+
+        # Adjust row header width
+        context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0))
+        font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {self.renderer.FONT_SIZE}')
+        cell_height = self.display.CELL_DEFAULT_HEIGHT
+        y_start = self.display.COLUMN_HEADER_HEIGHT
+        max_row_number = (self.display.scroll_vertical_position // cell_height) + 1 + ((self.main_canvas.get_height() - y_start) // cell_height)
+        layout = PangoCairo.create_layout(context)
+        layout.set_text(str(max_row_number), -1)
+        layout.set_font_description(font_desc)
+        text_width = layout.get_size()[0] / Pango.SCALE
+        self.display.ROW_HEADER_WIDTH = max(40, int(text_width + 2 * self.display.CELL_DEFAULT_PADDING + 0.5))
+
+        self.renderer.reset_cache()
+        self.renderer.reset_cache()
         self.main_canvas.queue_draw()
+
         return True
 
     def on_scrollbar_entered(self, event: Gtk.EventControllerMotion, x: float, y: float) -> None:
@@ -403,11 +454,11 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         print_log(f"Cell data at index ({format(row, ",d")}, {format(col, ",d")}) is updated")
         return True
 
-    def scroll_to_active_cell(self) -> None:
+    def scroll_to_active_cell(self) -> bool:
         """Scroll the main canvas to the active cell."""
         viewport_height = self.main_canvas.get_height() - self.display.COLUMN_HEADER_HEIGHT
         viewport_width = self.main_canvas.get_width() - self.display.ROW_HEADER_WIDTH
-        self.display.scroll_to_cell(self.selection.get_active_cell(), viewport_height, viewport_width)
+        return self.display.scroll_to_cell(self.selection.get_active_cell(), viewport_height, viewport_width)
 
     def load_file(self, file: Gio.File) -> None:
         """
@@ -453,17 +504,26 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             the width of the longest column header, and stores the result in display.cell_sizes.
             """
             print_log('Calculating preferred column widths...', Log.DEBUG)
+
             display = Gdk.Display.get_default()
             monitor = display.get_monitors()[0]
             max_width = monitor.get_geometry().width // 8
             sample_data = self.dbms.data_frame.head(200)
             self.display.column_widths = polars.Series([self.display.CELL_DEFAULT_WIDTH] * self.dbms.data_frame.shape[1])
+
+            font_desc = Gtk.Widget.create_pango_context(self.main_canvas).get_font_description()
+            system_font = font_desc.get_family() if font_desc else 'Sans'
+            font_desc = Pango.font_description_from_string(f'{system_font} Normal Bold {self.renderer.FONT_SIZE}')
+            context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0))
+            layout = PangoCairo.create_layout(context)
+            layout.set_font_description(font_desc)
+
             for index, col_name in enumerate(sample_data.columns):
                 sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
                 max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
-                context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0))
-                text_extents = context.text_extents('0' * max_length)[2]
-                preferred_width = text_extents + 3 * self.display.CELL_DEFAULT_PADDING + self.display.ICON_DEFAULT_SIZE
+                layout.set_text('0' * max_length, -1)
+                text_width = layout.get_size()[0] / Pango.SCALE
+                preferred_width = text_width + 2 * self.display.CELL_DEFAULT_PADDING
                 self.display.column_widths[index] = max(self.display.CELL_DEFAULT_WIDTH, min(max_width, int(preferred_width)))
 
         def calculate_cumulative_column_widths() -> None:
@@ -501,6 +561,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 calculate_column_widths()
                 calculate_cumulative_column_widths()
                 assign_file()
+                self.renderer.reset_cache()
+                self.renderer.reset_cache()
                 self.main_canvas.queue_draw()
 
         threading.Thread(target=load_file_thread, daemon=True).start()

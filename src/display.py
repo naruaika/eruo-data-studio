@@ -31,7 +31,7 @@ class Display(GObject.Object):
     CELL_DEFAULT_HEIGHT: int = 20
     CELL_DEFAULT_WIDTH: int = 65
     CELL_DEFAULT_PADDING: int = 6
-    ICON_DEFAULT_SIZE: int = 16
+    ICON_DEFAULT_SIZE: int = 8
 
     scroll_vertical_position: int = 0
     scroll_horizontal_position: int = 0
@@ -49,7 +49,7 @@ class Display(GObject.Object):
         """
         super().__init__()
 
-    def scroll_to_cell(self, cell: tuple[int, int], viewport_height: int, viewport_width: int) -> None:
+    def scroll_to_cell(self, cell: tuple[int, int], viewport_height: int, viewport_width: int) -> bool:
         """
         Scrolls the display to a specific cell.
 
@@ -73,10 +73,10 @@ class Display(GObject.Object):
             left_offset = self.get_column_position(cell[1])
 
         # Skip if the target cell is already visible
-        if self.scroll_vertical_position < top_offset and bottom_offset < self.scroll_vertical_position + viewport_height and \
-                self.scroll_horizontal_position < left_offset and right_offset < self.scroll_horizontal_position + viewport_width:
+        if self.scroll_vertical_position <= top_offset and bottom_offset <= self.scroll_vertical_position + viewport_height and \
+                self.scroll_horizontal_position <= left_offset and right_offset <= self.scroll_horizontal_position + viewport_width:
             print_log('Target cell is already visible in the viewport', Log.DEBUG)
-            return
+            return False
 
         # Scroll down when the target cell is below the viewport so that the target cell is near the bottom of the viewport
         if bottom_offset > self.scroll_vertical_position + viewport_height:
@@ -93,6 +93,8 @@ class Display(GObject.Object):
         # Scroll to the left when the target cell is to the left of the viewport so that the target cell is exactly at the left of the viewport
         if left_offset < self.scroll_horizontal_position:
             self.scroll_horizontal_position = left_offset
+
+        return True
 
     def get_column_position(self, col_index) -> int:
         """Calculates the x-coordinate for the start of a given column."""
