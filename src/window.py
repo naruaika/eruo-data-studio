@@ -288,7 +288,64 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
     def on_main_canvas_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         """Callback function for when the main canvas is released."""
+        def find_or_create_context_menu() -> Gtk.PopoverMenu:
+            """Helper function to find or create the context menu."""
+            if isinstance(self.main_canvas.get_first_child(), Gtk.PopoverMenu):
+                context_menu = self.main_canvas.get_first_child()
+            else:
+                context_menu = Gtk.PopoverMenu()
+                context_menu.set_parent(self.main_container)
+                context_menu.add_css_class('context-menu')
+            context_menu.connect('closed', on_context_menu_closed)
+
+            menu = Gio.Menu()
+            context_menu.set_menu_model(menu)
+
+            section1 = Gio.Menu()
+            menu.append_section(None, section1)
+
+            submenu11 = Gio.Menu()
+            section1.append_submenu('Convert To', submenu11)
+
+            submenu11.append('Boolean', 'app.sheet.column.convert-to.boolean')
+
+            submenu111 = Gio.Menu()
+            submenu11.append_submenu('Integer', submenu111)
+
+            section1111 = Gio.Menu()
+            for data_type in ['Int8', 'Int16', 'Int32', 'Int64']:
+                section1111.append(data_type, f'app.sheet.column.convert-to.{data_type.lower()}')
+            submenu111.append_section(None, section1111)
+
+            section1111 = Gio.Menu()
+            for data_type in ['UInt8', 'UInt16', 'UInt32', 'UInt64']:
+                section1111.append(data_type, f'app.sheet.column.convert-to.{data_type.lower()}')
+            submenu111.append_section(None, section1111)
+
+            submenu112 = Gio.Menu()
+            submenu11.append_submenu('Float', submenu112)
+            for data_type in ['Float32', 'Float64', 'Decimal']:
+                submenu112.append(data_type, f'app.sheet.column.convert-to.{data_type.lower()}')
+
+            submenu11.append('String', 'app.sheet.column.convert-to.string')
+            submenu11.append('Categorical', 'app.sheet.column.convert-to.categorical')
+            submenu11.append('Enum', 'app.sheet.column.convert-to.enum')
+
+            submenu113 = Gio.Menu()
+            submenu11.append_submenu('Time', submenu113)
+            for data_type in ['Date', 'Time', 'Datetime', 'Duration']:
+                submenu113.append(data_type, f'app.sheet.column.convert-to.{data_type.lower()}')
+
+            section2 = Gio.Menu()
+            section2.append('Sort A to Z', 'app.sheet.column.sort-a-to-z')
+            section2.append('Sort Z to A', 'app.sheet.column.sort-z-to-a')
+            section2.append('Reset Sort', 'app.sheet.column.reset-sort')
+            menu.append_section(None, section2)
+
+            return context_menu
+
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
+            """Callback function for when the context menu is closed."""
             self.selection.set_selected_column(-1)
             self.main_canvas.set_focusable(True)
             self.main_canvas.grab_focus()
@@ -316,19 +373,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 #     unique_values = self.dbms.get_column_unique_values(col_index)
 
                 # Show the context menu
-                if isinstance(self.main_canvas.get_first_child(), Gtk.PopoverMenu):
-                    context_menu = self.main_canvas.get_first_child()
-                else:
-                    context_menu = Gtk.PopoverMenu()
-                    context_menu.set_parent(self.main_container)
-                    context_menu.add_css_class('context-menu')
-                    self.main_canvas.queue_draw()
-                menu = Gio.Menu()
-                menu.append('Sort A to Z', 'app.sheet.column.sort-a-to-z')
-                menu.append('Sort Z to A', 'app.sheet.column.sort-z-to-a')
-                menu.append('Reset Sort', 'app.sheet.column.reset-sort')
-                context_menu.set_menu_model(menu)
-                context_menu.connect('closed', on_context_menu_closed)
+                context_menu = find_or_create_context_menu()
                 x_menu = self.display.get_column_position(col_index) + self.display.get_column_width(col_index) // 2 + self.display.ROW_HEADER_WIDTH - self.display.scroll_horizontal_position
                 if x_menu < self.display.ROW_HEADER_WIDTH:
                     x_menu = self.display.ROW_HEADER_WIDTH + 1
@@ -341,6 +386,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 rectangle.width = 1
                 context_menu.set_pointing_to(rectangle)
                 context_menu.popup()
+                self.main_canvas.queue_draw()
 
                 return
 

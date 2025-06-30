@@ -122,3 +122,23 @@ class DBMS(GObject.Object):
         self.data_frame = self.data_frame.sort(col_name, descending=descending, nulls_last=True)
         direction = 'descending' if descending else 'ascending'
         print_log(f'Sorting column {col_name} in {direction} order...', Log.DEBUG)
+
+    def convert_column_to(self, col_index: int, col_type: polars.DataType) -> bool:
+        """
+        Convert a column to a different data type.
+
+        Args:
+            col_index (int): The index of the column to convert.
+            col_type (polars.DataType): The data type to convert the column to.
+
+        Returns:
+            bool: True if the column was successfully converted, False otherwise.
+        """
+        col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
+        try:
+            self.data_frame = self.data_frame.with_columns(polars.col(col_name).cast(col_type))
+            print_log(f'Converting column {col_name} to {col_type.__name__.lower()}...', Log.DEBUG)
+            return True
+        except Exception as e:
+            print_log(f'Failed to convert column {col_name} to {col_type.__name__.lower()}: {e}', Log.WARNING)
+            return False

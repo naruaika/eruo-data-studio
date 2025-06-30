@@ -18,6 +18,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import gi
+import polars
 import sys
 
 gi.require_version('Gtk', '4.0')
@@ -47,9 +48,14 @@ class EruoDataStudioApplication(Adw.Application):
         self.create_action('about', self.on_about_action)
         self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
         self.create_action('open-file', self.on_open_file_action, ['<primary>o'])
+
         self.create_action('sheet.column.sort-a-to-z', self.on_column_sort_a_to_z_action)
         self.create_action('sheet.column.sort-z-to-a', self.on_column_sort_z_to_a_action)
         self.create_action('sheet.column.reset-sort', self.on_column_reset_sort_action)
+        for data_type in ['boolean', 'int8', 'int16', 'int32', 'int64',  'uint8', 'uint16',
+                          'uint32', 'uint64',  'float32', 'float64', 'decimal', 'string',
+                          'categorical', 'enum', 'date', 'time', 'datetime', 'duration']:
+            self.create_action(f'sheet.column.convert-to.{data_type}', getattr(self, f'on_column_convert_to_{data_type}_action'))
 
     def do_activate(self) -> None:
         """
@@ -233,6 +239,101 @@ class EruoDataStudioApplication(Adw.Application):
         window.dbms.sort_column_values(-1)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
+
+    def on_column_convert_to_boolean_action(self, *args) -> None:
+        """Converts the selected column to boolean values."""
+        self.column_convert_to(polars.Boolean)
+
+    def on_column_convert_to_int8_action(self, *args) -> None:
+        """Converts the selected column to Int8 values."""
+        self.column_convert_to(polars.Int8)
+
+    def on_column_convert_to_int16_action(self, *args) -> None:
+        """Converts the selected column to Int16 values."""
+        self.column_convert_to(polars.Int16)
+
+    def on_column_convert_to_int32_action(self, *args) -> None:
+        """Converts the selected column to Int32 values."""
+        self.column_convert_to(polars.Int32)
+
+    def on_column_convert_to_int64_action(self, *args) -> None:
+        """Converts the selected column to Int64 values."""
+        self.column_convert_to(polars.Int64)
+
+    def on_column_convert_to_uint8_action(self, *args) -> None:
+        """Converts the selected column to UInt8 values."""
+        self.column_convert_to(polars.UInt8)
+
+    def on_column_convert_to_uint16_action(self, *args) -> None:
+        """Converts the selected column to UInt16 values."""
+        self.column_convert_to(polars.UInt16)
+
+    def on_column_convert_to_uint32_action(self, *args) -> None:
+        """Converts the selected column to UInt32 values."""
+        self.column_convert_to(polars.UInt32)
+
+    def on_column_convert_to_uint64_action(self, *args) -> None:
+        """Converts the selected column to UInt64 values."""
+        self.column_convert_to(polars.UInt64)
+
+    def on_column_convert_to_float32_action(self, *args) -> None:
+        """Converts the selected column to Float32 values."""
+        self.column_convert_to(polars.Float32)
+
+    def on_column_convert_to_float64_action(self, *args) -> None:
+        """Converts the selected column to Float64 values."""
+        self.column_convert_to(polars.Float64)
+
+    def on_column_convert_to_decimal_action(self, *args) -> None:
+        """Converts the selected column to Decimal values."""
+        self.column_convert_to(polars.Decimal)
+
+    def on_column_convert_to_string_action(self, *args) -> None:
+        """Converts the selected column to String values."""
+        self.column_convert_to(polars.Utf8)
+
+    def on_column_convert_to_categorical_action(self, *args) -> None:
+        """Converts the selected column to Categorical values."""
+        self.column_convert_to(polars.Categorical)
+
+    def on_column_convert_to_enum_action(self, *args) -> None:
+        """Converts the selected column to Enum values."""
+        self.column_convert_to(polars.Enum)
+
+    def on_column_convert_to_date_action(self, *args) -> None:
+        """Converts the selected column to Date values."""
+        self.column_convert_to(polars.Date)
+
+    def on_column_convert_to_time_action(self, *args) -> None:
+        """Converts the selected column to Time values."""
+        self.column_convert_to(polars.Time)
+
+    def on_column_convert_to_datetime_action(self, *args) -> None:
+        """Converts the selected column to Datetime values."""
+        self.column_convert_to(polars.Datetime)
+
+    def on_column_convert_to_duration_action(self, *args) -> None:
+        """Converts the selected column to Duration values."""
+        self.column_convert_to(polars.Duration)
+
+    def column_convert_to(self, col_type: polars.DataType, *args) -> None:
+        """
+        Converts the selected column to the specified data type.
+
+        This method is triggered when the user selects the "Convert to [data type]"
+        action, typically through a menu item or a keyboard shortcut.
+        It is intended to convert the selected column to the specified data type.
+
+        Args:
+            col_type: The data type to convert the column to.
+            *args: Variable length argument list. Currently unused.
+        """
+        window = self.get_active_window()
+        col_index = window.selection.get_previous_selected_column()
+        if window.dbms.convert_column_to(col_index, col_type):
+            window.renderer.invalidate_cache()
+            window.main_canvas.queue_draw()
+        # TODO: show error message to user
 
     def create_action(self, name: str, callback: callable, shortcuts: list | None = None) -> None:
         """
