@@ -127,7 +127,7 @@ class Display(GObject.Object):
             return x // self.CELL_DEFAULT_WIDTH
 
         if x >= self.cumulative_column_widths[-1]:
-            return len(self.cumulative_column_widths) + (x - self.cumulative_column_widths[-1]) // self.CELL_DEFAULT_WIDTH + WITH_ROW_INDEX
+            return len(self.cumulative_column_widths) + (x - self.cumulative_column_widths[-1] + WITH_ROW_INDEX) // self.CELL_DEFAULT_WIDTH
 
         return self.cumulative_column_widths.search_sorted(x, 'left')
 
