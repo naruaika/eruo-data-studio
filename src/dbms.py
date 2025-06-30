@@ -17,6 +17,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from enum import Enum
 import polars
 
 from gi.repository import Gio, GObject
@@ -67,6 +68,15 @@ class DBMS(GObject.Object):
         """
         shape = self.data_frame.shape
         return (shape[0], shape[1] - WITH_ROW_INDEX)
+
+    def get_dtypes(self) -> list[str]:
+        """
+        Get the data types of the columns in the data frame.
+
+        Returns:
+            list[str]: A list of data types in the data frame.
+        """
+        return self.data_frame.dtypes[WITH_ROW_INDEX:]
 
     def get_columns(self) -> list[str]:
         """

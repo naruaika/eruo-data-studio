@@ -378,7 +378,7 @@ class Renderer(GObject.Object):
 
             # Draw the column type
             if col_index < self._dbms.get_shape()[1]:
-                cell_text_2 = str(self._dbms.data_frame.dtypes[col_index])
+                cell_text_2 = str(self._dbms.get_dtypes()[col_index])
                 layout.set_text(cell_text_2, -1)
                 layout.set_font_description(type_font_desc)
                 x_text = x + self._display.CELL_DEFAULT_PADDING - x_offset
