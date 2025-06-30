@@ -19,6 +19,7 @@
 
 from enum import Enum
 import os
+import time
 
 class Log(Enum):
     EMERGENCY = 1
@@ -89,4 +90,4 @@ def print_log(message: str, type: Log = Log.INFO, context: str = '') -> None:
         msg_type = 'DEBUG'
     if context:
         context = f'({context}): '
-    print(f'{context}{color}{msg_type}\033[0m: {message}')
+    print(f'{time.strftime("%H:%M:%S")}.{int(time.time() * 1000) % 1000:03d}: {context}{color}{msg_type}\033[0m: {message}')

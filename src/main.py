@@ -47,6 +47,9 @@ class EruoDataStudioApplication(Adw.Application):
         self.create_action('about', self.on_about_action)
         self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
         self.create_action('open-file', self.on_open_file_action, ['<primary>o'])
+        self.create_action('sheet.column.sort-a-to-z', self.on_column_sort_a_to_z_action)
+        self.create_action('sheet.column.sort-z-to-a', self.on_column_sort_z_to_a_action)
+        self.create_action('sheet.column.reset-sort', self.on_column_reset_sort_action)
 
     def do_activate(self) -> None:
         """
@@ -182,6 +185,54 @@ class EruoDataStudioApplication(Adw.Application):
             *args: Variable length argument list. Currently unused.
         """
         raise NotImplementedError # TODO
+
+    def on_column_sort_a_to_z_action(self, *args) -> None:
+        """
+        Sorts the selected column in ascending order.
+
+        This method is triggered when the user selects the "Sort A to Z"
+        action, typically through a menu item or a keyboard shortcut.
+        It is intended to sort the selected column in ascending order.
+
+        Args:
+            *args: Variable length argument list. Currently unused.
+        """
+        window = self.get_active_window()
+        window.dbms.sort_column_values(window.selection.get_previous_selected_column())
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_sort_z_to_a_action(self, *args) -> None:
+        """
+        Sorts the selected column in descending order.
+
+        This method is triggered when the user selects the "Sort Z to A"
+        action, typically through a menu item or a keyboard shortcut.
+        It is intended to sort the selected column in descending order.
+
+        Args:
+            *args: Variable length argument list. Currently unused.
+        """
+        window = self.get_active_window()
+        window.dbms.sort_column_values(window.selection.get_previous_selected_column(), descending=True)
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_reset_sort_action(self, *args) -> None:
+        """
+        Resets the sort order of the selected column.
+
+        This method is triggered when the user selects the "Reset Sort"
+        action, typically through a menu item or a keyboard shortcut.
+        It is intended to reset the sort order of the selected column.
+
+        Args:
+            *args: Variable length argument list. Currently unused.
+        """
+        window = self.get_active_window()
+        window.dbms.sort_column_values(-1)
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
 
     def create_action(self, name: str, callback: callable, shortcuts: list | None = None) -> None:
         """

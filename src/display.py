@@ -21,6 +21,7 @@ import polars
 
 from gi.repository import GObject
 
+from .dbms import WITH_ROW_INDEX
 from .utils import print_log, Log
 
 class Display(GObject.Object):
@@ -96,7 +97,7 @@ class Display(GObject.Object):
 
         return True
 
-    def get_column_position(self, col_index) -> int:
+    def get_column_position(self, col_index: int) -> int:
         """Calculates the x-coordinate for the start of a given column."""
         if col_index == 0:
             return 0
@@ -105,7 +106,7 @@ class Display(GObject.Object):
         else:
             return self.cumulative_column_widths[-1] + (col_index - self.cumulative_column_widths.shape[0]) * self.CELL_DEFAULT_WIDTH
 
-    def get_column_width(self, col_index) -> int:
+    def get_column_width(self, col_index: int) -> int:
         """Retrieves the width of a single column."""
         if col_index < self.column_widths.shape[0]:
             return self.column_widths[col_index]
@@ -126,7 +127,7 @@ class Display(GObject.Object):
             return x // self.CELL_DEFAULT_WIDTH
 
         if x >= self.cumulative_column_widths[-1]:
-            return len(self.cumulative_column_widths) + (x - self.cumulative_column_widths[-1]) // self.CELL_DEFAULT_WIDTH
+            return len(self.cumulative_column_widths) + (x - self.cumulative_column_widths[-1]) // self.CELL_DEFAULT_WIDTH + WITH_ROW_INDEX
 
         return self.cumulative_column_widths.search_sorted(x, 'left')
 

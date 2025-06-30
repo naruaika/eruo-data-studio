@@ -60,7 +60,7 @@
               </object>
             </child>
             <child>
-              <object class="GtkOverlay">
+              <object class="GtkOverlay" id="main_container">
                 <property name="vexpand">True</property>
                 <property name="hexpand">True</property>
                 <child>

@@ -28,6 +28,9 @@ class Selection(GObject.Object):
 
     _display: Display
 
+    _previous_selected_column: int = -1
+    _selected_column: int = -1
+
     _active_cell: tuple[int, int] = (0, 0)
     _selected_cells: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (0, 0))
 
@@ -42,6 +45,42 @@ class Selection(GObject.Object):
         """
         super().__init__()
         self._display = display
+
+    def get_previous_selected_column(self) -> int:
+        """
+        Returns the index of the previously selected column.
+
+        Returns:
+            An integer representing the index of the previously selected column.
+        """
+        return self._previous_selected_column
+
+    def set_previous_selected_column(self, index: int) -> None:
+        """
+        Sets the previously selected column.
+
+        Args:
+            index: The index of the previously selected column.
+        """
+        self._previous_selected_column = index
+
+    def get_selected_column(self) -> int:
+        """
+        Returns the index of the currently selected column.
+
+        Returns:
+            An integer representing the index of the selected column.
+        """
+        return self._selected_column
+
+    def set_selected_column(self, index: int) -> None:
+        """
+        Sets the currently selected column.
+
+        Args:
+            index: The index of the selected column.
+        """
+        self._selected_column = index
 
     def get_active_cell(self) -> tuple[int, int]:
         """

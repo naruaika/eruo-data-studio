@@ -27,7 +27,7 @@ import time
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango, PangoCairo
 
 from .utils import Log, print_log
-from .dbms import DBMS
+from .dbms import DBMS, WITH_ROW_INDEX
 from .display import Display
 from .renderer import Renderer
 from .selection import Selection
@@ -41,6 +41,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
     name_box: Gtk.Widget = Gtk.Template.Child()
     formula_bar: Gtk.Widget = Gtk.Template.Child()
+    main_container: Gtk.Widget = Gtk.Template.Child()
     main_canvas: Gtk.Widget = Gtk.Template.Child()
     vertical_scrollbar: Gtk.Widget = Gtk.Template.Child()
     horizontal_scrollbar: Gtk.Widget = Gtk.Template.Child()
@@ -52,6 +53,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
     renderer: Renderer
 
     _main_canvas_size: tuple[int, int] = (0, 0)
+    _main_canvas_cursor_name: str = 'cell'
 
     def __init__(self, file: Gio.File | None = None, **kwargs) -> None:
         """
@@ -78,6 +80,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.formula_bar.x_is_dirty = False
 
         self.main_canvas.connect('resize', self.on_main_canvas_resized)
+        self.main_canvas.set_cursor(Gdk.Cursor.new_from_name(self._main_canvas_cursor_name, Gdk.Cursor.new_from_name('default')))
         self.main_canvas.set_draw_func(self.renderer.draw)
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
@@ -109,6 +112,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
         click_event_controller = Gtk.GestureClick()
         click_event_controller.connect('pressed', self.on_main_canvas_pressed)
+        click_event_controller.connect('released', self.on_main_canvas_released)
         self.main_canvas.add_controller(click_event_controller)
         focus_event_controller = Gtk.EventControllerFocus()
         focus_event_controller.connect('leave', self.on_main_canvas_unfocused)
@@ -126,6 +130,10 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         scroll_event_controller.set_flags(Gtk.EventControllerScrollFlags.BOTH_AXES)
         scroll_event_controller.connect('scroll', self.on_main_canvas_scrolled)
         self.main_canvas.add_controller(scroll_event_controller)
+
+        motion_event_controller = Gtk.EventControllerMotion()
+        motion_event_controller.connect('motion', self.on_main_canvas_motion)
+        self.main_canvas.add_controller(motion_event_controller)
 
         motion_event_controller = Gtk.EventControllerMotion()
         motion_event_controller.connect('enter', self.on_scrollbar_entered)
@@ -173,9 +181,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.formula_bar.set_text(self.get_cell_data())
 
         self.scroll_to_active_cell()
+        self.renderer.invalidate_cache()
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
-        self.renderer.reset_cache()
         self.main_canvas.queue_draw()
 
     def on_name_box_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
@@ -224,9 +232,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.name_box.set_text(self.selection.get_active_cell_name())
         self.formula_bar.set_text(self.get_cell_data())
         self.formula_bar.x_is_dirty = False
+        self.renderer.invalidate_cache()
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
-        self.renderer.reset_cache()
         self.main_canvas.queue_draw()
 
     def on_formula_bar_changed(self, widget: Gtk.Widget) -> None:
@@ -255,7 +263,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             return
 
         if self._main_canvas_size[0] < width or self._main_canvas_size[1] < height:
-            self.renderer.reset_cache()
+            self.renderer.invalidate_cache()
 
     def on_main_canvas_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         """
@@ -267,24 +275,72 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         and schedules the main canvas to redraw.
         """
         if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.COLUMN_HEADER_HEIGHT:
-            if x <= self.display.ROW_HEADER_WIDTH and y <= self.display.COLUMN_HEADER_HEIGHT:
-                raise NotImplementedError # TODO: handle clicking on the top left corner area
-            if x <= self.display.ROW_HEADER_WIDTH and self.display.CELL_DEFAULT_HEIGHT <= y:
-                raise NotImplementedError # TODO: handle clicking on the row index cell
-            if y <= self.display.CELL_DEFAULT_HEIGHT and self.display.ROW_HEADER_WIDTH <= x:
-                raise NotImplementedError # TODO: handle clicking on the column index cell
-            if self.display.CELL_DEFAULT_HEIGHT <= y:
-                raise NotImplementedError # TODO: handle clicking on the column header cell
+            return
 
         # Set active cell
         self.selection.set_active_cell_by_coordinate((x + self.display.scroll_horizontal_position, y + self.display.scroll_vertical_position))
+        self.selection.set_selected_cells(((self.selection.get_active_cell()), (self.selection.get_active_cell())))
         self.name_box.set_text(self.selection.get_active_cell_name())
         self.formula_bar.set_text(self.get_cell_data())
-        self.selection.set_selected_cells(((self.selection.get_active_cell()), (self.selection.get_active_cell())))
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
-        self.renderer.reset_cache()
         self.main_canvas.queue_draw()
+
+    def on_main_canvas_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        """Callback function for when the main canvas is released."""
+        def on_context_menu_closed(widget: Gtk.Widget) -> None:
+            self.selection.set_selected_column(-1)
+            self.main_canvas.set_focusable(True)
+            self.main_canvas.grab_focus()
+
+        if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.COLUMN_HEADER_HEIGHT:
+            if x <= self.display.ROW_HEADER_WIDTH and y <= self.display.COLUMN_HEADER_HEIGHT:
+                raise NotImplementedError # TODO: handle clicking on the top left corner area
+
+            if x <= self.display.ROW_HEADER_WIDTH and self.display.CELL_DEFAULT_HEIGHT <= y:
+                raise NotImplementedError # TODO: handle clicking on the row index cell
+
+            if y <= self.display.CELL_DEFAULT_HEIGHT and self.display.ROW_HEADER_WIDTH <= x:
+                raise NotImplementedError # TODO: handle clicking on the column index cell
+
+            if self.display.CELL_DEFAULT_HEIGHT <= y:
+                row_index, col_index = self.display.coordinate_to_index((x + self.display.scroll_horizontal_position, self.display.CELL_DEFAULT_HEIGHT))
+                self.selection.set_selected_column(col_index)
+                self.selection.set_previous_selected_column(col_index)
+
+                # Show the unique values of the column
+                # unique_values = []
+                # if col_index < self.dbms.get_shape()[1]:
+                #     unique_values = self.dbms.get_column_unique_values(col_index)
+
+                # Show the context menu
+                if isinstance(self.main_canvas.get_first_child(), Gtk.PopoverMenu):
+                    context_menu = self.main_canvas.get_first_child()
+                else:
+                    context_menu = Gtk.PopoverMenu()
+                    context_menu.set_parent(self.main_container)
+                    context_menu.add_css_class('context-menu')
+                    self.main_canvas.queue_draw()
+                menu = Gio.Menu()
+                menu.append('Sort A to Z', 'app.sheet.column.sort-a-to-z')
+                menu.append('Sort Z to A', 'app.sheet.column.sort-z-to-a')
+                menu.append('Reset Sort', 'app.sheet.column.reset-sort')
+                context_menu.set_menu_model(menu)
+                context_menu.connect('closed', on_context_menu_closed)
+                x_menu = self.display.get_column_position(col_index) + self.display.get_column_width(col_index) // 2 + self.display.ROW_HEADER_WIDTH - self.display.scroll_horizontal_position
+                if x_menu < self.display.ROW_HEADER_WIDTH:
+                    x_menu = self.display.ROW_HEADER_WIDTH + 1
+                elif x_menu > self._main_canvas_size[0]:
+                    x_menu = self.main_canvas.get_width() - 1
+                rectangle = Gdk.Rectangle()
+                rectangle.x = int(x_menu)
+                rectangle.y = self.display.COLUMN_HEADER_HEIGHT
+                rectangle.height = 1
+                rectangle.width = 1
+                context_menu.set_pointing_to(rectangle)
+                context_menu.popup()
+
+                return
 
     def on_main_canvas_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         """
@@ -339,7 +395,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                     active_cell = (active_cell[0], max(0, active_cell[1] - 1))
             case Gdk.KEY_Right:
                 if state == Gdk.ModifierType.CONTROL_MASK:
-                    active_cell = (active_cell[0], max(0, self.dbms.data_frame.shape[1] - 1))
+                    active_cell = (active_cell[0], max(0, self.dbms.get_shape()[1] - 1))
                 else:
                     active_cell = (active_cell[0], active_cell[1] + 1)
             case Gdk.KEY_Up:
@@ -349,7 +405,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                     active_cell = (max(0, active_cell[0] - 1), active_cell[1])
             case Gdk.KEY_Down:
                 if state == Gdk.ModifierType.CONTROL_MASK:
-                    active_cell = (max(0, self.dbms.data_frame.shape[0] - 1), active_cell[1])
+                    active_cell = (max(0, self.dbms.get_shape()[0] - 1), active_cell[1])
                 else:
                     active_cell = (active_cell[0] + 1, active_cell[1])
             case _:
@@ -370,7 +426,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.formula_bar.set_text(self.get_cell_data())
 
         if self.scroll_to_active_cell():
-            self.renderer.reset_cache()
+            self.renderer.invalidate_cache()
         self.main_canvas.queue_draw()
 
     def on_main_canvas_scrolled(self, event: Gtk.EventControllerScroll, dx: float, dy: float) -> bool:
@@ -393,24 +449,26 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
         self.display.scroll_vertical_position = max(0, self.display.scroll_vertical_position + dy)
         self.display.scroll_horizontal_position = max(0, self.display.scroll_horizontal_position + dx)
-
-        # Adjust row header width
-        context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0))
-        font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {self.renderer.FONT_SIZE}')
-        cell_height = self.display.CELL_DEFAULT_HEIGHT
-        y_start = self.display.COLUMN_HEADER_HEIGHT
-        max_row_number = (self.display.scroll_vertical_position // cell_height) + 1 + ((self.main_canvas.get_height() - y_start) // cell_height)
-        layout = PangoCairo.create_layout(context)
-        layout.set_text(str(max_row_number), -1)
-        layout.set_font_description(font_desc)
-        text_width = layout.get_size()[0] / Pango.SCALE
-        self.display.ROW_HEADER_WIDTH = max(40, int(text_width + 2 * self.display.CELL_DEFAULT_PADDING + 0.5))
-
-        self.renderer.reset_cache()
-        self.renderer.reset_cache()
+        self.renderer.invalidate_cache()
         self.main_canvas.queue_draw()
 
         return True
+
+    def on_main_canvas_motion(self, event: Gtk.EventControllerMotion, x: float, y: float) -> None:
+        """Callback function for when the main canvas is hovered."""
+        cursor_name = 'cell'
+        if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.COLUMN_HEADER_HEIGHT:
+            if x <= self.display.ROW_HEADER_WIDTH and y <= self.display.COLUMN_HEADER_HEIGHT:
+                cursor_name = 'cell'
+            else:
+                cursor_name = 'pointer'
+        else:
+            cursor_name = 'cell'
+
+        if cursor_name != self._main_canvas_cursor_name:
+            print_log(f'Changing main canvas cursor to: {cursor_name}', Log.DEBUG)
+            self.main_canvas.set_cursor(Gdk.Cursor.new_from_name(cursor_name, Gdk.Cursor.new_from_name('default')))
+            self._main_canvas_cursor_name = cursor_name
 
     def on_scrollbar_entered(self, event: Gtk.EventControllerMotion, x: float, y: float) -> None:
         """Callback function for when the scrollbar is entered."""
@@ -427,11 +485,11 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         Returns:
             str: The data from the selected cell, or an empty string if the selected cell is out of bounds.
         """
-        df_shape = self.dbms.data_frame.shape
+        df_shape = self.dbms.get_shape()
         row, col = self.selection.get_active_cell()
         if df_shape[0] <= row or df_shape[1] <= col:
             return ""
-        return str(self.dbms.data_frame[row, col])
+        return str(self.dbms.get_data(row, col))
 
     def set_cell_data(self, row: int, col: int, value: any) -> bool:
         """
@@ -446,11 +504,11 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             bool: True if the cell data is successfully set, False otherwise.
         """
         print_log(f"Updating cell data at index ({format(row, ",d")}, {format(col, ",d")}) to: {value}")
-        df_shape = self.dbms.data_frame.shape
+        df_shape = self.dbms.get_shape()
         if df_shape[0] <= row or df_shape[1] <= col:
             print_log(f"Cannot update cell data at index ({format(row, ",d")}, {format(col, ",d")}) due to out of bounds", Log.NOTICE)
             return False # TODO: implement dynamic data frame(?)
-        self.dbms.data_frame[row, col] = value
+        self.dbms.set_data(row, col, value)
         print_log(f"Cell data at index ({format(row, ",d")}, {format(col, ",d")}) is updated")
         return True
 
@@ -489,7 +547,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             GLib.idle_add(self.formula_bar.set_text, self.get_cell_data())
             file_size = file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, None).get_size() / (1024 * 1024)
             GLib.idle_add(self.status_message.set_text, f'File: {file.get_basename()} | Size: {format(file_size, ",.2f")} MB | '
-                                                        f'Rows: {format(self.dbms.data_frame.shape[0], ",d")} | Columns: {format(self.dbms.data_frame.shape[1], ",d")}')
+                                                        f'Rows: {format(self.dbms.get_shape()[0], ",d")} | Columns: {format(self.dbms.get_shape()[1], ",d")}')
 
         def expand_column_header_height() -> None:
             """Expands the column header height to fit the header of the data frame."""
@@ -509,7 +567,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             monitor = display.get_monitors()[0]
             max_width = monitor.get_geometry().width // 8
             sample_data = self.dbms.data_frame.head(200)
-            self.display.column_widths = polars.Series([self.display.CELL_DEFAULT_WIDTH] * self.dbms.data_frame.shape[1])
+            self.display.column_widths = polars.Series([self.display.CELL_DEFAULT_WIDTH] * self.dbms.get_shape()[1])
 
             font_desc = Gtk.Widget.create_pango_context(self.main_canvas).get_font_description()
             system_font = font_desc.get_family() if font_desc else 'Sans'
@@ -518,7 +576,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             layout = PangoCairo.create_layout(context)
             layout.set_font_description(font_desc)
 
-            for index, col_name in enumerate(sample_data.columns):
+            for index, col_name in enumerate(self.dbms.get_columns()):
                 sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
                 max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
                 layout.set_text('0' * max_length, -1)
@@ -545,7 +603,10 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             """
             try:
                 start_time = time.time()
-                self.dbms.data_frame = polars.read_csv(file.get_path())
+                if WITH_ROW_INDEX:
+                    self.dbms.data_frame = polars.read_csv(file.get_path()).with_row_index()
+                else:
+                    self.dbms.data_frame = polars.read_csv(file.get_path())
                 end_time = time.time()
                 file_size = file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, None).get_size() / (1024 * 1024)
                 print_log(f'Loaded and parsed file {file.get_path()} of size {format(file_size, ",.2f")} MB in {end_time - start_time:.6f} seconds')
@@ -561,8 +622,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 calculate_column_widths()
                 calculate_cumulative_column_widths()
                 assign_file()
-                self.renderer.reset_cache()
-                self.renderer.reset_cache()
+                self.renderer.invalidate_cache()
                 self.main_canvas.queue_draw()
 
         threading.Thread(target=load_file_thread, daemon=True).start()
