@@ -543,8 +543,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         df_shape = self.dbms.get_shape()
         row, col = self.selection.get_active_cell()
         if df_shape[0] <= row or df_shape[1] <= col:
-            return ""
-        return str(self.dbms.get_data(row, col))
+            return ''
+        cell_data = self.dbms.get_data(row, col)
+        return str('' if cell_data is None else cell_data)
 
     def set_cell_data(self, row: int, col: int, value: any) -> bool:
         """
