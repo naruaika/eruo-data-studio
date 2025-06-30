@@ -32,6 +32,8 @@ class DBMS(GObject.Object):
     file: Gio.File | None = None
     data_frame: polars.DataFrame = polars.DataFrame()
 
+    fill_counts: list[int] = []
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -109,6 +111,13 @@ class DBMS(GObject.Object):
                 print_log(f'Column {col_name} has approximately {format(approx_n_unique, ",d")} unique values; too many to display.', Log.DEBUG)
                 return []
         return col_data.unique().to_list()
+
+    def summary_fill_counts(self) -> None:
+        """Calculates the fill counts for each column."""
+        print_log('Calculating fill counts...', Log.DEBUG)
+        for col_name in self.get_columns():
+            fill_count = self.data_frame.shape[0] - self.data_frame[col_name].is_null().sum()
+            self.fill_counts.append(fill_count)
 
     def sort_column_values(self, col_index: int, descending: bool = False) -> None:
         """

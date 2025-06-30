@@ -622,7 +622,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             monitor = display.get_monitors()[0]
             max_width = monitor.get_geometry().width // 8
             sample_data = self.dbms.data_frame.head(200)
-            self.display.column_widths = polars.Series([self.display.CELL_DEFAULT_WIDTH] * self.dbms.get_shape()[1])
+            self.display.column_widths = [0] * self.dbms.get_shape()[1]
 
             font_desc = Gtk.Widget.create_pango_context(self.main_canvas).get_font_description()
             system_font = font_desc.get_family() if font_desc else 'Sans'
@@ -646,6 +646,10 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             """Calculates the cumulative column widths."""
             print_log('Calculating cumulative column widths...', Log.DEBUG)
             self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
+
+        def summary_fill_counts() -> None:
+            """Calculates the fill counts for each column."""
+            self.dbms.summary_fill_counts()
 
         def load_file_thread() -> None:
             """
@@ -679,6 +683,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 expand_column_header_height()
                 calculate_column_widths()
                 calculate_cumulative_column_widths()
+                summary_fill_counts()
                 assign_file()
                 self.renderer.invalidate_cache()
                 self.main_canvas.queue_draw()

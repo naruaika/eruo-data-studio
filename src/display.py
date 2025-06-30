@@ -37,7 +37,7 @@ class Display(GObject.Object):
     scroll_vertical_position: int = 0
     scroll_horizontal_position: int = 0
 
-    column_widths: polars.Series = polars.Series()
+    column_widths: list[int] = []
     cumulative_column_widths: polars.Series = polars.Series()
 
     def __init__(self) -> None:
@@ -108,7 +108,7 @@ class Display(GObject.Object):
 
     def get_column_width(self, col_index: int) -> int:
         """Retrieves the width of a single column."""
-        if col_index < self.column_widths.shape[0]:
+        if col_index < len(self.column_widths):
             return self.column_widths[col_index]
         else:
             return self.CELL_DEFAULT_WIDTH

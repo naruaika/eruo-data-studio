@@ -37,7 +37,7 @@ class Renderer(GObject.Object):
     _selection: Selection
 
     _prefer_dark = Adw.StyleManager().get_dark()
-    _color_accent = Adw.StyleManager().get_accent_color_rgba()
+    _color_accent = (0.20, 0.51, 0.89, 1.00) # Adw.StyleManager().get_accent_color_rgba()
     _cell_contents_snapshot = None
 
     def __init__(self, display: Display, selection: Selection, dbms: DBMS) -> None:
@@ -82,6 +82,7 @@ class Renderer(GObject.Object):
         self.adjust_row_header_width(area, context, width, height)
         self.draw_headers_backgrounds(area, context, width, height)
         self.draw_selection_backgrounds(area, context, width, height)
+        self.draw_cells_borders(area, context, width, height)
         self.draw_headers_contents(area, context, width, height)
 
         # Draw the cell contents
@@ -92,7 +93,6 @@ class Renderer(GObject.Object):
         context.set_source_surface(self._cell_contents_snapshot, 0, 0)
         context.paint()
 
-        self.draw_cells_borders(area, context, width, height)
         self.draw_selection_borders(area, context, width, height)
 
         end_time = time.perf_counter()
@@ -111,7 +111,7 @@ class Renderer(GObject.Object):
         if (prefer_dark := Adw.StyleManager().get_dark()) != self._prefer_dark:
             self._prefer_dark = prefer_dark
             self.invalidate_cache()
-        self._color_accent = Adw.StyleManager().get_accent_color_rgba()
+        self._color_accent = (0.20, 0.51, 0.89, 1.00) # Adw.StyleManager().get_accent_color_rgba()
         font_options = cairo.FontOptions()
         font_options.set_antialias(cairo.Antialias.GOOD)
         context.set_font_options(font_options)
@@ -166,7 +166,7 @@ class Renderer(GObject.Object):
 
         # Set the accent color with reduced opacity for selected column header
         accent_rgba = list(self._color_accent)
-        accent_rgba[3] = 0.25
+        accent_rgba[3] = 0.15
         context.set_source_rgba(*accent_rgba)
 
         # Get the selected cell range
@@ -219,7 +219,7 @@ class Renderer(GObject.Object):
 
         # Set the accent color with reduced opacity for selected column header
         accent_rgba = list(self._color_accent)
-        accent_rgba[3] = 0.25
+        accent_rgba[3] = 0.15
         context.set_source_rgba(*accent_rgba)
 
         # Calculate the position and size of the selection rectangle
@@ -306,8 +306,12 @@ class Renderer(GObject.Object):
         type_font_desc = Pango.font_description_from_string(f'{system_font} Normal Regular {self.FONT_SIZE - 1}')
 
         text_color = (0.0, 0.0, 0.0)
+        green_color = (0.0, 0.5, 0.0)
+        orange_color = (1.0, 0.5, 0.0)
         if self._prefer_dark:
             text_color = (1.0, 1.0, 1.0)
+            green_color = (0.0, 0.7, 0.0)
+            orange_color = (0.9, 0.4, 0.0)
         *accent_color, _ = self._color_accent
 
         # Get the selected cell range
@@ -328,7 +332,7 @@ class Renderer(GObject.Object):
             if 0 <= col_index - 1 < self._display.cumulative_column_widths.shape[0]:
                 x_offset = self._display.cumulative_column_widths[col_index - 1]
             x_offset -= self._display.scroll_horizontal_position
-            if col_index < self._display.column_widths.shape[0]:
+            if col_index < len(self._display.column_widths):
                 cell_width = self._display.column_widths[col_index] + x_offset
             else:
                 scroll_position = self._display.scroll_horizontal_position - self._display.cumulative_column_widths[-1]
@@ -353,7 +357,7 @@ class Renderer(GObject.Object):
             layout.set_font_description(index_font_desc)
 
             cell_actual_width = self._display.CELL_DEFAULT_WIDTH
-            if col_index < self._display.column_widths.shape[0]:
+            if col_index < len(self._display.column_widths):
                 cell_actual_width = self._display.column_widths[col_index]
 
             x_offset = 0
@@ -397,11 +401,27 @@ class Renderer(GObject.Object):
                 context.line_to(x_text + self._display.ICON_DEFAULT_SIZE, y_text + 2)
                 context.stroke()
 
+            # Draw a progress bar to indicate the missing data
+            if col_index < len(self._dbms.fill_counts):
+                x_text = x - x_offset
+                y_text = self._display.CELL_DEFAULT_HEIGHT
+                fill_width = int(cell_width * self._dbms.fill_counts[col_index] / self._dbms.get_shape()[0])
+                context.set_hairline(False)
+                context.set_line_width(3)
+                context.set_source_rgb(*green_color)
+                context.move_to(x_text, y_text)
+                context.line_to(x_text + fill_width, y_text)
+                context.stroke()
+                context.set_source_rgb(*orange_color)
+                context.move_to(x_text + fill_width, y_text)
+                context.line_to(x_text + cell_width, y_text)
+                context.stroke()
+
             context.restore()
 
             x += cell_width
             col_index += 1
-            if col_index < self._display.column_widths.shape[0]:
+            if col_index < len(self._display.column_widths):
                 cell_width = self._display.column_widths[col_index]
             else:
                 cell_width = self._display.CELL_DEFAULT_WIDTH
@@ -470,7 +490,7 @@ class Renderer(GObject.Object):
         if 0 <= col_index - 1 < self._display.cumulative_column_widths.shape[0]:
             x_offset = self._display.cumulative_column_widths[col_index - 1]
         x_offset -= self._display.scroll_horizontal_position
-        if col_index < self._display.column_widths.shape[0]:
+        if col_index < len(self._display.column_widths):
             cell_width = self._display.column_widths[col_index] + x_offset
         else:
             scroll_position = self._display.scroll_horizontal_position - self._display.cumulative_column_widths[-1]
@@ -490,7 +510,7 @@ class Renderer(GObject.Object):
                     width = x # prevent iteration over empty cells
                     break
                 cell_actual_width = self._display.CELL_DEFAULT_WIDTH
-                if col_index < self._display.column_widths.shape[0]:
+                if col_index < len(self._display.column_widths):
                     cell_actual_width = self._display.column_widths[col_index]
                 x_offset = 0
                 if x == self._display.ROW_HEADER_WIDTH:
@@ -511,7 +531,7 @@ class Renderer(GObject.Object):
                 y += cell_height
             x += cell_width
             col_index += 1
-            if col_index < self._display.column_widths.shape[0]:
+            if col_index < len(self._display.column_widths):
                 cell_width = self._display.column_widths[col_index]
             else:
                 cell_width = self._display.CELL_DEFAULT_WIDTH
@@ -569,7 +589,7 @@ class Renderer(GObject.Object):
                 x_offset = self._display.cumulative_column_widths[col_index - 1]
             x_offset -= self._display.scroll_horizontal_position
             cell_width = self._display.CELL_DEFAULT_WIDTH
-            if col_index < self._display.column_widths.shape[0]:
+            if col_index < len(self._display.column_widths):
                 cell_width = self._display.column_widths[col_index] + x_offset
             else:
                 scroll_position = self._display.scroll_horizontal_position - self._display.cumulative_column_widths[-1]
@@ -581,7 +601,7 @@ class Renderer(GObject.Object):
                 context.line_to(x, height)
                 x += cell_width
                 col_index += 1
-                if col_index < self._display.column_widths.shape[0]:
+                if col_index < len(self._display.column_widths):
                     cell_width = self._display.column_widths[col_index]
                 else:
                     cell_width = self._display.CELL_DEFAULT_WIDTH
