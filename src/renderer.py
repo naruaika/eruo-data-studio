@@ -487,13 +487,14 @@ class Renderer(GObject.Object):
                 if df_shape[1] <= col_index:
                     width = x # prevent iteration over empty cells
                     break
-                if x == x_start:
-                    if (col_index > 0 and abs(x_offset) == self._display.get_column_width(col_index - 1)):
-                        x_offset = 0
-                    x_text = x + self._display.CELL_DEFAULT_PADDING - abs(x_offset)
-                else:
-                    x_text = x + self._display.CELL_DEFAULT_PADDING
-                cell_text = str(self._dbms.get_data(row_index, col_index))
+                cell_actual_width = self._display.CELL_DEFAULT_WIDTH
+                if col_index < self._display.column_widths.shape[0]:
+                    cell_actual_width = self._display.column_widths[col_index]
+                x_offset = 0
+                if x == self._display.ROW_HEADER_WIDTH:
+                    x_offset = cell_actual_width - cell_width
+                x_text = x + self._display.CELL_DEFAULT_PADDING - x_offset
+                cell_text = str(self._dbms.get_data(row_index, col_index))[:int(cell_actual_width * 1.25)] # 1.25 is a magic number
                 context.save()
                 context.rectangle(x, y, cell_width, cell_height)
                 context.clip()

@@ -579,7 +579,10 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             for index, col_name in enumerate(self.dbms.get_columns()):
                 sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
                 max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
-                layout.set_text('0' * max_length, -1)
+                if max_length is not None:
+                    layout.set_text('0' * max_length, -1)
+                else:
+                    layout.set_text('0', -1)
                 text_width = layout.get_size()[0] / Pango.SCALE
                 preferred_width = text_width + 2 * self.display.CELL_DEFAULT_PADDING
                 self.display.column_widths[index] = max(self.display.CELL_DEFAULT_WIDTH, min(max_width, int(preferred_width)))
