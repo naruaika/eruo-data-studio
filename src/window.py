@@ -303,8 +303,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             if y <= self.display.CELL_DEFAULT_HEIGHT and self.display.ROW_HEADER_WIDTH <= x:
                 raise NotImplementedError # TODO: handle clicking on the column index cell
 
-            if self.display.CELL_DEFAULT_HEIGHT <= y and \
-                    x + self.display.scroll_horizontal_position <= self.display.cumulative_column_widths[-1]:
+            if self.display.CELL_DEFAULT_HEIGHT <= y \
+                    and not self.display.cumulative_column_widths.is_empty() \
+                    and x + self.display.scroll_horizontal_position <= self.display.cumulative_column_widths[-1] + self.display.ROW_HEADER_WIDTH:
                 row_index, col_index = self.display.coordinate_to_index((x + self.display.scroll_horizontal_position, self.display.CELL_DEFAULT_HEIGHT))
                 self.selection.set_selected_column(col_index)
                 self.selection.set_previous_selected_column(col_index)
@@ -461,8 +462,12 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.COLUMN_HEADER_HEIGHT:
             if x <= self.display.ROW_HEADER_WIDTH and y <= self.display.COLUMN_HEADER_HEIGHT:
                 cursor_name = 'cell'
-            elif self.display.CELL_DEFAULT_HEIGHT <= y and \
-                    x + self.display.scroll_horizontal_position <= self.display.cumulative_column_widths[-1]:
+            elif \
+                (
+                    not self.display.cumulative_column_widths.is_empty()
+                    and x + self.display.scroll_horizontal_position <= self.display.cumulative_column_widths[-1] + self.display.ROW_HEADER_WIDTH
+                ) \
+                    or y <= self.display.CELL_DEFAULT_HEIGHT:
                 cursor_name = 'pointer'
             else:
                 cursor_name = 'default'
