@@ -496,7 +496,9 @@ class Renderer(GObject.Object):
                 if x == self._display.ROW_HEADER_WIDTH:
                     x_offset = cell_actual_width - cell_width
                 x_text = x + self._display.CELL_DEFAULT_PADDING - x_offset
-                cell_text = str(self._dbms.get_data(row_index, col_index))[:int(cell_actual_width * 1.25)] # 1.25 is a magic number
+                cell_text = self._dbms.get_data(row_index, col_index)
+                cell_text = str('' if cell_text is None else cell_text)
+                cell_text = cell_text[:int(cell_actual_width * 1.25)] # 1.25 is a magic number
                 context.save()
                 context.rectangle(x, y, cell_width, cell_height)
                 context.clip()

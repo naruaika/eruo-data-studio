@@ -1,3 +1,7 @@
+/* .toolbar entry {
+    min-height: 28px;
+} */
+
 .main-content scrollbar.vertical {
     padding-left: 5px;
     margin-bottom: 24px;

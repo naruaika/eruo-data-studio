@@ -30,12 +30,12 @@ Since we started developing the proof-of-concept with Libadwaita, a building blo
 
 ## Designing
 
-Here are some of the resources used in making decisions and planning application development:
+The following are some of the resources used in decision making and development planning.:
 
 - [The ONLY Data Cleaning Framework You Need | Ep. 3](https://www.youtube.com/watch?v=y9wFFD2bXQM)
 - [How to NAIL Exploratory Data Analysis (Lead Analyst Demo)](https://www.youtube.com/watch?v=deS6lETubdU)
 
-We've done some research on similar applications as follows:
+We've been doing some research on similar applications as follows:
 
 - Excel
 - Google Sheets
