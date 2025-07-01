@@ -1,6 +1,4 @@
-_build/
 .flatpak
-.pyenv
 .vscode
 *.bak
 TODO

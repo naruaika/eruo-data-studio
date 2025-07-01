@@ -3,6 +3,7 @@
   <gresource prefix="/com/macipra/Eruo">
     <file preprocess="xml-stripblanks">gtk/window.ui</file>
     <file preprocess="xml-stripblanks">gtk/help-overlay.ui</file>
+    <file preprocess="xml-stripblanks">gtk/sheet-column-menu.ui</file>
 
     <file alias="base.css">css/base.css</file>
     <file alias="style.css">css/style.css</file>

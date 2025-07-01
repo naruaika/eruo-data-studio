@@ -6,12 +6,29 @@ project('eruo-data-studio',
 
 i18n = import('i18n')
 gnome = import('gnome')
+python = import('python')
 
+pkgdatadir = get_option('prefix') / get_option('datadir') / meson.project_name()
+moduledir = pkgdatadir / 'eruo_data_studio'
 
+conf = configuration_data()
+conf.set('PYTHON', python.find_installation('python3').full_path())
+conf.set('VERSION', meson.project_version())
+conf.set('localedir', get_option('prefix') / get_option('localedir'))
+conf.set('pkgdatadir', pkgdatadir)
 
+configure_file(
+  input: 'eruo-data-studio.in',
+  output: 'eruo-data-studio',
+  configuration: conf,
+  install: true,
+  install_dir: get_option('bindir'),
+  install_mode: 'r-xr-xr-x'
+)
+
+install_subdir('src', install_dir: moduledir)
 
 subdir('data')
-subdir('src')
 subdir('po')
 
 gnome.post_install(
