@@ -405,7 +405,7 @@ class Renderer(GObject.Object):
             if col_index < len(self._dbms.fill_counts):
                 x_text = x - x_offset
                 y_text = self._display.CELL_DEFAULT_HEIGHT
-                fill_width = int(cell_width * self._dbms.fill_counts[col_index] / self._dbms.get_shape()[0])
+                fill_width = int(cell_actual_width * self._dbms.fill_counts[col_index] / self._dbms.get_shape()[0])
                 context.set_hairline(False)
                 context.set_line_width(3)
                 context.set_source_rgb(*green_color)
@@ -414,7 +414,7 @@ class Renderer(GObject.Object):
                 context.stroke()
                 context.set_source_rgb(*orange_color)
                 context.move_to(x_text + fill_width, y_text)
-                context.line_to(x_text + cell_width, y_text)
+                context.line_to(x_text + cell_actual_width, y_text)
                 context.stroke()
 
             context.restore()
