@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <menu id="sheet_column_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Sort _A to Z</attribute>
+        <attribute name="action">app.sheet.column.sort-a-to-z</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Sort _Z to A</attribute>
+        <attribute name="action">app.sheet.column.sort-z-to-a</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Reset All Sort(s)</attribute>
+        <attribute name="action">app.sheet.column.reset-sort</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="custom">filter_box</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Apply _Filter</attribute>
+        <attribute name="action">app.sheet.column.apply-filter</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Reset All Filter(s)</attribute>
+        <attribute name="action">app.sheet.column.reset-filter</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">_Convert To</attribute>
+        <link name="submenu">
+          <item>
+            <attribute name="label" translatable="yes">_Boolean</attribute>
+            <attribute name="action">app.sheet.column.convert-to.boolean</attribute>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">_Integer</attribute>
+            <link name="submenu">
+              <section>
+                <item>
+                  <attribute name="label" translatable="yes">_Integer8</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.int8</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Integer16</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.int16</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Integer32</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.int32</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Integer64</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.int64</attribute>
+                </item>
+              </section>
+              <section>
+                <item>
+                  <attribute name="label" translatable="yes">_Unsigned Int8</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.uint8</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Unsigned Int16</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.uint16</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Unsigned Int32</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.uint32</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Unsigned Int64</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.uint64</attribute>
+                </item>
+              </section>
+            </link>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">_Float</attribute>
+            <link name="submenu">
+              <section>
+                <item>
+                  <attribute name="label" translatable="yes">_Float32</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.float32</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Float64</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.float64</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Decimal</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.decimal</attribute>
+                </item>
+              </section>
+            </link>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">_String</attribute>
+            <attribute name="action">app.sheet.column.convert-to.string</attribute>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">_Categorical</attribute>
+            <attribute name="action">app.sheet.column.convert-to.categorical</attribute>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">_Date/Time</attribute>
+            <link name="submenu">
+              <section>
+                <item>
+                  <attribute name="label" translatable="yes">_Date</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.date</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Time</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.time</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Datetime</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.datetime</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">Du_ration</attribute>
+                  <attribute name="action">app.sheet.column.convert-to.duration</attribute>
+                </item>
+              </section>
+            </link>
+          </item>
+        </link>
+      </item>
+    </section>
+  </menu>
+  <template class="SheetColumnMenu" parent="GtkPopoverMenu">
+    <property name="menu-model">sheet_column_menu</property>
+    <child type="filter_box">
+      <object class="GtkBox">
+        <property name="orientation">vertical</property>
+        <child>
+          <object class="GtkSearchEntry">
+            <property name="placeholder-text">Search...</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkScrolledWindow" id="filter_scrolledwindow">
+            <property name="height-request">181</property>
+            <property name="width-request">400</property>
+            <property name="hscrollbar-policy">GTK_POLICY_EXTERNAL</property>
+            <child>
+              <object class="GtkViewport">
+                <child>
+                  <object class="GtkListBox" id="filter_listbox"></object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <style>
+      <class name="context-menu"/>
+    </style>
+  </template>
+</interface>

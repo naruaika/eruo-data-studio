@@ -11,10 +11,26 @@
     margin-right: 24px;
 }
 
-.main-content .context-menu .flat {
+/* .main-content .context-menu modelbutton {
     min-height: 24px;
     padding: 0px 8px;
     font-size: 13px;
+} */
+.main-content .context-menu entry + scrolledwindow {
+    margin-top: 6px;
+}
+.main-content .context-menu list {
+    padding: 0;
+}
+.main-content .context-menu row {
+    margin: 0;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    padding-left: 0;
+    padding-right: 0;
+}
+.main-content .context-menu .truncated {
+    font-style: italic;
 }
 
 .status-bar {

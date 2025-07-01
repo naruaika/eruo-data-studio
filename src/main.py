@@ -52,9 +52,11 @@ class EruoDataStudioApplication(Adw.Application):
         self.create_action('sheet.column.sort-a-to-z', self.on_column_sort_a_to_z_action)
         self.create_action('sheet.column.sort-z-to-a', self.on_column_sort_z_to_a_action)
         self.create_action('sheet.column.reset-sort', self.on_column_reset_sort_action)
+        self.create_action('sheet.column.apply-filter', self.on_column_apply_filter_action)
+        self.create_action('sheet.column.reset-filter', self.on_column_reset_filter_action)
         for data_type in ['boolean', 'int8', 'int16', 'int32', 'int64',  'uint8', 'uint16',
                           'uint32', 'uint64',  'float32', 'float64', 'decimal', 'string',
-                          'categorical', 'enum', 'date', 'time', 'datetime', 'duration']:
+                          'categorical', 'date', 'time', 'datetime', 'duration']:
             self.create_action(f'sheet.column.convert-to.{data_type}', getattr(self, f'on_column_convert_to_{data_type}_action'))
 
     def do_activate(self) -> None:
@@ -205,6 +207,7 @@ class EruoDataStudioApplication(Adw.Application):
         """
         window = self.get_active_window()
         window.dbms.sort_column_values(window.selection.get_previous_selected_column())
+        window.action_set_enabled('app.sheet.column.reset-sort', True)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
 
@@ -221,6 +224,7 @@ class EruoDataStudioApplication(Adw.Application):
         """
         window = self.get_active_window()
         window.dbms.sort_column_values(window.selection.get_previous_selected_column(), descending=True)
+        window.action_set_enabled('app.sheet.column.reset-sort', True)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
 
@@ -237,6 +241,41 @@ class EruoDataStudioApplication(Adw.Application):
         """
         window = self.get_active_window()
         window.dbms.sort_column_values(-1)
+        window.action_set_enabled('app.sheet.column.reset-sort', False)
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_apply_filter_action(self, *args) -> None:
+        """
+        Applies a filter to the selected column.
+
+        This method is triggered when the user selects the "Apply Filter"
+        action, typically through a menu item or a keyboard shortcut.
+        It is intended to apply a filter to the selected column.
+
+        Args:
+            *args: Variable length argument list. Currently unused.
+        """
+        window = self.get_active_window()
+        window.dbms.apply_filter()
+        window.action_set_enabled('app.sheet.column.reset-filter', True)
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_reset_filter_action(self, *args) -> None:
+        """
+        Resets the filter applied to the selected column.
+
+        This method is triggered when the user selects the "Reset Filter"
+        action, typically through a menu item or a keyboard shortcut.
+        It is intended to reset the filter applied to the selected column.
+
+        Args:
+            *args: Variable length argument list. Currently unused.
+        """
+        window = self.get_active_window()
+        window.dbms.reset_filter()
+        window.action_set_enabled('app.sheet.column.reset-filter', False)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
 
@@ -295,10 +334,6 @@ class EruoDataStudioApplication(Adw.Application):
     def on_column_convert_to_categorical_action(self, *args) -> None:
         """Converts the selected column to Categorical values."""
         self.column_convert_to(polars.Categorical)
-
-    def on_column_convert_to_enum_action(self, *args) -> None:
-        """Converts the selected column to Enum values."""
-        self.column_convert_to(polars.Enum)
 
     def on_column_convert_to_date_action(self, *args) -> None:
         """Converts the selected column to Date values."""

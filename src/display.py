@@ -32,7 +32,7 @@ class Display(GObject.Object):
     CELL_DEFAULT_HEIGHT: int = 20
     CELL_DEFAULT_WIDTH: int = 65
     CELL_DEFAULT_PADDING: int = 6
-    ICON_DEFAULT_SIZE: int = 8
+    ICON_DEFAULT_SIZE: int = 10
 
     scroll_vertical_position: int = 0
     scroll_horizontal_position: int = 0

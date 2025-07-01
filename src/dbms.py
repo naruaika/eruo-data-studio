@@ -17,7 +17,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from enum import Enum
+import gc
 import polars
 
 from gi.repository import Gio, GObject
@@ -31,8 +31,13 @@ class DBMS(GObject.Object):
 
     file: Gio.File | None = None
     data_frame: polars.DataFrame = polars.DataFrame()
-
     fill_counts: list[int] = []
+
+    pending_values_to_show: dict[str, list[str]] = {}
+    pending_values_to_hide: dict[str, list[str]] = {}
+    current_column_index: int = -1
+    current_unique_values: polars.Series = polars.Series()
+    current_unique_values_hash: str = ''
 
     def __init__(self) -> None:
         super().__init__()
@@ -89,7 +94,7 @@ class DBMS(GObject.Object):
         """
         return self.data_frame.columns[WITH_ROW_INDEX:]
 
-    def get_column_unique_values(self, col_index: int) -> list[str]:
+    def scan_column_unique_values(self, col_index: int) -> list[str]:
         """
         Get the unique values in a column.
 
@@ -99,18 +104,70 @@ class DBMS(GObject.Object):
         Returns:
             list[str]: A list of unique values in the specified column.
         """
-        col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
+        col_index = col_index + WITH_ROW_INDEX
+        col_name = self.data_frame.columns[col_index]
         col_data = self.data_frame.get_column(col_name)
-        if col_data.dtype in [polars.Categorical, polars.Enum, polars.Date, polars.Duration, polars.Time, polars.Boolean, polars.Null]:
-            print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
+
+        if col_data.dtype in [polars.Categorical, polars.Date, polars.Datetime, polars.Time, polars.Duration, polars.Boolean, polars.Null]:
+            print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique().to_list()}', Log.DEBUG)
         else:
             approx_n_unique = self.data_frame.select(polars.col(col_name).approx_n_unique()).item()
-            if approx_n_unique <= 1024:
-                print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
+            approx_n_unique = min(approx_n_unique, self.data_frame.shape[0])
+            if approx_n_unique <= 200:
+                print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique().to_list()}', Log.DEBUG)
             else:
                 print_log(f'Column {col_name} has approximately {format(approx_n_unique, ",d")} unique values; too many to display.', Log.DEBUG)
-                return []
-        return col_data.unique().to_list()
+
+                sample_size = min(10_000, approx_n_unique)
+                sample_data = col_data.head(sample_size).unique().sort()
+                self.current_unique_values_hash = sample_data.hash()
+                self.current_unique_values = sample_data.head(200).to_list()
+                self.current_column_index = col_index
+
+                return self.current_unique_values + [f'eruo-data-studio:truncated']
+
+        unique_data = col_data.unique().sort()
+        self.current_unique_values_hash = unique_data.hash()
+        self.current_unique_values = unique_data.to_list()
+        self.current_column_index = col_index
+
+        return self.current_unique_values
+
+    # def cache_column_unique_values(self, col_index: int) -> None:
+    #     """
+    #     Cache the unique values in a column.
+
+    #     Args:
+    #         col_index (int): The index of the column to cache unique values for.
+    #     """
+    #     col_index += WITH_ROW_INDEX
+    #     col_name = self.data_frame.columns[col_index]
+    #     col_data = self.data_frame.get_column(col_name)
+    #     self.current_column_index = col_index
+    #     self.current_unique_values = col_data.unique()
+    #     self.current_unique_values_hash = self.current_unique_values.hash()
+
+    # def get_column_unique_values_from_cache(self, filter: str) -> list[str]:
+    #     """
+    #     Get the unique values in a column from the cache.
+
+    #     Args:
+    #         filter (str): The filter to apply to the unique values.
+
+    #     Returns:
+    #         list[str]: A list of unique values in the specified column.
+    #     """
+    #     # TODO: support other data types than string
+    #     return self.current_unique_values.filter(self.current_unique_values.str.contains(filter)).to_list()
+
+    def clean_up_temporary_data(self) -> None:
+        """Cleans up temporary data."""
+        self.pending_values_to_show = {}
+        self.pending_values_to_hide = {}
+        self.current_column_index = -1
+        self.current_unique_values = polars.Series()
+        self.current_unique_values_hash = ''
+        gc.collect()
 
     def summary_fill_counts(self) -> None:
         """Calculates the fill counts for each column."""
@@ -131,6 +188,14 @@ class DBMS(GObject.Object):
         self.data_frame = self.data_frame.sort(col_name, descending=descending, nulls_last=True)
         direction = 'descending' if descending else 'ascending'
         print_log(f'Sorting column {col_name} in {direction} order...', Log.DEBUG)
+
+    def apply_filter(self) -> None:
+        """Apply a filter to the data frame."""
+        raise NotImplementedError
+
+    def reset_filter(self) -> None:
+        """Reset the filter applied to the data frame."""
+        raise NotImplementedError
 
     def convert_column_to(self, col_index: int, col_type: polars.DataType) -> bool:
         """

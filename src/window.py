@@ -32,6 +32,8 @@ from .display import Display
 from .renderer import Renderer
 from .selection import Selection
 
+from .widgets.sheet_column_menu import SheetColumnMenu
+
 @Gtk.Template(resource_path='/com/macipra/Eruo/gtk/window.ui')
 class EruoDataStudioWindow(Adw.ApplicationWindow):
     __gtype_name__ = 'EruoDataStudioWindow'
@@ -288,64 +290,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
     def on_main_canvas_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         """Callback function for when the main canvas is released."""
-        def find_or_create_context_menu() -> Gtk.PopoverMenu:
-            """Helper function to find or create the context menu."""
-            if isinstance(self.main_canvas.get_first_child(), Gtk.PopoverMenu):
-                context_menu = self.main_canvas.get_first_child()
-            else:
-                context_menu = Gtk.PopoverMenu()
-                context_menu.set_parent(self.main_container)
-                context_menu.add_css_class('context-menu')
-            context_menu.connect('closed', on_context_menu_closed)
-
-            menu = Gio.Menu()
-            context_menu.set_menu_model(menu)
-
-            section1 = Gio.Menu()
-            menu.append_section(None, section1)
-
-            submenu11 = Gio.Menu()
-            section1.append_submenu('Convert To', submenu11)
-
-            submenu11.append('Boolean', 'app.sheet.column.convert-to.boolean')
-
-            submenu111 = Gio.Menu()
-            submenu11.append_submenu('Integer', submenu111)
-
-            section1111 = Gio.Menu()
-            for data_type in ['Int8', 'Int16', 'Int32', 'Int64']:
-                section1111.append(data_type, f'app.sheet.column.convert-to.{data_type.lower()}')
-            submenu111.append_section(None, section1111)
-
-            section1111 = Gio.Menu()
-            for data_type in ['UInt8', 'UInt16', 'UInt32', 'UInt64']:
-                section1111.append(data_type, f'app.sheet.column.convert-to.{data_type.lower()}')
-            submenu111.append_section(None, section1111)
-
-            submenu112 = Gio.Menu()
-            submenu11.append_submenu('Float', submenu112)
-            for data_type in ['Float32', 'Float64', 'Decimal']:
-                submenu112.append(data_type, f'app.sheet.column.convert-to.{data_type.lower()}')
-
-            submenu11.append('String', 'app.sheet.column.convert-to.string')
-            submenu11.append('Categorical', 'app.sheet.column.convert-to.categorical')
-            submenu11.append('Enum', 'app.sheet.column.convert-to.enum')
-
-            submenu113 = Gio.Menu()
-            submenu11.append_submenu('Time', submenu113)
-            for data_type in ['Date', 'Time', 'Datetime', 'Duration']:
-                submenu113.append(data_type, f'app.sheet.column.convert-to.{data_type.lower()}')
-
-            section2 = Gio.Menu()
-            section2.append('Sort A to Z', 'app.sheet.column.sort-a-to-z')
-            section2.append('Sort Z to A', 'app.sheet.column.sort-z-to-a')
-            section2.append('Reset Sort', 'app.sheet.column.reset-sort')
-            menu.append_section(None, section2)
-
-            return context_menu
-
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
             """Callback function for when the context menu is closed."""
+            self.dbms.clean_up_temporary_data()
             self.selection.set_selected_column(-1)
             self.main_canvas.set_focusable(True)
             self.main_canvas.grab_focus()
@@ -363,17 +310,29 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             if self.display.CELL_DEFAULT_HEIGHT <= y \
                     and not self.display.cumulative_column_widths.is_empty() \
                     and x + self.display.scroll_horizontal_position <= self.display.cumulative_column_widths[-1] + self.display.ROW_HEADER_WIDTH:
+                # Get hovered column index
                 row_index, col_index = self.display.coordinate_to_index((x + self.display.scroll_horizontal_position, self.display.CELL_DEFAULT_HEIGHT))
                 self.selection.set_selected_column(col_index)
                 self.selection.set_previous_selected_column(col_index)
 
-                # Show the unique values of the column
-                # unique_values = []
-                # if col_index < self.dbms.get_shape()[1]:
-                #     unique_values = self.dbms.get_column_unique_values(col_index)
+                # Find or create context menu
+                if isinstance(self.main_container.get_last_child(), Gtk.PopoverMenu):
+                    context_menu = self.main_container.get_last_child()
+                    context_menu.set_colid(col_index)
+                else:
+                    context_menu = SheetColumnMenu(col_index, self.dbms)
+                    context_menu.set_parent(self.main_container)
+                    context_menu.action_set_enabled('app.sheet.column.reset-sort', False)
+                    context_menu.action_set_enabled('app.sheet.column.reset-filter', False)
+                context_menu.connect('closed', on_context_menu_closed)
 
-                # Show the context menu
-                context_menu = find_or_create_context_menu()
+                # Show the unique values of the column
+                unique_values = []
+                if col_index < self.dbms.get_shape()[1]:
+                    unique_values = self.dbms.scan_column_unique_values(col_index)
+                context_menu.set_filter_options(unique_values)
+
+                # Position context menu
                 x_menu = self.display.get_column_position(col_index) + self.display.get_column_width(col_index) // 2 + self.display.ROW_HEADER_WIDTH - self.display.scroll_horizontal_position
                 if x_menu < self.display.ROW_HEADER_WIDTH:
                     x_menu = self.display.ROW_HEADER_WIDTH + 1
@@ -385,6 +344,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 rectangle.height = 1
                 rectangle.width = 1
                 context_menu.set_pointing_to(rectangle)
+
+                # Show context menu
                 context_menu.popup()
                 self.main_canvas.queue_draw()
 
@@ -686,8 +647,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 calculate_cumulative_column_widths()
                 summary_fill_counts()
                 assign_file()
-                self.renderer.invalidate_cache()
-                self.main_canvas.queue_draw()
+                GLib.idle_add(self.renderer.invalidate_cache)
+                GLib.idle_add(self.main_canvas.queue_draw)
 
         threading.Thread(target=load_file_thread, daemon=True).start()
         print_log(f'Loading file {file.get_path()} in background...', Log.DEBUG)

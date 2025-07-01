@@ -396,9 +396,9 @@ class Renderer(GObject.Object):
                 context.set_hairline(True)
                 x_text = x + cell_actual_width - self._display.ICON_DEFAULT_SIZE - self._display.CELL_DEFAULT_PADDING - x_offset
                 y_text = self._display.CELL_DEFAULT_HEIGHT * 2 + self._display.ICON_DEFAULT_SIZE / 2
-                context.move_to(x_text, y_text + 2)
-                context.line_to(x_text + self._display.ICON_DEFAULT_SIZE / 2, y_text + self._display.ICON_DEFAULT_SIZE - 2)
-                context.line_to(x_text + self._display.ICON_DEFAULT_SIZE, y_text + 2)
+                for i in range(3):
+                    context.move_to(x_text + i * 2, y_text + i * 3)
+                    context.line_to(x_text + self._display.ICON_DEFAULT_SIZE - i * 2, y_text + i * 3)
                 context.stroke()
 
             # Draw a progress bar to indicate the missing data
