@@ -114,8 +114,11 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.formula_bar.add_controller(key_event_controller)
 
         click_event_controller = Gtk.GestureClick()
-        click_event_controller.connect('pressed', self.on_main_canvas_pressed)
-        click_event_controller.connect('released', self.on_main_canvas_released)
+        click_event_controller.connect('pressed', self.on_main_canvas_lmb_pressed)
+        self.main_canvas.add_controller(click_event_controller)
+        click_event_controller = Gtk.GestureClick()
+        click_event_controller.set_button(3)
+        click_event_controller.connect('pressed', self.on_main_canvas_rmb_pressed)
         self.main_canvas.add_controller(click_event_controller)
         focus_event_controller = Gtk.EventControllerFocus()
         focus_event_controller.connect('leave', self.on_main_canvas_unfocused)
@@ -163,7 +166,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
     @Gtk.Template.Callback()
     def on_name_box_activated(self, widget: Gtk.Widget) -> None:
         """
-        Callback function for when the name box is activated (e.g., when the user presses Enter).
+        Callback function for when the name box is activated (e.g. when the user presses Enter).
 
         This function validates the input in the name box to ensure it follows the expected format
         and updates the selection accordingly. If the input is invalid, it resets the name box to
@@ -237,6 +240,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.name_box.set_text(self.selection.get_active_cell_name())
         self.formula_bar.set_text(self.get_cell_data())
         self.formula_bar.x_is_dirty = False
+
+        self.scroll_to_active_cell()
         self.renderer.invalidate_cache()
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
@@ -270,9 +275,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         if self._main_canvas_size[0] < width or self._main_canvas_size[1] < height:
             self.renderer.invalidate_cache()
 
-    def on_main_canvas_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+    def on_main_canvas_lmb_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         """
-        Callback function for when the main canvas is pressed.
+        Callback function for when the main canvas is pressed with the left mouse button.
 
         This function checks if the click coordinates are within the bounds of the main canvas.
         It sets the active cell based on the clicked coordinates and updates the name box with
@@ -291,8 +296,13 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.main_canvas.grab_focus()
         self.main_canvas.queue_draw()
 
-    def on_main_canvas_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
-        """Callback function for when the main canvas is released."""
+    def on_main_canvas_rmb_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        """
+        Callback function for when the main canvas is pressed with the right mouse button.
+
+        This function checks if the click coordinates are within the bounds of the main canvas.
+        It triggers the context menu at the clicked coordinates.
+        """
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
             """Callback function for when the context menu is closed."""
             self.selection.set_selected_column(-1)
@@ -477,8 +487,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 (
                     not self.display.cumulative_column_widths.is_empty()
                     and x + self.display.scroll_horizontal_position <= self.display.cumulative_column_widths[-1] + self.display.ROW_HEADER_WIDTH
+                    and y <= self.display.CELL_DEFAULT_HEIGHT
                 ) \
-                    or y <= self.display.CELL_DEFAULT_HEIGHT:
+                    or x <= self.display.ROW_HEADER_WIDTH:
                 cursor_name = 'pointer'
             else:
                 cursor_name = 'default'
@@ -537,7 +548,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         cell_data = self.dbms.get_data(row, col)
         return str('' if cell_data is None else cell_data)
 
-    def set_cell_data(self, row: int, col: int, value: any) -> bool:
+    def set_cell_data(self, row: int, col: int, value: any, range: bool = False) -> bool:
         """
         Set the data in the selected cell.
 

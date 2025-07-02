@@ -195,8 +195,6 @@ class DBMS(GObject.Object):
     #     Returns:
     #         list[str]: A list of unique values in the specified column.
     #     """
-    #     # TODO: support another data types
-    #     # TODO: support advanced filtering
     #     return self.current_unique_values.filter(self.current_unique_values.str.contains(filter)).to_list()
 
     def write_erquet_file(self) -> None:
@@ -246,9 +244,9 @@ class DBMS(GObject.Object):
             print_log('Applying no filter to data frame...', Log.DEBUG)
             return False
 
-        # Cache previous unique values, so that user can undo filter
-        self.previous_column_index = self.current_column_index
-        self.previous_unique_values = self.current_unique_values.copy()
+        # # Cache previous unique values, so that user can undo filter
+        # self.previous_column_index = self.current_column_index
+        # self.previous_unique_values = self.current_unique_values.copy()
 
         # # Write current data frame to a new temporary file
         # self.temp_data_frame = self.data_frame
@@ -257,7 +255,6 @@ class DBMS(GObject.Object):
         col_name = self.data_frame.columns[self.current_column_index]
 
         # Apply filter to current data frame
-        # TODO: support other data types
         # TODO: support advanced filtering
         if 'meta:all' in self.pending_values_to_show:
             predicates = polars.col(col_name).is_in(self.pending_values_to_hide).not_()
