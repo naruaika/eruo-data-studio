@@ -119,7 +119,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.main_canvas.add_controller(click_event_controller)
         click_event_controller = Gtk.GestureClick()
         click_event_controller.set_button(3)
-        click_event_controller.connect('pressed', self.on_main_canvas_rmb_pressed)
+        click_event_controller.connect('released', self.on_main_canvas_rmb_released)
         self.main_canvas.add_controller(click_event_controller)
         focus_event_controller = Gtk.EventControllerFocus()
         focus_event_controller.connect('leave', self.on_main_canvas_unfocused)
@@ -297,9 +297,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.main_canvas.grab_focus()
         self.main_canvas.queue_draw()
 
-    def on_main_canvas_rmb_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+    def on_main_canvas_rmb_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         """
-        Callback function for when the main canvas is pressed with the right mouse button.
+        Callback function for when the main canvas is released with the right mouse button.
 
         This function checks if the click coordinates are within the bounds of the main canvas.
         It triggers the context menu at the clicked coordinates.

@@ -60,6 +60,8 @@ class EruoDataStudioApplication(Adw.Application):
 
         self.create_action('sheet.column.insert-to-left', self.on_column_insert_to_left)
         self.create_action('sheet.column.insert-to-right', self.on_column_insert_to_right)
+        self.create_action('sheet.column.duplicate-to-left', self.on_column_duplicate_to_left)
+        self.create_action('sheet.column.duplicate-to-right', self.on_column_duplicate_to_right)
         self.create_action('sheet.column.delete', self.on_column_delete)
         self.create_action('sheet.column.clear', self.on_column_clear)
 
@@ -210,7 +212,8 @@ class EruoDataStudioApplication(Adw.Application):
             *args: Variable length argument list. Currently unused.
         """
         window = self.get_active_window()
-        window.dbms.sort_column_values(window.selection.get_previous_selected_column())
+        col_index = window.selection.get_previous_selected_column()
+        window.dbms.sort_column_values(col_index, descending=False)
         window.action_set_enabled('app.sheet.column.reset-sort', True)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
@@ -227,7 +230,8 @@ class EruoDataStudioApplication(Adw.Application):
             *args: Variable length argument list. Currently unused.
         """
         window = self.get_active_window()
-        window.dbms.sort_column_values(window.selection.get_previous_selected_column(), descending=True)
+        col_index = window.selection.get_previous_selected_column()
+        window.dbms.sort_column_values(col_index, descending=True)
         window.action_set_enabled('app.sheet.column.reset-sort', True)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
@@ -357,8 +361,10 @@ class EruoDataStudioApplication(Adw.Application):
     def on_column_insert_to_left(self, *args) -> None:
         """Inserts a new column to the left of the selected column."""
         window = self.get_active_window()
-        window.dbms.insert_column_before(window.selection.get_previous_selected_locator()[1])
+        col_index = window.selection.get_previous_selected_locator()[1]
+        window.dbms.insert_column_before(col_index)
         window.dbms.summary_fill_counts()
+        window.update_project_status()
         window.calculate_column_widths()
         window.calculate_cumulative_column_widths()
         window.renderer.invalidate_cache()
@@ -367,31 +373,59 @@ class EruoDataStudioApplication(Adw.Application):
     def on_column_insert_to_right(self, *args) -> None:
         """Inserts a new column to the right of the selected column."""
         window = self.get_active_window()
-        window.dbms.insert_column_after(window.selection.get_previous_selected_locator()[1])
+        col_index = window.selection.get_previous_selected_locator()[1]
+        window.dbms.insert_column_after(col_index)
         window.dbms.summary_fill_counts()
+        window.update_project_status()
+        window.calculate_column_widths()
+        window.calculate_cumulative_column_widths()
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_duplicate_to_left(self, *args) -> None:
+        """Duplicates the selected column to the left."""
+        window = self.get_active_window()
+        col_index = window.selection.get_previous_selected_locator()[1]
+        window.dbms.duplicate_column_at(col_index, True)
+        window.dbms.summary_fill_counts()
+        window.update_project_status()
+        window.calculate_column_widths()
+        window.calculate_cumulative_column_widths()
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_duplicate_to_right(self, *args) -> None:
+        """Duplicates the selected column to the right."""
+        window = self.get_active_window()
+        col_index = window.selection.get_previous_selected_locator()[1]
+        window.dbms.duplicate_column_at(col_index, False)
+        window.dbms.summary_fill_counts()
+        window.update_project_status()
         window.calculate_column_widths()
         window.calculate_cumulative_column_widths()
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
 
     def on_column_delete(self, *args) -> None:
+        """Deletes the selected column."""
         window = self.get_active_window()
-        window.dbms.delete_column_at(window.selection.get_previous_selected_locator()[1])
+        col_index = window.selection.get_previous_selected_locator()[1]
+        window.dbms.delete_column_at(col_index)
         window.dbms.summary_fill_counts()
+        window.update_project_status()
         window.calculate_column_widths()
         window.calculate_cumulative_column_widths()
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
 
     def on_column_clear(self, *args) -> None:
+        """Clears the selected column."""
         window = self.get_active_window()
-        window.dbms.clear_column_at(window.selection.get_previous_selected_locator()[1])
+        col_index = window.selection.get_previous_selected_locator()[1]
+        window.dbms.clear_column_at(col_index)
         window.dbms.summary_fill_counts()
-        window.calculate_column_widths()
-        window.calculate_cumulative_column_widths()
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
-
 
     def column_convert_to(self, col_type: polars.DataType, *args) -> None:
         """
@@ -451,10 +485,9 @@ class EruoDataStudioApplication(Adw.Application):
         """
         window = self.get_active_window()
         if window and not window.dbms.file:
-            print_log('Reusing the active window...', Log.DEBUG)
+            print_log('Reusing the current active window...', Log.DEBUG)
             window.load_file(file)
             return
-
         print_log(f'Opening a new window...', Log.DEBUG)
         EruoDataStudioWindow(application=self, file=file).present()
 

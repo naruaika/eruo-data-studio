@@ -94,6 +94,7 @@ class DBMS(GObject.Object):
                 print_log(f'Failed to convert value to {column_dtype} at index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
                 return False
 
+        # Update the data frame
         try:
             self.data_frame[row, col + WITH_ROW_INDEX] = value
         except Exception as e:
@@ -153,6 +154,23 @@ class DBMS(GObject.Object):
             col_index (int): The index of the column to insert after.
         """
         self.insert_column_before(col_index + 1)
+
+    def duplicate_column_at(self, col_index: int, to_left: bool = False) -> None:
+        """
+        Duplicate a column to the left or right of the specified column index.
+
+        Args:
+            col_index (int): The index of the column to duplicate.
+            to_left (bool): Whether to duplicate the column to the left of the specified column index.
+        """
+        col_name = self.get_columns()[col_index]
+        suffix = 0
+        new_name = f'{col_name}_0'
+        for name in self.get_columns():
+            if name.startswith(f'{col_name}_'):
+                suffix += 1
+        new_name = f'{col_name}_{suffix}'
+        self.data_frame.insert_column(col_index + WITH_ROW_INDEX + (0 if to_left else 1), polars.col(col_name).alias(new_name))
 
     def delete_column_at(self, col_index: int) -> None:
         """

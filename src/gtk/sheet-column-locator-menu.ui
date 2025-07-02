@@ -4,12 +4,22 @@
   <menu id="sheet_column_locator_menu">
     <section>
       <item>
-        <attribute name="label" translatable="yes">Insert Column to _Left</attribute>
+        <attribute name="label" translatable="yes">New Column to _Left</attribute>
         <attribute name="action">app.sheet.column.insert-to-left</attribute>
       </item>
       <item>
-        <attribute name="label" translatable="yes">Insert Column to _Right</attribute>
+        <attribute name="label" translatable="yes">New Column to _Right</attribute>
         <attribute name="action">app.sheet.column.insert-to-right</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Duplicate to L_eft</attribute>
+        <attribute name="action">app.sheet.column.duplicate-to-left</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Duplicate to R_ight</attribute>
+        <attribute name="action">app.sheet.column.duplicate-to-right</attribute>
       </item>
     </section>
     <section>

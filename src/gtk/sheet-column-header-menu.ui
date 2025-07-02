@@ -177,7 +177,7 @@
         <child type="overlay">
           <object class="AdwStatusPage" id="filter_placeholder">
             <property name="title">No Available Filters</property>
-            <property name="description">Data type isn't supported.</property>
+            <property name="description">Data type isn't supported</property>
           </object>
         </child>
       </object>
