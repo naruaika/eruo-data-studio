@@ -368,8 +368,11 @@ class EruoDataStudioApplication(Adw.Application):
             window.main_canvas.queue_draw()
         else:
             col_name = window.dbms.get_columns()[col_index]
-            current_type = window.dbms.get_dtypes()[col_index]
-            window.show_toast_message(f'Failed to convert column \'{col_name}\' from {current_type} to {col_type}')
+            if col_name.startswith('Categorical'):
+                col_name = 'Categorical'
+            elif col_name.startswith('Datetime'):
+                col_name = 'Datetime'
+            window.show_toast_message(f'Failed to convert column \'{col_name}\' to {col_type}')
 
     def create_action(self, name: str, callback: callable, shortcuts: list | None = None) -> None:
         """

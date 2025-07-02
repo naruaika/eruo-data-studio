@@ -16,7 +16,7 @@
     padding: 0px 8px;
     font-size: 13px;
 } */
-.main-content .context-menu entry + scrolledwindow {
+.main-content .context-menu scrolledwindow {
     margin-top: 6px;
 }
 .main-content .context-menu list {

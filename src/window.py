@@ -327,12 +327,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                     context_menu.action_set_enabled('app.sheet.column.reset-sort', False)
                     context_menu.action_set_enabled('app.sheet.column.reset-filter', False)
                 context_menu.connect('closed', on_context_menu_closed)
-
-                # Show the unique values of the column
-                unique_values = []
-                if col_index < self.dbms.get_shape()[1]:
-                    unique_values = self.dbms.scan_column_unique_values(col_index)
-                context_menu.set_filter_options(unique_values)
+                context_menu.update_filters()
 
                 # Position context menu
                 x_menu = self.display.get_column_position(col_index) + self.display.get_column_width(col_index) // 2 + self.display.ROW_HEADER_WIDTH - self.display.scroll_horizontal_position

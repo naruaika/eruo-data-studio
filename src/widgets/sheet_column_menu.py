@@ -18,16 +18,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import polars
+import threading
 
-from gi.repository import Gtk
+from gi.repository import GLib, Gtk
 
 from ..dbms import DBMS
+from ..utils import print_log, Log
 
 @Gtk.Template(resource_path='/com/macipra/Eruo/gtk/sheet-column-menu.ui')
 class SheetColumnMenu(Gtk.PopoverMenu):
     __gtype_name__ = 'SheetColumnMenu'
 
+    filter_placeholder = Gtk.Template.Child()
     filter_scrolledwindow = Gtk.Template.Child()
+    filter_spinner = Gtk.Template.Child()
     filter_listbox = Gtk.Template.Child()
 
     _colid: str
@@ -44,14 +48,11 @@ class SheetColumnMenu(Gtk.PopoverMenu):
         """Sets the colid for the SheetColumnMenu."""
         self._colid = str(colid)
 
-    def set_filter_options(self, options: list[any]) -> None:
+    def update_filters(self) -> None:
         """
-        Sets the filter options for the SheetColumnMenu.
+        Updates the filter options for the SheetColumnMenu.
 
         This function resets the existing filter options and adds the new options to the SheetColumnMenu.
-
-        Args:
-            options (list[str]): A list of filter options.
         """
         def on_check_button_toggled(widget: Gtk.Widget, is_meta: bool) -> None:
             """
@@ -151,7 +152,7 @@ class SheetColumnMenu(Gtk.PopoverMenu):
                         self._dbms.pending_values_to_hide.append(widget.filter_value)
                 post_process()
 
-        def add_check_button(value: any, is_active: bool = False, is_meta: bool = False) -> None:
+        def add_check_button(value: any, is_active: bool = False, is_meta: bool = False) -> Gtk.CheckButton:
             """
             Adds a check button to the SheetColumnMenu.
 
@@ -180,19 +181,40 @@ class SheetColumnMenu(Gtk.PopoverMenu):
                 check_button.set_active(is_active)
                 check_button.set_can_focus(False)
                 check_button.connect('toggled', on_check_button_toggled, is_meta)
-            self.filter_listbox.append(check_button)
+            return check_button
 
-        self.filter_listbox.remove_all()
-        add_check_button('Select All', True, True)
-        if any(option in [None, ''] for option in options):
-            add_check_button('(Blanks)', True, True)
-        for option in options:
-            if option in [None, '']:
-                continue
-            add_check_button(option, is_active=True)
+        def update_listbox(checkboxes: list[Gtk.CheckButton]) -> None:
+            for checkbox in checkboxes:
+                self.filter_listbox.append(checkbox)
+            self.filter_spinner.hide()
+
+        def update_filters_thread():
+            checkboxes = []
+            options = self._dbms.scan_column_unique_values(int(self._colid))
+            checkboxes.append(add_check_button('Select All', True, True))
+            if any(option in [None, ''] for option in options):
+                checkboxes.append(add_check_button('(Blanks)', True, True))
+            for option in options:
+                if option in [None, '']:
+                    continue
+                checkboxes.append(add_check_button(option, True))
+            GLib.idle_add(update_listbox, checkboxes)
+            self.action_set_enabled('app.sheet.column.apply-filter', True)
+            col_name = self._dbms.get_columns()[int(self._colid)]
+            print_log(f'Showing filter options for column {col_name}...', Log.DEBUG)
 
         # TODO: read from the current applied filters if any
         self.filter_scrolledwindow.get_vadjustment().set_value(0)
+        self.filter_listbox.remove_all()
         self._dbms.pending_values_to_show = ['meta:all']
         self._dbms.pending_values_to_hide = []
-        self.action_set_enabled('app.sheet.column.apply-filter', True)
+
+        col_dtype = self._dbms.get_dtypes()[int(self._colid)]
+        if col_dtype in [polars.Null]:
+            self.action_set_enabled('app.sheet.column.apply-filter', False)
+            self.filter_placeholder.show()
+            self.filter_spinner.hide()
+        else:
+            self.filter_placeholder.hide()
+            self.filter_spinner.show()
+            threading.Thread(target=update_filters_thread, daemon=True).start()

@@ -140,7 +140,7 @@ class Renderer(GObject.Object):
         layout.set_text(str(max_row_number), -1)
         layout.set_font_description(font_desc)
         text_width = layout.get_size()[0] / Pango.SCALE
-        self._display.ROW_HEADER_WIDTH = max(40, int(text_width + self._display.CELL_DEFAULT_PADDING + 0.5))
+        self._display.ROW_HEADER_WIDTH = max(40, int(text_width + self._display.CELL_DEFAULT_PADDING * 2 + 0.5))
 
     def draw_headers_backgrounds(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
@@ -389,6 +389,8 @@ class Renderer(GObject.Object):
                 cell_text_2 = str(self._dbms.get_dtypes()[col_index])
                 if cell_text_2.startswith('Categorical'):
                     cell_text_2 = 'Categor.'
+                elif cell_text_2.startswith('Datetime'):
+                    cell_text_2 = 'Datetime'
                 layout.set_text(cell_text_2, -1)
                 layout.set_font_description(type_font_desc)
                 x_text = x + self._display.CELL_DEFAULT_PADDING - x_offset

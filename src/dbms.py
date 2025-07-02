@@ -149,29 +149,26 @@ class DBMS(GObject.Object):
         #     self.current_unique_values =
         #     return self.previous_unique_values
 
-        if col_data.dtype in [polars.Categorical, polars.Date, polars.Datetime, polars.Time, polars.Boolean, polars.Null]:
+        if col_data.dtype in [polars.Categorical, polars.Date, polars.Datetime, polars.Time, polars.Duration, polars.Null]:
+            n_unique = self.data_frame.select(polars.col(col_name).n_unique()).item()
+        else:
+            n_unique = self.data_frame.select(polars.col(col_name).approx_n_unique()).item()
+        n_unique = min(n_unique, self.data_frame.shape[0])
+        if n_unique <= 1_000:
             print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
         else:
-            approx_n_unique = self.data_frame.select(polars.col(col_name).approx_n_unique()).item()
-            approx_n_unique = min(approx_n_unique, self.data_frame.shape[0])
-            if approx_n_unique <= 200:
-                print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
-            else:
-                print_log(f'Column {col_name} has approximately {format(approx_n_unique, ",d")} unique values; too many to display.', Log.DEBUG)
-
-                sample_size = min(10_000, approx_n_unique)
-                sample_data = col_data.sample(sample_size, seed=0).unique().sort()
-                self.current_unique_values_hash = sample_data.hash()
-                self.current_unique_values = sample_data.head(200).to_list()
-                self.current_column_index = col_index
-
-                return self.current_unique_values + [f'eruo-data-studio:truncated']
+            print_log(f'Column {col_name} has approximately {format(n_unique, ",d")} unique values; too many to display.', Log.DEBUG)
+            sample_size = min(500_000, n_unique)
+            sample_data = col_data.sample(sample_size, seed=0).unique().sort()
+            self.current_unique_values_hash = sample_data.hash()
+            self.current_unique_values = sample_data.head(1_000).to_list()
+            self.current_column_index = col_index
+            return self.current_unique_values + [f'eruo-data-studio:truncated']
 
         unique_data = col_data.unique().sort()
         self.current_unique_values_hash = unique_data.hash()
         self.current_unique_values = unique_data.to_list()
         self.current_column_index = col_index
-
         return self.current_unique_values
 
     # def cache_column_unique_values(self, col_index: int) -> None:

@@ -133,25 +133,51 @@
   <template class="SheetColumnMenu" parent="GtkPopoverMenu">
     <property name="menu-model">sheet_column_menu</property>
     <child type="filter_box">
-      <object class="GtkBox">
-        <property name="orientation">vertical</property>
+      <object class="GtkOverlay">
+        <property name="vexpand">True</property>
+        <property name="hexpand">True</property>
         <child>
-          <object class="GtkSearchEntry">
-            <property name="placeholder-text">Search...</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkScrolledWindow" id="filter_scrolledwindow">
-            <property name="height-request">280</property>
-            <property name="width-request">320</property>
-            <property name="hscrollbar-policy">GTK_POLICY_EXTERNAL</property>
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
             <child>
-              <object class="GtkViewport">
+              <object class="GtkSearchEntry">
+                <property name="placeholder-text">Search...</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkOverlay">
+                <property name="vexpand">True</property>
+                <property name="hexpand">True</property>
                 <child>
-                  <object class="GtkListBox" id="filter_listbox"></object>
+                  <object class="GtkScrolledWindow" id="filter_scrolledwindow">
+                    <property name="height-request">280</property>
+                    <property name="width-request">320</property>
+                    <property name="hscrollbar-policy">GTK_POLICY_EXTERNAL</property>
+                    <child>
+                      <object class="GtkViewport">
+                        <child>
+                          <object class="GtkListBox" id="filter_listbox"></object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child type="overlay">
+                  <object class="AdwSpinner" id="filter_spinner">
+                    <property name="halign">center</property>
+                    <property name="valign">center</property>
+                    <property name="width-request">64</property>
+                    <property name="height-request">64</property>
+                  </object>
                 </child>
               </object>
             </child>
+          </object>
+        </child>
+        <child type="overlay">
+          <object class="AdwStatusPage" id="filter_placeholder">
+            <property name="title">No Available Filters</property>
+            <property name="description">Data type isn't supported.</property>
           </object>
         </child>
       </object>
