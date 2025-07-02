@@ -130,7 +130,70 @@ class DBMS(GObject.Object):
         """
         return self.data_frame.columns[WITH_ROW_INDEX:]
 
-    def scan_column_unique_values(self, col_index: int) -> list[str]:
+    def insert_column_before(self, col_index: int) -> None:
+        """
+        Insert a new column before the specified column index.
+
+        Args:
+            col_index (int): The index of the column to insert before.
+        """
+        suffix = 0
+        new_name = 'col_0'
+        for name in self.get_columns():
+            if name.startswith('col_'):
+                suffix += 1
+        new_name = f'col_{suffix}'
+        self.data_frame.insert_column(col_index + WITH_ROW_INDEX, polars.lit(None).alias(new_name))
+
+    def insert_column_after(self, col_index: int) -> None:
+        """
+        Insert a new column after the specified column index.
+
+        Args:
+            col_index (int): The index of the column to insert after.
+        """
+        self.insert_column_before(col_index + 1)
+
+    def delete_column_at(self, col_index: int) -> None:
+        """
+        Delete a column from the data frame.
+
+        Args:
+            col_index (int): The index of the column to delete.
+        """
+        col_name = self.get_columns()[col_index]
+        self.data_frame = self.data_frame.drop(col_name)
+
+    def clear_column_at(self, col_index: int) -> None:
+        """
+        Clear the values in a column.
+
+        Args:
+            col_index (int): The index of the column to clear.
+        """
+        col_name = self.get_columns()[col_index]
+        self.data_frame = self.data_frame.with_columns(polars.lit(None).alias(col_name))
+
+    def summary_fill_counts(self, col_index: int | None = None) -> None:
+        """Calculates the fill counts for each column."""
+        if col_index is not None:
+            col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
+            fill_count = self.data_frame.shape[0] - self.data_frame.get_column(col_name).is_null().sum()
+            if self.data_frame.get_column(col_name).dtype in [polars.String]:
+                fill_count -= self.data_frame.filter(polars.col(col_name).str.len_bytes() == 0).shape[0]
+            self.fill_counts[col_index] = fill_count
+            print_log(f'Calculating fill counts for column: {col_name}...', Log.DEBUG)
+            return
+
+        self.fill_counts = []
+        for col_index, col_name in enumerate(self.get_columns()):
+            fill_count = self.data_frame.shape[0] - self.data_frame.get_column(col_name).is_null().sum()
+            if self.data_frame.get_column(col_name).dtype in [polars.String]:
+                fill_count -= self.data_frame.filter(polars.col(col_name).str.len_bytes() == 0).shape[0]
+            self.fill_counts.append(fill_count)
+        print_log('Calculating fill counts for all columns...', Log.DEBUG)
+
+    def scan_unique_values(self, col_index: int) -> list[str]:
         """
         Get the unique values in a column.
 
@@ -171,59 +234,14 @@ class DBMS(GObject.Object):
         self.current_column_index = col_index
         return self.current_unique_values
 
-    # def cache_column_unique_values(self, col_index: int) -> None:
-    #     """
-    #     Cache the unique values in a column.
-
-    #     Args:
-    #         col_index (int): The index of the column to cache unique values for.
-    #     """
-    #     col_index += WITH_ROW_INDEX
-    #     col_name = self.data_frame.columns[col_index]
-    #     col_data = self.data_frame.get_column(col_name)
-    #     self.current_column_index = col_index
-    #     self.current_unique_values = col_data.unique()
-    #     self.current_unique_values_hash = self.current_unique_values.hash()
-
-    # def get_column_unique_values_from_cache(self, filter: str) -> list[str]:
-    #     """
-    #     Get the unique values in a column from the cache.
-
-    #     Args:
-    #         filter (str): The filter to apply to the unique values.
-
-    #     Returns:
-    #         list[str]: A list of unique values in the specified column.
-    #     """
-    #     return self.current_unique_values.filter(self.current_unique_values.str.contains(filter)).to_list()
-
-    def write_erquet_file(self) -> None:
-        """Writes the data frame to an erquet file."""
-        with NamedTemporaryFile(suffix='.erquet', delete=False) as temp_file:
-            print_log(f'Writing temporary file: {temp_file.name}', Log.DEBUG)
-            self.temp_data_frame.write_parquet(temp_file.name)
-            self.temp_data_frame = polars.DataFrame()
-            self.temp_data_file_paths.append(temp_file.name)
-        gc.collect()
-
-    def summary_fill_counts(self, col_index: int | None = None) -> None:
-        """Calculates the fill counts for each column."""
-        if col_index is not None:
-            col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
-            fill_count = self.data_frame.shape[0] - self.data_frame.get_column(col_name).is_null().sum()
-            if self.data_frame.get_column(col_name).dtype in [polars.String]:
-                fill_count -= self.data_frame.filter(polars.col(col_name).str.len_bytes() == 0).shape[0]
-            self.fill_counts[col_index] = fill_count
-            print_log(f'Calculating fill counts for column: {col_name}...', Log.DEBUG)
-            return
-
-        self.fill_counts = []
-        for col_index, col_name in enumerate(self.get_columns()):
-            fill_count = self.data_frame.shape[0] - self.data_frame.get_column(col_name).is_null().sum()
-            if self.data_frame.get_column(col_name).dtype in [polars.String]:
-                fill_count -= self.data_frame.filter(polars.col(col_name).str.len_bytes() == 0).shape[0]
-            self.fill_counts.append(fill_count)
-        print_log('Calculating fill counts for all columns...', Log.DEBUG)
+    # def take_snapshot(self) -> None:
+    #     """Writes the data frame to an erquet file."""
+    #     with NamedTemporaryFile(suffix='.erquet', delete=False) as temp_file:
+    #         print_log(f'Writing temporary file: {temp_file.name}', Log.DEBUG)
+    #         self.temp_data_frame.write_parquet(temp_file.name)
+    #         self.temp_data_frame = polars.DataFrame()
+    #         self.temp_data_file_paths.append(temp_file.name)
+    #     gc.collect()
 
     def sort_column_values(self, col_index: int, descending: bool = False) -> None:
         """
@@ -238,7 +256,11 @@ class DBMS(GObject.Object):
         direction = 'descending' if descending else 'ascending'
         print_log(f'Sorting column \'{col_name}\' in {direction} order...', Log.DEBUG)
 
-    def apply_filter(self) -> bool:
+    def reset_column_sort(self) -> None:
+        """Reset the sort applied to the data frame."""
+        self.sort_column_values(-1)
+
+    def filter_row_values(self) -> bool:
         """Apply a filter to the data frame."""
         if 'meta:all' in self.pending_values_to_show and len(self.pending_values_to_hide) == 0:
             print_log('Applying no filter to data frame...', Log.DEBUG)
@@ -250,7 +272,7 @@ class DBMS(GObject.Object):
 
         # # Write current data frame to a new temporary file
         # self.temp_data_frame = self.data_frame
-        # threading.Thread(target=self.write_erquet_file, daemon=True).start()
+        # threading.Thread(target=self.take_snapshot, daemon=True).start()
 
         col_name = self.data_frame.columns[self.current_column_index]
 
@@ -274,7 +296,7 @@ class DBMS(GObject.Object):
 
         return False
 
-    def reset_filter(self) -> None:
+    def reset_row_filter(self) -> None:
         """Reset the filter applied to the data frame."""
         raise NotImplementedError
 

@@ -674,23 +674,41 @@ class Renderer(GObject.Object):
         context.rel_line_to(0, height_sel)
         context.stroke()
 
-        if (col_index := self._selection.get_selected_column()) > -1:
-            if self._prefer_dark:
-                context.set_source_rgb(1.0, 1.0, 1.0)
-            else:
-                context.set_source_rgb(0.1, 0.1, 0.1)
+        if self._prefer_dark:
+            context.set_source_rgb(1.0, 1.0, 1.0)
+        else:
+            context.set_source_rgb(0.1, 0.1, 0.1)
 
+        # Draw selection border around the selected column header
+        if (col_index := self._selection.get_selected_column()) > -1:
             x_start = self._display.ROW_HEADER_WIDTH + col_index * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
             width_sel = (end_col - col_index + 1) * self._display.CELL_DEFAULT_WIDTH
             if not self._display.cumulative_column_widths.is_empty():
                 x_start = self._display.get_column_position(col_index) + self._display.ROW_HEADER_WIDTH - self._display.scroll_horizontal_position
                 width_sel = self._display.get_column_width(col_index)
 
-            # Draw selection border around the selected column
             context.reset_clip()
             context.rectangle(self._display.ROW_HEADER_WIDTH - 1, self._display.CELL_DEFAULT_HEIGHT - 1, width, self._display.COLUMN_HEADER_HEIGHT)
             context.clip()
-            context.rectangle(x_start, self._display.CELL_DEFAULT_HEIGHT, width_sel, self._display.CELL_DEFAULT_HEIGHT * 2)
+            context.rectangle(x_start, self._display.CELL_DEFAULT_HEIGHT + 2, width_sel, self._display.CELL_DEFAULT_HEIGHT * 2 - 2)
             context.stroke()
+
+        # Draw selection border around the selected locator
+        cell_index = self._selection.get_selected_locator()
+        if any(index > -1 for index in cell_index):
+            row_index, col_index = cell_index
+            if col_index > -1:
+                x_start = self._display.ROW_HEADER_WIDTH + col_index * self._display.CELL_DEFAULT_WIDTH - self._display.scroll_horizontal_position
+                width_sel = (end_col - col_index + 1) * self._display.CELL_DEFAULT_WIDTH
+                if not self._display.cumulative_column_widths.is_empty():
+                    x_start = self._display.get_column_position(col_index) + self._display.ROW_HEADER_WIDTH - self._display.scroll_horizontal_position
+                    width_sel = self._display.get_column_width(col_index)
+                context.reset_clip()
+                context.rectangle(self._display.ROW_HEADER_WIDTH - 1, 0, width, self._display.COLUMN_HEADER_HEIGHT)
+                context.clip()
+                context.rectangle(x_start, 1, width_sel, self._display.CELL_DEFAULT_HEIGHT - 4)
+                context.stroke()
+            else:
+                pass
 
         context.restore()

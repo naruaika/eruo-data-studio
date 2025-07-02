@@ -31,6 +31,9 @@ class Selection(GObject.Object):
     _previous_selected_column: int = -1
     _selected_column: int = -1
 
+    _previous_selected_locator: tuple[int, int] = (-1, -1)
+    _selected_locator: tuple[int, int] = (-1, -1)
+
     _active_cell: tuple[int, int] = (0, 0)
     _selected_cells: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (0, 0))
 
@@ -81,6 +84,41 @@ class Selection(GObject.Object):
             index: The index of the selected column.
         """
         self._selected_column = index
+    def get_previous_selected_locator(self) -> tuple[int, int]:
+        """
+        Returns the index of the previously selected locator.
+
+        Returns:
+            A tuple representing the index of the previously selected locator.
+        """
+        return self._previous_selected_locator
+
+    def set_previous_selected_locator(self, index: tuple[int, int]) -> None:
+        """
+        Sets the previously selected locator.
+
+        Args:
+            index: The index of the previously selected locator.
+        """
+        self._previous_selected_locator = index
+
+    def get_selected_locator(self) -> tuple[int, int]:
+        """
+        Returns the index of the currently selected locator.
+
+        Returns:
+            A tuple representing the index of the selected locator.
+        """
+        return self._selected_locator
+
+    def set_selected_locator(self, index: tuple[int, int]) -> None:
+        """
+        Sets the currently selected locator.
+
+        Args:
+            index: The index of the selected locator.
+        """
+        self._selected_locator = index
 
     def get_active_cell(self) -> tuple[int, int]:
         """

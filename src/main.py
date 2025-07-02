@@ -58,6 +58,11 @@ class EruoDataStudioApplication(Adw.Application):
                           'float32', 'float64', 'decimal', 'string', 'categorical', 'date', 'time', 'datetime']:
             self.create_action(f'sheet.column.convert-to.{data_type}', getattr(self, f'on_column_convert_to_{data_type}_action'))
 
+        self.create_action('sheet.column.insert-to-left', self.on_column_insert_to_left)
+        self.create_action('sheet.column.insert-to-right', self.on_column_insert_to_right)
+        self.create_action('sheet.column.delete', self.on_column_delete)
+        self.create_action('sheet.column.clear', self.on_column_clear)
+
     def do_activate(self) -> None:
         """
         Activates the application.
@@ -239,7 +244,7 @@ class EruoDataStudioApplication(Adw.Application):
             *args: Variable length argument list. Currently unused.
         """
         window = self.get_active_window()
-        window.dbms.sort_column_values(-1)
+        window.dbms.reset_column_sort()
         window.action_set_enabled('app.sheet.column.reset-sort', False)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
@@ -256,7 +261,7 @@ class EruoDataStudioApplication(Adw.Application):
             *args: Variable length argument list. Currently unused.
         """
         window = self.get_active_window()
-        if not window.dbms.apply_filter():
+        if not window.dbms.filter_row_values():
             return
         window.dbms.summary_fill_counts()
         window.update_project_status()
@@ -276,7 +281,7 @@ class EruoDataStudioApplication(Adw.Application):
             *args: Variable length argument list. Currently unused.
         """
         window = self.get_active_window()
-        window.dbms.reset_filter()
+        window.dbms.reset_row_filter()
         window.action_set_enabled('app.sheet.column.reset-filter', False)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
@@ -348,6 +353,45 @@ class EruoDataStudioApplication(Adw.Application):
     def on_column_convert_to_datetime_action(self, *args) -> None:
         """Converts the selected column to Datetime values."""
         self.column_convert_to(polars.Datetime)
+
+    def on_column_insert_to_left(self, *args) -> None:
+        """Inserts a new column to the left of the selected column."""
+        window = self.get_active_window()
+        window.dbms.insert_column_before(window.selection.get_previous_selected_locator()[1])
+        window.dbms.summary_fill_counts()
+        window.calculate_column_widths()
+        window.calculate_cumulative_column_widths()
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_insert_to_right(self, *args) -> None:
+        """Inserts a new column to the right of the selected column."""
+        window = self.get_active_window()
+        window.dbms.insert_column_after(window.selection.get_previous_selected_locator()[1])
+        window.dbms.summary_fill_counts()
+        window.calculate_column_widths()
+        window.calculate_cumulative_column_widths()
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_delete(self, *args) -> None:
+        window = self.get_active_window()
+        window.dbms.delete_column_at(window.selection.get_previous_selected_locator()[1])
+        window.dbms.summary_fill_counts()
+        window.calculate_column_widths()
+        window.calculate_cumulative_column_widths()
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
+    def on_column_clear(self, *args) -> None:
+        window = self.get_active_window()
+        window.dbms.clear_column_at(window.selection.get_previous_selected_locator()[1])
+        window.dbms.summary_fill_counts()
+        window.calculate_column_widths()
+        window.calculate_cumulative_column_widths()
+        window.renderer.invalidate_cache()
+        window.main_canvas.queue_draw()
+
 
     def column_convert_to(self, col_type: polars.DataType, *args) -> None:
         """

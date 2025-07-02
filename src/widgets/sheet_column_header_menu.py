@@ -1,4 +1,4 @@
-# sheet_column_menu.py
+# sheet_column_header_menu.py
 #
 # Copyright 2025 Naufan Rusyda Faikar
 #
@@ -25,9 +25,9 @@ from gi.repository import GLib, Gtk
 from ..dbms import DBMS
 from ..utils import print_log, Log
 
-@Gtk.Template(resource_path='/com/macipra/Eruo/gtk/sheet-column-menu.ui')
-class SheetColumnMenu(Gtk.PopoverMenu):
-    __gtype_name__ = 'SheetColumnMenu'
+@Gtk.Template(resource_path='/com/macipra/Eruo/gtk/sheet-column-header-menu.ui')
+class SheetColumnHeaderMenu(Gtk.PopoverMenu):
+    __gtype_name__ = 'SheetColumnHeaderMenu'
 
     filter_placeholder = Gtk.Template.Child()
     filter_scrolledwindow = Gtk.Template.Child()
@@ -38,21 +38,21 @@ class SheetColumnMenu(Gtk.PopoverMenu):
     _dbms: DBMS
 
     def __init__(self, colid: int, dbms: DBMS, **kwargs) -> None:
-        """Creates a new SheetColumnMenu."""
+        """Creates a new SheetColumnHeaderMenu."""
         super().__init__(**kwargs)
 
         self._colid = str(colid)
         self._dbms = dbms
 
     def set_colid(self, colid: int) -> None:
-        """Sets the colid for the SheetColumnMenu."""
+        """Sets the colid for the SheetColumnHeaderMenu."""
         self._colid = str(colid)
 
     def update_filters(self) -> None:
         """
-        Updates the filter options for the SheetColumnMenu.
+        Updates the filter options for the SheetColumnHeaderMenu.
 
-        This function resets the existing filter options and adds the new options to the SheetColumnMenu.
+        This function resets the existing filter options and adds the new options to the SheetColumnHeaderMenu.
         """
         def on_check_button_toggled(widget: Gtk.Widget, is_meta: bool) -> None:
             """
@@ -66,7 +66,7 @@ class SheetColumnMenu(Gtk.PopoverMenu):
             select_all = self.filter_listbox.get_row_at_index(0).get_first_child()
 
             def post_process() -> None:
-                """Post-processes the SheetColumnMenu after the check button is toggled."""
+                """Post-processes the SheetColumnHeaderMenu after the check button is toggled."""
                 is_consistent = False
 
                 select_all.handler_block_by_func(on_check_button_toggled)
@@ -154,9 +154,9 @@ class SheetColumnMenu(Gtk.PopoverMenu):
 
         def add_check_button(value: any, is_active: bool = False, is_meta: bool = False) -> Gtk.CheckButton:
             """
-            Adds a check button to the SheetColumnMenu.
+            Adds a check button to the SheetColumnHeaderMenu.
 
-            This function adds a check button to the SheetColumnMenu with the given label and active state.
+            This function adds a check button to the SheetColumnHeaderMenu with the given label and active state.
             The label is truncated if it is too long. The check button is appended to the filter listbox.
             The check button is disabled if the label starts with 'eruo-data-studio:truncated', as it is used
             as a placeholder indicating that more options are available.
@@ -190,7 +190,7 @@ class SheetColumnMenu(Gtk.PopoverMenu):
 
         def update_filters_thread():
             checkboxes = []
-            options = self._dbms.scan_column_unique_values(int(self._colid))
+            options = self._dbms.scan_unique_values(int(self._colid))
             checkboxes.append(add_check_button('Select All', True, True))
             if any(option in [None, ''] for option in options):
                 checkboxes.append(add_check_button('(Blanks)', True, True))
@@ -210,7 +210,9 @@ class SheetColumnMenu(Gtk.PopoverMenu):
         self._dbms.pending_values_to_hide = []
 
         col_dtype = self._dbms.get_dtypes()[int(self._colid)]
-        if col_dtype in [polars.Null]:
+        if col_dtype not in [polars.Boolean, polars.Int8, polars.Int16, polars.Int32, polars.Int64, polars.UInt8,
+                             polars.UInt16, polars.UInt32, polars.UInt64, polars.Float32, polars.Float64, polars.Decimal,
+                             polars.Utf8, polars.Categorical, polars.Date,polars.Time, polars.Datetime]:
             self.action_set_enabled('app.sheet.column.apply-filter', False)
             self.filter_placeholder.show()
             self.filter_spinner.hide()

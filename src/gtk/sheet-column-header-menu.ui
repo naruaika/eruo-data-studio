@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <requires lib="gtk" version="4.0"/>
-  <menu id="sheet_column_menu">
+  <menu id="sheet_column_header_menu">
     <section>
       <item>
         <attribute name="label" translatable="yes">Sort _A to Z</attribute>
@@ -130,8 +130,8 @@
       </item>
     </section>
   </menu>
-  <template class="SheetColumnMenu" parent="GtkPopoverMenu">
-    <property name="menu-model">sheet_column_menu</property>
+  <template class="SheetColumnHeaderMenu" parent="GtkPopoverMenu">
+    <property name="menu-model">sheet_column_header_menu</property>
     <child type="filter_box">
       <object class="GtkOverlay">
         <property name="vexpand">True</property>

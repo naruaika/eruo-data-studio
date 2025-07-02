@@ -32,7 +32,8 @@ from .display import Display
 from .renderer import Renderer
 from .selection import Selection
 
-from .widgets.sheet_column_menu import SheetColumnMenu
+from .widgets.sheet_column_header_menu import SheetColumnHeaderMenu
+from .widgets.sheet_column_locator_menu import SheetColumnLocatorMenu
 
 @Gtk.Template(resource_path='/com/macipra/Eruo/gtk/window.ui')
 class EruoDataStudioWindow(Adw.ApplicationWindow):
@@ -306,8 +307,18 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
             """Callback function for when the context menu is closed."""
             self.selection.set_selected_column(-1)
+            self.selection.set_selected_locator((-1, -1))
             self.main_canvas.set_focusable(True)
             self.main_canvas.grab_focus()
+
+        def find_popover_menu(type: type[Gtk.PopoverMenu]) -> Gtk.PopoverMenu | None:
+            """Find an instance of target type of popover menu."""
+            widget = self.main_container.get_last_child()
+            while widget is not None:
+                if isinstance(widget, type):
+                    return widget
+                widget = widget.get_prev_sibling()
+            return None
 
         if x <= self.display.ROW_HEADER_WIDTH or y <= self.display.COLUMN_HEADER_HEIGHT:
             if x <= self.display.ROW_HEADER_WIDTH and y <= self.display.COLUMN_HEADER_HEIGHT:
@@ -317,7 +328,37 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 raise NotImplementedError # TODO: handle clicking on the row index cell
 
             if y <= self.display.CELL_DEFAULT_HEIGHT and self.display.ROW_HEADER_WIDTH <= x:
-                raise NotImplementedError # TODO: handle clicking on the column index cell
+                # Get hovered locator index
+                row_index, col_index = self.display.coordinate_to_index((x + self.display.scroll_horizontal_position, self.display.CELL_DEFAULT_HEIGHT))
+                self.selection.set_selected_locator((-1, col_index))
+                self.selection.set_previous_selected_locator((-1, col_index))
+
+                # Find or create context menu
+                if (context_menu := find_popover_menu(SheetColumnLocatorMenu)) is not None:
+                    context_menu.set_colid(col_index)
+                else:
+                    context_menu = SheetColumnLocatorMenu(col_index, self.dbms)
+                    context_menu.set_parent(self.main_container)
+                context_menu.connect('closed', on_context_menu_closed)
+
+                # Position context menu
+                x_menu = self.display.get_column_position(col_index) + self.display.get_column_width(col_index) // 2 + self.display.ROW_HEADER_WIDTH - self.display.scroll_horizontal_position
+                if x_menu < self.display.ROW_HEADER_WIDTH:
+                    x_menu = self.display.ROW_HEADER_WIDTH + 1
+                elif x_menu > self._main_canvas_size[0]:
+                    x_menu = self.main_canvas.get_width() - 1
+                rectangle = Gdk.Rectangle()
+                rectangle.x = int(x_menu)
+                rectangle.y = self.display.CELL_DEFAULT_HEIGHT
+                rectangle.height = 1
+                rectangle.width = 1
+                context_menu.set_pointing_to(rectangle)
+
+                # Show context menu
+                context_menu.popup()
+                self.main_canvas.queue_draw()
+
+                return
 
             if self.display.CELL_DEFAULT_HEIGHT <= y \
                     and not self.display.cumulative_column_widths.is_empty() \
@@ -328,11 +369,10 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 self.selection.set_previous_selected_column(col_index)
 
                 # Find or create context menu
-                if isinstance(self.main_container.get_last_child(), Gtk.PopoverMenu):
-                    context_menu = self.main_container.get_last_child()
+                if (context_menu := find_popover_menu(SheetColumnHeaderMenu)) is not None:
                     context_menu.set_colid(col_index)
                 else:
-                    context_menu = SheetColumnMenu(col_index, self.dbms)
+                    context_menu = SheetColumnHeaderMenu(col_index, self.dbms)
                     context_menu.set_parent(self.main_container)
                     context_menu.action_set_enabled('app.sheet.column.reset-sort', False)
                     context_menu.action_set_enabled('app.sheet.column.reset-filter', False)
@@ -610,47 +650,6 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             print_log('Calculating column header height...', Log.DEBUG)
             self.display.COLUMN_HEADER_HEIGHT += self.display.CELL_DEFAULT_HEIGHT * 2
 
-        def calculate_column_widths() -> None:
-            """
-            Automatically fits the column header width to the content.
-
-            It starts by reading the first 200 rows of the data frame, using Cairo to measure
-            the width of the longest column header, and stores the result in display.cell_sizes.
-            """
-            display = Gdk.Display.get_default()
-            monitor = display.get_monitors()[0]
-            max_width = monitor.get_geometry().width // 8
-            sample_data = self.dbms.data_frame.head(200)
-            self.display.column_widths = [0] * self.dbms.get_shape()[1]
-
-            font_desc = Gtk.Widget.create_pango_context(self.main_canvas).get_font_description()
-            system_font = font_desc.get_family() if font_desc else 'Sans'
-            font_desc = Pango.font_description_from_string(f'{system_font} Normal Bold {self.renderer.FONT_SIZE}')
-            context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0))
-            layout = PangoCairo.create_layout(context)
-            layout.set_font_description(font_desc)
-
-            print_log('Calculating preferred column widths...', Log.DEBUG)
-            for index, col_name in enumerate(self.dbms.get_columns()):
-                sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
-                max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
-                if max_length is not None:
-                    layout.set_text('0' * max_length, -1)
-                else:
-                    layout.set_text('0', -1)
-                text_width = layout.get_size()[0] / Pango.SCALE
-                preferred_width = text_width + 2 * self.display.CELL_DEFAULT_PADDING
-                self.display.column_widths[index] = max(self.display.CELL_DEFAULT_WIDTH, min(max_width, int(preferred_width)))
-
-        def calculate_cumulative_column_widths() -> None:
-            """Calculates the cumulative column widths."""
-            print_log('Calculating cumulative column widths...', Log.DEBUG)
-            self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
-
-        def summary_fill_counts() -> None:
-            """Calculates the fill counts for each column."""
-            self.dbms.summary_fill_counts()
-
         def load_file_thread() -> None:
             """
             A background thread to load and parse a file.
@@ -679,18 +678,55 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             if self.dbms.data_frame.is_empty():
                 self.show_toast_message('We\'re sorry, we couldn\'t load your workbook.')
             else:
-                expand_column_header_height()
-                calculate_column_widths()
-                calculate_cumulative_column_widths()
-                summary_fill_counts()
                 assign_file()
+                expand_column_header_height()
+                GLib.idle_add(self.calculate_column_widths)
+                GLib.idle_add(self.calculate_cumulative_column_widths)
                 GLib.idle_add(self.update_project_status)
+                GLib.idle_add(self.dbms.summary_fill_counts)
                 GLib.idle_add(self.renderer.invalidate_cache)
                 GLib.idle_add(self.main_canvas.queue_draw)
 
         threading.Thread(target=load_file_thread, daemon=True).start()
         print_log(f'Loading file {file.get_path()} in background...', Log.DEBUG)
         GLib.idle_add(self.status_message.set_text, 'Loading your workbook...')
+
+    def calculate_column_widths(self) -> None:
+        """
+        Automatically fits the column header width to the content.
+
+        It starts by reading the first 200 rows of the data frame, using Cairo to measure
+        the width of the longest column header, and stores the result in display.cell_sizes.
+        """
+        display = Gdk.Display.get_default()
+        monitor = display.get_monitors()[0]
+        max_width = monitor.get_geometry().width // 8
+        sample_data = self.dbms.data_frame.head(200)
+        self.display.column_widths = [0] * self.dbms.get_shape()[1]
+
+        font_desc = Gtk.Widget.create_pango_context(self.main_canvas).get_font_description()
+        system_font = font_desc.get_family() if font_desc else 'Sans'
+        font_desc = Pango.font_description_from_string(f'{system_font} Normal Bold {self.renderer.FONT_SIZE}')
+        context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0))
+        layout = PangoCairo.create_layout(context)
+        layout.set_font_description(font_desc)
+
+        print_log('Calculating preferred column widths...', Log.DEBUG)
+        for index, col_name in enumerate(self.dbms.get_columns()):
+            sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
+            max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
+            if max_length is not None:
+                layout.set_text('0' * max_length, -1)
+            else:
+                layout.set_text('0', -1)
+            text_width = layout.get_size()[0] / Pango.SCALE
+            preferred_width = text_width + 2 * self.display.CELL_DEFAULT_PADDING
+            self.display.column_widths[index] = max(self.display.CELL_DEFAULT_WIDTH, min(max_width, int(preferred_width)))
+
+    def calculate_cumulative_column_widths(self) -> None:
+        """Calculates the cumulative column widths."""
+        print_log('Calculating cumulative column widths...', Log.DEBUG)
+        self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
 
     def update_project_status(self) -> None:
         """Updates the project status."""

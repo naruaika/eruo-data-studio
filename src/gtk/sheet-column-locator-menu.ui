@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <menu id="sheet_column_locator_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Insert Column to _Left</attribute>
+        <attribute name="action">app.sheet.column.insert-to-left</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Insert Column to _Right</attribute>
+        <attribute name="action">app.sheet.column.insert-to-right</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">_Delete Column</attribute>
+        <attribute name="action">app.sheet.column.delete</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Clear Contents</attribute>
+        <attribute name="action">app.sheet.column.clear</attribute>
+      </item>
+    </section>
+  </menu>
+  <template class="SheetColumnLocatorMenu" parent="GtkPopoverMenu">
+    <property name="menu-model">sheet_column_locator_menu</property>
+    <style>
+      <class name="context-menu"/>
+    </style>
+  </template>
+</interface>
