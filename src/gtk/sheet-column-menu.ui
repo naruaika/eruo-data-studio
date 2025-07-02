@@ -123,10 +123,6 @@
                   <attribute name="label" translatable="yes">_Datetime</attribute>
                   <attribute name="action">app.sheet.column.convert-to.datetime</attribute>
                 </item>
-                <item>
-                  <attribute name="label" translatable="yes">Du_ration</attribute>
-                  <attribute name="action">app.sheet.column.convert-to.duration</attribute>
-                </item>
               </section>
             </link>
           </item>
@@ -146,8 +142,8 @@
         </child>
         <child>
           <object class="GtkScrolledWindow" id="filter_scrolledwindow">
-            <property name="height-request">181</property>
-            <property name="width-request">400</property>
+            <property name="height-request">280</property>
+            <property name="width-request">320</property>
             <property name="hscrollbar-policy">GTK_POLICY_EXTERNAL</property>
             <child>
               <object class="GtkViewport">

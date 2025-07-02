@@ -17,8 +17,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from datetime import datetime
+from tempfile import NamedTemporaryFile
 import gc
 import polars
+import threading
 
 from gi.repository import Gio, GObject
 
@@ -33,16 +36,22 @@ class DBMS(GObject.Object):
     data_frame: polars.DataFrame = polars.DataFrame()
     fill_counts: list[int] = []
 
-    pending_values_to_show: dict[str, list[str]] = {}
-    pending_values_to_hide: dict[str, list[str]] = {}
+    temp_data_frame: polars.DataFrame = polars.DataFrame()
+    temp_data_file_paths: list[str] = []
+
+    pending_values_to_show: list[any] = []
+    pending_values_to_hide: list[any] = []
     current_column_index: int = -1
     current_unique_values: polars.Series = polars.Series()
     current_unique_values_hash: str = ''
 
+    previous_column_index: int = -1
+    previous_unique_values: list[any] = []
+
     def __init__(self) -> None:
         super().__init__()
 
-    def get_data(self, row: int, col: int) -> str:
+    def get_data(self, row: int, col: int) -> any:
         """
         Get the data from a cell.
 
@@ -51,11 +60,11 @@ class DBMS(GObject.Object):
             col (int): The column index of the cell.
 
         Returns:
-            str: The data from the cell.
+            any: The data from the cell.
         """
         return self.data_frame[row, col + WITH_ROW_INDEX]
 
-    def set_data(self, row: int, col: int, value: any) -> None:
+    def set_data(self, row: int, col: int, value: any) -> bool:
         """
         Set the data in a cell.
 
@@ -64,7 +73,34 @@ class DBMS(GObject.Object):
             col (int): The column index of the cell.
             value (any): The value to be set in the cell.
         """
-        self.data_frame[row, col + WITH_ROW_INDEX] = value
+        # Convert the input value to the correct type
+        column_dtype = self.get_dtypes()[col]
+        if column_dtype == polars.Date:
+            try:
+                value = datetime.strptime(value, '%Y-%m-%d').date()
+            except Exception as e:
+                print_log(f'Failed to convert value to {column_dtype} at index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
+                return False
+        elif column_dtype == polars.Datetime:
+            try:
+                value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+            except Exception as e:
+                print_log(f'Failed to convert value to {column_dtype} at index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
+                return False
+        elif column_dtype == polars.Time:
+            try:
+                value = datetime.strptime(value, '%H:%M:%S').time()
+            except Exception as e:
+                print_log(f'Failed to convert value to {column_dtype} at index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
+                return False
+
+        try:
+            self.data_frame[row, col + WITH_ROW_INDEX] = value
+        except Exception as e:
+            print_log(f'Failed to update data frame at index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
+            return False
+
+        return True
 
     def get_shape(self) -> tuple[int, int]:
         """
@@ -108,18 +144,23 @@ class DBMS(GObject.Object):
         col_name = self.data_frame.columns[col_index]
         col_data = self.data_frame.get_column(col_name)
 
-        if col_data.dtype in [polars.Categorical, polars.Date, polars.Datetime, polars.Time, polars.Duration, polars.Boolean, polars.Null]:
-            print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique().to_list()}', Log.DEBUG)
+        # if col_index == self.previous_column_index:
+        #     print_log(f'Column {col_name} has {format(len(self.previous_unique_values), ",d")} unique values: {self.previous_unique_values}', Log.DEBUG)
+        #     self.current_unique_values =
+        #     return self.previous_unique_values
+
+        if col_data.dtype in [polars.Categorical, polars.Date, polars.Datetime, polars.Time, polars.Boolean, polars.Null]:
+            print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
         else:
             approx_n_unique = self.data_frame.select(polars.col(col_name).approx_n_unique()).item()
             approx_n_unique = min(approx_n_unique, self.data_frame.shape[0])
             if approx_n_unique <= 200:
-                print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique().to_list()}', Log.DEBUG)
+                print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
             else:
                 print_log(f'Column {col_name} has approximately {format(approx_n_unique, ",d")} unique values; too many to display.', Log.DEBUG)
 
                 sample_size = min(10_000, approx_n_unique)
-                sample_data = col_data.head(sample_size).unique().sort()
+                sample_data = col_data.sample(sample_size, seed=0).unique().sort()
                 self.current_unique_values_hash = sample_data.hash()
                 self.current_unique_values = sample_data.head(200).to_list()
                 self.current_column_index = col_index
@@ -157,24 +198,37 @@ class DBMS(GObject.Object):
     #     Returns:
     #         list[str]: A list of unique values in the specified column.
     #     """
-    #     # TODO: support other data types than string
+    #     # TODO: support another data types
+    #     # TODO: support advanced filtering
     #     return self.current_unique_values.filter(self.current_unique_values.str.contains(filter)).to_list()
 
-    def clean_up_temporary_data(self) -> None:
-        """Cleans up temporary data."""
-        self.pending_values_to_show = {}
-        self.pending_values_to_hide = {}
-        self.current_column_index = -1
-        self.current_unique_values = polars.Series()
-        self.current_unique_values_hash = ''
+    def write_erquet_file(self) -> None:
+        """Writes the data frame to an erquet file."""
+        with NamedTemporaryFile(suffix='.erquet', delete=False) as temp_file:
+            print_log(f'Writing temporary file: {temp_file.name}', Log.DEBUG)
+            self.temp_data_frame.write_parquet(temp_file.name)
+            self.temp_data_frame = polars.DataFrame()
+            self.temp_data_file_paths.append(temp_file.name)
         gc.collect()
 
-    def summary_fill_counts(self) -> None:
+    def summary_fill_counts(self, col_index: int | None = None) -> None:
         """Calculates the fill counts for each column."""
-        print_log('Calculating fill counts...', Log.DEBUG)
-        for col_name in self.get_columns():
-            fill_count = self.data_frame.shape[0] - self.data_frame[col_name].is_null().sum()
+        if col_index is not None:
+            col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
+            fill_count = self.data_frame.shape[0] - self.data_frame.get_column(col_name).is_null().sum()
+            if self.data_frame.get_column(col_name).dtype in [polars.String]:
+                fill_count -= self.data_frame.filter(polars.col(col_name).str.len_bytes() == 0).shape[0]
+            self.fill_counts[col_index] = fill_count
+            print_log(f'Calculating fill counts for column: {col_name}...', Log.DEBUG)
+            return
+
+        self.fill_counts = []
+        for col_index, col_name in enumerate(self.get_columns()):
+            fill_count = self.data_frame.shape[0] - self.data_frame.get_column(col_name).is_null().sum()
+            if self.data_frame.get_column(col_name).dtype in [polars.String]:
+                fill_count -= self.data_frame.filter(polars.col(col_name).str.len_bytes() == 0).shape[0]
             self.fill_counts.append(fill_count)
+        print_log('Calculating fill counts for all columns...', Log.DEBUG)
 
     def sort_column_values(self, col_index: int, descending: bool = False) -> None:
         """
@@ -187,11 +241,44 @@ class DBMS(GObject.Object):
         col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
         self.data_frame = self.data_frame.sort(col_name, descending=descending, nulls_last=True)
         direction = 'descending' if descending else 'ascending'
-        print_log(f'Sorting column {col_name} in {direction} order...', Log.DEBUG)
+        print_log(f'Sorting column \'{col_name}\' in {direction} order...', Log.DEBUG)
 
-    def apply_filter(self) -> None:
+    def apply_filter(self) -> bool:
         """Apply a filter to the data frame."""
-        raise NotImplementedError
+        if 'meta:all' in self.pending_values_to_show and len(self.pending_values_to_hide) == 0:
+            print_log('Applying no filter to data frame...', Log.DEBUG)
+            return False
+
+        # Cache previous unique values, so that user can undo filter
+        self.previous_column_index = self.current_column_index
+        self.previous_unique_values = self.current_unique_values.copy()
+
+        # # Write current data frame to a new temporary file
+        # self.temp_data_frame = self.data_frame
+        # threading.Thread(target=self.write_erquet_file, daemon=True).start()
+
+        col_name = self.data_frame.columns[self.current_column_index]
+
+        # Apply filter to current data frame
+        # TODO: support other data types
+        # TODO: support advanced filtering
+        if 'meta:all' in self.pending_values_to_show:
+            predicates = polars.col(col_name).is_in(self.pending_values_to_hide).not_()
+            if 'meta:blank' in self.pending_values_to_hide:
+                predicates &= polars.col(col_name).is_not_null()
+            self.data_frame = self.data_frame.filter(predicates)
+            print_log(f'Applying filter to column \'{col_name}\'...', Log.DEBUG)
+            return True
+
+        if 'meta:all' in self.pending_values_to_hide and len(self.pending_values_to_show) > 0:
+            predicates = polars.col(col_name).is_in(self.pending_values_to_show)
+            if 'meta:blank' in self.pending_values_to_show:
+                predicates |= polars.col(col_name).is_null()
+            self.data_frame = self.data_frame.filter(predicates)
+            print_log(f'Applying filter to column \'{col_name}\'...', Log.DEBUG)
+            return True
+
+        return False
 
     def reset_filter(self) -> None:
         """Reset the filter applied to the data frame."""
@@ -210,9 +297,12 @@ class DBMS(GObject.Object):
         """
         col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
         try:
-            self.data_frame = self.data_frame.with_columns(polars.col(col_name).cast(col_type))
-            print_log(f'Converting column {col_name} to {col_type.__name__.lower()}...', Log.DEBUG)
+            if col_type == polars.Categorical:
+                self.data_frame = self.data_frame.with_columns(polars.col(col_name).cast(polars.Categorical('lexical')))
+            else:
+                self.data_frame = self.data_frame.with_columns(polars.col(col_name).cast(col_type))
+            print_log(f'Converting column \'{col_name}\' to {col_type.__name__.lower()}...', Log.DEBUG)
             return True
         except Exception as e:
-            print_log(f'Failed to convert column {col_name} to {col_type.__name__.lower()}: {e}', Log.WARNING)
+            print_log(f'Failed to convert column \'{col_name}\' to {col_type.__name__.lower()}: {e}', Log.WARNING)
             return False

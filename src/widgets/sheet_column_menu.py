@@ -44,7 +44,7 @@ class SheetColumnMenu(Gtk.PopoverMenu):
         """Sets the colid for the SheetColumnMenu."""
         self._colid = str(colid)
 
-    def set_filter_options(self, options: list[str]) -> None:
+    def set_filter_options(self, options: list[any]) -> None:
         """
         Sets the filter options for the SheetColumnMenu.
 
@@ -69,51 +69,46 @@ class SheetColumnMenu(Gtk.PopoverMenu):
                 is_consistent = False
 
                 select_all.handler_block_by_func(on_check_button_toggled)
-                if 'meta:all' in self._dbms.pending_values_to_show[self._colid] and len(self._dbms.pending_values_to_hide[self._colid]) == 0:
-                    self._dbms.pending_values_to_show[self._colid] = ['meta:all']
-                    self._dbms.pending_values_to_hide[self._colid] = []
+                if 'meta:all' in self._dbms.pending_values_to_show and len(self._dbms.pending_values_to_hide) == 0:
+                    self._dbms.pending_values_to_show = ['meta:all']
+                    self._dbms.pending_values_to_hide = []
                     select_all.set_active(True)
                     is_consistent = True
-                elif 'meta:all' in self._dbms.pending_values_to_hide[self._colid] and len(self._dbms.pending_values_to_show[self._colid]) == 0:
-                    self._dbms.pending_values_to_show[self._colid] = []
-                    self._dbms.pending_values_to_hide[self._colid] = ['meta:all']
+                elif 'meta:all' in self._dbms.pending_values_to_hide and len(self._dbms.pending_values_to_show) == 0:
+                    self._dbms.pending_values_to_show = []
+                    self._dbms.pending_values_to_hide = ['meta:all']
                     select_all.set_active(False)
                     is_consistent = True
                 else:
-                    values_to_show = self._dbms.pending_values_to_show[self._colid]
-                    values_to_hide = self._dbms.pending_values_to_hide[self._colid]
-                    if 'meta:blank' in values_to_show:
-                        values_to_show.remove('meta:blank')
-                    if 'meta:blank' in values_to_hide:
-                        values_to_hide.remove('meta:blank')
+                    values_to_show = list(set(self._dbms.pending_values_to_show) - {'meta:blank'})
+                    values_to_hide = list(set(self._dbms.pending_values_to_hide) - {'meta:blank'})
                     values_to_show_hash = polars.Series(values_to_show).sort().hash()
                     values_to_hide_hash = polars.Series(values_to_hide).sort().hash()
                     if 'meta:all' in values_to_show and values_to_hide_hash.equals(self._dbms.current_unique_values_hash):
-                        self._dbms.pending_values_to_show[self._colid] = []
-                        self._dbms.pending_values_to_hide[self._colid] = ['meta:all']
+                        self._dbms.pending_values_to_show = []
+                        self._dbms.pending_values_to_hide = ['meta:all']
                         select_all.set_active(False)
                         is_consistent = True
                     elif 'meta:all' in values_to_hide and values_to_show_hash.equals(self._dbms.current_unique_values_hash):
-                        self._dbms.pending_values_to_show[self._colid] = ['meta:all']
-                        self._dbms.pending_values_to_hide[self._colid] = []
+                        self._dbms.pending_values_to_show = ['meta:all']
+                        self._dbms.pending_values_to_hide = []
                         select_all.set_active(True)
                         is_consistent = True
                 select_all.handler_unblock_by_func(on_check_button_toggled)
 
-                if len(self._dbms.pending_values_to_show[self._colid]) == 0:
+                if len(self._dbms.pending_values_to_show) == 0:
                     self.action_set_enabled('app.sheet.column.apply-filter', False)
                 else:
                     self.action_set_enabled('app.sheet.column.apply-filter', True)
-
                 select_all.set_inconsistent(not is_consistent)
 
             if is_meta and widget.get_label() == 'Select All':
                 if is_active:
-                    self._dbms.pending_values_to_show[self._colid] = ['meta:all']
-                    self._dbms.pending_values_to_hide[self._colid] = []
+                    self._dbms.pending_values_to_show = ['meta:all']
+                    self._dbms.pending_values_to_hide = []
                 else:
-                    self._dbms.pending_values_to_show[self._colid] = []
-                    self._dbms.pending_values_to_hide[self._colid] = ['meta:all']
+                    self._dbms.pending_values_to_show = []
+                    self._dbms.pending_values_to_hide = ['meta:all']
 
                 index = 1
                 widget = self.filter_listbox.get_row_at_index(index).get_first_child()
@@ -132,31 +127,31 @@ class SheetColumnMenu(Gtk.PopoverMenu):
 
             elif is_meta and widget.get_label() == '(Blanks)':
                 if is_active:
-                    if 'meta:blank' in self._dbms.pending_values_to_hide[self._colid]:
-                        self._dbms.pending_values_to_hide[self._colid].remove('meta:blank')
-                    if 'meta:all' not in self._dbms.pending_values_to_show[self._colid]:
-                        self._dbms.pending_values_to_show[self._colid].append('meta:blank')
+                    if 'meta:blank' in self._dbms.pending_values_to_hide:
+                        self._dbms.pending_values_to_hide.remove('meta:blank')
+                    if 'meta:all' not in self._dbms.pending_values_to_show:
+                        self._dbms.pending_values_to_show.append('meta:blank')
                 else:
-                    if 'meta:blank' in self._dbms.pending_values_to_show[self._colid]:
-                        self._dbms.pending_values_to_show[self._colid].remove('meta:blank')
-                    if 'meta:all' not in self._dbms.pending_values_to_hide[self._colid]:
-                        self._dbms.pending_values_to_hide[self._colid].append('meta:blank')
+                    if 'meta:blank' in self._dbms.pending_values_to_show:
+                        self._dbms.pending_values_to_show.remove('meta:blank')
+                    if 'meta:all' not in self._dbms.pending_values_to_hide:
+                        self._dbms.pending_values_to_hide.append('meta:blank')
                 post_process()
 
             else:
                 if is_active:
-                    if widget.filter_value in self._dbms.pending_values_to_hide[self._colid]:
-                        self._dbms.pending_values_to_hide[self._colid].remove(widget.filter_value)
-                    if 'meta:all' not in self._dbms.pending_values_to_show[self._colid]:
-                        self._dbms.pending_values_to_show[self._colid].append(widget.filter_value)
+                    if widget.filter_value in self._dbms.pending_values_to_hide:
+                        self._dbms.pending_values_to_hide.remove(widget.filter_value)
+                    if 'meta:all' not in self._dbms.pending_values_to_show:
+                        self._dbms.pending_values_to_show.append(widget.filter_value)
                 else:
-                    if widget.filter_value in self._dbms.pending_values_to_show[self._colid]:
-                        self._dbms.pending_values_to_show[self._colid].remove(widget.filter_value)
-                    if 'meta:all' not in self._dbms.pending_values_to_hide[self._colid]:
-                        self._dbms.pending_values_to_hide[self._colid].append(widget.filter_value)
+                    if widget.filter_value in self._dbms.pending_values_to_show:
+                        self._dbms.pending_values_to_show.remove(widget.filter_value)
+                    if 'meta:all' not in self._dbms.pending_values_to_hide:
+                        self._dbms.pending_values_to_hide.append(widget.filter_value)
                 post_process()
 
-        def add_check_button(label: str, is_active: bool = False, is_meta: bool = False) -> None:
+        def add_check_button(value: any, is_active: bool = False, is_meta: bool = False) -> None:
             """
             Adds a check button to the SheetColumnMenu.
 
@@ -169,13 +164,14 @@ class SheetColumnMenu(Gtk.PopoverMenu):
                 label (str): The label of the check button.
                 active (bool, optional): Whether the check button is active. Defaults to False.
             """
-            filter_value = label
-            if len(label) > 80:
-                label = label[:77] + '...' # truncate to optimize UI rendering
-            check_button = Gtk.CheckButton.new_with_label(label)
+            filter_value = value
+            value = str(value)
+            if len(value) > 80:
+                value = value[:77] + '...' # truncate to optimize UI rendering
+            check_button = Gtk.CheckButton.new_with_label(value)
             check_button.filter_value = filter_value
-            if label == 'eruo-data-studio:truncated':
-                check_button.set_label(f'Search to find out the remaining items...')
+            if value == 'eruo-data-studio:truncated':
+                check_button.set_label(f'Use search to find more items...')
                 check_button.set_active(False)
                 check_button.set_sensitive(False)
                 check_button.add_css_class('truncated')
@@ -188,13 +184,15 @@ class SheetColumnMenu(Gtk.PopoverMenu):
 
         self.filter_listbox.remove_all()
         add_check_button('Select All', True, True)
-        if self._dbms.fill_counts[int(self._colid)] < self._dbms.get_shape()[0]:
+        if any(option in [None, ''] for option in options):
             add_check_button('(Blanks)', True, True)
         for option in options:
-            add_check_button(str(option), is_active=True)
+            if option in [None, '']:
+                continue
+            add_check_button(option, is_active=True)
 
         # TODO: read from the current applied filters if any
         self.filter_scrolledwindow.get_vadjustment().set_value(0)
-        self._dbms.pending_values_to_show[self._colid] = ['meta:all']
-        self._dbms.pending_values_to_hide[self._colid] = []
+        self._dbms.pending_values_to_show = ['meta:all']
+        self._dbms.pending_values_to_hide = []
         self.action_set_enabled('app.sheet.column.apply-filter', True)

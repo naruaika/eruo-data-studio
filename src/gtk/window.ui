@@ -60,49 +60,53 @@
               </object>
             </child>
             <child>
-              <object class="GtkOverlay" id="main_container">
-                <property name="vexpand">True</property>
-                <property name="hexpand">True</property>
+              <object class="AdwToastOverlay" id="toast_container">
                 <child>
-                  <object class="GtkOverlay">
+                  <object class="GtkOverlay" id="main_container">
                     <property name="vexpand">True</property>
                     <property name="hexpand">True</property>
                     <child>
-                      <object class="GtkDrawingArea" id="main_canvas">
-                        <property name="halign">fill</property>
-                        <property name="valign">fill</property>
+                      <object class="GtkOverlay">
                         <property name="vexpand">True</property>
                         <property name="hexpand">True</property>
-                        <style>
-                          <class name="main-canvas"/>
-                        </style>
+                        <child>
+                          <object class="GtkDrawingArea" id="main_canvas">
+                            <property name="halign">fill</property>
+                            <property name="valign">fill</property>
+                            <property name="vexpand">True</property>
+                            <property name="hexpand">True</property>
+                            <style>
+                              <class name="main-canvas"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child type="overlay">
+                          <object class="GtkScrollbar" id="horizontal_scrollbar">
+                            <property name="orientation">horizontal</property>
+                            <property name="valign">end</property>
+                            <style>
+                              <class name="bottom"/>
+                              <class name="overlay-indicator"/>
+                            </style>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <child type="overlay">
-                      <object class="GtkScrollbar" id="horizontal_scrollbar">
-                        <property name="orientation">horizontal</property>
-                        <property name="valign">end</property>
+                      <object class="GtkScrollbar" id="vertical_scrollbar">
+                        <property name="orientation">vertical</property>
+                        <property name="halign">end</property>
                         <style>
-                          <class name="bottom"/>
+                          <class name="right"/>
                           <class name="overlay-indicator"/>
                         </style>
                       </object>
                     </child>
-                  </object>
-                </child>
-                <child type="overlay">
-                  <object class="GtkScrollbar" id="vertical_scrollbar">
-                    <property name="orientation">vertical</property>
-                    <property name="halign">end</property>
                     <style>
-                      <class name="right"/>
-                      <class name="overlay-indicator"/>
+                      <class name="main-content"/>
                     </style>
                   </object>
                 </child>
-                <style>
-                  <class name="main-content"/>
-                </style>
               </object>
             </child>
             <child>

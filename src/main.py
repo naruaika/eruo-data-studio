@@ -54,9 +54,8 @@ class EruoDataStudioApplication(Adw.Application):
         self.create_action('sheet.column.reset-sort', self.on_column_reset_sort_action)
         self.create_action('sheet.column.apply-filter', self.on_column_apply_filter_action)
         self.create_action('sheet.column.reset-filter', self.on_column_reset_filter_action)
-        for data_type in ['boolean', 'int8', 'int16', 'int32', 'int64',  'uint8', 'uint16',
-                          'uint32', 'uint64',  'float32', 'float64', 'decimal', 'string',
-                          'categorical', 'date', 'time', 'datetime', 'duration']:
+        for data_type in ['boolean', 'int8', 'int16', 'int32', 'int64',  'uint8', 'uint16', 'uint32', 'uint64',
+                          'float32', 'float64', 'decimal', 'string', 'categorical', 'date', 'time', 'datetime']:
             self.create_action(f'sheet.column.convert-to.{data_type}', getattr(self, f'on_column_convert_to_{data_type}_action'))
 
     def do_activate(self) -> None:
@@ -257,10 +256,13 @@ class EruoDataStudioApplication(Adw.Application):
             *args: Variable length argument list. Currently unused.
         """
         window = self.get_active_window()
-        window.dbms.apply_filter()
-        window.action_set_enabled('app.sheet.column.reset-filter', True)
+        if not window.dbms.apply_filter():
+            return
+        window.dbms.summary_fill_counts()
+        window.update_project_status()
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
+        window.action_set_enabled('app.sheet.column.reset-filter', True)
 
     def on_column_reset_filter_action(self, *args) -> None:
         """
@@ -347,10 +349,6 @@ class EruoDataStudioApplication(Adw.Application):
         """Converts the selected column to Datetime values."""
         self.column_convert_to(polars.Datetime)
 
-    def on_column_convert_to_duration_action(self, *args) -> None:
-        """Converts the selected column to Duration values."""
-        self.column_convert_to(polars.Duration)
-
     def column_convert_to(self, col_type: polars.DataType, *args) -> None:
         """
         Converts the selected column to the specified data type.
@@ -368,7 +366,10 @@ class EruoDataStudioApplication(Adw.Application):
         if window.dbms.convert_column_to(col_index, col_type):
             window.renderer.invalidate_cache()
             window.main_canvas.queue_draw()
-        # TODO: show error message to user
+        else:
+            col_name = window.dbms.get_columns()[col_index]
+            current_type = window.dbms.get_dtypes()[col_index]
+            window.show_toast_message(f'Failed to convert column \'{col_name}\' from {current_type} to {col_type}')
 
     def create_action(self, name: str, callback: callable, shortcuts: list | None = None) -> None:
         """

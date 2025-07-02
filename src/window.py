@@ -43,6 +43,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
     name_box: Gtk.Widget = Gtk.Template.Child()
     formula_bar: Gtk.Widget = Gtk.Template.Child()
+    toast_container: Gtk.Widget = Gtk.Template.Child()
     main_container: Gtk.Widget = Gtk.Template.Child()
     main_canvas: Gtk.Widget = Gtk.Template.Child()
     vertical_scrollbar: Gtk.Widget = Gtk.Template.Child()
@@ -146,6 +147,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         motion_event_controller.connect('enter', self.on_scrollbar_entered)
         motion_event_controller.connect('leave', self.on_scrollbar_left)
         self.horizontal_scrollbar.add_controller(motion_event_controller)
+
+        self.connect('close-request', self.on_close_request)
 
         if file is not None:
             self.load_file(file)
@@ -292,7 +295,6 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         """Callback function for when the main canvas is released."""
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
             """Callback function for when the context menu is closed."""
-            self.dbms.clean_up_temporary_data()
             self.selection.set_selected_column(-1)
             self.main_canvas.set_focusable(True)
             self.main_canvas.grab_focus()
@@ -428,6 +430,13 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                     self.formula_bar.grab_focus()
                     self.formula_bar.set_text('')
                     self.formula_bar.set_position(1)
+                elif keyval == Gdk.KEY_Delete:
+                    # TODO: add support for multiple cells
+                    self.set_cell_data(*active_cell, None)
+                    self.formula_bar.set_text('')
+                    self.renderer.invalidate_cache()
+                    self.main_canvas.queue_draw()
+                    return
                 return
 
         self.selection.set_selected_cells(((active_cell), (active_cell)))
@@ -494,6 +503,31 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         """Callback function for when the scrollbar is left."""
         event.get_widget().remove_css_class('hovering')
 
+    def on_close_request(self, window: Gtk.Window) -> bool:
+        """
+        Callback function for when the window is closed.
+
+        This function removes the temporary data files and destroys the window.
+        It also checks if the .erquet file exists in the temporary directory and
+        deletes it in case the program crashed or exited unexpectedly last time.
+
+        Returns:
+            bool: True if the window should be closed, False otherwise.
+        """
+        import os
+        for temp_file_path in self.dbms.temp_data_file_paths:
+            print_log(f'Removing temporary file: {temp_file_path}', Log.DEBUG)
+            os.remove(temp_file_path)
+
+        import tempfile
+        for file in os.listdir(tempfile.gettempdir()):
+            if file.endswith('.erquet'):
+                print_log(f'Removing temporary file: {file}', Log.DEBUG)
+                os.remove(os.path.join(os.getcwd(), 'temp', file))
+
+        self.destroy()
+        return True
+
     def get_cell_data(self) -> str:
         """
         Retrieve the data from the selected cell.
@@ -525,8 +559,15 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         if df_shape[0] <= row or df_shape[1] <= col:
             print_log(f"Cannot update cell data at index ({format(row, ",d")}, {format(col, ",d")}) due to out of bounds", Log.NOTICE)
             return False # TODO: implement dynamic data frame(?)
-        self.dbms.set_data(row, col, value)
-        print_log(f"Cell data at index ({format(row, ",d")}, {format(col, ",d")}) is updated")
+        if self.dbms.set_data(row, col, value):
+            self.dbms.summary_fill_counts(col)
+        else:
+            col_type = self.dbms.get_dtypes()[col]
+            cell_name = self.selection.index_to_name((row, col))
+            if str(col_type).startswith('Categorical'):
+                col_type = 'Categorical'
+            self.show_toast_message(f'Incorrect {col_type} value: \'{value}\' at {cell_name}')
+            return False
         return True
 
     def scroll_to_active_cell(self) -> bool:
@@ -558,14 +599,6 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             """Assigns the given file to the window's file attribute."""
             self.dbms.file = file
 
-        def update_ui() -> None:
-            """Updates the UI to reflect the loaded file."""
-            GLib.idle_add(self.set_title, f'{file.get_basename()} – Eruo Data Studio')
-            GLib.idle_add(self.formula_bar.set_text, self.get_cell_data())
-            file_size = file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, None).get_size() / (1024 * 1024)
-            GLib.idle_add(self.status_message.set_text, f'File: {file.get_basename()} | Size: {format(file_size, ",.2f")} MB | '
-                                                        f'Rows: {format(self.dbms.get_shape()[0], ",d")} | Columns: {format(self.dbms.get_shape()[1], ",d")}')
-
         def expand_column_header_height() -> None:
             """Expands the column header height to fit the header of the data frame."""
             print_log('Calculating column header height...', Log.DEBUG)
@@ -578,8 +611,6 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             It starts by reading the first 200 rows of the data frame, using Cairo to measure
             the width of the longest column header, and stores the result in display.cell_sizes.
             """
-            print_log('Calculating preferred column widths...', Log.DEBUG)
-
             display = Gdk.Display.get_default()
             monitor = display.get_monitors()[0]
             max_width = monitor.get_geometry().width // 8
@@ -593,6 +624,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             layout = PangoCairo.create_layout(context)
             layout.set_font_description(font_desc)
 
+            print_log('Calculating preferred column widths...', Log.DEBUG)
             for index, col_name in enumerate(self.dbms.get_columns()):
                 sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
                 max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
@@ -628,7 +660,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             try:
                 start_time = time.time()
                 if WITH_ROW_INDEX:
-                    self.dbms.data_frame = polars.read_csv(file.get_path()).with_row_index()
+                    self.dbms.data_frame = polars.read_csv(file.get_path()).with_row_index(offset=1)
                 else:
                     self.dbms.data_frame = polars.read_csv(file.get_path())
                 end_time = time.time()
@@ -639,17 +671,32 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 print_log(f'Failed to load file: {e}', Log.WARNING)
 
             if self.dbms.data_frame.is_empty():
-                self.status_message.set_text('We\'re sorry, we couldn\'t load your workbook.')
+                self.show_toast_message('We\'re sorry, we couldn\'t load your workbook.')
             else:
-                update_ui()
                 expand_column_header_height()
                 calculate_column_widths()
                 calculate_cumulative_column_widths()
                 summary_fill_counts()
                 assign_file()
+                GLib.idle_add(self.update_project_status)
                 GLib.idle_add(self.renderer.invalidate_cache)
                 GLib.idle_add(self.main_canvas.queue_draw)
 
         threading.Thread(target=load_file_thread, daemon=True).start()
         print_log(f'Loading file {file.get_path()} in background...', Log.DEBUG)
         GLib.idle_add(self.status_message.set_text, 'Loading your workbook...')
+
+    def update_project_status(self) -> None:
+        """Updates the project status."""
+        print_log('Updating project status...', Log.DEBUG)
+        self.set_title(f'{self.dbms.file.get_basename()} – Eruo Data Studio')
+        self.formula_bar.set_text(self.get_cell_data())
+        file_size = self.dbms.file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, None).get_size() / (1024 * 1024)
+        self.status_message.set_text(f'File: {self.dbms.file.get_basename()} | Size: {format(file_size, ",.2f")}MB | '
+                                     f'Rows: {format(self.dbms.get_shape()[0], ",d")} | Columns: {format(self.dbms.get_shape()[1], ",d")} | '
+                                     f'Memory: {format(self.dbms.data_frame.estimated_size("mb"), ",.2f")}MB')
+
+    def show_toast_message(self, message: str) -> None:
+        """Shows a toast message."""
+        print_log(f'Showing toast message: {message}', Log.DEBUG)
+        self.toast_container.add_toast(Adw.Toast.new(message))
