@@ -37,7 +37,7 @@ class Selection(GObject.Object):
     _active_cell: tuple[int, int] = (0, 0)
     _selected_cells: tuple[tuple[int, int], tuple[int, int]] = ((0, 0), (0, 0))
 
-    _opposite_active_cell: tuple[int, int] = (0, 0)
+    _opposite_cell: tuple[int, int] = (0, 0)
 
     def __init__(self, display: Display) -> None:
         """
@@ -197,17 +197,26 @@ class Selection(GObject.Object):
         self.set_active_cell((row, col))
         return True
 
-    def get_opposite_active_cell(self) -> tuple[int, int]:
+    def get_opposite_cell(self) -> tuple[int, int]:
         """
-        Returns the opposite active cell.
+        Returns the opposite cell.
 
-        The opposite active cell is the cell opposite the currently active cell,
+        The opposite cell is the cell opposite the currently active cell,
         represented as a tuple of (row, column) indices.
 
         Returns:
             A tuple containing the row and column indices of the opposite active cell.
         """
-        return self._opposite_active_cell
+        return self._opposite_cell
+
+    def set_opposite_cell(self, index: tuple[int, int]) -> None:
+        """
+        Sets the opposite active cell.
+
+        Args:
+            index: The index of the opposite active cell.
+        """
+        self._opposite_cell = index
 
     def get_selected_cells(self) -> tuple[tuple[int, int], tuple[int, int]]:
         """
@@ -238,9 +247,9 @@ class Selection(GObject.Object):
         """
         start = (min(range[0][0], range[1][0]), min(range[0][1], range[1][1]))
         end = (max(range[0][0], range[1][0]), max(range[0][1], range[1][1]))
-        range = (start, end)
-        self._selected_cells = range
-        self.set_active_cell(start)
+        self._selected_cells = (start, end)
+        self.set_active_cell(range[0])
+        self.set_opposite_cell(range[1])
 
     def set_selected_cells_by_name(self, range: str) -> bool:
         """
@@ -297,7 +306,7 @@ class Selection(GObject.Object):
         range = ((start_row, start_col), (end_row, end_col))
         self.set_selected_cells(range)
         self.set_active_cell(range[0])
-        self._opposite_active_cell = range[1]
+        self.set_opposite_cell(range[1])
 
     def name_to_index(self, name: str) -> tuple[int, int]:
         """

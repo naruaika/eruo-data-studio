@@ -223,7 +223,7 @@ class Renderer(GObject.Object):
 
         # Set the accent color with reduced opacity for selected column header
         accent_rgba = list(self._color_accent)
-        accent_rgba[3] = 0.15
+        accent_rgba[3] = 0.2
         context.set_source_rgba(*accent_rgba)
 
         # Calculate the position and size of the selection rectangle

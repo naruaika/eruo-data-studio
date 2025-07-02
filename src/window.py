@@ -189,7 +189,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         widget.set_position(len(widget.get_text()))
         self.formula_bar.set_text(self.get_cell_data())
 
-        self.scroll_to_active_cell()
+        active_cell = self.selection.get_active_cell()
+        self.scroll_to_cell(active_cell)
         self.renderer.invalidate_cache()
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
@@ -242,7 +243,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.formula_bar.set_text(self.get_cell_data())
         self.formula_bar.x_is_dirty = False
 
-        self.scroll_to_active_cell()
+        active_cell = self.selection.get_active_cell()
+        self.scroll_to_cell(active_cell)
         self.renderer.invalidate_cache()
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
@@ -418,7 +420,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             return # prevent from dragging the worksheet header cells
         start_coord = (start_coord[0] + self.display.scroll_horizontal_position, start_coord[1] + self.display.scroll_vertical_position)
         end_coord = (start_coord[0] + offset_x, start_coord[1] + offset_y)
-        if (self.selection.get_opposite_active_cell() == self.display.coordinate_to_index(end_coord)):
+        if (self.selection.get_opposite_cell() == self.display.coordinate_to_index(end_coord)):
             return # skip redraw if the opposite active cell is being selected
         self.selection.set_selected_cells_by_coordinates((start_coord, end_coord))
         self.main_canvas.queue_draw()
@@ -432,40 +434,65 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         It also updates the selection to include the active cell and schedules the main canvas to redraw.
         """
         active_cell = self.selection.get_active_cell()
+        opposite_cell = self.selection.get_opposite_cell()
+        target_cell = active_cell
 
         match keyval:
             case Gdk.KEY_Tab | Gdk.KEY_ISO_Left_Tab:
                 if state == Gdk.ModifierType.SHIFT_MASK:
-                    active_cell = (active_cell[0], max(0, active_cell[1] - 1))
+                    target_cell = (active_cell[0], max(0, active_cell[1] - 1))
                 else:
-                    active_cell = (active_cell[0], active_cell[1] + 1)
+                    target_cell = (active_cell[0], active_cell[1] + 1)
+
             case Gdk.KEY_Return:
                 if state == Gdk.ModifierType.SHIFT_MASK:
-                    active_cell = (max(0, active_cell[0] - 1), active_cell[1])
+                    target_cell = (max(0, active_cell[0] - 1), active_cell[1])
                 else:
-                    active_cell = (active_cell[0] + 1, active_cell[1])
+                    target_cell = (active_cell[0] + 1, active_cell[1])
+
             case Gdk.KEY_Left:
                 if state == Gdk.ModifierType.CONTROL_MASK:
-                    active_cell = (active_cell[0], 0)
+                    target_cell = (active_cell[0], 0)
+                elif state == Gdk.ModifierType.SHIFT_MASK:
+                    target_cell = (active_cell, (opposite_cell[0], max(0, opposite_cell[1] - 1)))
+                elif state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
+                    target_cell = (active_cell, (opposite_cell[0], 0))
                 else:
-                    active_cell = (active_cell[0], max(0, active_cell[1] - 1))
+                    target_cell = (active_cell[0], max(0, active_cell[1] - 1))
+
             case Gdk.KEY_Right:
                 if state == Gdk.ModifierType.CONTROL_MASK:
-                    active_cell = (active_cell[0], max(0, self.dbms.get_shape()[1] - 1))
+                    target_cell = (active_cell[0], max(0, self.dbms.get_shape()[1] - 1))
+                elif state == Gdk.ModifierType.SHIFT_MASK:
+                    target_cell = (active_cell, (opposite_cell[0], opposite_cell[1] + 1))
+                elif state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
+                    target_cell = (active_cell, (opposite_cell[0], max(0, self.dbms.get_shape()[1] - 1)))
                 else:
-                    active_cell = (active_cell[0], active_cell[1] + 1)
+                    target_cell = (active_cell[0], active_cell[1] + 1)
+
             case Gdk.KEY_Up:
                 if state == Gdk.ModifierType.CONTROL_MASK:
-                    active_cell = (0, active_cell[1])
+                    target_cell = (0, active_cell[1])
+                elif state == Gdk.ModifierType.SHIFT_MASK:
+                    target_cell = (active_cell, (max(0, opposite_cell[0] - 1), opposite_cell[1]))
+                elif state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
+                    target_cell = (active_cell, (0, opposite_cell[1]))
                 else:
-                    active_cell = (max(0, active_cell[0] - 1), active_cell[1])
+                    target_cell = (max(0, active_cell[0] - 1), active_cell[1])
+
             case Gdk.KEY_Down:
                 if state == Gdk.ModifierType.CONTROL_MASK:
-                    active_cell = (max(0, self.dbms.get_shape()[0] - 1), active_cell[1])
+                    target_cell = (max(0, self.dbms.get_shape()[0] - 1), active_cell[1])
+                elif state == Gdk.ModifierType.SHIFT_MASK:
+                    target_cell = (active_cell, (opposite_cell[0] + 1, opposite_cell[1]))
+                elif state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
+                    target_cell = (active_cell, (max(0, self.dbms.get_shape()[0] - 1), opposite_cell[1]))
                 else:
-                    active_cell = (active_cell[0] + 1, active_cell[1])
+                    target_cell = (active_cell[0] + 1, active_cell[1])
+
             case _:
-                if state == Gdk.ModifierType.CONTROL_MASK:
+                if state == Gdk.ModifierType.CONTROL_MASK \
+                        or state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK):
                     return
                 if Gdk.KEY_space <= keyval <= Gdk.KEY_asciitilde:
                     self.formula_bar.grab_focus()
@@ -477,18 +504,22 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                     self.formula_bar.set_position(1)
                 elif keyval == Gdk.KEY_Delete:
                     # TODO: add support for multiple cells
-                    self.set_cell_data(*active_cell, None)
+                    self.set_cell_data(*target_cell, None)
                     self.formula_bar.set_text('')
                     self.renderer.invalidate_cache()
                     self.main_canvas.queue_draw()
-                    return
                 return
 
-        self.selection.set_selected_cells(((active_cell), (active_cell)))
+        if single_target := all(isinstance(i, int) for i in target_cell):
+            self.selection.set_selected_cells((target_cell, target_cell))
+        else:
+            self.selection.set_selected_cells(target_cell)
         self.name_box.set_text(self.selection.get_active_cell_name())
         self.formula_bar.set_text(self.get_cell_data())
 
-        if self.scroll_to_active_cell():
+        active_cell = self.selection.get_active_cell()
+        opposite_cell = self.selection.get_opposite_cell()
+        if (single_target and self.scroll_to_cell(active_cell)) or self.scroll_to_cell(opposite_cell):
             self.renderer.invalidate_cache()
         self.main_canvas.queue_draw()
 
@@ -588,7 +619,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         cell_data = self.dbms.get_data(row, col)
         return str('' if cell_data is None else cell_data)
 
-    def set_cell_data(self, row: int, col: int, value: any, range: bool = False) -> bool:
+    def set_cell_data(self, row: int, col: int, value: any) -> bool:
         """
         Set the data in the selected cell.
 
@@ -616,11 +647,11 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
             return False
         return True
 
-    def scroll_to_active_cell(self) -> bool:
+    def scroll_to_cell(self, target_cell: tuple[int, int]) -> bool:
         """Scroll the main canvas to the active cell."""
         viewport_height = self.main_canvas.get_height() - self.display.COLUMN_HEADER_HEIGHT
         viewport_width = self.main_canvas.get_width() - self.display.ROW_HEADER_WIDTH
-        return self.display.scroll_to_cell(self.selection.get_active_cell(), viewport_height, viewport_width)
+        return self.display.scroll_to_cell(target_cell, viewport_height, viewport_width)
 
     def load_file(self, file: Gio.File) -> None:
         """
