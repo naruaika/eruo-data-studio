@@ -214,9 +214,10 @@ class EruoDataStudioApplication(Adw.Application):
         window = self.get_active_window()
         col_index = window.selection.get_previous_selected_column()
         window.dbms.sort_column_values(col_index, descending=False)
-        window.action_set_enabled('app.sheet.column.reset-sort', True)
+        window.update_project_status()
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
+        window.action_set_enabled('app.sheet.column.reset-sort', True)
 
     def on_column_sort_z_to_a_action(self, *args) -> None:
         """
@@ -232,9 +233,10 @@ class EruoDataStudioApplication(Adw.Application):
         window = self.get_active_window()
         col_index = window.selection.get_previous_selected_column()
         window.dbms.sort_column_values(col_index, descending=True)
-        window.action_set_enabled('app.sheet.column.reset-sort', True)
+        window.update_project_status()
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
+        window.action_set_enabled('app.sheet.column.reset-sort', True)
 
     def on_column_reset_sort_action(self, *args) -> None:
         """
@@ -249,9 +251,10 @@ class EruoDataStudioApplication(Adw.Application):
         """
         window = self.get_active_window()
         window.dbms.reset_column_sort()
-        window.action_set_enabled('app.sheet.column.reset-sort', False)
+        window.update_project_status()
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
+        window.action_set_enabled('app.sheet.column.reset-sort', False)
 
     def on_column_apply_filter_action(self, *args) -> None:
         """
@@ -286,9 +289,9 @@ class EruoDataStudioApplication(Adw.Application):
         """
         window = self.get_active_window()
         window.dbms.reset_row_filter()
-        window.action_set_enabled('app.sheet.column.reset-filter', False)
         window.renderer.invalidate_cache()
         window.main_canvas.queue_draw()
+        window.action_set_enabled('app.sheet.column.reset-filter', False)
 
     def on_column_convert_to_boolean_action(self, *args) -> None:
         """Converts the selected column to boolean values."""

@@ -128,15 +128,14 @@ class Renderer(GObject.Object):
             width: The width of the drawing area.
         """
         print_log('Adjusting row header width...', Log.DEBUG)
-        row_index = self._display.scroll_vertical_position // self._display.CELL_DEFAULT_HEIGHT
-        max_row_number = -1
-        for y in range(self._display.COLUMN_HEADER_HEIGHT, height, self._display.CELL_DEFAULT_HEIGHT):
-            if row_index >= self._dbms.get_shape()[0]:
-                break
-            row_original_index = self._dbms.get_data(row_index, -1)
-            if row_original_index > max_row_number:
-                max_row_number = row_original_index
-            row_index += 1
+        cell_height = self._display.CELL_DEFAULT_HEIGHT
+        y_start = self._display.COLUMN_HEADER_HEIGHT
+        max_row_number = (self._display.scroll_vertical_position // cell_height) + 1 + ((height - y_start) // cell_height)
+        if not self._dbms.data_frame.is_empty():
+            if max_row_number > self._dbms.get_shape()[0]:
+                max_row_number = self._dbms.get_data(self._dbms.get_shape()[0] - 1, -1) + max_row_number
+            else:
+                max_row_number = self._dbms.get_data(max_row_number, -1)
         print_log(f'Detected maximum row number: {max_row_number}', Log.DEBUG)
         font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {self.FONT_SIZE}')
         layout = PangoCairo.create_layout(context)
@@ -437,30 +436,26 @@ class Renderer(GObject.Object):
                 cell_width = self._display.CELL_DEFAULT_WIDTH
 
         # Determine the starting row label based on the scroll position
-        row_index = self._display.scroll_vertical_position // self._display.CELL_DEFAULT_HEIGHT
+        cell_text = self._display.scroll_vertical_position // self._display.CELL_DEFAULT_HEIGHT + 1
 
         # Draw row headers texts (right-aligned)
         layout = PangoCairo.create_layout(context)
         layout.set_font_description(index_font_desc)
         for y in range(self._display.COLUMN_HEADER_HEIGHT, height, self._display.CELL_DEFAULT_HEIGHT):
-            if row_index >= self._dbms.get_shape()[0]:
-                break
-            row_original_index = self._dbms.get_data(row_index, -1)
-
             # Align the text to the right of the cell
-            layout.set_text(str(row_original_index), -1)
+            layout.set_text(str(cell_text), -1)
             text_width = layout.get_size()[0] / Pango.SCALE
             x = self._display.ROW_HEADER_WIDTH - text_width - self._display.CELL_DEFAULT_PADDING
 
             # Use the current system accent color, if the current row header is within the selected cell range
-            if start_row <= row_index <= end_row:
+            if start_row <= cell_text - 1 <= end_row:
                 context.set_source_rgb(*accent_color)
             else:
                 context.set_source_rgb(*text_color)
 
             context.move_to(x, 2 + y)
             PangoCairo.show_layout(context, layout)
-            row_index += 1
+            cell_text += 1
 
         context.restore()
 

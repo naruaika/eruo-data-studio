@@ -119,14 +119,14 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
             if self._dbms.data_frame[col_name].dtype.is_integer():
                 description = description.with_columns(polars.col('value').cast(polars.Int64))
                 str_format = ',d'
-            self.quick_statistics.set_label(f'<span color="{green_color}" weight="bold">Count:</span> {format(fill_count, ",d")}\n'
-                                            f'<span color="{orange_color}" weight="bold">Missing:</span> {format(self._dbms.data_frame.shape[0] - fill_count, ",d")}\n'
-                                            f'<b>Minimum:</b> {format(description[4, "value"], str_format)}\n'
-                                            f'<b>Median:</b> {format(description[6, "value"], str_format)}\n'
-                                            f'<b>Maximum:</b> {format(description[8, "value"], str_format)} ')
+            self.quick_statistics.set_label(f'<span color="{green_color}" weight="bold">Count:</span> {format(fill_count, ",d")} '
+                                            f'<span color="{orange_color}" weight="bold">Missing:</span> {format(self._dbms.data_frame.shape[0] - fill_count, ",d")} '
+                                            f'<b>Min:</b> {format(description[4, "value"], str_format)} '
+                                            f'<b>Med:</b> {format(description[6, "value"], str_format)} '
+                                            f'<b>Max:</b> {format(description[8, "value"], str_format)}')
             print_log(f'Quick preview of the column {col_name}: {description}', Log.DEBUG)
         else:
-            self.quick_statistics.set_label(f'<span color="{green_color}" weight="bold">Count:</span> {format(fill_count, ",d")}\n'
+            self.quick_statistics.set_label(f'<span color="{green_color}" weight="bold">Count:</span> {format(fill_count, ",d")} '
                                             f'<span color="{orange_color}" weight="bold">Missing:</span> {format(self._dbms.data_frame.shape[0] - fill_count, ",d")}')
 
     def populate_filters(self, query: str | None = None) -> None:

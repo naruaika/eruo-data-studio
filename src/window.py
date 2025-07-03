@@ -711,6 +711,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
 
             if self.dbms.data_frame.is_empty():
                 self.show_toast_message('We\'re sorry, we couldn\'t load your workbook.')
+                GLib.idle_add(self.status_message.set_label, '')
             else:
                 assign_file()
                 expand_column_header_height()
