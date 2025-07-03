@@ -98,7 +98,7 @@ class Renderer(GObject.Object):
         end_time = time.perf_counter()
         print_log(f'Time to finish drawing: {end_time - start_time:.6f} sec', Log.DEBUG)
 
-    def setup_cairo_context(self, area: Gtk.DrawingArea, context: cairo.Context, height: int, width: int) -> None:
+    def setup_cairo_context(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
         Sets up global Cairo context settings for drawing operations.
 
@@ -117,7 +117,7 @@ class Renderer(GObject.Object):
         context.set_font_options(font_options)
         context.set_antialias(cairo.Antialias.NONE)
 
-    def adjust_row_header_width(self, area: Gtk.DrawingArea, context: cairo.Context, height: int, width: int) -> None:
+    def adjust_row_header_width(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
         Adjusts the width of the row header to fit the maximum row number.
 
@@ -127,20 +127,24 @@ class Renderer(GObject.Object):
             height: The height of the drawing area.
             width: The width of the drawing area.
         """
+        print_log('Adjusting row header width...', Log.DEBUG)
+        row_index = self._display.scroll_vertical_position // self._display.CELL_DEFAULT_HEIGHT
+        max_row_number = -1
+        for y in range(self._display.COLUMN_HEADER_HEIGHT, height, self._display.CELL_DEFAULT_HEIGHT):
+            if row_index >= self._dbms.get_shape()[0]:
+                break
+            row_original_index = self._dbms.get_data(row_index, -1)
+            if row_original_index > max_row_number:
+                max_row_number = row_original_index
+            row_index += 1
+        print_log(f'Detected maximum row number: {max_row_number}', Log.DEBUG)
         font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {self.FONT_SIZE}')
-        cell_height = self._display.CELL_DEFAULT_HEIGHT
-        y_start = self._display.COLUMN_HEADER_HEIGHT
-        max_row_number = (self._display.scroll_vertical_position // cell_height) + 1 + ((height - y_start) // cell_height)
-        if not self._dbms.data_frame.is_empty():
-            if max_row_number > self._dbms.get_shape()[0]:
-                max_row_number = self._dbms.get_data(self._dbms.get_shape()[0] - 1, -1) + max_row_number
-            else:
-                max_row_number = self._dbms.get_data(max_row_number, -1)
         layout = PangoCairo.create_layout(context)
         layout.set_text(str(max_row_number), -1)
         layout.set_font_description(font_desc)
         text_width = layout.get_size()[0] / Pango.SCALE
         self._display.ROW_HEADER_WIDTH = max(40, int(text_width + self._display.CELL_DEFAULT_PADDING * 2 + 0.5))
+        print_log(f'Adjusted row header width to {self._display.ROW_HEADER_WIDTH}px', Log.DEBUG)
 
     def draw_headers_backgrounds(self, area: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
         """
