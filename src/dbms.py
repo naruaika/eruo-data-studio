@@ -19,6 +19,7 @@
 
 from datetime import datetime
 from tempfile import NamedTemporaryFile
+from typing import Generator
 import gc
 import polars
 import threading
@@ -42,8 +43,10 @@ class DBMS(GObject.Object):
     pending_values_to_show: list[any] = []
     pending_values_to_hide: list[any] = []
     current_column_index: int = -1
+
     current_unique_values: polars.Series = polars.Series()
     current_unique_values_hash: str = ''
+    current_unique_values_cached: bool = False
 
     previous_column_index: int = -1
     previous_unique_values: list[any] = []
@@ -218,46 +221,78 @@ class DBMS(GObject.Object):
         for col_index, col_name in enumerate(self.get_columns()):
             self.fill_counts.append(fill_count(col_name))
 
-    def scan_unique_values(self, col_index: int) -> list[str]:
+    def scan_unique_values(self, col_index: int) -> Generator:
         """
-        Get the unique values in a column.
+        Scan the unique values in a column.
 
         Args:
             col_index (int): The index of the column to get unique values for.
 
         Returns:
-            list[str]: A list of unique values in the specified column.
+            Generator: A generator that yields data related unique values in the column.
+        """
+        self.current_unique_values_cached = False
+
+        col_index = col_index + WITH_ROW_INDEX
+        col_name = self.data_frame.columns[col_index]
+        col_data = self.data_frame.get_column(col_name)
+        max_sample_size = 1_000_000
+        display_size = 1_000
+
+        should_approx = col_data.dtype not in [polars.Categorical, polars.Date, polars.Time, polars.Duration, polars.Null]
+        should_approx = should_approx and (self.data_frame.shape[0] > max_sample_size)
+        if should_approx:
+            n_unique = self.data_frame.select(polars.col(col_name).approx_n_unique()).item()
+            n_unique = min(n_unique, self.data_frame.shape[0])
+        else:
+            n_unique = self.data_frame.select(polars.col(col_name).n_unique()).item()
+        yield n_unique, should_approx
+
+        if n_unique > display_size:
+            print_log(f'Column {col_name} has {"approx. " if should_approx else ""}{format(n_unique, ",d")} unique values: too many to display', Log.DEBUG)
+            sample_size = min(max_sample_size, n_unique)
+            sample_data = col_data.bottom_k(sample_size).unique().sort()
+            self.current_unique_values_hash = sample_data.hash()
+            self.current_unique_values = sample_data.limit(display_size)
+            self.current_column_index = col_index
+            yield self.current_unique_values.to_list()
+            return
+
+        print_log(f'Column {col_name} has {"approx. " if should_approx else ""} {format(n_unique, ",d")} unique values: {col_data.unique()}', Log.DEBUG)
+        unique_data = col_data.unique().sort()
+        self.current_unique_values_hash = unique_data.hash()
+        self.current_unique_values = unique_data
+        self.current_column_index = col_index
+        yield self.current_unique_values.to_list()
+
+    def find_unique_values(self, col_index: int, query: str) -> list:
+        """
+        Find unique values in a column based on a query.
+
+        Args:
+            col_index (int): The index of the column to get unique values for.
+            query (str): The query to search for.
+
+        Returns:
+            list: A list of unique values that match the query.
         """
         col_index = col_index + WITH_ROW_INDEX
         col_name = self.data_frame.columns[col_index]
         col_data = self.data_frame.get_column(col_name)
+        display_size = 1_000
 
-        # if col_index == self.previous_column_index:
-        #     print_log(f'Column {col_name} has {format(len(self.previous_unique_values), ",d")} unique values: {self.previous_unique_values}', Log.DEBUG)
-        #     self.current_unique_values =
-        #     return self.previous_unique_values
-
-        if col_data.dtype in [polars.Categorical, polars.Date, polars.Datetime, polars.Time, polars.Duration, polars.Null]:
-            n_unique = self.data_frame.select(polars.col(col_name).n_unique()).item()
+        if self.current_column_index == col_index and self.current_unique_values_cached:
+            unique_data = self.current_unique_values
         else:
-            n_unique = self.data_frame.select(polars.col(col_name).approx_n_unique()).item()
-        n_unique = min(n_unique, self.data_frame.shape[0])
-        if n_unique <= 1_000:
-            print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
-        else:
-            print_log(f'Column {col_name} has approximately {format(n_unique, ",d")} unique values: too many to display.', Log.DEBUG)
-            sample_size = min(1_000_000, n_unique)
-            sample_data = col_data.sample(sample_size, seed=0).unique().sort()
-            self.current_unique_values_hash = sample_data.hash()
-            self.current_unique_values = sample_data.head(1_000).to_list()
+            unique_data = col_data.unique().sort()
+            self.current_unique_values_hash = unique_data.hash()
+            self.current_unique_values = unique_data
             self.current_column_index = col_index
-            return self.current_unique_values + [f'eruo-data-studio:truncated']
+            self.current_unique_values_cached = True
 
-        unique_data = col_data.unique().sort()
-        self.current_unique_values_hash = unique_data.hash()
-        self.current_unique_values = unique_data.to_list()
-        self.current_column_index = col_index
-        return self.current_unique_values
+        if query == '':
+            return unique_data.count(), unique_data.limit(display_size).to_list()
+        return unique_data.count(), unique_data.filter(unique_data.str.contains(f'(?i){query}')).limit(display_size).to_list()
 
     # def take_snapshot(self) -> None:
     #     """Writes the data frame to an erquet file."""
@@ -290,10 +325,6 @@ class DBMS(GObject.Object):
         if 'meta:all' in self.pending_values_to_show and len(self.pending_values_to_hide) == 0:
             print_log('Applied no filter to data frame', Log.DEBUG)
             return False
-
-        # # Cache previous unique values, so that user can undo filter
-        # self.previous_column_index = self.current_column_index
-        # self.previous_unique_values = self.current_unique_values.copy()
 
         # # Write current data frame to a new temporary file
         # self.temp_data_frame = self.data_frame

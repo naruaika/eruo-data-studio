@@ -20,7 +20,7 @@
 import polars
 import threading
 
-from gi.repository import GLib, Gtk
+from gi.repository import Adw, Gdk, GLib, Gtk
 
 from ..dbms import DBMS
 from ..utils import print_log, Log
@@ -29,13 +29,17 @@ from ..utils import print_log, Log
 class SheetColumnHeaderMenu(Gtk.PopoverMenu):
     __gtype_name__ = 'SheetColumnHeaderMenu'
 
+    quick_statistics = Gtk.Template.Child()
     filter_placeholder = Gtk.Template.Child()
+    filter_searchentry = Gtk.Template.Child()
     filter_scrolledwindow = Gtk.Template.Child()
     filter_spinner = Gtk.Template.Child()
     filter_listbox = Gtk.Template.Child()
 
     _colid: str
     _dbms: DBMS
+
+    _is_filter_ready: bool = False
 
     def __init__(self, colid: int, dbms: DBMS, **kwargs) -> None:
         """Creates a new SheetColumnHeaderMenu."""
@@ -44,16 +48,89 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
         self._colid = str(colid)
         self._dbms = dbms
 
+        key_event_controller = Gtk.EventControllerKey()
+        key_event_controller.connect('key-pressed', self.on_filter_searchentry_key_pressed)
+        self.filter_searchentry.add_controller(key_event_controller)
+
+    def do_hide(self) -> None:
+        """Callback function for when the popover menu is hidden."""
+        self._colid = -1
+        return Gtk.PopoverMenu.do_hide(self)
+
+    def on_filter_searchentry_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+        if keyval == Gdk.KEY_Escape:
+            self.filter_listbox.grab_focus()
+
+    @Gtk.Template.Callback()
+    def on_filter_searchentry_changed(self, widget: Gtk.Widget) -> None:
+        """Updates the filter options when the filter search entry is changed."""
+        # Prevent the callback from being called when the first time the popover menu is shown
+        if not self._is_filter_ready:
+            self._is_filter_ready = True
+            return
+
+        self.filter_scrolledwindow.get_vadjustment().set_value(0)
+        self.filter_listbox.remove_all()
+        self.filter_spinner.show()
+
+        col_name = self._dbms.get_column(int(self._colid))
+        query = widget.get_text()
+        print_log(f'Searching for \'{query}\' in column {col_name}...', Log.DEBUG)
+        threading.Thread(target=self.populate_filters, args=(query,), daemon=True).start()
+
     def set_colid(self, colid: int) -> None:
         """Sets the colid for the SheetColumnHeaderMenu."""
         self._colid = str(colid)
 
-    def update_filters(self) -> None:
-        """
-        Updates the filter options for the SheetColumnHeaderMenu.
+    def prepare_ui(self) -> None:
+        """Prepares the UI for the SheetColumnHeaderMenu."""
+        self.filter_searchentry.set_text('')
+        self.filter_searchentry.set_placeholder_text('Loading...')
+        self.filter_scrolledwindow.get_vadjustment().set_value(0)
+        self.filter_listbox.remove_all()
+        self._dbms.pending_values_to_show = ['meta:all']
+        self._dbms.pending_values_to_hide = []
 
-        This function resets the existing filter options and adds the new options to the SheetColumnHeaderMenu.
-        """
+        col_dtype = self._dbms.get_dtype(int(self._colid))
+        if col_dtype not in [polars.Boolean, polars.Int8, polars.Int16, polars.Int32, polars.Int64, polars.UInt8,
+                             polars.UInt16, polars.UInt32, polars.UInt64, polars.Float32, polars.Float64, polars.Decimal,
+                             polars.Utf8, polars.Categorical, polars.Date,polars.Time, polars.Datetime]:
+            self.action_set_enabled('app.sheet.column.apply-filter', False)
+            self.filter_placeholder.show()
+            self.filter_spinner.hide()
+            return
+
+        self.filter_placeholder.hide()
+        self.filter_spinner.show()
+        threading.Thread(target=self.populate_filters, daemon=True).start()
+
+        green_color = '#008000'
+        orange_color = '#FF8000'
+        if Adw.StyleManager().get_dark():
+            green_color = '#00B300'
+            orange_color = '#E66000'
+        col_name = self._dbms.get_column(int(self._colid))
+        fill_count = self._dbms.fill_counts[int(self._colid)]
+
+        # Show quick statistics
+        if self._dbms.data_frame[col_name].dtype.is_numeric():
+            description = self._dbms.data_frame[col_name].describe()
+            str_format = ',.2f'
+            if self._dbms.data_frame[col_name].dtype.is_integer():
+                description = description.with_columns(polars.col('value').cast(polars.Int16))
+                str_format = ',d'
+            self.quick_statistics.set_label(f'<span color="{green_color}" weight="bold">Count:</span> {format(fill_count, ",d")}\n'
+                                            f'<span color="{orange_color}" weight="bold">Missing:</span> {format(self._dbms.data_frame.shape[0] - fill_count, ",d")}\n'
+                                            f'<b>Minimum:</b> {format(description[4, "value"], str_format)}\n'
+                                            f'<b>Median:</b> {format(description[6, "value"], str_format)}\n'
+                                            f'<b>Maximum:</b> {format(description[8, "value"], str_format)} ')
+            print_log(f'Quick preview of the column {col_name}: {description}', Log.DEBUG)
+        else:
+            self.quick_statistics.set_label(f'<span color="{green_color}" weight="bold">Count:</span> {format(fill_count, ",d")}\n'
+                                            f'<span color="{orange_color}" weight="bold">Missing:</span> {format(self._dbms.data_frame.shape[0] - fill_count, ",d")}')
+
+    def populate_filters(self, query: str | None = None) -> None:
+        """Populates the filter options for the SheetColumnHeaderMenu."""
         def on_check_button_toggled(widget: Gtk.Widget, is_meta: bool) -> None:
             """
             Callback function for when a check button is toggled.
@@ -61,7 +138,6 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
             Args:
                 check_button (Gtk.CheckButton): The check button that was toggled.
             """
-
             is_active = widget.get_active()
             select_all = self.filter_listbox.get_row_at_index(0).get_first_child()
 
@@ -103,7 +179,7 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
                     self.action_set_enabled('app.sheet.column.apply-filter', True)
                 select_all.set_inconsistent(not is_consistent)
 
-            if is_meta and widget.get_label() == 'Select All':
+            if is_meta and widget.filter_value == 'meta:all':
                 if is_active:
                     self._dbms.pending_values_to_show = ['meta:all']
                     self._dbms.pending_values_to_hide = []
@@ -126,7 +202,29 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
                 select_all.set_inconsistent(False)
                 self.action_set_enabled('app.sheet.column.apply-filter', is_active)
 
-            elif is_meta and widget.get_label() == '(Blanks)':
+            elif is_meta and widget.filter_value == 'meta:all-result':
+                index = 1
+                widget = self.filter_listbox.get_row_at_index(index).get_first_child()
+                while widget:
+                    if hasattr(widget, 'is_placeholder'):
+                        break
+                    if is_active:
+                        self._dbms.pending_values_to_show.append(widget.filter_value)
+                        if widget.filter_value in self._dbms.pending_values_to_hide:
+                            self._dbms.pending_values_to_hide.remove(widget.filter_value)
+                    else:
+                        self._dbms.pending_values_to_hide.append(widget.filter_value)
+                        if widget.filter_value in self._dbms.pending_values_to_show:
+                            self._dbms.pending_values_to_show.remove(widget.filter_value)
+                    widget.handler_block_by_func(on_check_button_toggled)
+                    widget.set_active(is_active)
+                    widget.handler_unblock_by_func(on_check_button_toggled)
+                    index += 1
+                    listboxrow = self.filter_listbox.get_row_at_index(index)
+                    widget = listboxrow.get_first_child() if listboxrow else None
+                post_process()
+
+            elif is_meta and widget.filter_value == 'meta:blank':
                 if is_active:
                     if 'meta:blank' in self._dbms.pending_values_to_hide:
                         self._dbms.pending_values_to_hide.remove('meta:blank')
@@ -158,8 +256,7 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
 
             This function adds a check button to the SheetColumnHeaderMenu with the given label and active state.
             The label is truncated if it is too long. The check button is appended to the filter listbox.
-            The check button is disabled if the label starts with 'eruo-data-studio:truncated', as it is used
-            as a placeholder indicating that more options are available.
+            The check button is disabled if the label starts with 'eruo-data-studio:*', as it is used as a placeholder.
 
             Args:
                 label (str): The label of the check button.
@@ -169,18 +266,40 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
             value = str(value)
             if len(value) > 80:
                 value = value[:77] + '...' # truncate to optimize UI rendering
-            check_button = Gtk.CheckButton.new_with_label(value)
-            check_button.filter_value = filter_value
-            if value == 'eruo-data-studio:truncated':
-                check_button.set_label(f'Use search to find more items...')
+
+            check_button = Gtk.CheckButton()
+
+            if is_meta and filter_value == 'Select All':
+                filter_value = 'meta:all'
+                check_button.set_active(filter_value in self._dbms.pending_values_to_show or len(self._dbms.pending_values_to_show) > 0)
+                is_consistent = (filter_value in self._dbms.pending_values_to_show and len(self._dbms.pending_values_to_hide) == 0) \
+                                or (filter_value in self._dbms.pending_values_to_hide and len(self._dbms.pending_values_to_show) == 0)
+                check_button.set_inconsistent(not is_consistent)
+            elif is_meta and filter_value == '(Select All)':
+                filter_value = 'meta:all-result'
+            elif is_meta and filter_value == '(Blanks)':
+                filter_value = 'meta:blank'
+            elif filter_value == 'eruo-data-studio:truncated':
+                value = _('Use search to uncover more items')
+            elif filter_value == 'eruo-data-studio:empty':
+                value = _('No items found')
+
+            if filter_value != 'meta:all':
+                is_active = (filter_value in self._dbms.pending_values_to_show and 'meta:all' in self._dbms.pending_values_to_hide) \
+                            or (filter_value not in self._dbms.pending_values_to_hide and 'meta:all' in self._dbms.pending_values_to_show)
+                check_button.set_active(is_active)
+
+            if filter_value.startswith('eruo-data-studio:'):
                 check_button.set_active(False)
                 check_button.set_sensitive(False)
-                check_button.add_css_class('truncated')
+                check_button.add_css_class('search-placeholder')
                 check_button.is_placeholder = True
             else:
-                check_button.set_active(is_active)
                 check_button.set_can_focus(False)
                 check_button.connect('toggled', on_check_button_toggled, is_meta)
+
+            check_button.set_label(value)
+            check_button.filter_value = filter_value
             return check_button
 
         def update_listbox(checkboxes: list[Gtk.CheckButton]) -> None:
@@ -188,38 +307,42 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
                 self.filter_listbox.append(checkbox)
             self.filter_spinner.hide()
 
-        def update_filters_thread():
-            colid = int(self._colid)
-            col_name = self._dbms.get_column(colid)
-            options = self._dbms.scan_unique_values(colid)
-            if colid != int(self._colid):
-                print_log(f'Interrupted from showing filter options for column {col_name}', Log.DEBUG)
-                return
-            checkboxes = [add_check_button('Select All', True, True)]
-            if any(option in [None, ''] for option in options):
-                checkboxes.append(add_check_button('(Blanks)', True, True))
-            for option in options:
-                if option in [None, '']:
-                    continue
-                checkboxes.append(add_check_button(option, True))
-            GLib.idle_add(update_listbox, checkboxes)
-            self.action_set_enabled('app.sheet.column.apply-filter', True)
-            print_log(f'Showing filter options for column {col_name}...', Log.DEBUG)
+        colid = int(self._colid)
+        col_name = self._dbms.get_column(colid)
 
-        # TODO: read from the current applied filters if any
-        self.filter_scrolledwindow.get_vadjustment().set_value(0)
-        self.filter_listbox.remove_all()
-        self._dbms.pending_values_to_show = ['meta:all']
-        self._dbms.pending_values_to_hide = []
-
-        col_dtype = self._dbms.get_dtype(int(self._colid))
-        if col_dtype not in [polars.Boolean, polars.Int8, polars.Int16, polars.Int32, polars.Int64, polars.UInt8,
-                             polars.UInt16, polars.UInt32, polars.UInt64, polars.Float32, polars.Float64, polars.Decimal,
-                             polars.Utf8, polars.Categorical, polars.Date,polars.Time, polars.Datetime]:
-            self.action_set_enabled('app.sheet.column.apply-filter', False)
-            self.filter_placeholder.show()
-            self.filter_spinner.hide()
+        if query is not None:
+            is_approx = False
+            n_unique, options = self._dbms.find_unique_values(colid, query)
         else:
-            self.filter_placeholder.hide()
-            self.filter_spinner.show()
-            threading.Thread(target=update_filters_thread, daemon=True).start()
+            for index, return_value in enumerate(self._dbms.scan_unique_values(colid)):
+                if index == 0:
+                    n_unique, is_approx = return_value
+                else:
+                    options = return_value
+
+        if len(options) == 1_000 and n_unique > 1_000: # 1_000 is used in scan_unique_values()
+            options += ['eruo-data-studio:truncated']
+        elif len(options) == 0:
+            options += ['eruo-data-studio:empty']
+
+        if colid != int(self._colid):
+            print_log(f'Interrupted from showing filter options for column {col_name}', Log.DEBUG)
+            return
+
+        if query in [None, '']:
+            checkboxes = [add_check_button(_('Select All'), True, True)]
+        elif len(options) > 0:
+            checkboxes = [add_check_button('(Select All)', False, True)]
+        else:
+            checkboxes = []
+        if any(option in [None, ''] for option in options):
+            checkboxes.append(add_check_button(_('(Blanks)'), True, True))
+        for option in options:
+            if option in [None, '']:
+                continue
+            checkboxes.append(add_check_button(option, True))
+
+        GLib.idle_add(self.filter_searchentry.set_placeholder_text, f'Search in {"approx. " if is_approx else ""}{format(n_unique, ",d")} item(s)...')
+        GLib.idle_add(update_listbox, checkboxes)
+        self.action_set_enabled('app.sheet.column.apply-filter', True)
+        print_log(f'Showing filter options for column {col_name}...', Log.DEBUG)

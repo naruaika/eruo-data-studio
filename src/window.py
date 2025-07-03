@@ -26,7 +26,7 @@ import time
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango, PangoCairo
 
-from .utils import Log, print_log
+from .utils import should_print_log, print_log, Log
 from .dbms import DBMS, WITH_ROW_INDEX
 from .display import Display
 from .renderer import Renderer
@@ -218,7 +218,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
     def on_name_box_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
         """Callback function for when a key is pressed on the name box."""
         if keyval == Gdk.KEY_Tab:
-            self.on_name_box_activated(self.name_box)
+            self.name_box.set_text(self.selection.get_active_cell_name())
         elif keyval == Gdk.KEY_Escape:
             self.name_box.set_text(self.selection.get_active_cell_name())
             self.main_canvas.set_focusable(True)
@@ -257,6 +257,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         """Callback function for when a key is pressed on the formula bar."""
         if keyval == Gdk.KEY_Tab:
             if not self.formula_bar.x_is_dirty or self.get_cell_data() == self.formula_bar.get_text():
+                self.main_canvas.set_focusable(True)
+                self.main_canvas.grab_focus()
                 return
             self.on_formula_bar_activated(self.formula_bar, Gtk.DirectionType.RIGHT)
         elif keyval == Gdk.KEY_Escape:
@@ -379,7 +381,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                     context_menu.action_set_enabled('app.sheet.column.reset-sort', False)
                     context_menu.action_set_enabled('app.sheet.column.reset-filter', False)
                 context_menu.connect('closed', on_context_menu_closed)
-                context_menu.update_filters()
+                context_menu.prepare_ui()
 
                 # Position context menu
                 x_menu = self.display.get_column_position(col_index) + self.display.get_column_width(col_index) // 2 + self.display.ROW_HEADER_WIDTH - self.display.scroll_horizontal_position
@@ -702,7 +704,8 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                 end_time = time.time()
                 file_size = file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, None).get_size() / (1024 * 1024)
                 print_log(f'Loaded and parsed file {file.get_path()} of size {format(file_size, ",.2f")} MB in {end_time - start_time:.6f} seconds')
-                print_log(f'Quick preview of the file: {self.dbms.data_frame.head()}', Log.DEBUG)
+                if should_print_log(Log.DEBUG):
+                    print_log(f'Quick preview of the file: {self.dbms.data_frame.head()}', Log.DEBUG)
             except Exception as e:
                 print_log(f'Failed to load file: {e}', Log.WARNING)
 
@@ -765,9 +768,9 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         self.set_title(f'{self.dbms.file.get_basename()} – Eruo Data Studio')
         self.formula_bar.set_text(self.get_cell_data())
         file_size = self.dbms.file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, None).get_size() / (1024 * 1024)
-        self.status_message.set_text(f'File: {self.dbms.file.get_basename()} | Size: {format(file_size, ",.2f")}MB | '
-                                     f'Rows: {format(self.dbms.get_shape()[0], ",d")} | Columns: {format(self.dbms.get_shape()[1], ",d")} | '
-                                     f'Memory: {format(self.dbms.data_frame.estimated_size("mb"), ",.2f")}MB')
+        self.status_message.set_label(f'File: {self.dbms.file.get_basename()} ({format(file_size, ",.2f")}MB)     '
+                                      f'Rows {format(self.dbms.get_shape()[0], ",d")} Cols {format(self.dbms.get_shape()[1], ",d")}     '
+                                      f'Memory: {format(self.dbms.data_frame.estimated_size("mb"), ",.2f")}MB')
 
     def show_toast_message(self, message: str) -> None:
         """Shows a toast message."""

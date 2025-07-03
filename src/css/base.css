@@ -14,6 +14,11 @@
 .main-content .context-menu {
     font-size: 14px;
 }
+.main-content .context-menu .quick-statistics {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+}
 .main-content .context-menu entry,
 .main-content .context-menu modelbutton {
     min-height: 28px;
@@ -29,11 +34,12 @@
     margin: 0;
     padding: 0;
 }
-.main-content .context-menu .truncated {
+.main-content .context-menu .search-placeholder {
     font-style: italic;
 }
 
 .status-bar {
-    font-size: 12px;
     padding: 3px 15px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
 }

@@ -4,15 +4,20 @@
   <menu id="sheet_column_header_menu">
     <section>
       <item>
-        <attribute name="label" translatable="yes">Sort _A to Z</attribute>
+        <attribute name="custom">statistics</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Sort A to Z</attribute>
         <attribute name="action">app.sheet.column.sort-a-to-z</attribute>
       </item>
       <item>
-        <attribute name="label" translatable="yes">Sort _Z to A</attribute>
+        <attribute name="label" translatable="yes">Sort Z to A</attribute>
         <attribute name="action">app.sheet.column.sort-z-to-a</attribute>
       </item>
       <item>
-        <attribute name="label" translatable="yes">_Reset All Sort(s)</attribute>
+        <attribute name="label" translatable="yes">Reset All Sort(s)</attribute>
         <attribute name="action">app.sheet.column.reset-sort</attribute>
       </item>
     </section>
@@ -23,17 +28,17 @@
     </section>
     <section>
       <item>
-        <attribute name="label" translatable="yes">Apply _Filter</attribute>
+        <attribute name="label" translatable="yes">Apply Filter</attribute>
         <attribute name="action">app.sheet.column.apply-filter</attribute>
       </item>
       <item>
-        <attribute name="label" translatable="yes">_Reset All Filter(s)</attribute>
+        <attribute name="label" translatable="yes">Reset All Filter(s)</attribute>
         <attribute name="action">app.sheet.column.reset-filter</attribute>
       </item>
     </section>
     <section>
       <item>
-        <attribute name="label" translatable="yes">_Convert To</attribute>
+        <attribute name="label" translatable="yes">Convert To</attribute>
         <link name="submenu">
           <item>
             <attribute name="label" translatable="yes">_Boolean</attribute>
@@ -132,6 +137,18 @@
   </menu>
   <template class="SheetColumnHeaderMenu" parent="GtkPopoverMenu">
     <property name="menu-model">sheet_column_header_menu</property>
+    <child type="statistics">
+      <object class="GtkLabel" id="quick_statistics">
+        <property name="label">Count: 0</property>
+        <property name="halign">start</property>
+        <property name="margin-start">8</property>
+        <property name="margin-end">8</property>
+        <property name="use-markup">True</property>
+        <style>
+          <class name="quick-statistics"/>
+        </style>
+      </object>
+    </child>
     <child type="filter_box">
       <object class="GtkOverlay">
         <property name="vexpand">True</property>
@@ -140,8 +157,10 @@
           <object class="GtkBox">
             <property name="orientation">vertical</property>
             <child>
-              <object class="GtkSearchEntry">
+              <object class="GtkSearchEntry" id="filter_searchentry">
                 <property name="placeholder-text">Search...</property>
+                <property name="search-delay">500</property>
+                <signal name="search_changed" handler="on_filter_searchentry_changed" swapped="no" />
               </object>
             </child>
             <child>

@@ -52,6 +52,9 @@ def get_debug_level() -> int:
         _DEBUG_LEVEL = int(os.environ.get('DEBUG_LEVEL', '4'))
     return _DEBUG_LEVEL
 
+def should_print_log(type: Log = Log.WARNING) -> bool:
+    return is_debug_mode_enabled() and get_debug_level() >= type.value
+
 def print_log(message: str, type: Log = Log.INFO, context: str = '') -> None:
     """Print info or warning message
 
