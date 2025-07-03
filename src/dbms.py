@@ -246,7 +246,7 @@ class DBMS(GObject.Object):
             print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
         else:
             print_log(f'Column {col_name} has approximately {format(n_unique, ",d")} unique values: too many to display.', Log.DEBUG)
-            sample_size = min(500_000, n_unique)
+            sample_size = min(1_000_000, n_unique)
             sample_data = col_data.sample(sample_size, seed=0).unique().sort()
             self.current_unique_values_hash = sample_data.hash()
             self.current_unique_values = sample_data.head(1_000).to_list()

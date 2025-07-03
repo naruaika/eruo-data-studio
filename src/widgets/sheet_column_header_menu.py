@@ -189,9 +189,13 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
             self.filter_spinner.hide()
 
         def update_filters_thread():
-            checkboxes = []
-            options = self._dbms.scan_unique_values(int(self._colid))
-            checkboxes.append(add_check_button('Select All', True, True))
+            colid = int(self._colid)
+            col_name = self._dbms.get_column(colid)
+            options = self._dbms.scan_unique_values(colid)
+            if colid != int(self._colid):
+                print_log(f'Interrupted from showing filter options for column {col_name}', Log.DEBUG)
+                return
+            checkboxes = [add_check_button('Select All', True, True)]
             if any(option in [None, ''] for option in options):
                 checkboxes.append(add_check_button('(Blanks)', True, True))
             for option in options:
@@ -200,7 +204,6 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
                 checkboxes.append(add_check_button(option, True))
             GLib.idle_add(update_listbox, checkboxes)
             self.action_set_enabled('app.sheet.column.apply-filter', True)
-            col_name = self._dbms.get_column(int(self._colid))
             print_log(f'Showing filter options for column {col_name}...', Log.DEBUG)
 
         # TODO: read from the current applied filters if any
