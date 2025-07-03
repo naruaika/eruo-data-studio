@@ -445,7 +445,7 @@ class EruoDataStudioApplication(Adw.Application):
             window.renderer.invalidate_cache()
             window.main_canvas.queue_draw()
         else:
-            col_name = window.dbms.get_columns()[col_index]
+            col_name = window.dbms.get_column(col_index)
             if col_name.startswith('Categorical'):
                 col_name = 'Categorical'
             elif col_name.startswith('Datetime'):

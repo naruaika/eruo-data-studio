@@ -74,25 +74,17 @@ class DBMS(GObject.Object):
             value (any): The value to be set in the cell.
         """
         # Convert the input value to the correct type
-        column_dtype = self.get_dtypes()[col]
-        if column_dtype == polars.Date:
-            try:
-                value = datetime.strptime(value, '%Y-%m-%d').date()
-            except Exception as e:
-                print_log(f'Failed to convert value to {column_dtype} at index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
-                return False
-        elif column_dtype == polars.Datetime:
-            try:
-                value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
-            except Exception as e:
-                print_log(f'Failed to convert value to {column_dtype} at index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
-                return False
-        elif column_dtype == polars.Time:
-            try:
-                value = datetime.strptime(value, '%H:%M:%S').time()
-            except Exception as e:
-                print_log(f'Failed to convert value to {column_dtype} at index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
-                return False
+        try:
+            match column_dtype := self.get_dtype(col):
+                case polars.Date:
+                    value = datetime.strptime(value, '%Y-%m-%d').date()
+                case polars.Datetime:
+                    value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                case polars.Time:
+                    value = datetime.strptime(value, '%H:%M:%S').time()
+        except Exception as e:
+            print_log(f'Failed to convert value to {column_dtype} at cell index ({format(row, ",d")}, {format(col, ",d")}): {e}', Log.WARNING)
+            return False
 
         # Update the data frame
         try:
@@ -113,14 +105,29 @@ class DBMS(GObject.Object):
         shape = self.data_frame.shape
         return (shape[0], shape[1] - WITH_ROW_INDEX)
 
-    def get_dtypes(self) -> list[str]:
+    def get_dtype(self, col_index: int) -> polars.DataType:
         """
-        Get the data types of the columns in the data frame.
+        Get the data type of a column.
+
+        Args:
+            col_index (int): The index of the column to get the data type of.
 
         Returns:
-            list[str]: A list of data types in the data frame.
+            polars.DataType: The data type of the column at the specified index.
         """
-        return self.data_frame.dtypes[WITH_ROW_INDEX:]
+        return self.data_frame.dtypes[col_index + WITH_ROW_INDEX]
+
+    def get_column(self, col_index: int) -> str:
+        """
+        Get the name of a column.
+
+        Args:
+            col_index (int): The index of the column to get the name of.
+
+        Returns:
+            str: The name of the column at the specified index.
+        """
+        return self.data_frame.columns[col_index + WITH_ROW_INDEX]
 
     def get_columns(self) -> list[str]:
         """
@@ -163,7 +170,7 @@ class DBMS(GObject.Object):
             col_index (int): The index of the column to duplicate.
             to_left (bool): Whether to duplicate the column to the left of the specified column index.
         """
-        col_name = self.get_columns()[col_index]
+        col_name = self.get_column(col_index)
         suffix = 0
         new_name = f'{col_name}_0'
         for name in self.get_columns():
@@ -179,7 +186,7 @@ class DBMS(GObject.Object):
         Args:
             col_index (int): The index of the column to delete.
         """
-        col_name = self.get_columns()[col_index]
+        col_name = self.get_column(col_index)
         self.data_frame = self.data_frame.drop(col_name)
 
     def clear_column_at(self, col_index: int) -> None:
@@ -189,27 +196,27 @@ class DBMS(GObject.Object):
         Args:
             col_index (int): The index of the column to clear.
         """
-        col_name = self.get_columns()[col_index]
+        col_name = self.get_column(col_index)
         self.data_frame = self.data_frame.with_columns(polars.lit(None).alias(col_name))
 
     def summary_fill_counts(self, col_index: int | None = None) -> None:
         """Calculates the fill counts for each column."""
+        def fill_count(col_name) -> int:
+            if self.get_dtype(col_index) in [polars.String]:
+                return self.data_frame.get_column(col_name).is_not_null().filter(self.data_frame.get_column(col_name).str.len_bytes() > 0).sum()
+            else:
+                return self.data_frame.get_column(col_name).is_not_null().sum()
+
         if col_index is not None:
             col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
-            fill_count = self.data_frame.shape[0] - self.data_frame.get_column(col_name).is_null().sum()
-            if self.data_frame.get_column(col_name).dtype in [polars.String]:
-                fill_count -= self.data_frame.filter(polars.col(col_name).str.len_bytes() == 0).shape[0]
-            self.fill_counts[col_index] = fill_count
             print_log(f'Calculating fill counts for column: {col_name}...', Log.DEBUG)
+            self.fill_counts[col_index] = fill_count(col_name)
             return
 
+        print_log('Calculating fill counts for all columns...', Log.DEBUG)
         self.fill_counts = []
         for col_index, col_name in enumerate(self.get_columns()):
-            fill_count = self.data_frame.shape[0] - self.data_frame.get_column(col_name).is_null().sum()
-            if self.data_frame.get_column(col_name).dtype in [polars.String]:
-                fill_count -= self.data_frame.filter(polars.col(col_name).str.len_bytes() == 0).shape[0]
-            self.fill_counts.append(fill_count)
-        print_log('Calculating fill counts for all columns...', Log.DEBUG)
+            self.fill_counts.append(fill_count(col_name))
 
     def scan_unique_values(self, col_index: int) -> list[str]:
         """
@@ -238,7 +245,7 @@ class DBMS(GObject.Object):
         if n_unique <= 1_000:
             print_log(f'Column {col_name} has {format(col_data.n_unique(), ",d")} unique values: {col_data.unique()}', Log.DEBUG)
         else:
-            print_log(f'Column {col_name} has approximately {format(n_unique, ",d")} unique values; too many to display.', Log.DEBUG)
+            print_log(f'Column {col_name} has approximately {format(n_unique, ",d")} unique values: too many to display.', Log.DEBUG)
             sample_size = min(500_000, n_unique)
             sample_data = col_data.sample(sample_size, seed=0).unique().sort()
             self.current_unique_values_hash = sample_data.hash()
@@ -270,9 +277,9 @@ class DBMS(GObject.Object):
             descending (bool, optional): Whether to sort in descending order. Defaults to False.
         """
         col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
-        self.data_frame = self.data_frame.sort(col_name, descending=descending, nulls_last=True)
         direction = 'descending' if descending else 'ascending'
         print_log(f'Sorting column \'{col_name}\' in {direction} order...', Log.DEBUG)
+        self.data_frame = self.data_frame.sort(col_name, descending=descending, nulls_last=True)
 
     def reset_column_sort(self) -> None:
         """Reset the sort applied to the data frame."""
@@ -281,7 +288,7 @@ class DBMS(GObject.Object):
     def filter_row_values(self) -> bool:
         """Apply a filter to the data frame."""
         if 'meta:all' in self.pending_values_to_show and len(self.pending_values_to_hide) == 0:
-            print_log('Applying no filter to data frame...', Log.DEBUG)
+            print_log('Applied no filter to data frame', Log.DEBUG)
             return False
 
         # # Cache previous unique values, so that user can undo filter
@@ -297,19 +304,19 @@ class DBMS(GObject.Object):
         # Apply filter to current data frame
         # TODO: support advanced filtering
         if 'meta:all' in self.pending_values_to_show:
+            print_log(f'Applying filter to column \'{col_name}\'...', Log.DEBUG)
             predicates = polars.col(col_name).is_in(self.pending_values_to_hide).not_()
             if 'meta:blank' in self.pending_values_to_hide:
                 predicates &= polars.col(col_name).is_not_null()
             self.data_frame = self.data_frame.filter(predicates)
-            print_log(f'Applying filter to column \'{col_name}\'...', Log.DEBUG)
             return True
 
         if 'meta:all' in self.pending_values_to_hide and len(self.pending_values_to_show) > 0:
+            print_log(f'Applying filter to column \'{col_name}\'...', Log.DEBUG)
             predicates = polars.col(col_name).is_in(self.pending_values_to_show)
             if 'meta:blank' in self.pending_values_to_show:
                 predicates |= polars.col(col_name).is_null()
             self.data_frame = self.data_frame.filter(predicates)
-            print_log(f'Applying filter to column \'{col_name}\'...', Log.DEBUG)
             return True
 
         return False
@@ -331,12 +338,12 @@ class DBMS(GObject.Object):
         """
         col_name = self.data_frame.columns[col_index + WITH_ROW_INDEX]
         try:
+            print_log(f'Converting column \'{col_name}\' to {col_type.__name__.lower()}...', Log.DEBUG)
             if col_type == polars.Categorical:
                 self.data_frame = self.data_frame.with_columns(polars.col(col_name).cast(polars.Categorical('lexical')))
             else:
                 self.data_frame = self.data_frame.with_columns(polars.col(col_name).cast(col_type))
-            print_log(f'Converting column \'{col_name}\' to {col_type.__name__.lower()}...', Log.DEBUG)
-            return True
         except Exception as e:
             print_log(f'Failed to convert column \'{col_name}\' to {col_type.__name__.lower()}: {e}', Log.WARNING)
             return False
+        return True

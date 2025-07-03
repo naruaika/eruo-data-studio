@@ -377,7 +377,7 @@ class Renderer(GObject.Object):
 
             # Draw the column name
             if col_index < self._dbms.get_shape()[1]:
-                cell_text_2 = str(self._dbms.get_columns()[col_index])
+                cell_text_2 = str(self._dbms.get_column(col_index))
                 layout.set_text(cell_text_2, -1)
                 layout.set_font_description(name_font_desc)
                 x_text = x + self._display.CELL_DEFAULT_PADDING - x_offset
@@ -386,7 +386,7 @@ class Renderer(GObject.Object):
 
             # Draw the column type
             if col_index < self._dbms.get_shape()[1]:
-                cell_text_2 = str(self._dbms.get_dtypes()[col_index])
+                cell_text_2 = str(self._dbms.get_dtype(col_index))
                 if cell_text_2.startswith('Categorical'):
                     cell_text_2 = 'Categor.'
                 elif cell_text_2.startswith('Datetime'):

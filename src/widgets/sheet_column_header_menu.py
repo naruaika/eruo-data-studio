@@ -200,7 +200,7 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
                 checkboxes.append(add_check_button(option, True))
             GLib.idle_add(update_listbox, checkboxes)
             self.action_set_enabled('app.sheet.column.apply-filter', True)
-            col_name = self._dbms.get_columns()[int(self._colid)]
+            col_name = self._dbms.get_column(int(self._colid))
             print_log(f'Showing filter options for column {col_name}...', Log.DEBUG)
 
         # TODO: read from the current applied filters if any
@@ -209,7 +209,7 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
         self._dbms.pending_values_to_show = ['meta:all']
         self._dbms.pending_values_to_hide = []
 
-        col_dtype = self._dbms.get_dtypes()[int(self._colid)]
+        col_dtype = self._dbms.get_dtype(int(self._colid))
         if col_dtype not in [polars.Boolean, polars.Int8, polars.Int16, polars.Int32, polars.Int64, polars.UInt8,
                              polars.UInt16, polars.UInt32, polars.UInt64, polars.Float32, polars.Float64, polars.Decimal,
                              polars.Utf8, polars.Categorical, polars.Date,polars.Time, polars.Datetime]:

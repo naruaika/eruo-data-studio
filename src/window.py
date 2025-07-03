@@ -503,7 +503,6 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
                     self.formula_bar.set_text('')
                     self.formula_bar.set_position(1)
                 elif keyval == Gdk.KEY_Delete:
-                    # TODO: add support for multiple cells
                     self.set_cell_data(*target_cell, None)
                     self.formula_bar.set_text('')
                     self.renderer.invalidate_cache()
@@ -600,7 +599,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         for file in os.listdir(tempfile.gettempdir()):
             if file.endswith('.erquet'):
                 print_log(f'Removing temporary file: {file}', Log.DEBUG)
-                os.remove(os.path.join(os.getcwd(), 'temp', file))
+                os.remove(os.path.join(tempfile.gettempdir(), file))
 
         self.destroy()
         return True
@@ -631,6 +630,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         Returns:
             bool: True if the cell data is successfully set, False otherwise.
         """
+        value = None if value == '' else value
         print_log(f"Updating cell data at index ({format(row, ",d")}, {format(col, ",d")}) to: {value}")
         df_shape = self.dbms.get_shape()
         if df_shape[0] <= row or df_shape[1] <= col:
@@ -639,7 +639,7 @@ class EruoDataStudioWindow(Adw.ApplicationWindow):
         if self.dbms.set_data(row, col, value):
             self.dbms.summary_fill_counts(col)
         else:
-            col_type = self.dbms.get_dtypes()[col]
+            col_type = self.dbms.get_dtype(col)
             cell_name = self.selection.index_to_name((row, col))
             if str(col_type).startswith('Categorical'):
                 col_type = 'Categorical'
