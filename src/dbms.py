@@ -258,7 +258,7 @@ class DBMS(GObject.Object):
             yield self.current_unique_values.to_list()
             return
 
-        print_log(f'Column {col_name} has {"approx. " if should_approx else ""} {format(n_unique, ",d")} unique values: {col_data.unique()}', Log.DEBUG)
+        print_log(f'Column {col_name} has {"approx. " if should_approx else ""}{format(n_unique, ",d")} unique values: {col_data.unique()}', Log.DEBUG)
         unique_data = col_data.unique().sort()
         self.current_unique_values_hash = unique_data.hash()
         self.current_unique_values = unique_data

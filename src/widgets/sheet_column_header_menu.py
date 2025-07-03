@@ -117,7 +117,7 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
             description = self._dbms.data_frame[col_name].describe()
             str_format = ',.2f'
             if self._dbms.data_frame[col_name].dtype.is_integer():
-                description = description.with_columns(polars.col('value').cast(polars.Int16))
+                description = description.with_columns(polars.col('value').cast(polars.Int64))
                 str_format = ',d'
             self.quick_statistics.set_label(f'<span color="{green_color}" weight="bold">Count:</span> {format(fill_count, ",d")}\n'
                                             f'<span color="{orange_color}" weight="bold">Missing:</span> {format(self._dbms.data_frame.shape[0] - fill_count, ",d")}\n'
@@ -289,7 +289,7 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
                             or (filter_value not in self._dbms.pending_values_to_hide and 'meta:all' in self._dbms.pending_values_to_show)
                 check_button.set_active(is_active)
 
-            if filter_value.startswith('eruo-data-studio:'):
+            if str(filter_value).startswith('eruo-data-studio:'):
                 check_button.set_active(False)
                 check_button.set_sensitive(False)
                 check_button.add_css_class('search-placeholder')
