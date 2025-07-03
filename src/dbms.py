@@ -221,7 +221,7 @@ class DBMS(GObject.Object):
         for col_index, col_name in enumerate(self.get_columns()):
             self.fill_counts.append(fill_count(col_name))
 
-    def scan_unique_values(self, col_index: int) -> Generator:
+    def scan_unique_values(self, col_index: int) -> list:
         """
         Scan the unique values in a column.
 
@@ -229,41 +229,32 @@ class DBMS(GObject.Object):
             col_index (int): The index of the column to get unique values for.
 
         Returns:
-            Generator: A generator that yields data related unique values in the column.
+            list: A list of unique values in the column.
         """
         self.current_unique_values_cached = False
 
         col_index = col_index + WITH_ROW_INDEX
         col_name = self.data_frame.columns[col_index]
         col_data = self.data_frame.get_column(col_name)
-        max_sample_size = 1_000_000
+        max_data_length = 1_000_000
+        sample_size = 100_000
         display_size = 1_000
 
-        should_approx = col_data.dtype not in [polars.Categorical, polars.Date, polars.Time, polars.Duration, polars.Null]
-        should_approx = should_approx and (self.data_frame.shape[0] > max_sample_size)
-        if should_approx:
+        if col_data.dtype not in [polars.Categorical, polars.Datetime, polars.Date, polars.Time, polars.Duration, polars.Null]:
             n_unique = self.data_frame.select(polars.col(col_name).approx_n_unique()).item()
-            n_unique = min(n_unique, self.data_frame.shape[0])
         else:
-            n_unique = self.data_frame.select(polars.col(col_name).n_unique()).item()
-        yield n_unique, should_approx
+            n_unique = self.data_frame.select(polars.col(col_name).n_unique()).item() # using standard for unsupported types
 
-        if n_unique > display_size:
-            print_log(f'Column {col_name} has {"approx. " if should_approx else ""}{format(n_unique, ",d")} unique values: too many to display', Log.DEBUG)
-            sample_size = min(max_sample_size, n_unique)
-            sample_data = col_data.bottom_k(sample_size).unique().sort()
-            self.current_unique_values_hash = sample_data.hash()
-            self.current_unique_values = sample_data.limit(display_size)
-            self.current_column_index = col_index
-            yield self.current_unique_values.to_list()
-            return
+        print_log(f'Column {col_name} has {format(n_unique, ",d")} unique values', Log.DEBUG)
 
-        print_log(f'Column {col_name} has {"approx. " if should_approx else ""}{format(n_unique, ",d")} unique values: {col_data.unique()}', Log.DEBUG)
-        unique_data = col_data.unique().sort()
+        if n_unique > max_data_length:
+            unique_data = col_data.sample(sample_size, seed=0, with_replacement=True).unique().sort().cast(polars.String).limit(display_size)
+        else:
+            unique_data = col_data.unique().sort().cast(polars.String).limit(display_size)
+
         self.current_unique_values_hash = unique_data.hash()
-        self.current_unique_values = unique_data
         self.current_column_index = col_index
-        yield self.current_unique_values.to_list()
+        return n_unique, unique_data.to_list()
 
     def find_unique_values(self, col_index: int, query: str) -> list:
         """
@@ -284,7 +275,7 @@ class DBMS(GObject.Object):
         if self.current_column_index == col_index and self.current_unique_values_cached:
             unique_data = self.current_unique_values
         else:
-            unique_data = col_data.unique().sort()
+            unique_data = col_data.unique().sort().cast(polars.String)
             self.current_unique_values_hash = unique_data.hash()
             self.current_unique_values = unique_data
             self.current_column_index = col_index
@@ -336,18 +327,36 @@ class DBMS(GObject.Object):
         # TODO: support advanced filtering
         if 'meta:all' in self.pending_values_to_show:
             print_log(f'Applying filter to column \'{col_name}\'...', Log.DEBUG)
-            predicates = polars.col(col_name).is_in(self.pending_values_to_hide).not_()
-            if 'meta:blank' in self.pending_values_to_hide:
+            if exclude_nulls := 'meta:blank' in self.pending_values_to_hide:
+                self.pending_values_to_hide.remove('meta:blank')
+            try:
+                values_to_hide = polars.Series(self.pending_values_to_hide).cast(self.data_frame[col_name].dtype, strict=False)
+            except Exception as e:
+                print_log(f'Failed to cast filter values to {self.data_frame[col_name].dtype}: {e}', Log.WARNING)
+                return False
+            predicates = polars.col(col_name).is_in(values_to_hide).not_()
+            if exclude_nulls:
                 predicates &= polars.col(col_name).is_not_null()
             self.data_frame = self.data_frame.filter(predicates)
+            self.current_column_index = -1
+            self.current_unique_values_cached = False
             return True
 
         if 'meta:all' in self.pending_values_to_hide and len(self.pending_values_to_show) > 0:
             print_log(f'Applying filter to column \'{col_name}\'...', Log.DEBUG)
-            predicates = polars.col(col_name).is_in(self.pending_values_to_show)
-            if 'meta:blank' in self.pending_values_to_show:
+            if include_nulls := 'meta:blank' in self.pending_values_to_show:
+                self.pending_values_to_show.remove('meta:blank')
+            try:
+                values_to_show = polars.Series(self.pending_values_to_show).cast(self.data_frame[col_name].dtype, strict=False)
+            except Exception as e:
+                print_log(f'Failed to cast filter values to {self.data_frame[col_name].dtype}: {e}', Log.WARNING)
+                return False
+            predicates = polars.col(col_name).is_in(values_to_show)
+            if include_nulls:
                 predicates |= polars.col(col_name).is_null()
             self.data_frame = self.data_frame.filter(predicates)
+            self.current_column_index = -1
+            self.current_unique_values_cached = False
             return True
 
         return False

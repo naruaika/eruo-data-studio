@@ -303,6 +303,7 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
             return check_button
 
         def update_listbox(checkboxes: list[Gtk.CheckButton]) -> None:
+            self.filter_listbox.remove_all()
             for checkbox in checkboxes:
                 self.filter_listbox.append(checkbox)
             self.filter_spinner.hide()
@@ -314,16 +315,11 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
             is_approx = False
             n_unique, options = self._dbms.find_unique_values(colid, query)
         else:
-            for index, return_value in enumerate(self._dbms.scan_unique_values(colid)):
-                if index == 0:
-                    n_unique, is_approx = return_value
-                else:
-                    options = return_value
-
-        if len(options) == 1_000 and n_unique > 1_000: # 1_000 is used in scan_unique_values()
-            options += ['eruo-data-studio:truncated']
-        elif len(options) == 0:
-            options += ['eruo-data-studio:empty']
+            is_approx = True
+            n_unique, options = self._dbms.scan_unique_values(colid)
+            if len(options) >= n_unique:
+                n_unique = len(options)
+                is_approx = False
 
         if colid != int(self._colid):
             print_log(f'Interrupted from showing filter options for column {col_name}', Log.DEBUG)
@@ -335,6 +331,12 @@ class SheetColumnHeaderMenu(Gtk.PopoverMenu):
             checkboxes = [add_check_button('(Select All)', False, True)]
         else:
             checkboxes = []
+
+        if len(options) == 1_000 and n_unique > 1_000: # 1_000 is used in scan_unique_values()
+            options += ['eruo-data-studio:truncated']
+        elif len(options) == 0:
+            options += ['eruo-data-studio:empty']
+
         if any(option in [None, ''] for option in options):
             checkboxes.append(add_check_button(_('(Blanks)'), True, True))
         for option in options:
