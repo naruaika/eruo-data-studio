@@ -43,6 +43,27 @@ class SheetDisplay(GObject.Object):
     scroll_y_position: int = 0
     scroll_x_position: int = 0
 
+    # We don't need to fill these upfront because everything will be visible
+    # by default. It'll be filled up on demand, usually when the user performs
+    # a filter to any dataframe. Whenever possible, we should try to avoid
+    # having these series with the same length as the number of rows/columns;
+    # I think it's best to have them as short as possible, i.e. truncating
+    # all the true values at the end.
+    row_visibility_flags: polars.Series = polars.Series(dtype=polars.Boolean)
+    column_visibility_flags: polars.Series = polars.Series(dtype=polars.Boolean)
+
+    # These are the cumulative heights/widths of the visible cells, a helper
+    # for the renderer to know which cells will be on the very top left of
+    # the viewport regarding the current scroll position. It's useful for
+    # two scenarios at least: 1) when some rows/columns are hidden, and 2)
+    # when the width/height of some rows/columns have been adjusted. It's
+    # also useful to calculate the total width/height of the visible cells
+    # so that the user can go to the edges of the table, for example by
+    # pressing the arrow keys with the ctrl[+shift] modifier. Most of the
+    # time when accessing these values, a binary search will be involved.
+    cumulative_visible_heights: polars.Series = polars.Series(dtype=polars.UInt32)
+    cumulative_visible_widths: polars.Series = polars.Series(dtype=polars.UInt32)
+
     def __init__(self, document: SheetDocument) -> None:
         super().__init__()
 

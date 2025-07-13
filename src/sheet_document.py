@@ -633,16 +633,18 @@ class SheetDocument(GObject.Object):
 
         return False
 
+    def filter_current_rows(self) -> None:
+        pass
+
     def sort_current_rows(self, descending: bool = False) -> bool:
         active = self.selection.current_active_cell
 
         # Prepare for snapshot
-        # Sorting is expensive; we can see double in memory usage. Anything we can do?
-        # Doing manipulation by not calling SheetData methods is ugly, but I'll leave that for now.
         if not globals.is_changing_state and 0 <= active.metadata.dfi < len(self.data.dfs):
             self.data.dfs[active.metadata.dfi] = self.data.dfs[active.metadata.dfi].with_row_index('eridx')
             active.metadata.column += 1
 
+        # Sorting is expensive; we can see double in memory usage. Anything we can do?
         if self.data.sort_rows_from_metadata(active.metadata.column, active.metadata.dfi, descending):
             # Save snapshot
             if not globals.is_changing_state and 0 <= active.metadata.dfi < len(self.data.dfs):

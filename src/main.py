@@ -68,7 +68,7 @@ class Application(Adw.Application):
         self.create_action('delete-row', self.on_delete_row_x_action)
         self.create_action('delete-column', self.on_delete_column_x_action)
         self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
-        # self.create_action('filter-cell-value', self.on_filter_cell_value_action)
+        self.create_action('filter-cell-value', self.on_filter_cell_value_action)
         # self.create_action('filter-cell-color', self.on_filter_cell_color_action)
         # self.create_action('filter-font-color', self.on_filter_font_color_action)
         self.create_action('sort-smallest-to-largest', self.on_sort_smallest_to_largest_action)
@@ -99,10 +99,22 @@ class Application(Adw.Application):
 
     def on_quit_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
+
+        # We do cleanup the history of all sheets in the current window, mainly
+        # to free up disk space from the temporary files, usually .ersnap files
+        # created for example when multiple cells or even the entire row(s) or
+        # column(s) are edited so that the user can perform undo/redo operations.
+        # At the moment, any previous states will be stored as a file on a disk,
+        # not in memory to reduce the memory footprint. It's purely to support
+        # handling of big datasets more possible.
         for page_index in range (window.tab_view.get_n_pages()):
             tab_page = window.tab_view.get_nth_page(page_index)
             sheet_view = tab_page.get_child()
             sheet_view.document.history.cleanup_all()
+
+        # Instead of closing the whole application at once, we just close the current
+        # window one by one until no more windows are open and the application will be
+        # closed automatically by itself.
         window.close()
 
     def on_about_action(self, action: Gio.SimpleAction, *args) -> None:
@@ -125,6 +137,7 @@ class Application(Adw.Application):
     def on_save_file_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
 
+        # Pre-check if there is any data to save
         sheets = list(window.sheet_manager.sheets.values())
         if len(sheets) == 0 or len(sheets[0].data.dfs) == 0:
             return
@@ -134,6 +147,7 @@ class Application(Adw.Application):
     def on_save_as_file_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
 
+        # Pre-check if there is any data to save
         sheets = list(window.sheet_manager.sheets.values())
         if len(sheets) == 0 or len(sheets[0].data.dfs) == 0:
             return
@@ -142,11 +156,12 @@ class Application(Adw.Application):
 
     def on_file_opened(self, source: GObject.Object, file_path: str) -> None:
         if not file_path:
-            return
+            return # shouldn't happen, but for completeness
+
         self.create_new_window(file_path)
 
     def on_file_saved(self, source: GObject.Object, file_path: str) -> None:
-        pass # TODO: indicate file has been saved
+        pass # TODO: indicate the user when the file has been saved
 
     def on_new_sheet_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
@@ -160,14 +175,22 @@ class Application(Adw.Application):
 
     def on_undo_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
+
+        # Prevent from colliding with the undo action of editable widgets.
+        # Not every editable widget supports the undo action, but for
+        # safety, we exclude them all.
         if isinstance(window.get_focus(), Gtk.Editable):
             return
+
         globals.history.undo()
 
     def on_redo_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
+
+        # Prevent from colliding with the redo action of editable widgets
         if isinstance(window.get_focus(), Gtk.Editable):
             return
+
         globals.history.redo()
 
     def on_cut_action(self, action: Gio.SimpleAction, *args) -> None:
@@ -312,9 +335,15 @@ class Application(Adw.Application):
     def create_new_window(self, file_path: str = '') -> None:
         file = None
         dataframe = None
+
+        # By default, no file is loaded when creating a new window.
+        # But later on, we can add support for file manager integration
+        # as well as a command line interface. Maybe even adding support
+        # for opening the last session automatically.
         if file_path:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(file_path)
+
         window = Window(application=self, file=file, dataframe=dataframe)
         window.present()
 

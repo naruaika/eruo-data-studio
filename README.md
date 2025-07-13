@@ -24,22 +24,23 @@ Currently in early development. Stay tuned for updates.
 
 Currently we only support x86_64 architectures and Linux distributions using `glibc` (GNU C Library) due to lack of dependecy management by the team. Building [Polars](https://pola.rs/) from source doesn't seem to be so complicated though, so we'll make sure to try again in the near future.
 
-Since we started developing the proof-of-concept with Libadwaita, a building blocks for GNOME applications, so it's supposed to be compatible only with GNOME desktop environment. I think it's possible that the application will still look correct and good on other distributions. Anyway, we'll add support for Windows in the future and hopefully for macOS as well.
+Since we started developing the proof-of-concept with Libadwaita, a building blocks for GNOME applications, so it's supposed to be compatible only with GNOME desktop environment. I think it's possible that the application will still look correct and good on other distributions. Anyway, we'll add support for Windows in the future and hopefully for macOS as well as web platforms!
 
 ## Designing
 
-The following are some of the resources used in decision making and development planning.:
+The following are some of the resources used in decision making and development planning:
 
 - [The ONLY Data Cleaning Framework You Need | Ep. 3](https://www.youtube.com/watch?v=y9wFFD2bXQM)
 - [How to NAIL Exploratory Data Analysis (Lead Analyst Demo)](https://www.youtube.com/watch?v=deS6lETubdU)
 
 We've been doing some research on similar applications as follows:
 
-- Excel
-- Google Sheets
-- Power BI
-- Tableau
-- Alteryx Designer
+- [Microsoft Excel](https://www.microsoft.com/en-us/microsoft-365/excel)
+- [Google Sheets](https://workspace.google.com/intl/en_id/products/sheets/)
+- [Power BI](https://www.microsoft.com/en-us/power-platform/products/power-bi)
+- [Tableau](https://www.tableau.com/products/desktop)
+- [Alteryx Designer](https://www.alteryx.com/products/alteryx-designer)
+- [SmoothCSV](https://smoothcsv.com/)
 
 ## Planning
 
