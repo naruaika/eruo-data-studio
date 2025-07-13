@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="FileSaveAsDialog" parent="AdwDialog">
+    <property name="title">Save As</property>
+    <property name="can-close">true</property>
+    <property name="content-height">500</property>
+    <property name="content-width">400</property>
+    <child>
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar">
+            <property name="title-widget">
+              <object class="AdwInlineViewSwitcher" id="view_switcher">
+                <property name="stack">view_stack</property>
+                <style>
+                  <class name="round"/>
+                </style>
+              </object>
+            </property>
+          </object>
+        </child>
+        <property name="content">
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <child>
+              <object class="AdwBanner" id="warning_banner">
+                <property name="revealed">false</property>
+                <property name="title">Only Erbook supports all features</property>
+                <property name="button-label">Switch</property>
+              </object>
+            </child>
+            <child>
+              <object class="AdwViewStack" id="view_stack"/>
+            </child>
+          </object>
+        </property>
+        <child type="bottom">
+          <object class="GtkBox">
+            <property name="orientation">horizontal</property>
+            <property name="halign">end</property>
+            <child>
+              <object class="GtkButton" id="save_button">
+                <property name="label">Save</property>
+                <signal name="clicked" handler="on_save_button_clicked" swapped="no"/>
+                <style>
+                  <class name="suggested-action"/>
+                </style>
+              </object>
+            </child>
+            <style>
+              <class name="toolbar"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>

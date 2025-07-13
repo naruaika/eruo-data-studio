@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="SheetView" parent="GtkBox">
+    <property name="orientation">vertical</property>
+    <child>
+      <object class="GtkOverlay" id="main_overlay">
+        <child>
+          <object class="GtkOverlay">
+            <child>
+              <object class="GtkDrawingArea" id="main_canvas">
+                <property name="halign">fill</property>
+                <property name="valign">fill</property>
+                <property name="vexpand">true</property>
+                <property name="hexpand">true</property>
+                <style>
+                  <class name="main-canvas"/>
+                </style>
+              </object>
+            </child>
+            <child type="overlay">
+              <object class="GtkScrollbar" id="horizontal_scrollbar">
+                <property name="orientation">horizontal</property>
+                <property name="valign">end</property>
+                <style>
+                  <class name="bottom"/>
+                  <class name="overlay-indicator"/>
+                </style>
+              </object>
+            </child>
+            <child type="overlay">
+              <object class="GtkScrollbar" id="vertical_scrollbar">
+                <property name="orientation">vertical</property>
+                <property name="halign">end</property>
+                <style>
+                  <class name="right"/>
+                  <class name="overlay-indicator"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child type="overlay">
+          <object class="GtkTextView" id="inline_formula">
+            <property name="valign">start</property>
+            <property name="halign">start</property>
+            <property name="hexpand">true</property>
+            <property name="vexpand">true</property>
+            <property name="width-request">67</property>
+            <property name="height-request">22</property>
+            <property name="wrap-mode">word</property>
+            <property name="visible">false</property>
+            <style>
+              <class name="inline-formula"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+    <style>
+      <class name="tab-page"/>
+    </style>
+  </template>
+</interface>

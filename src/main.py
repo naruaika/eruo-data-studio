@@ -17,6 +17,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+
 import gi
 import polars
 import sys
@@ -24,477 +25,299 @@ import sys
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 
-from gi.repository import Adw, Gio, Gtk
+from gi.repository import Adw, Gio, GObject, Gtk
 
-from .utils import Log, print_log
-from .window import EruoDataStudioWindow
+from . import globals
+from .file_manager import FileManager
+from .sheet_document import SheetDocument
+from .window import Window
 
-class EruoDataStudioApplication(Adw.Application):
+class Application(Adw.Application):
     """The main application singleton class."""
 
     def __init__(self) -> None:
-        """
-        Creates a new EruoDataStudioApplication.
-
-        Sets up the application's unique ID and resource base path,
-        and creates several actions that can be activated by the user.
-        """
-        super().__init__(application_id='com.macipra.Eruo',
+        super().__init__(application_id='com.macipra.eruo',
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
-                         resource_base_path='/com/macipra/Eruo')
+                         resource_base_path='/com/macipra/eruo')
 
-        print_log('Registering application actions...', Log.DEBUG)
+        self.file_manager = FileManager()
+        self.file_manager.connect('file-opened', self.on_file_opened)
+        self.file_manager.connect('file-saved', self.on_file_saved)
+
         self.create_action('quit', self.on_quit_action, ['<primary>q'])
         self.create_action('about', self.on_about_action)
         self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
-        self.create_action('open-file', self.on_open_file_action, ['<primary>o'])
-
-        self.create_action('sheet.column.sort-a-to-z', self.on_column_sort_a_to_z_action)
-        self.create_action('sheet.column.sort-z-to-a', self.on_column_sort_z_to_a_action)
-        self.create_action('sheet.column.reset-sort', self.on_column_reset_sort_action)
-        self.create_action('sheet.column.apply-filter', self.on_column_apply_filter_action)
-        self.create_action('sheet.column.reset-filter', self.on_column_reset_filter_action)
-        for data_type in ['boolean', 'int8', 'int16', 'int32', 'int64',  'uint8', 'uint16', 'uint32', 'uint64',
-                          'float32', 'float64', 'decimal', 'string', 'categorical', 'date', 'time', 'datetime']:
-            self.create_action(f'sheet.column.convert-to.{data_type}', getattr(self, f'on_column_convert_to_{data_type}_action'))
-
-        self.create_action('sheet.column.insert-to-left', self.on_column_insert_to_left)
-        self.create_action('sheet.column.insert-to-right', self.on_column_insert_to_right)
-        self.create_action('sheet.column.duplicate-to-left', self.on_column_duplicate_to_left)
-        self.create_action('sheet.column.duplicate-to-right', self.on_column_duplicate_to_right)
-        self.create_action('sheet.column.delete', self.on_column_delete)
-        self.create_action('sheet.column.clear', self.on_column_clear)
+        self.create_action('open', self.on_open_file_action, ['<primary>o'])
+        self.create_action('save', self.on_save_file_action, ['<primary>s'])
+        self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
+        self.create_action('new-sheet', self.on_new_sheet_action, ['<primary>t'])
+        self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
+        self.create_action('undo', self.on_undo_action, ['<primary>z'])
+        self.create_action('redo', self.on_redo_action, ['<shift><primary>z', '<primary>y'])
+        # self.create_action('cut', self.on_cut_action, ['<primary>x'])
+        # self.create_action('copy', self.on_copy_action, ['<primary>c'])
+        # self.create_action('paste', self.on_paste_action, ['<primary>v'])
+        self.create_action('insert-row-above', self.on_insert_row_above_action)
+        self.create_action('insert-row-below', self.on_insert_row_below_action)
+        self.create_action('insert-column-left', self.on_insert_column_left_action)
+        self.create_action('insert-column-right', self.on_insert_column_right_action)
+        self.create_action('duplicate-to-above', self.on_duplicate_to_above_action)
+        self.create_action('duplicate-to-below', self.on_duplicate_to_below_action)
+        self.create_action('duplicate-to-left', self.on_duplicate_to_left_action)
+        self.create_action('duplicate-to-right', self.on_duplicate_to_right_action)
+        self.create_action('delete-row', self.on_delete_row_x_action)
+        self.create_action('delete-column', self.on_delete_column_x_action)
+        self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
+        # self.create_action('filter-cell-value', self.on_filter_cell_value_action)
+        # self.create_action('filter-cell-color', self.on_filter_cell_color_action)
+        # self.create_action('filter-font-color', self.on_filter_font_color_action)
+        self.create_action('sort-smallest-to-largest', self.on_sort_smallest_to_largest_action)
+        self.create_action('sort-largest-to-smallest', self.on_sort_largest_to_smallest_action)
+        self.create_action('convert-to-int8', self.on_convert_to_int8_action)
+        self.create_action('convert-to-int16', self.on_convert_to_int16_action)
+        self.create_action('convert-to-int32', self.on_convert_to_int32_action)
+        self.create_action('convert-to-int64', self.on_convert_to_int64_action)
+        self.create_action('convert-to-uint8', self.on_convert_to_uint8_action)
+        self.create_action('convert-to-uint16', self.on_convert_to_uint16_action)
+        self.create_action('convert-to-uint32', self.on_convert_to_uint32_action)
+        self.create_action('convert-to-uint64', self.on_convert_to_uint64_action)
+        self.create_action('convert-to-float32', self.on_convert_to_float32_action)
+        self.create_action('convert-to-float64', self.on_convert_to_float64_action)
+        self.create_action('convert-to-decimal', self.on_convert_to_decimal_action)
+        self.create_action('convert-to-date', self.on_convert_to_date_action)
+        self.create_action('convert-to-time', self.on_convert_to_time_action)
+        self.create_action('convert-to-datetime', self.on_convert_to_datetime_action)
+        self.create_action('convert-to-categorical', self.on_convert_to_categorical_action)
+        self.create_action('convert-to-boolean', self.on_convert_to_boolean_action)
+        self.create_action('convert-to-text', self.on_convert_to_text_action)
 
     def do_activate(self) -> None:
-        """
-        Activates the application.
+        if window := self.get_active_window():
+            window.present()
+            return
+        self.create_new_window()
 
-        This method is called when the application is activated,
-        e.g. when the user clicks on its desktop icon or searches for it
-        in their application launcher.
+    def on_quit_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        for page_index in range (window.tab_view.get_n_pages()):
+            tab_page = window.tab_view.get_nth_page(page_index)
+            sheet_view = tab_page.get_child()
+            sheet_view.document.history.cleanup_all()
+        window.close()
 
-        The method opens a new window if none is already open.
-        """
-        self.open_new_window(None)
-
-    def on_quit_action(self, *args) -> None:
-        """
-        Closes the currently active window.
-
-        This method is activated when the user uses the "Quit" action,
-        usually by clicking on the "Quit" menu item or pressing the
-        shortcut key combination Ctrl+Q.
-        """
-        self.get_active_window().close()
-
-    def on_about_action(self, *args) -> None:
-        """
-        Shows the about dialog for the application.
-
-        This method is activated when the user uses the "About" action,
-        usually by clicking on the "About" menu item or pressing the
-        shortcut key combination Ctrl+?. The about dialog shows the
-        name, icon, version, and copyright information of the application,
-        as well as a list of developers and translators.
-        """
+    def on_about_action(self, action: Gio.SimpleAction, *args) -> None:
         dialog = Adw.AboutDialog(application_name='Eruo Data Studio',
-                                 application_icon='com.macipra.Eruo',
+                                 application_icon='com.macipra.eruo',
                                  developer_name='Naufan Rusyda Faikar',
                                  version='0.1.0',
                                  developers=['Naufan Rusyda Faikar'],
                                  copyright='© 2025 Naufan Rusyda Faikar')
-        # Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
         dialog.set_translator_credits(_('translator-credits'))
         dialog.present(self.get_active_window())
 
-    def on_open_file_action(self, *args) -> None:
-        """
-        Opens a file dialog for the user to select a file to open.
+    def on_preferences_action(self, action: Gio.SimpleAction, *args) -> None:
+        raise NotImplementedError
 
-        This method presents a file dialog to the user, allowing them to
-        select a file to be opened in the application window. The dialog
-        filters files to show only text and CSV files by default, although
-        all files can be displayed with the "All Files" option. This method
-        is triggered by the "open-file" action and utilizes a callback to
-        handle the dialog dismissal.
+    def on_open_file_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        self.file_manager.open_file(window)
 
-        Args:
-            *args: Variable length argument list. Currently unused.
+    def on_save_file_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
 
-        Note:
-            At the moment, only text and CSV files are supported.
-        """
-        FILTER_TXT = Gtk.FileFilter()
-        FILTER_TXT.set_name(name='Text Files')
-        FILTER_TXT.add_pattern(pattern='*.txt')
-        FILTER_TXT.add_pattern(pattern='*.csv')
-        FILTER_TXT.add_mime_type(mime_type='text/plain')
-        FILTER_TXT.add_mime_type(mime_type='text/csv')
-
-        FILTER_ALL = Gtk.FileFilter()
-        FILTER_ALL.set_name(name='All Files')
-        FILTER_ALL.add_pattern(pattern='*')
-
-        filters = Gio.ListStore.new(Gtk.FileFilter)
-        filters.append(item=FILTER_TXT)
-        filters.append(item=FILTER_ALL)
-
-        dialog = Gtk.FileDialog.new()
-        dialog.set_title(title='Open File')
-        dialog.set_modal(True)
-        dialog.set_filters(filters)
-
-        print_log('Opening a file dialog...', Log.DEBUG)
-        dialog.open(parent=self.get_active_window(), callback=self.on_file_dialog_dismissed)
-
-    def on_file_dialog_dismissed(self, dialog: Gtk.FileDialog, response: Gio.Task) -> None:
-        """
-        Handles the dismissal of the file dialog and processes the selected file.
-
-        This method is invoked when the file dialog is dismissed. It attempts to
-        retrieve the file selected by the user. If the file is successfully located,
-        it checks if the file is already open in any existing window. If the file is
-        already open, it brings that window to the foreground. Otherwise, it opens
-        the file in a new window. Logs relevant status messages during the process.
-
-        Args:
-            dialog: The Gtk.FileDialog that was dismissed.
-            response: The Gio.Task containing the result of the dialog operation.
-        """
-        def finish() -> None:
-            print_log('File dialog dismissed', Log.DEBUG)
-
-        file = None
-        try:
-            print_log('Trying to locate file...', Log.DEBUG)
-            file = dialog.open_finish(response)
-            print_log(f'Located file {file.get_path()}')
-        except Exception as e:
-            print_log(f'Failed to locate file: {e}', Log.WARNING)
-
-        if file is None:
-            finish()
+        sheets = list(window.sheet_manager.sheets.values())
+        if len(sheets) == 0 or len(sheets[0].data.dfs) == 0:
             return
 
-        for window in self.get_windows():
-            if window.dbms.file and window.dbms.file.get_path() == file.get_path():
-                print_log('File is already open in a window', Log.DEBUG)
-                window.present()
-                finish()
-                return
+        self.file_manager.save_file(window)
 
-        self.open_new_window(file)
-        finish()
-
-    def on_preferences_action(self, *args) -> None:
-        """
-        Opens the preferences dialog for the application.
-
-        This method is triggered when the user selects the "Preferences"
-        action, typically through a menu item or a keyboard shortcut.
-        It is intended to present a dialog or window where users can
-        configure application-specific settings.
-
-        Args:
-            *args: Variable length argument list. Currently unused.
-        """
-        raise NotImplementedError # TODO
-
-    def on_column_sort_a_to_z_action(self, *args) -> None:
-        """
-        Sorts the selected column in ascending order.
-
-        This method is triggered when the user selects the "Sort A to Z"
-        action, typically through a menu item or a keyboard shortcut.
-        It is intended to sort the selected column in ascending order.
-
-        Args:
-            *args: Variable length argument list. Currently unused.
-        """
+    def on_save_as_file_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_column()
-        window.dbms.sort_column_values(col_index, descending=False)
-        window.update_project_status()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
-        window.action_set_enabled('app.sheet.column.reset-sort', True)
 
-    def on_column_sort_z_to_a_action(self, *args) -> None:
-        """
-        Sorts the selected column in descending order.
-
-        This method is triggered when the user selects the "Sort Z to A"
-        action, typically through a menu item or a keyboard shortcut.
-        It is intended to sort the selected column in descending order.
-
-        Args:
-            *args: Variable length argument list. Currently unused.
-        """
-        window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_column()
-        window.dbms.sort_column_values(col_index, descending=True)
-        window.update_project_status()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
-        window.action_set_enabled('app.sheet.column.reset-sort', True)
-
-    def on_column_reset_sort_action(self, *args) -> None:
-        """
-        Resets the sort order of the selected column.
-
-        This method is triggered when the user selects the "Reset Sort"
-        action, typically through a menu item or a keyboard shortcut.
-        It is intended to reset the sort order of the selected column.
-
-        Args:
-            *args: Variable length argument list. Currently unused.
-        """
-        window = self.get_active_window()
-        window.dbms.reset_column_sort()
-        window.update_project_status()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
-        window.action_set_enabled('app.sheet.column.reset-sort', False)
-
-    def on_column_apply_filter_action(self, *args) -> None:
-        """
-        Applies a filter to the selected column.
-
-        This method is triggered when the user selects the "Apply Filter"
-        action, typically through a menu item or a keyboard shortcut.
-        It is intended to apply a filter to the selected column.
-
-        Args:
-            *args: Variable length argument list. Currently unused.
-        """
-        window = self.get_active_window()
-        if not window.dbms.filter_row_values():
+        sheets = list(window.sheet_manager.sheets.values())
+        if len(sheets) == 0 or len(sheets[0].data.dfs) == 0:
             return
-        window.dbms.summary_fill_counts()
-        window.update_project_status()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
-        window.action_set_enabled('app.sheet.column.reset-filter', True)
 
-    def on_column_reset_filter_action(self, *args) -> None:
-        """
-        Resets the filter applied to the selected column.
+        self.file_manager.save_as_file(window)
 
-        This method is triggered when the user selects the "Reset Filter"
-        action, typically through a menu item or a keyboard shortcut.
-        It is intended to reset the filter applied to the selected column.
+    def on_file_opened(self, source: GObject.Object, file_path: str) -> None:
+        if not file_path:
+            return
+        self.create_new_window(file_path)
 
-        Args:
-            *args: Variable length argument list. Currently unused.
-        """
+    def on_file_saved(self, source: GObject.Object, file_path: str) -> None:
+        pass # TODO: indicate file has been saved
+
+    def on_new_sheet_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        window.dbms.reset_row_filter()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
-        window.action_set_enabled('app.sheet.column.reset-filter', False)
+        sheet_view = window.sheet_manager.create_sheet(None)
+        window.add_new_tab(sheet_view)
 
-    def on_column_convert_to_boolean_action(self, *args) -> None:
-        """Converts the selected column to boolean values."""
-        self.column_convert_to(polars.Boolean)
-
-    def on_column_convert_to_int8_action(self, *args) -> None:
-        """Converts the selected column to Int8 values."""
-        self.column_convert_to(polars.Int8)
-
-    def on_column_convert_to_int16_action(self, *args) -> None:
-        """Converts the selected column to Int16 values."""
-        self.column_convert_to(polars.Int16)
-
-    def on_column_convert_to_int32_action(self, *args) -> None:
-        """Converts the selected column to Int32 values."""
-        self.column_convert_to(polars.Int32)
-
-    def on_column_convert_to_int64_action(self, *args) -> None:
-        """Converts the selected column to Int64 values."""
-        self.column_convert_to(polars.Int64)
-
-    def on_column_convert_to_uint8_action(self, *args) -> None:
-        """Converts the selected column to UInt8 values."""
-        self.column_convert_to(polars.UInt8)
-
-    def on_column_convert_to_uint16_action(self, *args) -> None:
-        """Converts the selected column to UInt16 values."""
-        self.column_convert_to(polars.UInt16)
-
-    def on_column_convert_to_uint32_action(self, *args) -> None:
-        """Converts the selected column to UInt32 values."""
-        self.column_convert_to(polars.UInt32)
-
-    def on_column_convert_to_uint64_action(self, *args) -> None:
-        """Converts the selected column to UInt64 values."""
-        self.column_convert_to(polars.UInt64)
-
-    def on_column_convert_to_float32_action(self, *args) -> None:
-        """Converts the selected column to Float32 values."""
-        self.column_convert_to(polars.Float32)
-
-    def on_column_convert_to_float64_action(self, *args) -> None:
-        """Converts the selected column to Float64 values."""
-        self.column_convert_to(polars.Float64)
-
-    def on_column_convert_to_decimal_action(self, *args) -> None:
-        """Converts the selected column to Decimal values."""
-        self.column_convert_to(polars.Decimal)
-
-    def on_column_convert_to_string_action(self, *args) -> None:
-        """Converts the selected column to String values."""
-        self.column_convert_to(polars.Utf8)
-
-    def on_column_convert_to_categorical_action(self, *args) -> None:
-        """Converts the selected column to Categorical values."""
-        self.column_convert_to(polars.Categorical)
-
-    def on_column_convert_to_date_action(self, *args) -> None:
-        """Converts the selected column to Date values."""
-        self.column_convert_to(polars.Date)
-
-    def on_column_convert_to_time_action(self, *args) -> None:
-        """Converts the selected column to Time values."""
-        self.column_convert_to(polars.Time)
-
-    def on_column_convert_to_datetime_action(self, *args) -> None:
-        """Converts the selected column to Datetime values."""
-        self.column_convert_to(polars.Datetime)
-
-    def on_column_insert_to_left(self, *args) -> None:
-        """Inserts a new column to the left of the selected column."""
+    def on_close_sheet_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_locator()[1]
-        window.dbms.insert_column_before(col_index)
-        window.dbms.summary_fill_counts()
-        window.update_project_status()
-        window.calculate_column_widths()
-        window.calculate_cumulative_column_widths()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
+        tab_page = window.tab_view.get_selected_page()
+        window.tab_view.close_page(tab_page)
 
-    def on_column_insert_to_right(self, *args) -> None:
-        """Inserts a new column to the right of the selected column."""
+    def on_undo_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_locator()[1]
-        window.dbms.insert_column_after(col_index)
-        window.dbms.summary_fill_counts()
-        window.update_project_status()
-        window.calculate_column_widths()
-        window.calculate_cumulative_column_widths()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
+        if isinstance(window.get_focus(), Gtk.Editable):
+            return
+        globals.history.undo()
 
-    def on_column_duplicate_to_left(self, *args) -> None:
-        """Duplicates the selected column to the left."""
+    def on_redo_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_locator()[1]
-        window.dbms.duplicate_column_at(col_index, True)
-        window.dbms.summary_fill_counts()
-        window.update_project_status()
-        window.calculate_column_widths()
-        window.calculate_cumulative_column_widths()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
+        if isinstance(window.get_focus(), Gtk.Editable):
+            return
+        globals.history.redo()
 
-    def on_column_duplicate_to_right(self, *args) -> None:
-        """Duplicates the selected column to the right."""
+    def on_cut_action(self, action: Gio.SimpleAction, *args) -> None:
+        pass
+
+    def on_copy_action(self, action: Gio.SimpleAction, *args) -> None:
+        pass
+
+    def on_paste_action(self, action: Gio.SimpleAction, *args) -> None:
+        pass
+
+    def on_insert_row_above_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.insert_blank_from_current_rows(above=True)
+
+    def on_insert_row_below_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.insert_blank_from_current_rows(above=False)
+
+    def on_insert_column_left_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.insert_blank_from_current_columns(left=True)
+
+    def on_insert_column_right_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.insert_blank_from_current_columns(left=False)
+
+    def on_duplicate_to_above_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.duplicate_from_current_rows(above=True)
+
+    def on_duplicate_to_below_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.duplicate_from_current_rows(above=False)
+
+    def on_duplicate_to_left_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.duplicate_from_current_columns(left=True)
+
+    def on_duplicate_to_right_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.duplicate_from_current_columns(left=False)
+
+    def on_delete_row_x_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.delete_current_rows()
+
+    def on_delete_column_x_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.delete_current_columns()
+
+    def on_clear_contents_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.update_current_cells('')
+
+    def on_filter_cell_value_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.filter_current_rows()
+
+    def on_filter_cell_color_action(self, action: Gio.SimpleAction, *args) -> None:
+        pass
+
+    def on_filter_font_color_action(self, action: Gio.SimpleAction, *args) -> None:
+        pass
+
+    def on_sort_smallest_to_largest_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.sort_current_rows(descending=False)
+
+    def on_sort_largest_to_smallest_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.sort_current_rows(descending=True)
+
+    def on_convert_to_categorical_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Categorical)
+
+    def on_convert_to_int8_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Int8)
+
+    def on_convert_to_int16_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Int16)
+
+    def on_convert_to_int32_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Int32)
+
+    def on_convert_to_int64_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Int64)
+
+    def on_convert_to_uint8_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.UInt8)
+
+    def on_convert_to_uint16_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.UInt16)
+
+    def on_convert_to_uint32_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.UInt32)
+
+    def on_convert_to_uint64_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.UInt64)
+
+    def on_convert_to_float32_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Float32)
+
+    def on_convert_to_float64_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Float64)
+
+    def on_convert_to_decimal_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Decimal)
+
+    def on_convert_to_date_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Date)
+
+    def on_convert_to_time_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Time)
+
+    def on_convert_to_datetime_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Datetime)
+
+    def on_convert_to_boolean_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Boolean)
+
+    def on_convert_to_text_action(self, action: Gio.SimpleAction, *args) -> None:
+        self.convert_to(polars.Utf8)
+
+    def convert_to(self, dtype: polars.DataType) -> None:
+        document = self.get_current_active_document()
+        document.convert_current_columns_dtype(dtype)
+
+    def get_current_active_document(self) -> SheetDocument:
         window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_locator()[1]
-        window.dbms.duplicate_column_at(col_index, False)
-        window.dbms.summary_fill_counts()
-        window.update_project_status()
-        window.calculate_column_widths()
-        window.calculate_cumulative_column_widths()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
+        tab_page = window.tab_view.get_selected_page()
+        sheet_view = tab_page.get_child()
+        return sheet_view.document
 
-    def on_column_delete(self, *args) -> None:
-        """Deletes the selected column."""
-        window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_locator()[1]
-        window.dbms.delete_column_at(col_index)
-        window.dbms.summary_fill_counts()
-        window.update_project_status()
-        window.calculate_column_widths()
-        window.calculate_cumulative_column_widths()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
-
-    def on_column_clear(self, *args) -> None:
-        """Clears the selected column."""
-        window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_locator()[1]
-        window.dbms.clear_column_at(col_index)
-        window.dbms.summary_fill_counts()
-        window.renderer.invalidate_cache()
-        window.main_canvas.queue_draw()
-
-    def column_convert_to(self, col_type: polars.DataType, *args) -> None:
-        """
-        Converts the selected column to the specified data type.
-
-        This method is triggered when the user selects the "Convert to [data type]"
-        action, typically through a menu item or a keyboard shortcut.
-        It is intended to convert the selected column to the specified data type.
-
-        Args:
-            col_type: The data type to convert the column to.
-            *args: Variable length argument list. Currently unused.
-        """
-        window = self.get_active_window()
-        col_index = window.selection.get_previous_selected_column()
-        if window.dbms.convert_column_to(col_index, col_type):
-            window.renderer.invalidate_cache()
-            window.main_canvas.queue_draw()
-        else:
-            col_name = window.dbms.get_column(col_index)
-            if col_name.startswith('Categorical'):
-                col_name = 'Categorical'
-            elif col_name.startswith('Datetime'):
-                col_name = 'Datetime'
-            window.show_toast_message(f'Failed to convert column \'{col_name}\' to {col_type}')
-
-    def create_action(self, name: str, callback: callable, shortcuts: list | None = None) -> None:
-        """
-        Creates an action for the application.
-
-        This method creates a new action with the given name, connects the
-        given callback to the action's activate signal, and adds the action
-        to the application. If shortcuts are provided, the action is also
-        associated with the given shortcuts.
-
-        Args:
-            name: The name of the action to create.
-            callback: The callback to connect to the action's activate signal.
-            shortcuts: An optional list of shortcuts to associate with the action.
-        """
+    def create_action(self, name: str, callback: callable, shortcuts: list = None) -> None:
         action = Gio.SimpleAction.new(name, None)
         action.connect('activate', callback)
         self.add_action(action)
         if shortcuts:
             self.set_accels_for_action(f'app.{name}', shortcuts)
 
-    def open_new_window(self, file: Gio.File | None) -> None:
-        """
-        Opens a new window for the application.
-
-        This method opens a new window for the application, loading the given file
-        if specified. If the application already has a window with no associated
-        file, it will be reused instead of opening a new window.
-
-        Args:
-            file: An optional Gio.File object to load into the new window.
-        """
-        window = self.get_active_window()
-        if window and not window.dbms.file:
-            print_log('Reusing the current active window...', Log.DEBUG)
-            window.load_file(file)
-            return
-        print_log(f'Opening a new window...', Log.DEBUG)
-        EruoDataStudioWindow(application=self, file=file).present()
+    def create_new_window(self, file_path: str = '') -> None:
+        file = None
+        dataframe = None
+        if file_path:
+            file = Gio.File.new_for_path(file_path)
+            dataframe = self.file_manager.read_file(file_path)
+        window = Window(application=self, file=file, dataframe=dataframe)
+        window.present()
 
 def main(version):
     """The application's entry point."""
-    app = EruoDataStudioApplication()
-    return app.run(sys.argv)
+    return Application().run(sys.argv)

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="FileSaveAsCsvView" parent="AdwPreferencesPage">
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwEntryRow" id="save_as">
+            <property name="title">Save As</property>
+            <property name="text">Book1</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow" id="save_to">
+            <property name="title">Save To</property>
+            <property name="subtitle">~/Documents</property>
+            <property name="activatable">true</property>
+            <signal name="activated" handler="on_save_to_activated" swapped="no"/>
+            <child>
+              <object class="GtkImage">
+                <property name="margin-start">8</property>
+                <property name="margin-end">8</property>
+                <property name="icon-name">go-next-symbolic</property>
+              </object>
+            </child>
+            <style>
+              <class name="property"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title">Contents</property>
+        <child>
+          <object class="AdwSwitchRow" id="include_header">
+            <property name="active">true</property>
+            <property name="title">Header</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title">Separators</property>
+        <child>
+          <object class="AdwEntryRow" id="separator">
+            <property name="title">Value Separator</property>
+            <property name="text">,</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwEntryRow" id="line_terminator">
+            <property name="title">Line Terminator</property>
+            <property name="text">\n</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwEntryRow" id="quote_character">
+            <property name="title">Quote Character</property>
+            <property name="text">"</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title">Formatting</property>
+        <child>
+          <object class="AdwEntryRow" id="datetime_format">
+            <property name="title">Datetime Format</property>
+            <property name="text">%Y-%m-%d %H:%M:%S</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwEntryRow" id="date_format">
+            <property name="title">Date Format</property>
+            <property name="text">%Y-%m-%d</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwEntryRow" id="time_format">
+            <property name="title">Time Format</property>
+            <property name="text">%H:%M:%S</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="GtkButton">
+            <property name="halign">center</property>
+            <property name="label">Reset Default</property>
+            <signal name="clicked" handler="on_reset_default_clicked" swapped="no"/>
+            <style>
+              <class name="destructive-action"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>

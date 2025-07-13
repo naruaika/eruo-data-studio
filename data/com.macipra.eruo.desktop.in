@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Eruo Data Studio
 Exec=eruo-data-studio
-Icon=com.macipra.Eruo
+Icon=com.macipra.eruo
 Terminal=false
 Type=Application
 Categories=Utility;

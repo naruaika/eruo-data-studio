@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="FileSaveAsParquetView" parent="AdwPreferencesPage">
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwEntryRow" id="save_as">
+            <property name="title">Save As</property>
+            <property name="text">Book1</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow" id="save_to">
+            <property name="title">Save To</property>
+            <property name="subtitle">~/Documents</property>
+            <property name="activatable">true</property>
+            <signal name="activated" handler="on_save_to_activated" swapped="no"/>
+            <child>
+              <object class="GtkImage">
+                <property name="margin-start">8</property>
+                <property name="margin-end">8</property>
+                <property name="icon-name">go-next-symbolic</property>
+              </object>
+            </child>
+            <style>
+              <class name="property"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title">Contents</property>
+        <child>
+          <object class="AdwSwitchRow" id="statistics">
+            <property name="active">true</property>
+            <property name="title">Statistics</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title">Compression</property>
+        <child>
+          <object class="AdwComboRow" id="compression">
+            <property name="title">Algorithm</property>
+            <property name="model">
+              <object class="GtkStringList">
+                <items>
+                  <item translatable="no">zstd</item>
+                  <item translatable="no">lz4</item>
+                  <item translatable="no">snappy</item>
+                  <item translatable="no">gzip</item>
+                  <item translatable="no">lzo</item>
+                  <item translatable="no">brotli</item>
+                  <item translatable="no">uncompressed</item>
+                </items>
+              </object>
+            </property>
+            <signal name="notify::selected" handler="on_compression_selected" swapped="no"/>
+          </object>
+        </child>
+        <child>
+          <object class="AdwSpinRow" id="compression_level">
+            <property name="title">Compression Level</property>
+            <property name="adjustment">
+              <object class="GtkAdjustment">
+                <property name="lower">1</property>
+                <property name="upper">22</property>
+                <property name="value">1</property>
+                <property name="page-increment">5</property>
+                <property name="step-increment">1</property>
+              </object>
+            </property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="GtkButton">
+            <property name="halign">center</property>
+            <property name="label">Reset Default</property>
+            <signal name="clicked" handler="on_reset_default_clicked" swapped="no"/>
+            <style>
+              <class name="destructive-action"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>

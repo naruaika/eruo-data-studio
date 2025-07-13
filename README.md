@@ -4,8 +4,6 @@ A powerful yet friendly ETL (Extract, Transform, Load) tool powered by [Polars](
 
 ![Eruo Data Studio](docs/screenshot.png)
 
-<!-- TODO: describe the project more accurately -->
-
 ## Status
 
 Currently in early development. Stay tuned for updates.
@@ -60,7 +58,7 @@ flatpak install gnome-nightly org.gnome.Platform//master
 flatpak install gnome-nightly org.gnome.Sdk//master
 ```
 
-Type and run `Flatpak: Select or Change Active Manifest` in the command palette (<kbd>F1</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>) and select the `com.macipra.Eruo.Devel.json` manifest file. Finally, type and run `Flatpak: Build and Run` in the command palette or simply hit <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd>.
+Type and run `Flatpak: Select or Change Active Manifest` in the command palette (<kbd>F1</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>) and select the `com.macipra.eruo.Devel.json` manifest file. Finally, type and run `Flatpak: Build and Run` in the command palette or simply hit <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd>.
 
 If you're using a Python language server, you may want to install the requirements. For better dependency management, it's recommended to create a virtual environment rather than installing packages globally:
 
@@ -70,7 +68,7 @@ source .pyenv/bin/activate
 pip install -r requirements-devel.txt
 ```
 
-To add new dependencies using [`pip`](https://packaging.python.org/en/latest/key_projects/#pip) to the [`flatpak-builder`](https://docs.flatpak.org/en/latest/flatpak-builder.html) manifest json file, you can use the [`flatpak-pip-generator`](https://github.com/flatpak/flatpak-builder-tools/tree/master/pip). Either adding the reference to the `com.macipra.Eruo*.json` files or copy-pasting the content directly into the manifest files and delete the generated file. Do not forget to update the `requirements*.txt` files as well.
+To add new dependencies using [`pip`](https://packaging.python.org/en/latest/key_projects/#pip) to the [`flatpak-builder`](https://docs.flatpak.org/en/latest/flatpak-builder.html) manifest json file, you can use the [`flatpak-pip-generator`](https://github.com/flatpak/flatpak-builder-tools/tree/master/pip). Either adding the reference to the `com.macipra.eruo*.json` files or copy-pasting the content directly into the manifest files and delete the generated file. Do not forget to update the `requirements*.txt` files as well.
 
 <!-- TODO: add instructions on packaging -->
 

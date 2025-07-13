@@ -1,5 +1,6 @@
 # Basically this file is a copy of requirements-devel.txt,
 # but without pycairo and PyGObject
+numpy==2.3.1
 polars==1.31.0
 # pycairo==1.28.0
 # PyGObject==3.52.3

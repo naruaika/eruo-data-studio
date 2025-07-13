@@ -1,6 +1,6 @@
 desktop_file = i18n.merge_file(
-        input: 'com.macipra.Eruo.desktop.in',
-       output: 'com.macipra.Eruo.desktop',
+        input: 'com.macipra.eruo.desktop.in',
+       output: 'com.macipra.eruo.desktop',
          type: 'desktop',
        po_dir: '../po',
       install: true,
@@ -13,8 +13,8 @@ if desktop_utils.found()
 endif
 
 appstream_file = i18n.merge_file(
-        input: 'com.macipra.Eruo.metainfo.xml.in',
-       output: 'com.macipra.Eruo.metainfo.xml',
+        input: 'com.macipra.eruo.metainfo.xml.in',
+       output: 'com.macipra.eruo.metainfo.xml',
        po_dir: '../po',
       install: true,
   install_dir: get_option('datadir') / 'metainfo'
@@ -24,7 +24,7 @@ appstreamcli = find_program('appstreamcli', required: false, disabler: true)
 test('Validate appstream file', appstreamcli,
      args: ['validate', '--no-net', '--explain', appstream_file])
 
-install_data('com.macipra.Eruo.gschema.xml',
+install_data('com.macipra.eruo.gschema.xml',
   install_dir: get_option('datadir') / 'glib-2.0' / 'schemas'
 )
 
@@ -49,8 +49,8 @@ test('Validate schema file',
 service_conf = configuration_data()
 service_conf.set('bindir', get_option('prefix') / get_option('bindir'))
 configure_file(
-  input: 'com.macipra.Eruo.service.in',
-  output: 'com.macipra.Eruo.service',
+  input: 'com.macipra.eruo.service.in',
+  output: 'com.macipra.eruo.service',
   configuration: service_conf,
   install_dir: get_option('datadir') / 'dbus-1' / 'services'
 )

@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <gresource prefix="/com/macipra/Eruo">
-    <file preprocess="xml-stripblanks">gtk/window.ui</file>
+  <gresource prefix="/com/macipra/eruo">
     <file preprocess="xml-stripblanks">gtk/help-overlay.ui</file>
-    <file preprocess="xml-stripblanks">gtk/sheet-column-header-menu.ui</file>
-    <file preprocess="xml-stripblanks">gtk/sheet-column-locator-menu.ui</file>
-
+    <file preprocess="xml-stripblanks">ui/file-save-as-dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/file-save-as-csv-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/file-save-as-json-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/file-save-as-parquet-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/window.ui</file>
     <file alias="base.css">css/base.css</file>
     <file alias="style.css">css/style.css</file>
     <file alias="style-dark.css">css/style-dark.css</file>

@@ -1,0 +1,453 @@
+# sheet_data.py
+#
+# Copyright 2025 Naufan Rusyda Faikar
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+
+from gi.repository import GObject
+import datetime
+import gc
+import numpy
+import polars
+import re
+
+from . import globals
+from .sheet_document import SheetDocument
+
+class SheetCellBoundingBox(GObject.Object):
+    __gtype_name__ = 'SheetCellBoundingBox'
+
+    column: int
+    row: int
+
+    column_span: int
+    row_span: int
+
+    def __init__(self, column: int, row: int, column_span: int, row_span: int) -> None:
+        super().__init__()
+
+        self.column = column
+        self.row = row
+
+        self.column_span = column_span
+        self.row_span = row_span
+
+
+
+class SheetCellMetadata(GObject.Object):
+    __gtype_name__ = 'SheetCellMetadata'
+
+    column: int
+    row: int
+
+    dfi: int
+
+    def __init__(self, column: int, row: int, dfi: int) -> None:
+        super().__init__()
+
+        self.column = column
+        self.row = row
+
+        self.dfi = dfi
+
+
+
+class SheetData(GObject.Object):
+    __gtype_name__ = 'SheetData'
+
+    bbs: list[SheetCellBoundingBox] = []
+    dfs: list[polars.DataFrame | numpy.ndarray] = []
+
+    def __init__(self, document: SheetDocument, dataframe: polars.DataFrame) -> None:
+        super().__init__()
+
+        self.document = document
+
+        if dataframe is None:
+            return
+        self.dfs = [dataframe]
+        # TODO: should we support dataframe starting from row > 1?
+        self.bbs = [SheetCellBoundingBox(1, 1, dataframe.shape[1], dataframe.shape[0] + 1)]
+
+    def get_cell_metadata_from_position(self, column: int, row: int) -> SheetCellMetadata:
+        # Handle the locator cells
+        column = max(1, column)
+        row = max(1, row)
+
+        for bbs in self.bbs:
+            if bbs.column <= column < bbs.column + bbs.column_span and bbs.row <= row < bbs.row + bbs.row_span:
+                column = column - bbs.column
+                row = row - bbs.row
+                dfi = self.bbs.index(bbs)
+                return SheetCellMetadata(column, row, dfi)
+
+        return SheetCellMetadata(-1, -1, -1)
+
+    def read_column_dtype_from_metadata(self, column: int, dfi: int) -> any:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+        return self.dfs[dfi].dtypes[column]
+
+    def read_cell_data_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int) -> any:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+
+        row -= 1
+
+        # Get the header(s)
+        if row < 0:
+            df = self.dfs[dfi].columns[column: column + column_span]
+            if column_span > 1:
+                return df
+            else:
+                return df[0]
+
+        # Get the content(s)
+        if row_span == 1 and column_span == 1:
+            return self.dfs[dfi][row, column]
+        else:
+            return self.dfs[dfi][row:row + row_span, column:column + column_span]
+
+    def read_cell_bbox_from_metadata(self, dfi: int) -> any:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+        return self.bbs[dfi]
+
+    def insert_rows_from_metadata(self, row: int, row_span: int, dfi: int) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        empty_rows = polars.DataFrame({
+            column_name: polars.Series(
+                values=[None] * row_span,
+                dtype=column_dtype,
+            )
+            for column_name, column_dtype in self.dfs[dfi].schema.items()
+        })
+
+        self.dfs[dfi] = polars.concat([
+            self.dfs[dfi].slice(0, row),
+            empty_rows,
+            self.dfs[dfi].slice(row),
+        ])
+
+        return True
+
+    def insert_columns_from_dataframe(self, dataframe: polars.DataFrame, column: int, dfi: int) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        for counter, column in enumerate(range(column, column + dataframe.shape[1])):
+            self.dfs[dfi] = self.dfs[dfi].insert_column(column, dataframe[:, counter])
+            self.bbs[dfi].column_span += 1
+
+        del dataframe
+        gc.collect()
+
+        return True
+
+    def insert_columns_from_metadata(self, column: int, column_span: int, dfi: int, left: bool = False) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        column_number = 1
+        for column_name in self.dfs[dfi].columns:
+            if match := re.match(r'column_(\d+)', column_name):
+                column_number = max(column_number, int(match.group(1)) + 1)
+
+        if left:
+            column += column_span - 1
+            column_number += column_span - 1
+
+        for _ in range(column_span):
+            column_name = f'column_{column_number}'
+            self.dfs[dfi] = self.dfs[dfi].insert_column(column, polars.lit(None).alias(column_name))
+            self.bbs[dfi].column_span += 1
+
+            if not left:
+                column += 1
+                column_number += 1
+            else:
+                column_number -= 1
+
+        return True
+
+    def insert_rows_from_dataframe(self, dataframe: polars.DataFrame, row: int, dfi: int) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        self.dfs[dfi] = polars.concat([
+            self.dfs[dfi].slice(0, row - 1),
+            dataframe,
+            self.dfs[dfi].slice(row - 1),
+        ])
+        self.bbs[dfi].row_span += dataframe.shape[0]
+
+        return True
+
+    def update_cell_data_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, value: any) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        if isinstance(value, list):
+            return self.update_cell_data_with_array_from_metadata(column, row, column_span, row_span, dfi, value)
+
+        return self.update_cell_data_with_single_from_metadata(column, row, column_span, row_span, dfi, value)
+
+    def update_cell_data_with_single_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, value: any) -> bool:
+        row -= 1
+
+        row_count = self.bbs[dfi].row_span - 1
+
+        end_column = column + column_span
+        if column_span < 0:
+            end_column = self.dfs[dfi].shape[1]
+
+        start = max(0, row)
+        stop = min(row + row_span, row_count)
+
+        for column in range(column, end_column):
+            # TODO: support updating over multiple dataframes?
+            if self.dfs[dfi].shape[1] <= column:
+                break
+
+            column_name = self.dfs[dfi].columns[column]
+            column_dtype = self.dfs[dfi].dtypes[column]
+
+            # Cast empty string
+            if value == '':
+                value = None
+
+            # Convert the input value to the correct type
+            if column_dtype in (polars.Date, polars.Datetime, polars.Time):
+                if column_dtype == polars.Date:
+                    new_value = datetime.strptime(new_value, '%Y-%m-%d').date()
+                elif column_dtype == polars.Datetime:
+                    new_value = datetime.strptime(new_value, '%Y-%m-%d %H:%M:%S')
+                else: # polars.Time
+                    new_value = datetime.strptime(new_value, '%H:%M:%S').time()
+            else:
+                try:
+                    new_value = polars.Series([value]).cast(column_dtype)[0]
+                except Exception:
+                    new_value = str(value)
+
+            # Update the entire column
+            if row_span < 0:
+                self.dfs[dfi] = self.dfs[dfi].with_columns(
+                    **{
+                        column_name: polars.repeat(new_value, row_count, eager=True, dtype=column_dtype)
+                    }
+                )
+            # Update the dataframe in range, excluding the header row
+            elif stop - start > 0:
+                self.dfs[dfi] = self.dfs[dfi].with_columns(
+                    **{
+                        column_name: self.dfs[dfi][0:start, column].extend(polars.repeat(value, stop - start, eager=True, dtype=column_dtype))
+                                                                   .extend(self.dfs[dfi][stop:row_count, column])
+                    }
+                )
+
+            if row >= 0:
+                continue # skip header cell
+
+            # Generate a new column name if needed
+            if new_value is None:
+                if re.match(r'column_(\d+)', column_name):
+                    continue # skip renaming already named column
+                cnumber = 1
+                for cname in self.dfs[dfi].columns:
+                    if match := re.match(r'column_(\d+)', cname):
+                        cnumber = max(cnumber, int(match.group(1)) + 1)
+                new_value = f'column_{cnumber}'
+            else:
+                new_value = str(value)
+
+            # Update the column name
+            self.dfs[dfi] = self.dfs[dfi].rename({column_name: new_value})
+
+        return True
+
+    def update_cell_data_with_array_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, value: list) -> bool:
+        row -= 1
+
+        header = value[0]
+        content = value[1]
+
+        row_count = self.bbs[dfi].row_span - 1
+
+        end_column = column + column_span
+        if column_span < 0:
+            end_column = self.dfs[dfi].shape[1]
+
+        if row_span < 0:
+            row_span = row_count
+
+        start = max(0, row)
+        stop = min(row + row_span, row_count)
+
+        content_index = -1
+        for column in range(column, end_column):
+            # TODO: support updating over multiple dataframes?
+            if self.dfs[dfi].shape[1] <= column:
+                break
+
+            content_index += 1
+
+            column_name = self.dfs[dfi].columns[column]
+            column_dtype = self.dfs[dfi].dtypes[column]
+
+            # Update the dataframe in range, excluding the header row
+            if isinstance(content, polars.DataFrame):
+                self.dfs[dfi] = self.dfs[dfi].with_columns(
+                    **{
+                        column_name: self.dfs[dfi][0:start, column].extend(content[:, content_index].cast(column_dtype))
+                                                                   .extend(self.dfs[dfi][stop:row_count, column])
+                    }
+                )
+            elif content is not None:
+                self.dfs[dfi] = self.dfs[dfi].with_columns(
+                    **{
+                        column_name: self.dfs[dfi][0:start, column].extend(polars.Series([content]).cast(column_dtype))
+                                                                   .extend(self.dfs[dfi][stop:row_count, column])
+                    }
+                )
+
+            if header is None:
+                continue # skip header cell
+
+            # Update the column name
+            if isinstance(header, list):
+                self.dfs[dfi] = self.dfs[dfi].rename({column_name: header[content_index]})
+            else:
+                self.dfs[dfi] = self.dfs[dfi].rename({column_name: header})
+
+        del content
+        gc.collect()
+
+        return True
+
+    def duplicate_rows_from_metadata(self, row: int, row_span: int, dfi: int) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        self.dfs[dfi] = polars.concat([
+            self.dfs[dfi].slice(0, row + row_span - 1),
+            self.dfs[dfi].slice(row - 1, row_span),
+            self.dfs[dfi].slice(row + row_span - 1),
+        ])
+        self.bbs[dfi].row_span += row_span
+
+        return True
+
+    def duplicate_columns_from_metadata(self, column: int, column_span: int, dfi: int, left: bool = False) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        if left:
+            column += column_span - 1
+
+        for _ in range(column_span):
+            target_name = self.dfs[dfi].columns[column]
+            new_name = re.sub(r'_(\d+)$', '', target_name)
+
+            # Determine a new column name
+            column_number = 1
+            for column_name in self.dfs[dfi].columns:
+                if match := re.match(new_name + r'_(\d+)', column_name):
+                    column_number = max(column_number, int(match.group(1)) + 1)
+                column_name = self.dfs[dfi].columns[column]
+
+            if not left:
+                column = column + column_span
+            else:
+                column = column - column_span + 1
+
+            new_name = f'{new_name}_{column_number}'
+            self.dfs[dfi] = self.dfs[dfi].insert_column(column, polars.col(target_name).alias(new_name))
+            self.bbs[dfi].column_span += 1
+
+            if not left:
+                column = column - column_span + 1
+            else:
+                column = column + column_span - 1
+
+        return True
+
+    def delete_rows_from_metadata(self, row: int, row_span: int, dfi: int) -> bool:
+        # TODO: should shift all dataframes below the current selection up?
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        row -= 1
+
+        # Prevent from deleting the header row
+        if row < 0:
+            row = 0
+            row_span -= 1
+
+        self.dfs[dfi] = self.dfs[dfi].with_row_index() \
+                                     .remove(polars.col('index').is_in(range(row, row + row_span))) \
+                                     .drop('index')
+        self.bbs[dfi].row_span -= row_span
+
+        return True
+
+    def delete_columns_from_metadata(self, column: int, column_span: int, dfi: int) -> bool:
+        # TODO: should shift all dataframes on the right side of the current selection to the left?
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        column_names = self.dfs[dfi].columns[column:column + column_span]
+        self.dfs[dfi] = self.dfs[dfi].drop(column_names)
+        self.bbs[dfi].column_span -= column_span
+
+        if self.bbs[dfi].column_span <= 0:
+            del self.dfs[dfi]
+            del self.bbs[dfi]
+            gc.collect()
+
+        return True
+
+    def sort_rows_from_metadata(self, column: int, dfi: int, descending: bool = False) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        column_name = self.dfs[dfi].columns[column]
+        self.dfs[dfi] = self.dfs[dfi].sort(column_name, descending=descending, nulls_last=True)
+
+        return True
+
+    def convert_columns_dtype_from_metadata(self, column: int, column_span: int, dfi: int, dtype: polars.DataType) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return
+
+        if isinstance(dtype, polars.Categorical):
+            dtype = polars.Categorical('lexical')
+
+        try:
+            self.dfs[dfi] = self.dfs[dfi].with_columns(
+                **{
+                    column_name: polars.col(column_name).cast(dtype)
+                        for column, column_name in enumerate(self.dfs[dfi].columns[column:column + column_span], column)
+                }
+            )
+        except Exception:
+            globals.send_notification(f'Cannot convert to: {dtype}')
+            return False
+
+        return True

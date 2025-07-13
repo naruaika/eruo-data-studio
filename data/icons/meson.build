@@ -1,4 +1,4 @@
-application_id = 'com.macipra.Eruo'
+application_id = 'com.macipra.eruo'
 
 scalable_dir = 'hicolor' / 'scalable' / 'apps'
 install_data(
