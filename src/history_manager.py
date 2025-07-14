@@ -21,7 +21,6 @@
 from collections import deque
 from gi.repository import GObject
 from tempfile import NamedTemporaryFile
-import gc
 import polars
 import time
 
@@ -93,7 +92,6 @@ class SelectionState(State):
 
     def redo(self) -> None:
         document = globals.history.document
-
         document.update_selection_from_position(self.col_1, self.row_1, self.col_2, self.row_2,
                                                 self.keep_order, self.follow_cursor, self.auto_scroll)
 
@@ -102,22 +100,28 @@ class SelectionState(State):
 class InsertBlankRowState(State):
     __gtype_name__ = 'InsertBlankRowState'
 
+    row_span: int
+    above: bool
+
     range: SheetCell
     active: SheetCell
     cursor: SheetCell
 
-    above: bool
-
-    def __init__(self, range: SheetCell, active: SheetCell, cursor: SheetCell, above: bool) -> None:
+    def __init__(self, row_span: int, above: bool) -> None:
         super().__init__()
 
-        self.range = range
-        self.active = active
-        self.cursor = cursor
+        self.row_span = row_span
         self.above = above
+
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
 
     def undo(self) -> None:
         document = globals.history.document
+
+        prow_span, self.range.row_span = self.range.row_span, self.row_span
 
         if not self.above:
             document.selection.current_active_range.metadata.row += self.range.row_span
@@ -126,9 +130,13 @@ class InsertBlankRowState(State):
 
         document.delete_current_rows()
 
+        self.range.row_span = prow_span
+
         document.selection.current_active_range = self.range
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
+
+        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -139,19 +147,21 @@ class InsertBlankRowState(State):
 class InsertBlankColumnState(State):
     __gtype_name__ = 'InsertBlankColumnState'
 
+    above: bool
+
     range: SheetCell
     active: SheetCell
     cursor: SheetCell
 
-    above: bool
-
-    def __init__(self, range: SheetCell, active: SheetCell, cursor: SheetCell, left: bool) -> None:
+    def __init__(self, left: bool) -> None:
         super().__init__()
 
-        self.range = range
-        self.active = active
-        self.cursor = cursor
         self.left = left
+
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
 
     def undo(self) -> None:
         document = globals.history.document
@@ -199,7 +209,7 @@ class UpdateDataState(State):
         self.replacer = replacer
 
         if isinstance(content, polars.DataFrame):
-            if content.shape[0] == 0:
+            if content.height == 0:
                 self.content = None
                 self.file_path = None
             else:
@@ -229,22 +239,28 @@ class UpdateDataState(State):
 class DuplicateRowState(State):
     __gtype_name__ = 'DuplicateRowState'
 
+    row_span: int
+    above: bool
+
     range: SheetCell
     active: SheetCell
     cursor: SheetCell
 
-    above: bool
-
-    def __init__(self, range: SheetCell, active: SheetCell, cursor: SheetCell, above: bool) -> None:
+    def __init__(self, row_span: int, above: bool) -> None:
         super().__init__()
 
-        self.range = range
-        self.active = active
-        self.cursor = cursor
+        self.row_span = row_span
         self.above = above
+
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
 
     def undo(self) -> None:
         document = globals.history.document
+
+        prow_span, self.range.row_span = self.range.row_span, self.row_span
 
         if not self.above:
             document.selection.current_active_range.metadata.row += self.range.row_span
@@ -253,9 +269,13 @@ class DuplicateRowState(State):
 
         document.delete_current_rows()
 
+        self.range.row_span = prow_span
+
         document.selection.current_active_range = self.range
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
+
+        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -266,19 +286,21 @@ class DuplicateRowState(State):
 class DuplicateColumnState(State):
     __gtype_name__ = 'DuplicateColumnState'
 
+    above: bool
+
     range: SheetCell
     active: SheetCell
     cursor: SheetCell
 
-    above: bool
-
-    def __init__(self, range: SheetCell, active: SheetCell, cursor: SheetCell, left: bool) -> None:
+    def __init__(self, left: bool) -> None:
         super().__init__()
 
-        self.range = range
-        self.active = active
-        self.cursor = cursor
         self.left = left
+
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
 
     def undo(self) -> None:
         document = globals.history.document
@@ -300,31 +322,86 @@ class DuplicateColumnState(State):
 
 
 
-class DeleteColumnState(State):
-    __gtype_name__ = 'DeleteColumnState'
+class DeleteRowState(State):
+    __gtype_name__ = 'DeleteRowState'
+
+    file_path: str
+    vflags_path: str
 
     range: SheetCell
     active: SheetCell
     cursor: SheetCell
 
-    file_path: str
-
-    def __init__(self, range: SheetCell, active: SheetCell, cursor: SheetCell, dataframe: polars.DataFrame) -> None:
+    def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series) -> None:
         super().__init__()
 
         if dataframe is None:
             self.file_path = None
             return
 
-        self.range = range
-        self.active = active
-        self.cursor = cursor
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
 
         with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
             # TODO: we leave uncompressed for now, but we may want to determine
             # the compression level based on the size of the dataframe later.
             dataframe.write_parquet(file_path.name, compression='uncompressed', statistics=False)
             self.file_path = file_path.name
+
+        if vflags is None:
+            self.vflags_path = None
+            return
+
+        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
+            # TODO: we leave uncompressed for now, but we may want to determine
+            # the compression level based on the size of the dataframe later.
+            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
+            self.vflags_path = file_path.name
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        document.selection.current_active_range = self.range
+        document.selection.current_active_cell = self.active
+        document.selection.current_cursor_cell = self.cursor
+
+        document.insert_from_current_rows(polars.read_parquet(self.file_path),
+                                          polars.read_parquet(self.vflags_path).to_series(0) if self.vflags_path is not None else None)
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.delete_current_rows()
+
+
+
+class DeleteColumnState(State):
+    __gtype_name__ = 'DeleteColumnState'
+
+    file_path: str
+
+    range: SheetCell
+    active: SheetCell
+    cursor: SheetCell
+
+    def __init__(self, dataframe: polars.DataFrame) -> None:
+        super().__init__()
+
+        if dataframe is None:
+            self.file_path = None
+            return
+
+        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
+            # TODO: we leave uncompressed for now, but we may want to determine
+            # the compression level based on the size of the dataframe later.
+            dataframe.write_parquet(file_path.name, compression='uncompressed', statistics=False)
+            self.file_path = file_path.name
+
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
 
     def undo(self) -> None:
         document = globals.history.document
@@ -339,45 +416,6 @@ class DeleteColumnState(State):
 
 
 
-class DeleteRowState(State):
-    __gtype_name__ = 'DeleteRowState'
-
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
-    file_path: str
-
-    def __init__(self, range: SheetCell, active: SheetCell, cursor: SheetCell, dataframe: polars.DataFrame) -> None:
-        super().__init__()
-
-        if dataframe is None:
-            self.file_path = None
-            return
-
-        self.range = range
-        self.active = active
-        self.cursor = cursor
-
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            dataframe.write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.file_path = file_path.name
-
-    def undo(self) -> None:
-        document = globals.history.document
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
-        document.insert_from_current_rows(polars.read_parquet(self.file_path))
-
-    def redo(self) -> None:
-        document = globals.history.document
-        document.delete_current_rows()
-
-
-
 class SortRowState(State):
     __gtype_name__ = 'SortRowState'
 
@@ -385,8 +423,9 @@ class SortRowState(State):
     dfi: int
 
     file_path: str
+    vflags_path: str
 
-    def __init__(self, descending: bool, dfi: int, row_index: polars.DataFrame) -> None:
+    def __init__(self, descending: bool, dfi: int, rindex: polars.DataFrame, vflags: polars.Series) -> None:
         super().__init__()
 
         self.descending = descending
@@ -395,18 +434,104 @@ class SortRowState(State):
         with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
             # TODO: we leave uncompressed for now, but we may want to determine
             # the compression level based on the size of the dataframe later.
-            polars.DataFrame(row_index).write_parquet(file_path.name, compression='uncompressed', statistics=False)
+            polars.DataFrame(rindex).write_parquet(file_path.name, compression='uncompressed', statistics=False)
             self.file_path = file_path.name
+
+        if vflags is None:
+            self.vflags_path = None
+            return
+
+        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
+            # TODO: we leave uncompressed for now, but we may want to determine
+            # the compression level based on the size of the dataframe later.
+            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
+            self.vflags_path = file_path.name
 
     def undo(self) -> None:
         document = globals.history.document
+
         document.data.dfs[self.dfi].insert_column(0, polars.read_parquet(self.file_path).to_series(0))
         document.data.sort_rows_from_metadata(0, self.dfi, False)
-        document.data.dfs[self.dfi].drop_in_place('eridx')
+        document.data.dfs[self.dfi].drop_in_place('$ridx')
+
+        if self.vflags_path is not None:
+            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+            document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
 
     def redo(self) -> None:
         document = globals.history.document
         document.sort_current_rows(self.descending)
+
+
+
+class FilterRowState(State):
+    __gtype_name__ = 'FilterRowState'
+
+    dfi: int
+
+    expression: polars.Expr
+
+    range: SheetCell
+    active: SheetCell
+    cursor: SheetCell
+
+    def __init__(self, dfi: int, expression: polars.Expr) -> None:
+        super().__init__()
+
+        self.dfi = dfi
+
+        self.expression = expression
+
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
+
+    def undo(self) -> None:
+        document = globals.history.document
+        document.data.fes[self.dfi] = self.expression
+
+        document.selection.current_active_range = self.range
+        document.selection.current_active_cell = self.active
+        document.selection.current_cursor_cell = self.cursor
+
+        if self.expression is not None:
+            document.display.row_visibility_flags = polars.concat([polars.Series([True]), # for header row
+                                                                   document.data.dfs[self.dfi].with_columns(self.expression.alias('$vrow'))['$vrow']])
+        else:
+            document.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+
+        document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+
+        if self.expression is not None:
+            document.data.bbs[self.dfi].row_span = len(document.display.row_visible_series)
+        else:
+            document.data.bbs[self.dfi].row_span = document.data.dfs[self.dfi].height
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.data.fes[self.dfi] = self.expression
+
+        document.selection.current_active_range = self.range
+        document.selection.current_active_cell = self.active
+        document.selection.current_cursor_cell = self.cursor
+
+        document.filter_current_rows()
+
+        # document.data.fes[self.dfi] = self.after
+
+        # if self.after is not None:
+        #     document.display.row_visibility_flags = polars.concat([polars.Series([True]), # for header row
+        #                                                            document.data.dfs[self.dfi].with_columns(self.after.alias('$vrow'))['$vrow']])
+        # else:
+        #     document.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+
+        # document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+
+        # if self.before is not None:
+        #     document.data.bbs[self.dfi].row_span = len(document.display.row_visible_series)
+        # else:
+        #     document.data.bbs[self.dfi].row_span = document.data.dfs[self.dfi].height
 
 
 
@@ -529,14 +654,20 @@ class HistoryManager(GObject.Object):
 
     def cleanup_undo_stack(self) -> None:
         for state in self.undo_stack:
-            if hasattr(state, 'file_path') and state.file_path is not None:
-                self.delete_snapshot(state.file_path)
+            for attribute in dir(state):
+                if attribute.endswith('_path'):
+                    file_path = getattr(state, attribute)
+                    if file_path is not None:
+                        self.delete_snapshot(file_path)
         self.undo_stack.clear()
 
     def cleanup_redo_stack(self) -> None:
         for state in self.redo_stack:
-            if hasattr(state, 'file_path') and state.file_path is not None:
-                self.delete_snapshot(state.file_path)
+            for attribute in dir(state):
+                if attribute.endswith('_path'):
+                    file_path = getattr(state, attribute)
+                    if file_path is not None:
+                        self.delete_snapshot(file_path)
         self.redo_stack.clear()
 
     def cleanup_all(self) -> None:

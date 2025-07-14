@@ -197,10 +197,10 @@ class SheetView(Gtk.Box):
         cursor_cell = self.document.selection.current_cursor_cell
         active_cell = self.document.selection.current_active_cell
 
-        col_1 = cursor_cell.column
-        row_1 = cursor_cell.row
-        col_2 = active_cell.column
-        row_2 = active_cell.row
+        col_1 = self.document.display.get_vcolumn_from_column(cursor_cell.column)
+        row_1 = self.document.display.get_vrow_from_row(cursor_cell.row)
+        col_2 = self.document.display.get_vcolumn_from_column(active_cell.column)
+        row_2 = self.document.display.get_vrow_from_row(active_cell.row)
 
         col_1, col_2 = min(col_1, col_2), max(col_1, col_2)
         row_1, row_2 = min(row_1, row_2), max(row_1, row_2)

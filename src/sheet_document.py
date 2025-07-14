@@ -20,7 +20,6 @@
 
 from gi.repository import Gdk, GObject, Gtk, Pango, PangoCairo
 import cairo
-import gc
 import polars
 
 from . import globals
@@ -282,7 +281,9 @@ class SheetDocument(GObject.Object):
 
     def update_selection_from_name(self, name: str) -> None:
         col_1, row_1, col_2, row_2 = self.display.get_cell_range_from_name(name)
-        self.update_selection_from_position(col_1, row_1, col_2, row_2, False, False, True)
+        vrow_1 = self.display.get_row_from_vrow(row_1)
+        vrow_2 = self.display.get_row_from_vrow(row_2)
+        self.update_selection_from_position(col_1, vrow_1, col_2, vrow_2, False, False, True)
 
     def update_selection_from_position(self, col_1: int, row_1: int, col_2: int, row_2: int,
                                        keep_order: bool = False, follow_cursor: bool = True, auto_scroll: bool = True) -> None:
@@ -323,7 +324,20 @@ class SheetDocument(GObject.Object):
         canvas_width = self.view.main_canvas.get_width()
         canvas_height = self.view.main_canvas.get_height()
 
-        cell_metadata = self.data.get_cell_metadata_from_position(col_1, row_1)
+        # I know this is ridiculous, if only we don't have to support the non-destructive
+        # row filtering, or hiding some rows to be precise, we only need the last line of
+        # this code block below, which is: get_cell_metadata_from_position(col_1, row_1).
+        vrow_1 = row_1
+        if len(self.display.row_visible_series):
+            if row_1 <= len(self.display.row_visible_series):
+                vrow_1 = self.display.get_vrow_from_row(row_1)
+            else:
+                vrow_1 = -1 # force to be out of bounds
+        if vrow_1 < 0:
+            from .sheet_data import SheetCellMetadata
+            cell_metadata = SheetCellMetadata(-1, -1, -1)
+        else:
+            cell_metadata = self.data.get_cell_metadata_from_position(col_1, vrow_1)
 
         # Cache the previous active range, usually to prevent from unnecessary re-renders
         self.selection.previous_active_range = self.selection.current_active_range
@@ -387,45 +401,86 @@ class SheetDocument(GObject.Object):
     def on_force_update_cell_data(self, source: GObject.Object, value: any) -> None:
         self.update_current_cells(value)
 
-    def insert_from_current_rows(self, dataframe: polars.DataFrame) -> bool:
+    def insert_from_current_rows(self, dataframe: polars.DataFrame, vflags: polars.Series = None) -> bool:
         range = self.selection.current_active_range
-        row = range.metadata.row
+        active = self.selection.current_active_cell
+
+        mrow = range.metadata.row
+        row_span = range.row_span
+
+        # Take hidden row(s) into account
+        if len(self.display.row_visibility_flags):
+            start_vrow = self.display.get_vrow_from_row(range.row)
+            end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+            row_span = end_vrow - start_vrow + 1
 
         if range.btt:
-            row = row - range.row_span + 1
+            mrow = mrow - row_span + 1
 
-        if self.data.insert_rows_from_dataframe(dataframe, row, range.metadata.dfi):
+        if self.data.insert_rows_from_dataframe(dataframe, mrow, range.metadata.dfi):
+            # Update row visibility flags
+            if len(self.display.row_visibility_flags):
+                if vflags is not None:
+                    self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:mrow],
+                                                                       vflags,
+                                                                       self.display.row_visibility_flags[mrow:]])
+                else:
+                    self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:mrow],
+                                                                       polars.Series([True] * dataframe.height),
+                                                                       self.display.row_visibility_flags[mrow:]])
+                self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+                self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, False)
+
             return True
 
         return False
 
     def insert_blank_from_current_rows(self, above: bool = False) -> bool:
         range = self.selection.current_active_range
-        row = range.metadata.row
+        active = self.selection.current_active_cell
+        cursor = self.selection.current_cursor_cell
+
+        mrow = range.metadata.row
+        row_span = range.row_span
+
+        # Take hidden row(s) into account
+        if len(self.display.row_visibility_flags):
+            start_vrow = self.display.get_vrow_from_row(range.row)
+            end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+            row_span = end_vrow - start_vrow + 1
 
         if not above:
-            row = row + range.row_span
+            mrow = mrow + row_span
         if range.btt:
-            row = row - range.row_span
+            mrow = mrow - row_span
         else:
-            row = row - 1
+            mrow = mrow - 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import InsertBlankRowState
-            active = self.selection.current_active_cell
-            cursor = self.selection.current_cursor_cell
-            state = InsertBlankRowState(range, active, cursor, above)
+            state = InsertBlankRowState(row_span, above)
 
-        if self.data.insert_rows_from_metadata(row, range.row_span, range.metadata.dfi):
+        if self.data.insert_rows_from_metadata(mrow, row_span, range.metadata.dfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
 
+            # Update row visibility flags
+            if len(self.display.row_visibility_flags):
+                if above:
+                    mrow = mrow + 1
+                self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:mrow],
+                                                                   polars.Series([True] * row_span),
+                                                                   self.display.row_visibility_flags[mrow:]])
+                self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+                self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+
             self.renderer.render_caches = {}
-            self.auto_adjust_selections_by_crud(0, 0 if not above else range.row_span, False)
+            self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
 
             return True
 
@@ -433,12 +488,12 @@ class SheetDocument(GObject.Object):
 
     def insert_from_current_columns(self, dataframe: polars.DataFrame) -> bool:
         range = self.selection.current_active_range
-        column = range.metadata.column
+        mcolumn = range.metadata.column
 
         if range.rtl:
-            column = column - range.column_span + 1
+            mcolumn = mcolumn - range.column_span + 1
 
-        if self.data.insert_columns_from_dataframe(dataframe, column, range.metadata.dfi):
+        if self.data.insert_columns_from_dataframe(dataframe, mcolumn, range.metadata.dfi):
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, False)
             return True
@@ -447,26 +502,28 @@ class SheetDocument(GObject.Object):
 
     def insert_blank_from_current_columns(self, left: bool = False) -> bool:
         range = self.selection.current_active_range
-        column = range.metadata.column
+        mcolumn = range.metadata.column
+
+        # TODO: take hidden column(s) into account
 
         if not left:
-            column = column + range.column_span
+            mcolumn = mcolumn + range.column_span
         else:
-            column = column - range.column_span + 1
+            mcolumn = mcolumn - range.column_span + 1
         if range.rtl:
-            column = column - range.column_span + 1
+            mcolumn = mcolumn - range.column_span + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import InsertBlankColumnState
-            active = self.selection.current_active_cell
-            cursor = self.selection.current_cursor_cell
-            state = InsertBlankColumnState(range, active, cursor, left)
+            state = InsertBlankColumnState(left)
 
-        if self.data.insert_columns_from_metadata(column, range.column_span, range.metadata.dfi, left):
+        if self.data.insert_columns_from_metadata(mcolumn, range.column_span, range.metadata.dfi, left):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
+
+            # TODO: update column visibility flags
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0 if not left else range.column_span, 0, False)
@@ -479,16 +536,24 @@ class SheetDocument(GObject.Object):
         # TODO: support updating over multiple dataframes?
         range = self.selection.current_active_range
 
-        column = range.metadata.column
-        row = range.metadata.row
+        mcolumn = range.metadata.column
+        mrow = range.metadata.row
         column_span = range.column_span
         row_span = range.row_span
 
+        # Take hidden row(s) into account
+        if len(self.display.row_visibility_flags):
+            start_vrow = self.display.get_vrow_from_row(range.row)
+            end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+            row_span = end_vrow - start_vrow + 1
+
+        # TODO: take hidden column(s) into account
+
         if range.rtl:
-            column = column - range.column_span + 1
+            mcolumn = mcolumn - range.column_span + 1
 
         if range.btt:
-            row = row - range.row_span + 1
+            mrow = mrow - row_span + 1
 
         if column_span < 0:
             column_span = self.data.bbs[range.metadata.dfi].column_span
@@ -501,16 +566,16 @@ class SheetDocument(GObject.Object):
             from .history_manager import UpdateDataState
 
             if range.metadata.row == 0: # includes header row
-                state = UpdateDataState(self.data.read_cell_data_from_metadata(column, row, range.column_span, 1, range.metadata.dfi),
-                                        self.data.read_cell_data_from_metadata(column, row + 1, column_span, row_span - 1, range.metadata.dfi),
+                state = UpdateDataState(self.data.read_cell_data_from_metadata(mcolumn, mrow, range.column_span, 1, range.metadata.dfi),
+                                        self.data.read_cell_data_from_metadata(mcolumn, mrow + 1, column_span, row_span - 1, range.metadata.dfi),
                                         value)
             else: # excludes header row
                 state = UpdateDataState(None,
-                                        self.data.read_cell_data_from_metadata(column, row, column_span, row_span, range.metadata.dfi),
+                                        self.data.read_cell_data_from_metadata(mcolumn, mrow, column_span, row_span, range.metadata.dfi),
                                         value)
 
         # Update data
-        if self.data.update_cell_data_from_metadata(column, row, range.column_span, range.row_span, range.metadata.dfi, value):
+        if self.data.update_cell_data_from_metadata(mcolumn, mrow, range.column_span, row_span, range.metadata.dfi, value):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -527,25 +592,43 @@ class SheetDocument(GObject.Object):
 
     def duplicate_from_current_rows(self, above: bool = False) -> bool:
         range = self.selection.current_active_range
-        row = range.metadata.row
+        active = self.selection.current_active_cell
+        cursor = self.selection.current_cursor_cell
+
+        mrow = range.metadata.row
+        row_span = range.row_span
+
+        # Take hidden row(s) into account
+        if len(self.display.row_visibility_flags):
+            start_vrow = self.display.get_vrow_from_row(range.row)
+            end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+            row_span = end_vrow - start_vrow + 1
 
         if range.btt:
-            row = row - range.row_span + 1
+            mrow = mrow - row_span + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import DuplicateRowState
-            active = self.selection.current_active_cell
-            cursor = self.selection.current_cursor_cell
-            state = DuplicateRowState(range, active, cursor, above)
+            state = DuplicateRowState(row_span, above)
 
-        if self.data.duplicate_rows_from_metadata(row, range.row_span, range.metadata.dfi):
+        if self.data.duplicate_rows_from_metadata(mrow, row_span, range.metadata.dfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
 
+            # Update row visibility flags
+            if len(self.display.row_visibility_flags):
+                if not above:
+                    mrow = mrow + row_span
+                self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:mrow],
+                                                                   polars.Series([True] * row_span),
+                                                                   self.display.row_visibility_flags[mrow:]])
+                self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+                self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+
             self.renderer.render_caches = {}
-            self.auto_adjust_selections_by_crud(0, 0 if not above else range.row_span, False)
+            self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
 
             return True
 
@@ -553,22 +636,24 @@ class SheetDocument(GObject.Object):
 
     def duplicate_from_current_columns(self, left: bool = False) -> bool:
         range = self.selection.current_active_range
-        column = range.metadata.column
+        mcolumn = range.metadata.column
+
+        # TODO: take hidden column(s) into account
 
         if range.rtl:
-            column = column - range.column_span + 1
+            mcolumn = mcolumn - range.column_span + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import DuplicateColumnState
-            active = self.selection.current_active_cell
-            cursor = self.selection.current_cursor_cell
-            state = DuplicateColumnState(range, active, cursor, left)
+            state = DuplicateColumnState(left)
 
-        if self.data.duplicate_columns_from_metadata(column, range.column_span, range.metadata.dfi, left):
+        if self.data.duplicate_columns_from_metadata(mcolumn, range.column_span, range.metadata.dfi, left):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
+
+            # TODO: update column visibility flags
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0 if not left else range.column_span, 0, False)
@@ -577,26 +662,42 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def delete_current_columns(self) -> bool:
+    def delete_current_rows(self) -> bool:
         # TODO: support deleting over multiple dataframes?
         range = self.selection.current_active_range
-        column = range.metadata.column
+        active = self.selection.current_active_cell
+        cursor = self.selection.current_cursor_cell
 
-        if range.rtl:
-            column = column - range.column_span + 1
+        mrow = range.metadata.row
+        row_span = range.row_span
+
+        # Take hidden row(s) into account
+        if len(self.display.row_visibility_flags):
+            start_vrow = self.display.get_vrow_from_row(range.row)
+            end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+            row_span = end_vrow - start_vrow + 1
+
+        if range.btt:
+            mrow = mrow - row_span + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
-            from .history_manager import DeleteColumnState
-            active = self.selection.current_active_cell
-            cursor = self.selection.current_cursor_cell
-            row_count = self.data.bbs[range.metadata.dfi].row_span - 1
-            state = DeleteColumnState(range, active, cursor, self.data.read_cell_data_from_metadata(column, 1, range.column_span, row_count, range.metadata.dfi))
+            from .history_manager import DeleteRowState
+            column_count = self.data.bbs[range.metadata.dfi].column_span
+            state = DeleteRowState(self.data.read_cell_data_from_metadata(0, mrow, column_count, row_span, range.metadata.dfi),
+                                   self.display.row_visibility_flags[mrow:mrow + row_span] if len(self.display.row_visibility_flags) else None)
 
-        if self.data.delete_columns_from_metadata(column, range.column_span, range.metadata.dfi):
+        if self.data.delete_rows_from_metadata(mrow, row_span, range.metadata.dfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
+
+            # Update row visibility flags
+            if len(self.display.row_visibility_flags):
+                self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:mrow],
+                                                                   self.display.row_visibility_flags[mrow + row_span:]])
+                self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+                self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, True)
@@ -605,26 +706,28 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def delete_current_rows(self) -> bool:
+    def delete_current_columns(self) -> bool:
         # TODO: support deleting over multiple dataframes?
         range = self.selection.current_active_range
-        row = range.metadata.row
+        mcolumn = range.metadata.column
 
-        if range.btt:
-            row = row - range.row_span + 1
+        # TODO: take hidden column(s) into account
+
+        if range.rtl:
+            mcolumn = mcolumn - range.column_span + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
-            from .history_manager import DeleteRowState
-            active = self.selection.current_active_cell
-            cursor = self.selection.current_cursor_cell
-            column_count = self.data.bbs[range.metadata.dfi].column_span
-            state = DeleteRowState(range, active, cursor, self.data.read_cell_data_from_metadata(0, row, column_count, range.row_span, range.metadata.dfi))
+            from .history_manager import DeleteColumnState
+            row_count = self.data.bbs[range.metadata.dfi].row_span - 1
+            state = DeleteColumnState(self.data.read_cell_data_from_metadata(mcolumn, 1, range.column_span, row_count, range.metadata.dfi))
 
-        if self.data.delete_rows_from_metadata(row, range.row_span, range.metadata.dfi):
+        if self.data.delete_columns_from_metadata(mcolumn, range.column_span, range.metadata.dfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
+
+            # TODO: update column visibility flags
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, True)
@@ -634,24 +737,62 @@ class SheetDocument(GObject.Object):
         return False
 
     def filter_current_rows(self) -> None:
-        pass
-
-    def sort_current_rows(self, descending: bool = False) -> bool:
         active = self.selection.current_active_cell
 
         # Prepare for snapshot
         if not globals.is_changing_state and 0 <= active.metadata.dfi < len(self.data.dfs):
-            self.data.dfs[active.metadata.dfi] = self.data.dfs[active.metadata.dfi].with_row_index('eridx')
+            pexpression = self.data.fes[active.metadata.dfi]
+
+        self.display.row_visibility_flags = self.data.filter_rows_from_metadata(active.metadata.column, active.metadata.row, active.metadata.dfi)
+        self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+        self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+
+        if len(self.display.row_visibility_flags) == 0:
+            return # shouldn't happen, but for completeness
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import FilterRowState
+            globals.history.save(FilterRowState(active.metadata.dfi, pexpression))
+
+        self.renderer.render_caches = {}
+        self.auto_adjust_selections_by_crud(0, 0, True)
+
+    def sort_current_rows(self, descending: bool = False, vflags: polars.Series = None) -> bool:
+        active = self.selection.current_active_cell
+
+        # Take hidden row(s) into account
+        # This approach will also sort hidden rows which is different from other applications,
+        # I haven't made up my mind yet if we should follow other applications behavior.
+        if len(self.display.row_visibility_flags) and 0 <= active.metadata.dfi < len(self.data.dfs):
+            self.data.dfs[active.metadata.dfi] = self.data.dfs[active.metadata.dfi].with_columns(self.display.row_visibility_flags[1:].alias('$vrow'))
+
+        # Prepare for snapshot
+        if not globals.is_changing_state and 0 <= active.metadata.dfi < len(self.data.dfs):
+            self.data.dfs[active.metadata.dfi] = self.data.dfs[active.metadata.dfi].with_row_index('$ridx')
             active.metadata.column += 1
 
         # Sorting is expensive; we can see double in memory usage. Anything we can do?
         if self.data.sort_rows_from_metadata(active.metadata.column, active.metadata.dfi, descending):
             # Save snapshot
-            if not globals.is_changing_state and 0 <= active.metadata.dfi < len(self.data.dfs):
+            if not globals.is_changing_state:
                 from .history_manager import SortRowState
-                globals.history.save(SortRowState(descending, active.metadata.dfi, self.data.dfs[active.metadata.dfi]['eridx']))
-                self.data.dfs[active.metadata.dfi].drop_in_place('eridx')
+                globals.history.save(SortRowState(descending, active.metadata.dfi,
+                                                  self.data.dfs[active.metadata.dfi]['$ridx'],
+                                                  self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None))
+                self.data.dfs[active.metadata.dfi].drop_in_place('$ridx')
                 active.metadata.column -= 1
+
+            # Update row visibility flags
+            if len(self.display.row_visibility_flags):
+                if vflags is not None:
+                    self.display.row_visibility_flags = polars.concat([polars.Series([True]),
+                                                                       vflags])
+                else:
+                    self.display.row_visibility_flags = polars.concat([polars.Series([True]),
+                                                                       self.data.dfs[active.metadata.dfi]['$vrow']])
+                self.data.dfs[active.metadata.dfi].drop_in_place('$vrow')
+                self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
 
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -662,15 +803,14 @@ class SheetDocument(GObject.Object):
 
     def convert_current_columns_dtype(self, dtype: polars.DataType) -> bool:
         range = self.selection.current_active_range
-        metadata = range.metadata
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import ConvertDataState
-            ndtype = self.data.read_column_dtype_from_metadata(metadata.column, metadata.dfi)
+            ndtype = self.data.read_column_dtype_from_metadata(range.metadata.column, range.metadata.dfi)
             state = ConvertDataState(ndtype, dtype)
 
-        if self.data.convert_columns_dtype_from_metadata(metadata.column, range.column_span, metadata.dfi, dtype):
+        if self.data.convert_columns_dtype_from_metadata(range.metadata.column, range.column_span, range.metadata.dfi, dtype):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -697,12 +837,19 @@ class SheetDocument(GObject.Object):
 
     def check_selection_contains_point(self, x: int, y: int) -> bool:
         range = self.selection.current_active_range
-        return range.x <= x <= range.x + range.width and range.y <= y <= range.y + range.height
+        return range.x <= x <= range.x + range.width and \
+               range.y <= y <= range.y + range.height
 
     def notify_selection_changed(self, column: int, row: int, metadata) -> None:
+        # Handle edge cases where the last row(s) are hidden
+        if row - 1 == len(self.display.row_visible_series) and \
+                row < len(self.display.row_visibility_flags) and \
+                not self.display.row_visibility_flags[row + 1]:
+            row += (len(self.display.row_visibility_flags) - 1) - (self.display.row_visible_series[-1] - 1) - 1
+
         # Cache the selected cell data usually for resetting the input bar
-        # TODO: Should we cache this in the window object instead?
-        self.selection.cell_name = self.display.get_cell_name_from_position(column, row)
+        vrow = self.display.get_vrow_from_row(row)
+        self.selection.cell_name = self.display.get_cell_name_from_position(column, vrow)
         self.selection.cell_data = self.data.read_cell_data_from_metadata(metadata.column, metadata.row, 1, 1, metadata.dfi)
 
         # Request to update the input bar with the selected cell data
@@ -752,12 +899,16 @@ class SheetDocument(GObject.Object):
     def auto_adjust_locators_size_by_scroll(self) -> None:
         globals.is_changing_state = True
 
-        cell_height = self.display.DEFAULT_CELL_HEIGHT
+        canvas_height = self.view.main_canvas.get_height()
         y_start = self.display.column_header_height
-        max_row_number = int(self.display.scroll_y_position // cell_height) + 1 + int((self.view.main_canvas.get_height() - y_start) // cell_height)
+        cell_height = self.display.DEFAULT_CELL_HEIGHT
+
+        max_row_number = int(self.display.get_starting_row()) + 1 + int((canvas_height - y_start) // cell_height)
+        max_row_number = self.display.get_vrow_from_row(max_row_number)
 
         context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1))
         font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {self.display.FONT_SIZE}px')
+
         layout = PangoCairo.create_layout(context)
         layout.set_text(str(max_row_number), -1)
         layout.set_font_description(font_desc)

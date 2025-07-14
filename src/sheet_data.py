@@ -69,8 +69,9 @@ class SheetCellMetadata(GObject.Object):
 class SheetData(GObject.Object):
     __gtype_name__ = 'SheetData'
 
-    bbs: list[SheetCellBoundingBox] = []
+    bbs: list[SheetCellBoundingBox] = [] # visual bounding boxes
     dfs: list[polars.DataFrame | numpy.ndarray] = []
+    fes: list[polars.Expr | None] = []
 
     def __init__(self, document: SheetDocument, dataframe: polars.DataFrame) -> None:
         super().__init__()
@@ -81,19 +82,20 @@ class SheetData(GObject.Object):
             return
         self.dfs = [dataframe]
         # TODO: should we support dataframe starting from row > 1?
-        self.bbs = [SheetCellBoundingBox(1, 1, dataframe.shape[1], dataframe.shape[0] + 1)]
+        # TODO: should we support dataframe starting from column > 1?
+        self.bbs = [SheetCellBoundingBox(1, 1, dataframe.width, dataframe.height + 1)]
+        self.fes = [None]
 
     def get_cell_metadata_from_position(self, column: int, row: int) -> SheetCellMetadata:
         # Handle the locator cells
         column = max(1, column)
         row = max(1, row)
 
-        for bbs in self.bbs:
-            if bbs.column <= column < bbs.column + bbs.column_span and bbs.row <= row < bbs.row + bbs.row_span:
+        for bbi, bbs in enumerate(self.bbs):
+            if bbs.column <= column < (bbs.column + bbs.column_span) and bbs.row <= row < (bbs.row + self.dfs[bbi].height + 1):
                 column = column - bbs.column
                 row = row - bbs.row
-                dfi = self.bbs.index(bbs)
-                return SheetCellMetadata(column, row, dfi)
+                return SheetCellMetadata(column, row, bbi)
 
         return SheetCellMetadata(-1, -1, -1)
 
@@ -151,7 +153,7 @@ class SheetData(GObject.Object):
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        for counter, column in enumerate(range(column, column + dataframe.shape[1])):
+        for counter, column in enumerate(range(column, column + dataframe.width)):
             self.dfs[dfi] = self.dfs[dfi].insert_column(column, dataframe[:, counter])
             self.bbs[dfi].column_span += 1
 
@@ -195,7 +197,7 @@ class SheetData(GObject.Object):
             dataframe,
             self.dfs[dfi].slice(row - 1),
         ])
-        self.bbs[dfi].row_span += dataframe.shape[0]
+        self.bbs[dfi].row_span += dataframe.height
 
         return True
 
@@ -211,18 +213,18 @@ class SheetData(GObject.Object):
     def update_cell_data_with_single_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, value: any) -> bool:
         row -= 1
 
-        row_count = self.bbs[dfi].row_span - 1
+        row_count = self.dfs[dfi].height
 
         end_column = column + column_span
         if column_span < 0:
-            end_column = self.dfs[dfi].shape[1]
+            end_column = self.dfs[dfi].width
 
         start = max(0, row)
         stop = min(row + row_span, row_count)
 
         for column in range(column, end_column):
             # TODO: support updating over multiple dataframes?
-            if self.dfs[dfi].shape[1] <= column:
+            if self.dfs[dfi].width <= column:
                 break
 
             column_name = self.dfs[dfi].columns[column]
@@ -288,11 +290,11 @@ class SheetData(GObject.Object):
         header = value[0]
         content = value[1]
 
-        row_count = self.bbs[dfi].row_span - 1
+        row_count = self.dfs[dfi].height
 
         end_column = column + column_span
         if column_span < 0:
-            end_column = self.dfs[dfi].shape[1]
+            end_column = self.dfs[dfi].width
 
         if row_span < 0:
             row_span = row_count
@@ -303,7 +305,7 @@ class SheetData(GObject.Object):
         content_index = -1
         for column in range(column, end_column):
             # TODO: support updating over multiple dataframes?
-            if self.dfs[dfi].shape[1] <= column:
+            if self.dfs[dfi].width <= column:
                 break
 
             content_index += 1
@@ -416,12 +418,26 @@ class SheetData(GObject.Object):
         self.dfs[dfi] = self.dfs[dfi].drop(column_names)
         self.bbs[dfi].column_span -= column_span
 
-        if self.bbs[dfi].column_span <= 0:
-            del self.dfs[dfi]
-            del self.bbs[dfi]
-            gc.collect()
-
         return True
+
+    def filter_rows_from_metadata(self, column: int, row: int, dfi: int) -> polars.Series:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return polars.Series(dtype=polars.Boolean)
+
+        column_name = self.dfs[dfi].columns[column]
+        cell_value = self.read_cell_data_from_metadata(column, row, 1, 1, dfi)
+
+        # Update the filter expression
+        if self.fes[dfi] is None:
+            self.fes[dfi] = polars.col(column_name).is_in([cell_value])
+        else:
+            self.fes[dfi] = self.fes[dfi] & polars.col(column_name).is_in([cell_value])
+
+        # We don't do the actual filtering on the original dataframe here, instead we
+        # just want to get the boolean series to flag which rows should be visible.
+        # TODO: combine with the current filter expressions if any
+        return polars.concat([polars.Series([True]), # for header row
+                              self.dfs[dfi].with_columns(self.fes[dfi].alias('$vrow'))['$vrow']])
 
     def sort_rows_from_metadata(self, column: int, dfi: int, descending: bool = False) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:

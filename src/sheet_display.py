@@ -43,39 +43,56 @@ class SheetDisplay(GObject.Object):
     scroll_y_position: int = 0
     scroll_x_position: int = 0
 
-    # We don't need to fill these upfront because everything will be visible
-    # by default. It'll be filled up on demand, usually when the user performs
-    # a filter to any dataframe. Whenever possible, we should try to avoid
-    # having these series with the same length as the number of rows/columns;
-    # I think it's best to have them as short as possible, i.e. truncating
-    # all the true values at the end.
     row_visibility_flags: polars.Series = polars.Series(dtype=polars.Boolean)
     column_visibility_flags: polars.Series = polars.Series(dtype=polars.Boolean)
 
-    # These are the cumulative heights/widths of the visible cells, a helper
-    # for the renderer to know which cells will be on the very top left of
-    # the viewport regarding the current scroll position. It's useful for
-    # two scenarios at least: 1) when some rows/columns are hidden, and 2)
-    # when the width/height of some rows/columns have been adjusted. It's
-    # also useful to calculate the total width/height of the visible cells
-    # so that the user can go to the edges of the table, for example by
-    # pressing the arrow keys with the ctrl[+shift] modifier. Most of the
-    # time when accessing these values, a binary search will be involved.
-    cumulative_visible_heights: polars.Series = polars.Series(dtype=polars.UInt32)
-    cumulative_visible_widths: polars.Series = polars.Series(dtype=polars.UInt32)
+    row_visible_series: polars.Series = polars.Series(dtype=polars.UInt32)
+    column_visible_series: polars.Series = polars.Series(dtype=polars.UInt32)
 
     def __init__(self, document: SheetDocument) -> None:
         super().__init__()
 
         self.document = document
 
-    def get_starting_column(self, offset: int = 0) -> int:
-        if offset == 0:
+    def get_vcolumn_from_column(self, column: int) -> int:
+        # TODO: should we support dataframe starting from column > 1?
+        if column < len(self.column_visible_series):
+            return self.column_visible_series[column - 1] + 1
+        if len(self.column_visible_series):
+            return self.column_visible_series[-1] + column - len(self.column_visible_series) + 1
+        return column
+
+    def get_vrow_from_row(self, row: int) -> int:
+        # TODO: should we support dataframe starting from row > 1?
+        if row < len(self.row_visible_series):
+            return self.row_visible_series[row - 1] + 1
+        if len(self.row_visible_series):
+            return self.row_visible_series[-1] + row - len(self.row_visible_series) + 1
+        return row
+
+    def get_column_from_vcolumn(self, vcolumn: int) -> int:
+        if len(self.column_visible_series):
+            if vcolumn - 1 <= self.column_visible_series[-1]:
+                return self.column_visible_series.search_sorted(vcolumn - 1, 'left') + 1
+            else:
+                return len(self.column_visible_series) + vcolumn - self.column_visible_series[-1] - 1
+        return vcolumn
+
+    def get_row_from_vrow(self, vrow: int) -> int:
+        if len(self.row_visible_series):
+            if vrow - 1 <= self.row_visible_series[-1]:
+                return self.row_visible_series.search_sorted(vrow - 1, 'left') + 1
+            else:
+                return len(self.row_visible_series) + vrow - self.row_visible_series[-1] - 1
+        return vrow
+
+    def get_starting_column(self, offset: int = None) -> int:
+        if offset is None:
             offset = self.scroll_x_position
         return int(offset // self.DEFAULT_CELL_WIDTH)
 
-    def get_starting_row(self, offset: int = 0) -> int:
-        if offset == 0:
+    def get_starting_row(self, offset: int = None) -> int:
+        if offset is None:
             offset = self.scroll_y_position
         return int(offset // self.DEFAULT_CELL_HEIGHT)
 
@@ -160,12 +177,8 @@ class SheetDisplay(GObject.Object):
         return name
 
     def get_cell_name_from_position(self, column: int = 0, row: int = 0) -> str:
-        if column == 0 and row == 0:
-            return 'A1'
-
         column_name = self.get_column_name_from_column(column)
         row_name = str(row) if row >= 0 else ''
-
         return column_name + row_name
 
     def get_cell_position_from_name(self, name: str) -> tuple[int, int]:

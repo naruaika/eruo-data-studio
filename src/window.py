@@ -88,8 +88,10 @@ class Window(Adw.ApplicationWindow):
             if sheet_view.main_canvas.has_focus():
                 return False
 
-        # Otherwise, let the default behavior happen.
-        # Usually, cycling focus between widgets.
+        # Otherwise, let the default behavior happen. Usually,
+        # cycling focus between widgets, excluding the main canvas,
+        # because the main canvas shouldn't receive the focus when
+        # the user leaves it (clicking on another widget).
         return Gtk.Window.do_focus(self, direction)
 
     def on_focus_received(self, event: Gtk.EventControllerFocus) -> None:
@@ -214,6 +216,8 @@ class Window(Adw.ApplicationWindow):
 
     def on_selected_page_changed(self, tab_view: Adw.TabView, pspec: GObject.ParamSpec) -> None:
         tab_page = tab_view.get_selected_page()
+        if tab_page is None:
+            return
         sheet_view = tab_page.get_child()
 
         # Update the global references to the current active document

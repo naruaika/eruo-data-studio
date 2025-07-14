@@ -262,19 +262,61 @@ class SheetRenderer(GObject.Object):
 
         # Draw horizontal lines
         y = y_start
+
+        nrow_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
+        prow_index = nrow_index
+
+        context.reset_clip()
+        context.rectangle(0, display.column_header_height, width, height)
+        context.clip()
+
         while y < height:
-            context.move_to(0, y)
+            # TODO: add support for custom row heights
+            context.move_to(x_start, y)
             context.line_to(width, y)
+
+            # Skipping rows that are hidden will result in double lines
+            double_lines = False
+            if nrow_index < len(display.row_visible_series):
+                vrow_index = display.row_visible_series[nrow_index]
+                if vrow_index != prow_index:
+                    double_lines = True
+                    prow_index = vrow_index
+
+            # Handle edge cases where the last row(s) are hidden
+            elif nrow_index == len(display.row_visible_series) and \
+                    0 < len(display.row_visible_series) and \
+                    display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) and \
+                    not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
+                double_lines = True
+
+            if double_lines:
+                context.move_to(0, y - 2)
+                context.line_to(x_start, y - 2)
+                context.move_to(0, y + 2)
+                context.line_to(x_start, y + 2)
+            else:
+                context.move_to(0, y)
+                context.line_to(x_start, y)
+
             y += cell_height
+            nrow_index += 1
+            prow_index += 1
+
         context.stroke()
 
         # Draw vertical lines
         x_offset = display.scroll_x_position % display.DEFAULT_CELL_WIDTH
         cell_width = display.DEFAULT_CELL_WIDTH - x_offset
         x = x_start
+
+        context.reset_clip()
         context.rectangle(display.row_header_width, 0, width, height)
         context.clip()
+
         while x < width:
+            # TODO: add indicator for hidden column(s)
+            # TODO: add support for custom column widths
             x_offset = 0
             if x == display.row_header_width:
                 x_offset = display.DEFAULT_CELL_WIDTH - cell_width
@@ -283,6 +325,7 @@ class SheetRenderer(GObject.Object):
             context.line_to(x_line, height)
             x += cell_width
             cell_width = display.DEFAULT_CELL_WIDTH
+
         context.stroke()
 
         context.restore()
@@ -325,31 +368,45 @@ class SheetRenderer(GObject.Object):
             layout.set_text(cell_text, -1)
             text_width = layout.get_size()[0] / Pango.SCALE
             x_text = x + (display.DEFAULT_CELL_WIDTH - text_width) / 2 - x_offset
+
             context.save()
             context.rectangle(x, 0, cell_width, display.column_header_height)
             context.clip()
             context.move_to(x_text, 2)
             PangoCairo.show_layout(context, layout)
             context.restore()
+
             x += cell_width
             col_index += 1
             cell_width = display.DEFAULT_CELL_WIDTH
+            # TODO: add support for skipping hidden column(s)
             cell_text = display.get_right_cell_name(cell_text)
 
         # Determine the starting row number
-        cell_text = display.get_starting_row() + 1
+        row_index = display.get_starting_row() + 1
+        cell_text = display.get_vrow_from_row(row_index)
 
         # Draw row headers texts (right-aligned)
         # Here we don't necessarily need the clip region because the row headers are usually if not always
         # readjusted before even moving to the rendering process.
         y = display.column_header_height
         while y < height:
+            # Handle edge cases where the last row(s) are hidden
+            if row_index - 1 == len(display.row_visible_series) and \
+                    0 < len(display.row_visible_series) and \
+                    display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) and \
+                    not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
+                row_index += (len(display.row_visibility_flags) - 1) - (display.row_visible_series[-1] - 1) - 1
+
+            cell_text = display.get_vrow_from_row(row_index)
             layout.set_text(str(cell_text), -1)
             text_width = layout.get_size()[0] / Pango.SCALE
             x = display.row_header_width - text_width - display.DEFAULT_CELL_PADDING
+
             context.move_to(x, 2 + y)
             PangoCairo.show_layout(context, layout)
-            cell_text += 1
+
+            row_index += 1
             y += display.DEFAULT_CELL_HEIGHT
 
         context.restore()
@@ -459,16 +516,16 @@ class SheetRenderer(GObject.Object):
 
         # TODO: support multiple dataframes?
         x = x_start
-        col_index = int((x - display.row_header_width) // cell_width + display.scroll_x_position // cell_width)
+        col_index = int((x - display.row_header_width) // cell_width + display.get_starting_column())
         while x < x_end:
             if data.bbs[0].column_span <= col_index:
                 width = x # prevent iteration over empty cells
                 break
             ccontext.save()
-            ccontext.rectangle(x, display.column_header_height, cell_width, height)
+            ccontext.rectangle(x, display.column_header_height, cell_width - 1, height)
             ccontext.clip()
             y = y_start
-            row_index = int((y - display.column_header_height) // cell_height + display.scroll_y_position // cell_height)
+            row_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
             while y < y_end:
                 if data.bbs[0].row_span <= row_index:
                     height = y # prevent iteration over empty cells
@@ -478,7 +535,15 @@ class SheetRenderer(GObject.Object):
                     dtype = display.get_dtype_symbol(data.dfs[0].dtypes[col_index])
                     cell_text = f'{cname} ({dtype})'
                 else: # dataframe content
-                    cell_text = data.dfs[0][row_index - 1, col_index]
+                    if row_index < len(display.row_visible_series):
+                        vrow_index = display.row_visible_series[row_index]
+                    else:
+                        vrow_index = row_index
+                    if col_index < len(display.column_visible_series):
+                        vcol_index = display.column_visible_series[col_index]
+                    else:
+                        vcol_index = col_index
+                    cell_text = data.dfs[0][vrow_index - 1, vcol_index]
                 if cell_text in ['', None]:
                     y += cell_height # skip empty cells
                     row_index += 1
