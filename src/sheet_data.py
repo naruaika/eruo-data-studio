@@ -435,7 +435,6 @@ class SheetData(GObject.Object):
 
         # We don't do the actual filtering on the original dataframe here, instead we
         # just want to get the boolean series to flag which rows should be visible.
-        # TODO: combine with the current filter expressions if any
         return polars.concat([polars.Series([True]), # for header row
                               self.dfs[dfi].with_columns(self.fes[dfi].alias('$vrow'))['$vrow']])
 

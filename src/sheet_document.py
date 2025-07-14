@@ -441,7 +441,6 @@ class SheetDocument(GObject.Object):
     def insert_blank_from_current_rows(self, above: bool = False) -> bool:
         range = self.selection.current_active_range
         active = self.selection.current_active_cell
-        cursor = self.selection.current_cursor_cell
 
         mrow = range.metadata.row
         row_span = range.row_span
@@ -593,7 +592,6 @@ class SheetDocument(GObject.Object):
     def duplicate_from_current_rows(self, above: bool = False) -> bool:
         range = self.selection.current_active_range
         active = self.selection.current_active_cell
-        cursor = self.selection.current_cursor_cell
 
         mrow = range.metadata.row
         row_span = range.row_span
@@ -666,7 +664,6 @@ class SheetDocument(GObject.Object):
         # TODO: support deleting over multiple dataframes?
         range = self.selection.current_active_range
         active = self.selection.current_active_cell
-        cursor = self.selection.current_cursor_cell
 
         mrow = range.metadata.row
         row_span = range.row_span

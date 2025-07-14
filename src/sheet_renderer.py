@@ -51,7 +51,7 @@ class SheetRenderer(GObject.Object):
         self.draw_headers_backgrounds(context, width, height, display)
         self.draw_selection_backgrounds(context, width, height, display, selection)
         self.draw_cells_borders(context, width, height, display)
-        self.draw_headers_contents(context, width, height, display)
+        self.draw_headers_contents(canvas, context, width, height, display, data)
         self.draw_cells_contents(canvas, context, width, height, display, data)
         self.draw_selection_borders(context, width, height, display, selection)
 
@@ -330,14 +330,19 @@ class SheetRenderer(GObject.Object):
 
         context.restore()
 
-    def draw_headers_contents(self, context: cairo.Context, width: int, height: int, display: SheetDisplay) -> None:
+    def draw_headers_contents(self, canvas: Gtk.DrawingArea, context: cairo.Context, width: int, height: int, display: SheetDisplay, data: SheetData) -> None:
         context.save()
 
         # Monospace is the best in my opinion for the headers, especially when it comes to the row headers
         # which are numbers so that it can be easier to read because of the good visual alignment.
-        font_description = Pango.font_description_from_string(f'Monospace Normal Bold {display.FONT_SIZE}px')
+        header_font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {display.FONT_SIZE}px')
         layout = PangoCairo.create_layout(context)
-        layout.set_font_description(font_description)
+        layout.set_font_description(header_font_desc)
+
+        # Use system default font family for drawing text
+        body_font_desc = Gtk.Widget.create_pango_context(canvas).get_font_description()
+        font_family = body_font_desc.get_family() if body_font_desc else 'Sans'
+        body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Bold {display.FONT_SIZE}px')
 
         # We should achieve the high contrast between the text and the canvas background, though I'm aware
         # of the potential problems with using the pure black and white colors. Let's decide that later.
@@ -359,18 +364,23 @@ class SheetRenderer(GObject.Object):
 
         # Draw column headers texts (centered)
         # It's so rare to see a worksheet go beyond Z*9 columns, but it's better to be prepared for it anyway
-        # by having defining the clip region.
+        # by having defining the clip region to prevent the text from overflowing to the next cells.
         x = display.row_header_width
         while x < width:
-            x_offset = 0
-            if x == display.row_header_width:
-                x_offset = display.DEFAULT_CELL_WIDTH - cell_width
-            layout.set_text(cell_text, -1)
-            text_width = layout.get_size()[0] / Pango.SCALE
-            x_text = x + (display.DEFAULT_CELL_WIDTH - text_width) / 2 - x_offset
+            if 0 < display.scroll_y_position and col_index < data.bbs[0].column_span:
+                cname = data.dfs[0].columns[col_index]
+                dtype = display.get_dtype_symbol(data.dfs[0].dtypes[col_index])
+                layout.set_font_description(body_font_desc)
+                layout.set_text(f'{cname} ({dtype})', -1)
+                x_text = x + display.DEFAULT_CELL_PADDING
+            else:
+                layout.set_font_description(header_font_desc)
+                layout.set_text(cell_text, -1)
+                text_width = layout.get_size()[0] / Pango.SCALE
+                x_text = x + (display.DEFAULT_CELL_WIDTH - text_width) / 2
 
             context.save()
-            context.rectangle(x, 0, cell_width, display.column_header_height)
+            context.rectangle(x, 0, cell_width - 1, display.column_header_height)
             context.clip()
             context.move_to(x_text, 2)
             PangoCairo.show_layout(context, layout)

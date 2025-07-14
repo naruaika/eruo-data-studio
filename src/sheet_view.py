@@ -114,7 +114,7 @@ class SheetView(Gtk.Box):
         self.is_initialized = False
 
     def do_state_flags_changed(self, previous_state_flags: Gtk.StateFlags) -> None:
-        if not self.is_initialized:
+        if not self.is_initialized and self.get_height() > 0:
             self.document.auto_adjust_scrollbars_by_scroll()
             self.main_canvas.queue_draw()
             self.is_initialized = True

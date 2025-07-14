@@ -123,7 +123,9 @@ class Application(Adw.Application):
                                  developer_name='Naufan Rusyda Faikar',
                                  version='0.1.0',
                                  developers=['Naufan Rusyda Faikar'],
-                                 copyright='© 2025 Naufan Rusyda Faikar')
+                                 copyright='© 2025 Naufan Rusyda Faikar',
+                                 issue_url='https://github.com/naruaika/eruo-data-studio/issues',
+                                 support_url='https://github.com/naruaika/eruo-data-studio/discussions')
         dialog.set_translator_credits(_('translator-credits'))
         dialog.present(self.get_active_window())
 
