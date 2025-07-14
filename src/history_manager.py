@@ -518,21 +518,6 @@ class FilterRowState(State):
 
         document.filter_current_rows()
 
-        # document.data.fes[self.dfi] = self.after
-
-        # if self.after is not None:
-        #     document.display.row_visibility_flags = polars.concat([polars.Series([True]), # for header row
-        #                                                            document.data.dfs[self.dfi].with_columns(self.after.alias('$vrow'))['$vrow']])
-        # else:
-        #     document.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
-
-        # document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
-
-        # if self.before is not None:
-        #     document.data.bbs[self.dfi].row_span = len(document.display.row_visible_series)
-        # else:
-        #     document.data.bbs[self.dfi].row_span = document.data.dfs[self.dfi].height
-
 
 
 class ConvertDataState(State):
