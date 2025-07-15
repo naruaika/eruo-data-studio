@@ -92,7 +92,7 @@ class SheetData(GObject.Object):
         row = max(1, row)
 
         for bbi, bbs in enumerate(self.bbs):
-            if bbs.column <= column < (bbs.column + bbs.column_span) and bbs.row <= row < (bbs.row + self.dfs[bbi].height + 1):
+            if bbs.column <= column < (bbs.column + self.dfs[bbi].width) and bbs.row <= row < (bbs.row + self.dfs[bbi].height + 1):
                 column = column - bbs.column
                 row = row - bbs.row
                 return SheetCellMetadata(column, row, bbi)

@@ -68,6 +68,8 @@ class Application(Adw.Application):
         self.create_action('delete-row', self.on_delete_row_x_action)
         self.create_action('delete-column', self.on_delete_column_x_action)
         self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
+        self.create_action('hide-row', self.on_hide_row_action)
+        self.create_action('hide-column', self.on_hide_column_action)
         self.create_action('filter-cell-value', self.on_filter_cell_value_action)
         # self.create_action('filter-cell-color', self.on_filter_cell_color_action)
         # self.create_action('filter-font-color', self.on_filter_font_color_action)
@@ -247,6 +249,14 @@ class Application(Adw.Application):
     def on_clear_contents_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()
         document.update_current_cells('')
+
+    def on_hide_row_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.hide_current_rows()
+
+    def on_hide_column_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.hide_current_columns()
 
     def on_filter_cell_value_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()

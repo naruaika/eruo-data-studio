@@ -147,15 +147,17 @@ class InsertBlankRowState(State):
 class InsertBlankColumnState(State):
     __gtype_name__ = 'InsertBlankColumnState'
 
-    above: bool
+    column_span: int
+    left: bool
 
     range: SheetCell
     active: SheetCell
     cursor: SheetCell
 
-    def __init__(self, left: bool) -> None:
+    def __init__(self, column_span: int, left: bool) -> None:
         super().__init__()
 
+        self.column_span = column_span
         self.left = left
 
         document = globals.history.document
@@ -166,6 +168,8 @@ class InsertBlankColumnState(State):
     def undo(self) -> None:
         document = globals.history.document
 
+        pcolumn_span, self.range.column_span = self.range.column_span, self.column_span
+
         if not self.left:
             document.selection.current_active_range.metadata.column += self.range.column_span
         else:
@@ -173,9 +177,13 @@ class InsertBlankColumnState(State):
 
         document.delete_current_columns()
 
+        self.range.column_span = pcolumn_span
+
         document.selection.current_active_range = self.range
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
+
+        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -286,15 +294,17 @@ class DuplicateRowState(State):
 class DuplicateColumnState(State):
     __gtype_name__ = 'DuplicateColumnState'
 
+    column_span: int
     left: bool
 
     range: SheetCell
     active: SheetCell
     cursor: SheetCell
 
-    def __init__(self, left: bool) -> None:
+    def __init__(self, column_span: int, left: bool) -> None:
         super().__init__()
 
+        self.column_span = column_span
         self.left = left
 
         document = globals.history.document
@@ -305,6 +315,8 @@ class DuplicateColumnState(State):
     def undo(self) -> None:
         document = globals.history.document
 
+        pcolumn_span, self.range.column_span = self.range.column_span, self.column_span
+
         if not self.left:
             document.selection.current_active_range.metadata.column += self.range.column_span
         else:
@@ -312,9 +324,13 @@ class DuplicateColumnState(State):
 
         document.delete_current_columns()
 
+        self.range.column_span = pcolumn_span
+
         document.selection.current_active_range = self.range
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
+
+        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -380,17 +396,23 @@ class DeleteColumnState(State):
     __gtype_name__ = 'DeleteColumnState'
 
     file_path: str
+    vflags_path: str
 
     range: SheetCell
     active: SheetCell
     cursor: SheetCell
 
-    def __init__(self, dataframe: polars.DataFrame) -> None:
+    def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series) -> None:
         super().__init__()
 
         if dataframe is None:
             self.file_path = None
             return
+
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
 
         with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
             # TODO: we leave uncompressed for now, but we may want to determine
@@ -398,17 +420,25 @@ class DeleteColumnState(State):
             dataframe.write_parquet(file_path.name, compression='uncompressed', statistics=False)
             self.file_path = file_path.name
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        if vflags is None:
+            self.vflags_path = None
+            return
+
+        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
+            # TODO: we leave uncompressed for now, but we may want to determine
+            # the compression level based on the size of the dataframe later.
+            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
+            self.vflags_path = file_path.name
 
     def undo(self) -> None:
         document = globals.history.document
+
         document.selection.current_active_range = self.range
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
-        document.insert_from_current_columns(polars.read_parquet(self.file_path))
+
+        document.insert_from_current_columns(polars.read_parquet(self.file_path),
+                                             polars.read_parquet(self.vflags_path).to_series(0) if self.vflags_path is not None else None)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -451,6 +481,44 @@ class HideRowState(State):
     def redo(self) -> None:
         document = globals.history.document
         document.hide_current_rows()
+
+
+
+class HideColumnState(State):
+    __gtype_name__ = 'HideColumnState'
+
+    column_span: int
+
+    range: SheetCell
+    active: SheetCell
+    cursor: SheetCell
+
+    def __init__(self, column_span: int) -> None:
+        super().__init__()
+
+        self.column_span = column_span
+
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        document.selection.current_active_range = self.range
+        document.selection.current_active_cell = self.active
+        document.selection.current_cursor_cell = self.cursor
+
+        document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:self.range.metadata.column],
+                                                                  polars.Series([True] * self.column_span),
+                                                                  document.display.column_visibility_flags[self.range.metadata.column + self.column_span:]])
+        document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
+        document.data.bbs[self.range.metadata.dfi].column_span = len(document.display.column_visible_series)
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.hide_current_columns()
 
 
 
