@@ -15,7 +15,7 @@
                 <property name="vexpand">true</property>
                 <property name="hexpand">true</property>
                 <style>
-                  <class name="main-canvas"/>
+                  <class name="background"/>
                 </style>
               </object>
             </child>

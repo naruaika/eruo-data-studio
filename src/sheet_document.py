@@ -1109,8 +1109,8 @@ class SheetDocument(GObject.Object):
         content_width = canvas_width
 
         if len(self.data.bbs):
-            content_height = self.data.bbs[0].row_span * self.display.DEFAULT_CELL_HEIGHT
-            content_width = self.data.bbs[0].column_span * self.display.DEFAULT_CELL_WIDTH
+            content_height = (self.data.bbs[0].row_span + 3) * self.display.DEFAULT_CELL_HEIGHT
+            content_width = (self.data.bbs[0].column_span + 1) * self.display.DEFAULT_CELL_WIDTH
 
         scroll_y_upper = max(content_height + self.display.column_header_height, self.display.scroll_y_position + canvas_height)
         self.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y_upper)

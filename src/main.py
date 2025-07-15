@@ -47,9 +47,12 @@ class Application(Adw.Application):
         self.create_action('quit', self.on_quit_action, ['<primary>q'])
         self.create_action('about', self.on_about_action)
         self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
+        self.create_action('toggle-sidebar', self.on_toggle_sidebar_action, ['<primary>b'])
         self.create_action('open', self.on_open_file_action, ['<primary>o'])
         self.create_action('save', self.on_save_file_action, ['<primary>s'])
         self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
+        self.create_action('toggle-search', self.on_toggle_search_action, ['<primary>f'])
+        self.create_action('toggle-history', self.on_toggle_history_action, ['<primary>h'])
         self.create_action('new-sheet', self.on_new_sheet_action, ['<primary>t'])
         self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
         self.create_action('undo', self.on_undo_action, ['<primary>z'])
@@ -138,6 +141,15 @@ class Application(Adw.Application):
     def on_preferences_action(self, action: Gio.SimpleAction, *args) -> None:
         raise NotImplementedError
 
+    def on_toggle_sidebar_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        if 'raised' in window.toggle_sidebar.get_css_classes():
+            window.toggle_sidebar.remove_css_class('raised')
+            window.split_view.set_collapsed(True)
+        else:
+            window.toggle_sidebar.add_css_class('raised')
+            window.split_view.set_collapsed(False)
+
     def on_open_file_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
         self.file_manager.open_file(window)
@@ -161,6 +173,43 @@ class Application(Adw.Application):
             return
 
         self.file_manager.save_as_file(window)
+
+    def on_toggle_search_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+
+        # Open the sidebar if it's closed
+        if 'raised' not in window.toggle_sidebar.get_css_classes():
+            window.toggle_sidebar.activate()
+
+        # Exit the search mode
+        if 'raised' in window.toggle_search.get_css_classes() and window.toggle_search.has_focus():
+            window.toggle_search.remove_css_class('raised')
+            window.toggle_search.set_icon_name('system-search-symbolic')
+            window.search_box.set_visible(False)
+            window.window_title.set_visible(True)
+
+            # Focus on the main canvas
+            tab_page = window.tab_view.get_selected_page()
+            sheet_view = tab_page.get_child()
+            sheet_view.main_canvas.set_focusable(True)
+            sheet_view.main_canvas.grab_focus()
+
+            return
+
+        # Enter the search mode
+        window.toggle_search.add_css_class('raised')
+        window.toggle_search.set_icon_name('go-previous-symbolic')
+        window.window_title.set_visible(False)
+        window.search_box.set_visible(True)
+        window.search_box.grab_focus()
+
+    def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        if 'raised' in window.toggle_history.get_css_classes():
+            window.toggle_history.remove_css_class('raised')
+        else:
+            window.toggle_history.add_css_class('raised')
+        raise NotImplementedError
 
     def on_file_opened(self, source: GObject.Object, file_path: str) -> None:
         if not file_path:

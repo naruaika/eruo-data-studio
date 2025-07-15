@@ -12,4 +12,7 @@
     <file alias="style.css">css/style.css</file>
     <file alias="style-dark.css">css/style-dark.css</file>
   </gresource>
+  <gresource prefix="/com/macipra/eruo/icons/scalable/actions/">
+    <file preprocess="xml-stripblanks">history-undo-symbolic.svg</file>
+  </gresource>
 </gresources>

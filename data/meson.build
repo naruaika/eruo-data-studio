@@ -32,11 +32,12 @@ gnome = import('gnome')
 
 pkgdatadir = get_option('prefix') / get_option('datadir') / meson.project_name()
 moduledir = pkgdatadir / 'eruo_data_studio'
+icondir = 'icons' / 'hicolor' / 'scalable' / 'actions'
 
 gnome.compile_resources('eruo-data-studio',
   'eruo-data-studio.gresource.xml',
   gresource_bundle: true,
-  source_dir: '../src',
+  source_dir: ['../src', icondir],
   install: true,
   install_dir: pkgdatadir,
 )

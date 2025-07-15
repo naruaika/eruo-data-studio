@@ -81,9 +81,9 @@ class SheetRenderer(GObject.Object):
         # I do agree that it's not always good to hardcode like this, so let's flag it
         # as a TODO for now.
         if self.prefers_dark:
-            context.set_source_rgb(0.15, 0.15, 0.15)
+            context.set_source_rgb(0.11, 0.11, 0.13)
         else:
-            context.set_source_rgb(0.9, 0.9, 0.9)
+            context.set_source_rgb(1.0, 1.0, 1.0)
 
         context.rectangle(0, 0, width, display.column_header_height)
         context.rectangle(0, display.column_header_height, display.row_header_width, height)
@@ -217,7 +217,7 @@ class SheetRenderer(GObject.Object):
         # because the active cell is the only one that its data is appearing in the input bar.
         # Here we reset the color of the drawing context back to the canvas background color.
         if self.prefers_dark:
-            context.set_source_rgb(0.1, 0.1, 0.1)
+            context.set_source_rgb(0.11, 0.11, 0.13)
         else:
             context.set_source_rgb(1.0, 1.0, 1.0)
 
@@ -427,6 +427,8 @@ class SheetRenderer(GObject.Object):
             x += cell_width
             col_index += 1
             cell_width = display.DEFAULT_CELL_WIDTH
+
+        layout.set_font_description(header_font_desc)
 
         # Determine the starting row number
         row_index = display.get_starting_row() + 1

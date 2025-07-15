@@ -7,114 +7,208 @@
     <property name="default-width">1200</property>
     <property name="default-height">800</property>
     <property name="focusable">true</property>
+    <child>
+      <object class="AdwBreakpoint">
+        <condition>max-width: 600sp</condition>
+        <setter object="split_view" property="collapsed">true</setter>
+      </object>
+    </child>
     <property name="content">
-      <object class="AdwToolbarView">
-        <child type="top">
-          <object class="AdwHeaderBar">
-            <child type="start">
-              <object class="GtkButton">
-                <property name="icon-name">document-open-symbolic</property>
-                <property name="tooltip-text" translatable="yes">Open</property>
-                <signal name="clicked" handler="on_open_file_clicked" swapped="no" />
-              </object>
-            </child>
-            <property name="title-widget">
-              <object class="GtkBox">
-                <property name="orientation">horizontal</property>
-                <property name="spacing">6</property>
-                <property name="margin-start">30</property>
-                <property name="margin-end">30</property>
-                <child>
-                  <object class="GtkEntry" id="name_box">
-                    <property name="tooltip-text">Name Box</property>
-                    <property name="halign">fill</property>
-                    <signal name="activate" handler="on_name_box_activated" swapped="no" />
-                    <style>
-                      <class name="name-box"/>
-                    </style>
-                  </object>
-                </child>
-                <child>
-                  <object class="GtkEntry" id="formula_bar">
-                    <property name="tooltip-text">Formula Bar</property>
-                    <property name="halign">fill</property>
-                    <property name="hexpand">True</property>
-                    <signal name="activate" handler="on_formula_bar_activated" swapped="no" />
-                  </object>
-                </child>
-              </object>
-            </property>
-            <child type="end">
-              <object class="GtkMenuButton">
-                <property name="primary">true</property>
-                <property name="icon-name">open-menu-symbolic</property>
-                <property name="tooltip-text" translatable="yes">Main Menu</property>
-                <property name="menu-model">primary_menu</property>
-              </object>
-            </child>
-          </object>
-        </child>
-        <property name="content">
-          <object class="AdwToastOverlay" id="toast_overlay">
-            <child>
-              <object class="GtkBox">
-                <property name="orientation">vertical</property>
-                <child>
-                  <object class="GtkSeparator">
-                    <property name="orientation">horizontal</property>
-                  </object>
-                </child>
-                <child>
-                  <object class="GtkOverlay">
-                    <property name="valign">fill</property>
-                    <property name="halign">fill</property>
-                    <property name="hexpand">true</property>
-                    <property name="vexpand">true</property>
-                    <child>
-                      <object class="AdwStatusPage">
-                        <property name="icon-name">accessories-calculator-symbolic</property>
-                        <property name="title">Workbook is Empty</property>
-                        <property name="description">Try add new sheet or open a file</property>
+      <object class="AdwNavigationSplitView" id="split_view">
+        <property name="collapsed">true</property>
+        <property name="show-content">true</property>
+        <property name="sidebar">
+          <object class="AdwNavigationPage">
+            <property name="title">Data Studio</property>
+            <property name="child">
+              <object class="AdwToolbarView">
+                <child type="top">
+                  <object class="AdwHeaderBar">
+                    <child type="start">
+                      <object class="GtkToggleButton" id="toggle_search">
+                        <property name="icon-name">system-search-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">Search</property>
+                        <property name="action-name">app.toggle-search</property>
                       </object>
                     </child>
-                    <child type="overlay">
-                      <object class="AdwTabView" id="tab_view">
-                        <property name="valign">fill</property>
-                        <property name="halign">fill</property>
-                        <property name="hexpand">true</property>
-                        <property name="vexpand">true</property>
-                        <style>
-                          <class name="tab-view"/>
-                        </style>
-                      </object>
-                    </child>
-                  </object>
-                </child>
-                <child>
-                  <object class="GtkSeparator">
-                    <property name="orientation">horizontal</property>
-                  </object>
-                </child>
-                <child>
-                  <object class="AdwTabBar" id="tab_bar">
-                    <property name="valign">end</property>
-                    <property name="autohide">false</property>
-                    <property name="expand_tabs">false</property>
-                    <property name="view">tab_view</property>
-                    <property name="end-action-widget">
-                      <object class="GtkButton">
-                        <property name="icon-name">list-add-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">New Sheet</property>
-                        <signal name="clicked" handler="on_new_sheet_clicked" swapped="no" />
+                    <property name="title-widget">
+                      <object class="GtkBox">
+                        <child>
+                          <object class="GtkLabel" id="window_title">
+                            <property name="label">Data Studio</property>
+                            <property name="visible">true</property>
+                            <style>
+                              <class name="title"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkSearchEntry" id="search_box">
+                            <property name="search-delay">500</property>
+                            <property name="placeholder-text" translatable="yes">Search...</property>
+                            <property name="visible">false</property>
+                            <signal name="search_changed" handler="on_search_box_changed" swapped="no" />
+                            <signal name="activate" handler="on_search_box_activated" swapped="no" />
+                          </object>
+                        </child>
                       </object>
                     </property>
-                    <style>
-                      <class name="inline"/>
-                    </style>
+                    <child type="end">
+                      <object class="GtkToggleButton" id="toggle_history">
+                        <property name="icon-name">history-undo-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">History</property>
+                        <property name="action-name">app.toggle-history</property>
+                      </object>
+                    </child>
                   </object>
                 </child>
+                <property name="content">
+                  <object class="GtkBox">
+                    <property name="orientation">vertical</property>
+                    <property name="margin-top">10</property>
+                    <property name="margin-bottom">10</property>
+                    <property name="margin-start">6</property>
+                    <property name="margin-end">6</property>
+                    <child>
+                      <object class="GtkListView">
+                      </object>
+                    </child>
+                  </object>
+                </property>
               </object>
-            </child>
+            </property>
+          </object>
+        </property>
+        <property name="content">
+          <object class="AdwNavigationPage">
+            <property name="can-pop">false</property>
+            <property name="title" translatable="yes">Workspace</property>
+            <property name="child">
+              <object class="AdwToolbarView">
+                <child type="top">
+                  <object class="AdwHeaderBar">
+                    <child type="start">
+                      <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        <child>
+                          <object class="GtkToggleButton" id="toggle_sidebar">
+                            <property name="icon-name">sidebar-show-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Toggle Sidebar</property>
+                            <property name="action-name">app.toggle-sidebar</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton">
+                            <property name="icon-name">document-open-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Open</property>
+                            <property name="action-name">app.open</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <property name="title-widget">
+                      <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">6</property>
+                        <child>
+                          <object class="GtkEntry" id="name_box">
+                            <property name="tooltip-text">Name Box</property>
+                            <property name="halign">fill</property>
+                            <signal name="activate" handler="on_name_box_activated" swapped="no" />
+                            <style>
+                              <class name="name-box"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkEntry" id="formula_bar">
+                            <property name="tooltip-text">Formula Bar</property>
+                            <property name="halign">fill</property>
+                            <property name="hexpand">True</property>
+                            <signal name="activate" handler="on_formula_bar_activated" swapped="no" />
+                          </object>
+                        </child>
+                      </object>
+                    </property>
+                    <child type="end">
+                      <object class="GtkMenuButton">
+                        <property name="primary">true</property>
+                        <property name="icon-name">open-menu-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">Main Menu</property>
+                        <property name="menu-model">primary_menu</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <property name="content">
+                  <object class="AdwToastOverlay" id="toast_overlay">
+                    <child>
+                      <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="orientation">horizontal</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkOverlay">
+                            <property name="valign">fill</property>
+                            <property name="halign">fill</property>
+                            <property name="hexpand">true</property>
+                            <property name="vexpand">true</property>
+                            <child>
+                              <object class="AdwStatusPage">
+                                <property name="icon-name">accessories-calculator-symbolic</property>
+                                <property name="title">Workbook is Empty</property>
+                                <property name="description">Try add new sheet or open a file</property>
+                              </object>
+                            </child>
+                            <child type="overlay">
+                              <object class="AdwTabView" id="tab_view">
+                                <property name="valign">fill</property>
+                                <property name="halign">fill</property>
+                                <property name="hexpand">true</property>
+                                <property name="vexpand">true</property>
+                                <style>
+                                  <class name="tab-view"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="orientation">horizontal</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="AdwTabBar" id="tab_bar">
+                            <property name="valign">end</property>
+                            <property name="autohide">false</property>
+                            <property name="expand_tabs">false</property>
+                            <property name="view">tab_view</property>
+                            <property name="end-action-widget">
+                              <object class="GtkButton">
+                                <property name="icon-name">list-add-symbolic</property>
+                                <property name="tooltip-text" translatable="yes">New Sheet</property>
+                                <signal name="clicked" handler="on_new_sheet_clicked" swapped="no" />
+                              </object>
+                            </property>
+                            <style>
+                              <class name="inline"/>
+                            </style>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </property>
+              </object>
+            </property>
+            <style>
+              <class name="view"/>
+            </style>
           </object>
         </property>
       </object>

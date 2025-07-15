@@ -30,8 +30,17 @@ from .sheet_view import SheetView
 class Window(Adw.ApplicationWindow):
     __gtype_name__ = 'Window'
 
+    split_view = Gtk.Template.Child()
+    toggle_sidebar = Gtk.Template.Child()
+    window_title = Gtk.Template.Child()
+
+    toggle_search = Gtk.Template.Child()
+    toggle_history = Gtk.Template.Child()
+    search_box = Gtk.Template.Child()
+
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
+
     toast_overlay = Gtk.Template.Child()
     tab_view = Gtk.Template.Child()
     tab_bar = Gtk.Template.Child()
@@ -43,6 +52,10 @@ class Window(Adw.ApplicationWindow):
 
         from .sheet_manager import SheetManager
         self.sheet_manager = SheetManager()
+
+        key_event_controller = Gtk.EventControllerKey()
+        key_event_controller.connect('key-pressed', self.on_search_box_key_pressed)
+        self.search_box.add_controller(key_event_controller)
 
         # We override the default behavior of the Gtk.Entry for the name box,
         # so that it'll select all text when the user clicks on it for the first
@@ -116,11 +129,33 @@ class Window(Adw.ApplicationWindow):
         # for the user. We can add a verification to avoid that though.
         globals.send_notification = self.show_toast_message
 
+    def on_search_box_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+        if keyval == Gdk.KEY_Escape:
+            # Close the search box
+            self.toggle_search.remove_css_class('raised')
+            self.toggle_search.set_icon_name('system-search-symbolic')
+            self.search_box.set_visible(False)
+            self.window_title.set_visible(True)
+
+            # Focus on the main canvas
+            tab_page = self.tab_view.get_selected_page()
+            sheet_view = tab_page.get_child()
+            sheet_view.main_canvas.set_focusable(True)
+            sheet_view.main_canvas.grab_focus()
+
+            return
+
     @Gtk.Template.Callback()
-    def on_open_file_clicked(self, button: Gtk.Button) -> None:
-        # This feels not so responsive, I don't know why. I'm sure we need
-        # a better implementation for triggering the open file action.
-        self.get_application().lookup_action('open').activate(None)
+    def on_search_box_activated(self, widget: Gtk.Widget) -> None:
+        # Focus on the main canvas without closing the search box
+        tab_page = self.tab_view.get_selected_page()
+        sheet_view = tab_page.get_child()
+        sheet_view.main_canvas.set_focusable(True)
+        sheet_view.main_canvas.grab_focus()
+
+    @Gtk.Template.Callback()
+    def on_search_box_changed(self, widget: Gtk.Widget) -> None:
+        print(widget.get_text())
 
     @Gtk.Template.Callback()
     def on_name_box_activated(self, widget: Gtk.Widget) -> None:

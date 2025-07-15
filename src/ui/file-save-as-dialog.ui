@@ -5,7 +5,7 @@
   <template class="FileSaveAsDialog" parent="AdwDialog">
     <property name="title">Save As</property>
     <property name="can-close">true</property>
-    <property name="content-height">500</property>
+    <property name="content-height">600</property>
     <property name="content-width">400</property>
     <child>
       <object class="AdwToolbarView">

@@ -38,6 +38,7 @@
           <object class="AdwSwitchRow" id="statistics">
             <property name="active">true</property>
             <property name="title">Statistics</property>
+            <property name="subtitle">Write to the parquet headers</property>
           </object>
         </child>
       </object>
@@ -48,6 +49,7 @@
         <child>
           <object class="AdwComboRow" id="compression">
             <property name="title">Algorithm</property>
+            <property name="subtitle">Choose "lz4" for fast compression</property>
             <property name="model">
               <object class="GtkStringList">
                 <items>
@@ -67,6 +69,7 @@
         <child>
           <object class="AdwSpinRow" id="compression_level">
             <property name="title">Compression Level</property>
+            <property name="subtitle">Higher means smaller files</property>
             <property name="adjustment">
               <object class="GtkAdjustment">
                 <property name="lower">1</property>

@@ -38,6 +38,7 @@
           <object class="AdwSwitchRow" id="include_header">
             <property name="active">true</property>
             <property name="title">Header</property>
+            <property name="subtitle">Includes header at the first row</property>
           </object>
         </child>
       </object>

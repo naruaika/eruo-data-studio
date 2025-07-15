@@ -59,7 +59,7 @@ class SheetView(Gtk.Box):
         self.main_canvas.add_controller(scroll_event_controller)
         motion_event_controller = Gtk.EventControllerMotion()
         drag_event_controller = Gtk.GestureDrag()
-        drag_event_controller.connect('drag_update', self.on_main_canvas_drag_update)
+        drag_event_controller.connect('drag-update', self.on_main_canvas_drag_update)
         self.main_canvas.add_controller(drag_event_controller)
 
         motion_event_controller.connect('motion', self.on_main_canvas_motion)
@@ -319,6 +319,7 @@ class SheetView(Gtk.Box):
             return
         self.main_canvas_width = width
         self.main_canvas_height = height
+        self.document.auto_adjust_scrollbars_by_scroll()
         self.document.renderer.render_caches = {}
 
     def on_main_overlay_get_child_position(self, overlay: Gtk.Overlay, widget: Gtk.Widget, allocation: Gdk.Rectangle) -> bool:
