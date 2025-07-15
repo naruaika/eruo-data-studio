@@ -473,7 +473,8 @@ class SheetRenderer(GObject.Object):
         # Use system default font family for drawing text
         font_desc = Gtk.Widget.create_pango_context(canvas).get_font_description()
         font_family = font_desc.get_family() if font_desc else 'Sans'
-        font_desc = Pango.font_description_from_string(f'{font_family} Normal Regular {display.FONT_SIZE}px')
+        header_font_desc = Pango.font_description_from_string(f'{font_family} Normal Bold {display.FONT_SIZE}px')
+        body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Regular {display.FONT_SIZE}px')
 
         x_start = display.row_header_width
         y_start = display.column_header_height
@@ -555,7 +556,6 @@ class SheetRenderer(GObject.Object):
             ccontext.set_source_rgb(0.0, 0.0, 0.0)
 
         layout = PangoCairo.create_layout(ccontext)
-        layout.set_font_description(font_desc)
 
         cell_width = display.DEFAULT_CELL_WIDTH
         cell_height = display.DEFAULT_CELL_HEIGHT
@@ -577,6 +577,7 @@ class SheetRenderer(GObject.Object):
                     height = y # prevent iteration over empty cells
                     break
                 if row_index == 0: # dataframe header
+                    layout.set_font_description(header_font_desc)
                     if col_index < len(display.column_visible_series):
                         vcol_index = display.column_visible_series[col_index]
                     else:
@@ -585,6 +586,7 @@ class SheetRenderer(GObject.Object):
                     dtype = display.get_dtype_symbol(data.dfs[0].dtypes[vcol_index])
                     cell_text = f'{cname} ({dtype})'
                 else: # dataframe content
+                    layout.set_font_description(body_font_desc)
                     if row_index < len(display.row_visible_series):
                         vrow_index = display.row_visible_series[row_index]
                     else:
