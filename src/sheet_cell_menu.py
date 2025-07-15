@@ -33,92 +33,171 @@ class SheetCellMenu(Gtk.PopoverMenu):
 
         main_menu = Gio.Menu.new()
 
-        # Cut/Copy/Paste Section
+        self.create_cut_copy_paste_section(main_menu)
+        self.create_insert_duplicate_delete_section(main_menu, start_column, start_row, end_column, end_row, ctype)
+        self.create_hide_autofit_section(main_menu, start_column, start_row, end_column, end_row, ctype)
+        self.create_filter_sort_section(main_menu)
+        self.create_convert_section(main_menu)
+
+        self.set_menu_model(main_menu)
+
+    def create_cut_copy_paste_section(self, main_menu: Gio.Menu) -> None:
         cut_copy_paste_section = Gio.Menu.new()
         cut_copy_paste_section.append(_('Cut'), 'app.cut')
         cut_copy_paste_section.append(_('Copy'), 'app.copy')
         cut_copy_paste_section.append(_('Paste'), 'app.paste')
         main_menu.append_section(None, cut_copy_paste_section)
 
-        # Insert Section
-        insert_menu = Gio.Menu.new()
+    def create_insert_duplicate_delete_section(self, main_menu: Gio.Menu, start_column: str, start_row: str, end_column: str, end_row: str, ctype: SheetCell) -> None:
+        column_span = ord(end_column) - ord(start_column) + 1
+        row_span = int(end_row) - int(start_row) + 1
 
-        ## Insert Row Section
-        if ctype is not SheetTopLocatorCell:
+        row_name = start_row
+        if start_row != end_row:
+            row_name = f'{start_row}–{end_row}'
+
+        column_name = start_column
+        if start_column != end_column:
+            column_name = f'{start_column}–{end_column}'
+
+        insert_duplicate_delete_section = Gio.Menu.new()
+
+        if ctype not in [SheetTopLocatorCell, SheetLeftLocatorCell]:
+            # Insert Section
+            insert_menu = Gio.Menu.new()
+
             row_span = int(end_row) - int(start_row) + 1
             insert_section_1 = Gio.Menu.new()
             if int(start_row) > 1:
-                insert_section_1.append(_('{} Row(s) _Above').format(row_span), 'app.insert-row-above')
-            insert_section_1.append(_('{} Row(s) _Below').format(row_span), 'app.insert-row-below')
-            insert_menu.append_section(None, insert_section_1)
+                insert_section_1.append(_('{:,} Row(s) _Above').format(row_span), 'app.insert-row-above')
+            insert_section_1.append(_('{:,} Row(s) _Below').format(row_span), 'app.insert-row-below')
 
-        ## Insert Column Section
-        if ctype is not SheetLeftLocatorCell:
             column_span = ord(end_column) - ord(start_column) + 1
             insert_section_2 = Gio.Menu.new()
-            insert_section_2.append(_('{} Column(s) _Left').format(column_span), 'app.insert-column-left')
-            insert_section_2.append(_('{} Column(s) _Right').format(column_span), 'app.insert-column-right')
+            insert_section_2.append(_('{:,} Column(s) _Left').format(column_span), 'app.insert-column-left')
+            insert_section_2.append(_('{:,} Column(s) _Right').format(column_span), 'app.insert-column-right')
+
+            insert_menu.append_section(None, insert_section_1)
             insert_menu.append_section(None, insert_section_2)
 
-        insert_menu_item = Gio.MenuItem.new(_('_Insert'), None)
-        insert_menu_item.set_submenu(insert_menu)
+            insert_menu_item = Gio.MenuItem.new(_('_Insert'), None)
+            insert_menu_item.set_submenu(insert_menu)
 
-        # Duplicate Section
-        duplicate_menu = Gio.Menu.new()
+            insert_duplicate_delete_section.append_item(insert_menu_item)
 
-        ## Duplicate Row Section
-        if ctype is not SheetTopLocatorCell and int(start_row) > 1:
-            duplicate_section_1 = Gio.Menu.new()
-            duplicate_section_1.append(_('To Row(s) _Above'), 'app.duplicate-to-above')
-            duplicate_section_1.append(_('To Row(s) _Below'), 'app.duplicate-to-below')
-            duplicate_menu.append_section(None, duplicate_section_1)
+            # Duplicate Section
+            duplicate_menu = Gio.Menu.new()
 
-        ## Duplicate Column Section
-        if ctype is not SheetLeftLocatorCell:
+            if int(start_row) > 1:
+                duplicate_section_1 = Gio.Menu.new()
+                duplicate_section_1.append(_('{:,} Row(s) _Above').format(row_span), 'app.duplicate-to-above')
+                duplicate_section_1.append(_('{:,} Row(s) _Below').format(row_span), 'app.duplicate-to-below')
+                duplicate_menu.append_section(None, duplicate_section_1)
+
             duplicate_section_2 = Gio.Menu.new()
-            duplicate_section_2.append(_('To Column(s) _Left'), 'app.duplicate-to-left')
-            duplicate_section_2.append(_('To Column(s) _Right'), 'app.duplicate-to-right')
+            duplicate_section_2.append(_('{:,} Column(s) _Left').format(column_span), 'app.duplicate-to-left')
+            duplicate_section_2.append(_('{:,} Column(s) _Right').format(column_span), 'app.duplicate-to-right')
             duplicate_menu.append_section(None, duplicate_section_2)
 
-        duplicate_menu_item = Gio.MenuItem.new(_('_Duplicate'), None)
-        duplicate_menu_item.set_submenu(duplicate_menu)
+            duplicate_menu_item = Gio.MenuItem.new(_('_Duplicate'), None)
+            duplicate_menu_item.set_submenu(duplicate_menu)
 
-        # Delete Section
-        delete_menu = Gio.Menu.new()
+            insert_duplicate_delete_section.append_item(duplicate_menu_item)
 
-        ## Delete Row Item
-        if ctype is not SheetTopLocatorCell and int(start_row) > 1:
-            row_name = start_row
-            if start_row != end_row:
-                row_name = f'{start_row}–{end_row}'
-            delete_menu.append(_('Delete _Row {}').format(row_name), 'app.delete-row')
+            # Delete Section
+            delete_menu = Gio.Menu.new()
 
-        ## Delete Column Item
-        if ctype is not SheetLeftLocatorCell:
-            column_name = start_column
-            if start_column != end_column:
-                column_name = f'{start_column}–{end_column}'
+            if int(start_row) > 1:
+                delete_menu.append(_('Delete _Row {}').format(row_name), 'app.delete-row')
             delete_menu.append(_('Delete _Column {}').format(column_name), 'app.delete-column')
 
-        delete_menu_item = Gio.MenuItem.new(_('_Delete'), None)
-        delete_menu_item.set_submenu(delete_menu)
+            delete_menu_item = Gio.MenuItem.new(_('_Delete'), None)
+            delete_menu_item.set_submenu(delete_menu)
 
-        # Clear Contents
-        insert_duplicate_delete_section = Gio.Menu.new()
-        insert_duplicate_delete_section.append_item(insert_menu_item)
-        if not(ctype is SheetLeftLocatorCell and int(start_row) == 1):
-            insert_duplicate_delete_section.append_item(duplicate_menu_item)
             insert_duplicate_delete_section.append_item(delete_menu_item)
 
-        clear_contents_item = Gio.MenuItem.new(_('_Clear Contents'), 'app.clear-contents')
-        insert_duplicate_delete_section.append_item(clear_contents_item)
+            # Clear Contents
+            clear_contents_item = Gio.MenuItem.new(_('_Clear Contents'), 'app.clear-contents')
+            insert_duplicate_delete_section.append_item(clear_contents_item)
 
-        main_menu.append_item(Gio.MenuItem.new_section(None, insert_duplicate_delete_section))
+            main_menu.append_section(None, insert_duplicate_delete_section)
 
-        # Filter/Sort Section
-        filter_sort_section = Gio.Menu.new()
+        if ctype is SheetTopLocatorCell:
+            insert_duplicate_section = Gio.Menu.new()
+            delete_clear_section = Gio.Menu.new()
 
-        ## Filter Section
+            # Insert Section
+            insert_duplicate_section.append(_('Insert {:,} Column(s) _Left').format(column_span), 'app.insert-column-left')
+            insert_duplicate_section.append(_('Insert {:,} Column(s) _Right').format(column_span), 'app.insert-column-right')
+
+            # Duplicate Section
+            insert_duplicate_section.append(_('Duplicate {:,} Column(s) _Left').format(column_span), 'app.duplicate-to-left')
+            insert_duplicate_section.append(_('Duplicate {:,} Column(s) _Right').format(column_span), 'app.duplicate-to-right')
+
+            # Delete Section
+            delete_clear_section.append(_('Delete {:,} Column(s)').format(column_span), 'app.delete-column')
+
+            # Clear Contents
+            delete_clear_section.append(_('_Clear Contents'), 'app.clear-contents')
+
+            main_menu.append_section(None, insert_duplicate_section)
+            main_menu.append_section(None, delete_clear_section)
+
+        if ctype is SheetLeftLocatorCell:
+            insert_duplicate_section = Gio.Menu.new()
+            delete_clear_section = Gio.Menu.new()
+
+            # Insert Section
+            insert_duplicate_section.append(_('Insert {:,} Row(s) _Above').format(row_span), 'app.insert-row-above')
+            insert_duplicate_section.append(_('Insert {:,} Row(s) _Below').format(row_span), 'app.insert-row-below')
+
+            # Duplication Section
+            insert_duplicate_section.append(_('Duplicate {:,} Row(s) _Above').format(row_span), 'app.duplicate-to-above')
+            insert_duplicate_section.append(_('Duplicate {:,} Row(s) _Below').format(row_span), 'app.duplicate-to-below')
+
+            # Delete Section
+            delete_clear_section.append(_('Delete {:,} Row(s)').format(row_span), 'app.delete-row')
+
+            # Clear Contents
+            delete_clear_section.append(_('_Clear Contents'), 'app.clear-contents')
+
+            main_menu.append_section(None, insert_duplicate_section)
+            main_menu.append_section(None, delete_clear_section)
+
+    def create_hide_autofit_section(self, main_menu: Gio.Menu, start_column: str, start_row: str, end_column: str, end_row: str, ctype: SheetCell) -> None:
+        column_span = ord(end_column) - ord(start_column) + 1
+        row_span = int(end_row) - int(start_row) + 1
+
+        row_name = start_row
+        if start_row != end_row:
+            row_name = f'{start_row}–{end_row}'
+
+        column_name = start_column
+        if start_column != end_column:
+            column_name = f'{start_column}–{end_column}'
+
+        # Hide Section
+        hide_section = Gio.Menu.new()
+
+        if ctype not in [SheetTopLocatorCell, SheetLeftLocatorCell]:
+            hide_menu = Gio.Menu.new()
+            hide_menu.append(_('Hide Row {}').format(row_name), 'app.hide-row')
+            hide_menu.append(_('Hide Column {}').format(column_name), 'app.hide-column')
+
+            hide_menu_item = Gio.MenuItem.new(_('_Hide'), None)
+            hide_menu_item.set_submenu(hide_menu)
+
+            hide_section.append_item(hide_menu_item)
+
+        if ctype is SheetTopLocatorCell:
+            hide_section.append(_('Hide Column {}').format(column_name), 'app.hide-column')
+
+        if ctype is SheetLeftLocatorCell:
+            hide_section.append(_('Hide Row {}').format(row_name), 'app.hide-row')
+
+        main_menu.append_section(None, hide_section)
+
+    def create_filter_sort_section(self, main_menu: Gio.Menu) -> None:
         filter_menu = Gio.Menu.new()
         filter_menu.append(_('Cell _Value'), 'app.filter-cell-value')
         filter_menu.append(_('Cell _Color'), 'app.filter-cell-color')
@@ -127,20 +206,20 @@ class SheetCellMenu(Gtk.PopoverMenu):
         filter_menu_item = Gio.MenuItem.new(_('_Filter'), None)
         filter_menu_item.set_submenu(filter_menu)
 
-        ## Sort Section
         sort_menu = Gio.Menu.new()
-        sort_menu.append(_('A-Z (Smallest to Largest)'), 'app.sort-smallest-to-largest')
-        sort_menu.append(_('Z-A (Largest to Smallest)'), 'app.sort-largest-to-smallest')
+        sort_menu.append(_('Smallest to Largest'), 'app.sort-smallest-to-largest')
+        sort_menu.append(_('Largest to Smallest'), 'app.sort-largest-to-smallest')
 
         sort_menu_item = Gio.MenuItem.new(_('_Sort'), None)
         sort_menu_item.set_submenu(sort_menu)
 
+        filter_sort_section = Gio.Menu.new()
         filter_sort_section.append_item(filter_menu_item)
         filter_sort_section.append_item(sort_menu_item)
 
-        main_menu.append_item(Gio.MenuItem.new_section(None, filter_sort_section))
+        main_menu.append_section(None, filter_sort_section)
 
-        # Convert Section
+    def create_convert_section(self, main_menu: Gio.Menu) -> None:
         convert_section = Gio.Menu.new()
 
         convert_int_section = Gio.Menu.new()
@@ -188,6 +267,4 @@ class SheetCellMenu(Gtk.PopoverMenu):
 
         convert_section.append_item(convert_menu_item)
 
-        main_menu.append_item(Gio.MenuItem.new_section(None, convert_section))
-
-        self.set_menu_model(main_menu)
+        main_menu.append_section(None, convert_section)

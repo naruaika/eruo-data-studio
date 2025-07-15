@@ -429,9 +429,9 @@ class SheetData(GObject.Object):
 
         # Update the filter expression
         if self.fes[dfi] is None:
-            self.fes[dfi] = polars.col(column_name).is_in([cell_value])
+            self.fes[dfi] = polars.col(column_name).is_in([cell_value], nulls_equal=True)
         else:
-            self.fes[dfi] = self.fes[dfi] & polars.col(column_name).is_in([cell_value])
+            self.fes[dfi] = self.fes[dfi] & polars.col(column_name).is_in([cell_value], nulls_equal=True)
 
         # We don't do the actual filtering on the original dataframe here, instead we
         # just want to get the boolean series to flag which rows should be visible.

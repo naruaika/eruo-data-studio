@@ -286,7 +286,7 @@ class DuplicateRowState(State):
 class DuplicateColumnState(State):
     __gtype_name__ = 'DuplicateColumnState'
 
-    above: bool
+    left: bool
 
     range: SheetCell
     active: SheetCell
@@ -416,51 +416,41 @@ class DeleteColumnState(State):
 
 
 
-class SortRowState(State):
-    __gtype_name__ = 'SortRowState'
+class HideRowState(State):
+    __gtype_name__ = 'HideRowState'
 
-    descending: bool
-    dfi: int
+    row_span: int
 
-    file_path: str
-    vflags_path: str
+    range: SheetCell
+    active: SheetCell
+    cursor: SheetCell
 
-    def __init__(self, descending: bool, dfi: int, rindex: polars.DataFrame, vflags: polars.Series) -> None:
+    def __init__(self, row_span: int) -> None:
         super().__init__()
 
-        self.descending = descending
-        self.dfi = dfi
+        self.row_span = row_span
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame(rindex).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.file_path = file_path.name
-
-        if vflags is None:
-            self.vflags_path = None
-            return
-
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.vflags_path = file_path.name
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
 
     def undo(self) -> None:
         document = globals.history.document
 
-        document.data.dfs[self.dfi].insert_column(0, polars.read_parquet(self.file_path).to_series(0))
-        document.data.sort_rows_from_metadata(0, self.dfi, False)
-        document.data.dfs[self.dfi].drop_in_place('$ridx')
+        document.selection.current_active_range = self.range
+        document.selection.current_active_cell = self.active
+        document.selection.current_cursor_cell = self.cursor
 
-        if self.vflags_path is not None:
-            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
-            document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+        document.display.row_visibility_flags = polars.concat([document.display.row_visibility_flags[:self.range.metadata.row],
+                                                               polars.Series([True] * self.row_span),
+                                                               document.display.row_visibility_flags[self.range.metadata.row + self.row_span:]])
+        document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+        document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
 
     def redo(self) -> None:
         document = globals.history.document
-        document.sort_current_rows(self.descending)
+        document.hide_current_rows()
 
 
 
@@ -518,6 +508,53 @@ class FilterRowState(State):
 
         document.filter_current_rows()
 
+
+
+class SortRowState(State):
+    __gtype_name__ = 'SortRowState'
+
+    descending: bool
+    dfi: int
+
+    file_path: str
+    vflags_path: str
+
+    def __init__(self, descending: bool, dfi: int, rindex: polars.DataFrame, vflags: polars.Series) -> None:
+        super().__init__()
+
+        self.descending = descending
+        self.dfi = dfi
+
+        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
+            # TODO: we leave uncompressed for now, but we may want to determine
+            # the compression level based on the size of the dataframe later.
+            polars.DataFrame(rindex).write_parquet(file_path.name, compression='uncompressed', statistics=False)
+            self.file_path = file_path.name
+
+        if vflags is None:
+            self.vflags_path = None
+            return
+
+        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
+            # TODO: we leave uncompressed for now, but we may want to determine
+            # the compression level based on the size of the dataframe later.
+            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
+            self.vflags_path = file_path.name
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        document.data.dfs[self.dfi].insert_column(0, polars.read_parquet(self.file_path).to_series(0))
+        document.data.sort_rows_from_metadata(0, self.dfi, False)
+        document.data.dfs[self.dfi].drop_in_place('$ridx')
+
+        if self.vflags_path is not None:
+            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+            document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.sort_current_rows(self.descending)
 
 
 class ConvertDataState(State):

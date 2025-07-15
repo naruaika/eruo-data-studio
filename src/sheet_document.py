@@ -733,6 +733,44 @@ class SheetDocument(GObject.Object):
 
         return False
 
+    def hide_current_rows(self) -> None:
+        range = self.selection.current_active_range
+        row_span = range.row_span
+
+        # Take hidden row(s) into account
+        if len(self.display.row_visibility_flags):
+            start_vrow = self.display.get_vrow_from_row(range.row)
+            end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+            row_span = end_vrow - start_vrow + 1
+
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            from .history_manager import HideRowState
+            state = HideRowState(row_span)
+
+        if len(self.display.row_visibility_flags):
+            self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:range.metadata.row],
+                                                               polars.Series([False] * row_span),
+                                                               self.display.row_visibility_flags[range.metadata.row + row_span:]])
+        else:
+            # It's better if we don't have to include the third part, but it didn't work.
+            # Maybe we need to change the code somewhere?
+            self.display.row_visibility_flags = polars.concat([polars.Series([True] * range.metadata.row),
+                                                               polars.Series([False] * row_span),
+                                                               polars.Series([True] * (self.data.bbs[range.metadata.dfi].row_span - range.metadata.row - row_span))])
+        self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+        self.data.bbs[range.metadata.dfi].row_span = len(self.display.row_visible_series)
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            globals.history.save(state)
+
+        self.renderer.render_caches = {}
+        self.auto_adjust_selections_by_crud(0, 0, True)
+
+    def hide_current_columns(self) -> None:
+        pass
+
     def filter_current_rows(self) -> None:
         active = self.selection.current_active_cell
 
@@ -783,11 +821,9 @@ class SheetDocument(GObject.Object):
             # Update row visibility flags
             if len(self.display.row_visibility_flags):
                 if vflags is not None:
-                    self.display.row_visibility_flags = polars.concat([polars.Series([True]),
-                                                                       vflags])
+                    self.display.row_visibility_flags = polars.concat([polars.Series([True]), vflags])
                 else:
-                    self.display.row_visibility_flags = polars.concat([polars.Series([True]),
-                                                                       self.data.dfs[active.metadata.dfi]['$vrow']])
+                    self.display.row_visibility_flags = polars.concat([polars.Series([True]), self.data.dfs[active.metadata.dfi]['$vrow']])
                 self.data.dfs[active.metadata.dfi].drop_in_place('$vrow')
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
 
