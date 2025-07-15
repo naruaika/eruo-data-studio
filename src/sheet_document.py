@@ -1008,26 +1008,29 @@ class SheetDocument(GObject.Object):
     def auto_adjust_scrollbars_by_scroll(self) -> None:
         globals.is_changing_state = True
 
-        content_height = self.view.main_canvas.get_height()
-        content_width = self.view.main_canvas.get_width()
+        canvas_height = self.view.main_canvas.get_height()
+        canvas_width = self.view.main_canvas.get_width()
+
+        content_height = canvas_height
+        content_width = canvas_width
 
         if len(self.data.bbs) > 0:
             content_height = self.data.bbs[0].row_span * self.display.DEFAULT_CELL_HEIGHT
             content_width = self.data.bbs[0].column_span * self.display.DEFAULT_CELL_WIDTH
 
-        # TODO: needs a better algorithm that the scrollbars don't jump when it reaches the bottom edge
-        # for case when the content is so large
-        scroll_y_upper = content_height + self.view.main_canvas.get_height()
-        if self.display.scroll_y_position + self.view.main_canvas.get_height() * 2 > scroll_y_upper:
-            scroll_y_upper = self.display.scroll_y_position + self.view.main_canvas.get_height() * 2
+        scroll_y_upper = content_height + self.display.column_header_height
+        if globals.is_mouse_scrolling:
+            scroll_y_upper = max(scroll_y_upper, self.display.scroll_y_position + canvas_height)
         self.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y_upper)
-        self.view.vertical_scrollbar.get_adjustment().set_page_size(self.view.main_canvas.get_height())
+        self.view.vertical_scrollbar.get_adjustment().set_page_size(canvas_height)
 
-        scroll_x_upper = content_width + self.view.main_canvas.get_width()
-        if self.display.scroll_x_position + self.view.main_canvas.get_width() * 2 > scroll_x_upper:
-            scroll_x_upper = self.display.scroll_x_position + self.view.main_canvas.get_width() * 2
+        scroll_x_upper = content_width + self.display.row_header_width
+        if globals.is_mouse_scrolling:
+            scroll_x_upper = max(scroll_x_upper, self.display.scroll_x_position + canvas_width)
         self.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x_upper)
-        self.view.horizontal_scrollbar.get_adjustment().set_page_size(self.view.main_canvas.get_width())
+        self.view.horizontal_scrollbar.get_adjustment().set_page_size(canvas_width)
+
+        globals.is_mouse_scrolling = False
 
         globals.is_changing_state = False
 

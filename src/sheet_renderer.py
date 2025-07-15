@@ -402,7 +402,7 @@ class SheetRenderer(GObject.Object):
             vcol_index = display.get_vcolumn_from_column(col_index)
 
             # Draw column name
-            if 0 < display.scroll_y_position and col_index <= data.bbs[0].column_span:
+            if 0 < len(data.bbs) and 0 < display.scroll_y_position and col_index <= data.bbs[0].column_span:
                 cname = data.dfs[0].columns[vcol_index - 1]
                 dtype = display.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
                 layout.set_font_description(body_font_desc)

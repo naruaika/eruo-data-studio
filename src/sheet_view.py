@@ -29,7 +29,6 @@ class SheetView(Gtk.Box):
     __gtype_name__ = 'SheetView'
 
     __gsignals__ = {
-        'canvas-scrolled': (GObject.SIGNAL_RUN_FIRST, None, ()),
         'select-by-keypress': (GObject.SIGNAL_RUN_FIRST, None, (int, int,)),
         'select-by-motion': (GObject.SIGNAL_RUN_FIRST, None, (int, int,)),
         'update-cell-data': (GObject.SIGNAL_RUN_FIRST, None, (str,)),
@@ -137,10 +136,13 @@ class SheetView(Gtk.Box):
         if dx < 0 and scroll_x_position == 0:
             return False
 
+        self.vertical_scrollbar.get_adjustment().set_upper(scroll_y_position + dy + self.main_canvas_height)
+        self.horizontal_scrollbar.get_adjustment().set_upper(scroll_x_position + dx + self.main_canvas_width)
+
         self.vertical_scrollbar.get_adjustment().set_value(max(0, scroll_y_position + dy))
         self.horizontal_scrollbar.get_adjustment().set_value(max(0, scroll_x_position + dx))
 
-        self.emit('canvas-scrolled')
+        globals.is_mouse_scrolling = True
 
         return True
 
