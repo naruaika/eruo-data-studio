@@ -70,6 +70,10 @@ class Application(Adw.Application):
         self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
         self.create_action('hide-row', self.on_hide_row_action)
         self.create_action('hide-column', self.on_hide_column_action)
+        self.create_action('unhide-row', self.on_unhide_row_action)
+        self.create_action('unhide-all-rows', self.on_unhide_all_rows_action)
+        self.create_action('unhide-column', self.on_unhide_column_action)
+        self.create_action('unhide-all-columns', self.on_unhide_all_columns_action)
         self.create_action('filter-cell-value', self.on_filter_cell_value_action)
         # self.create_action('filter-cell-color', self.on_filter_cell_color_action)
         # self.create_action('filter-font-color', self.on_filter_font_color_action)
@@ -257,6 +261,22 @@ class Application(Adw.Application):
     def on_hide_column_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()
         document.hide_current_columns()
+
+    def on_unhide_row_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.unhide_current_rows()
+
+    def on_unhide_all_rows_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.unhide_all_rows()
+
+    def on_unhide_column_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.unhide_current_columns()
+
+    def on_unhide_all_columns_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.unhide_all_columns()
 
     def on_filter_cell_value_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()

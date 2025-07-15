@@ -87,8 +87,8 @@ class SheetDocument(GObject.Object):
     def on_sheet_view_scrolled(self, source: GObject.Object) -> None:
         self.display.scroll_y_position = self.view.vertical_scrollbar.get_adjustment().get_value()
         self.display.scroll_x_position = self.view.horizontal_scrollbar.get_adjustment().get_value()
-        self.display.scroll_y_position = round(self.display.scroll_y_position / self.view.SCROLL_Y_MULTIPLIER) * self.view.SCROLL_Y_MULTIPLIER
-        self.display.scroll_x_position = round(self.display.scroll_x_position / self.view.SCROLL_X_MULTIPLIER) * self.view.SCROLL_X_MULTIPLIER
+        self.display.scroll_y_position = round(self.display.scroll_y_position / self.display.DEFAULT_CELL_HEIGHT) * self.display.DEFAULT_CELL_HEIGHT
+        self.display.scroll_x_position = round(self.display.scroll_x_position / self.display.DEFAULT_CELL_WIDTH) * self.display.DEFAULT_CELL_WIDTH
 
         self.auto_adjust_scrollbars_by_scroll()
         self.auto_adjust_locators_size_by_scroll()
@@ -877,6 +877,100 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, True)
 
+    def unhide_current_rows(self) -> None:
+        range = self.selection.current_active_range
+        row_span = range.row_span
+
+        # Take hidden row(s) into account
+        if len(self.display.row_visibility_flags):
+            start_vrow = self.display.get_vrow_from_row(range.row)
+            end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+            row_span = end_vrow - start_vrow + 1
+
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UnhideRowState
+            state = UnhideRowState(row_span, self.display.row_visibility_flags[range.metadata.row:range.metadata.row + row_span])
+
+        # TODO: support unhiding over multiple dataframes?
+        self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:range.metadata.row],
+                                                           polars.Series([True] * row_span),
+                                                           self.display.row_visibility_flags[range.metadata.row + row_span:]])
+        self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+        self.data.bbs[range.metadata.dfi].row_span = len(self.display.row_visible_series)
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            globals.history.save(state)
+
+        self.renderer.render_caches = {}
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
+    def unhide_all_rows(self) -> None:
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UnhideAllRowState
+            state = UnhideAllRowState(self.display.row_visibility_flags)
+
+        # TODO: support unhiding over multiple dataframes?
+        self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+        self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+        self.data.bbs[0].row_span = self.data.dfs[0].height + 1
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            globals.history.save(state)
+
+        self.renderer.render_caches = {}
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
+    def unhide_current_columns(self) -> None:
+        range = self.selection.current_active_range
+        column_span = range.column_span
+
+        # Take hidden column(s) into account
+        if len(self.display.column_visibility_flags):
+            start_vcolumn = self.display.get_vcolumn_from_column(range.column)
+            end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+            column_span = end_vcolumn - start_vcolumn + 1
+
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UnhideColumnState
+            state = UnhideColumnState(column_span, self.display.column_visibility_flags[range.metadata.column:range.metadata.column + column_span])
+
+        # TODO: support unhiding over multiple dataframes?
+        self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags[:range.metadata.column],
+                                                              polars.Series([True] * column_span),
+                                                              self.display.column_visibility_flags[range.metadata.column + column_span:]])
+        self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
+        self.data.bbs[range.metadata.dfi].column_span = len(self.display.column_visible_series)
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            globals.history.save(state)
+
+        self.renderer.render_caches = {}
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
+    def unhide_all_columns(self) -> None:
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UnhideAllColumnState
+            state = UnhideAllColumnState(self.display.column_visibility_flags)
+
+        # TODO: support unhiding over multiple dataframes?
+        self.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
+        self.display.column_visible_series = polars.Series(dtype=polars.UInt32)
+        self.data.bbs[0].column_span = self.data.dfs[0].width
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            globals.history.save(state)
+
+        self.renderer.render_caches = {}
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
     def filter_current_rows(self) -> None:
         active = self.selection.current_active_cell
 
@@ -1014,23 +1108,17 @@ class SheetDocument(GObject.Object):
         content_height = canvas_height
         content_width = canvas_width
 
-        if len(self.data.bbs) > 0:
+        if len(self.data.bbs):
             content_height = self.data.bbs[0].row_span * self.display.DEFAULT_CELL_HEIGHT
             content_width = self.data.bbs[0].column_span * self.display.DEFAULT_CELL_WIDTH
 
-        scroll_y_upper = content_height + self.display.column_header_height
-        if globals.is_mouse_scrolling:
-            scroll_y_upper = max(scroll_y_upper, self.display.scroll_y_position + canvas_height)
+        scroll_y_upper = max(content_height + self.display.column_header_height, self.display.scroll_y_position + canvas_height)
         self.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y_upper)
         self.view.vertical_scrollbar.get_adjustment().set_page_size(canvas_height)
 
-        scroll_x_upper = content_width + self.display.row_header_width
-        if globals.is_mouse_scrolling:
-            scroll_x_upper = max(scroll_x_upper, self.display.scroll_x_position + canvas_width)
+        scroll_x_upper = max(content_width + self.display.row_header_width, self.display.scroll_x_position + canvas_width)
         self.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x_upper)
         self.view.horizontal_scrollbar.get_adjustment().set_page_size(canvas_width)
-
-        globals.is_mouse_scrolling = False
 
         globals.is_changing_state = False
 

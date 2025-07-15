@@ -113,16 +113,16 @@ class SheetView(Gtk.Box):
         self.is_initialized = False
 
     def do_state_flags_changed(self, previous_state_flags: Gtk.StateFlags) -> None:
-        if not self.is_initialized and self.get_height() > 0:
+        if not self.is_initialized and self.get_height():
             self.document.auto_adjust_scrollbars_by_scroll()
             self.main_canvas.queue_draw()
             self.is_initialized = True
 
     def on_main_canvas_scrolled(self, event: Gtk.EventControllerScroll, dx: float, dy: float) -> bool:
         # Change direction of scroll based on shift key
-        if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dy > 0 or dy < 0):
+        if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dy < 0 or 0 < dy):
             dx, dy = dy, 0
-        elif event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dx > 0 or dx < 0):
+        elif event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dx < 0 or 0 < dx):
             dy, dx = dx, 0
 
         dx = int(dx * self.SCROLL_X_MULTIPLIER)
@@ -141,8 +141,6 @@ class SheetView(Gtk.Box):
 
         self.vertical_scrollbar.get_adjustment().set_value(max(0, scroll_y_position + dy))
         self.horizontal_scrollbar.get_adjustment().set_value(max(0, scroll_x_position + dx))
-
-        globals.is_mouse_scrolling = True
 
         return True
 
@@ -212,6 +210,12 @@ class SheetView(Gtk.Box):
         end_column = self.document.display.get_column_name_from_column(col_2)
         end_row = str(row_2)
 
+        n_hidden_columns = self.document.display.get_n_hidden_columns(col_1, col_2)
+        n_hidden_rows = self.document.display.get_n_hidden_rows(row_1, row_2)
+
+        n_all_hidden_columns = self.document.display.get_n_all_hidden_columns()
+        n_all_hidden_rows = self.document.display.get_n_all_hidden_rows()
+
         ctype = type(self.document.selection.current_active_range)
 
         x = self.document.display.get_cell_x_from_point(x + 1)
@@ -223,7 +227,8 @@ class SheetView(Gtk.Box):
         if self.context_menu is not None:
             self.context_menu.unparent()
             del self.context_menu
-        self.context_menu = SheetCellMenu(start_column, start_row, end_column, end_row, ctype)
+        self.context_menu = SheetCellMenu(start_column, start_row, end_column, end_row, n_hidden_columns, n_hidden_rows,
+                                          n_all_hidden_columns, n_all_hidden_rows, ctype)
         self.context_menu.set_parent(self.main_overlay)
 
         def on_context_menu_closed(widget: Gtk.Widget) -> None:

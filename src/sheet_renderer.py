@@ -285,7 +285,7 @@ class SheetRenderer(GObject.Object):
 
             # Handle edge cases where the last row(s) are hidden
             elif nrow_index == len(display.row_visible_series) and \
-                    0 < len(display.row_visible_series) and \
+                    len(display.row_visible_series) and \
                     display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) and \
                     not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
                 double_lines = True
@@ -332,7 +332,7 @@ class SheetRenderer(GObject.Object):
 
             # Handle edge cases where the last column(s) are hidden
             elif ncol_index == len(display.column_visible_series) and \
-                    0 < len(display.column_visible_series) and \
+                    len(display.column_visible_series) and \
                     display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) and \
                     not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 double_lines = True
@@ -394,7 +394,7 @@ class SheetRenderer(GObject.Object):
         while x < width:
             # Handle edge cases where the last column(s) are hidden
             if col_index - 1 == len(display.column_visible_series) and \
-                    0 < len(display.column_visible_series) and \
+                    len(display.column_visible_series) and \
                     display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) and \
                     not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 col_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1) - 1
@@ -402,7 +402,7 @@ class SheetRenderer(GObject.Object):
             vcol_index = display.get_vcolumn_from_column(col_index)
 
             # Draw column name
-            if 0 < len(data.bbs) and 0 < display.scroll_y_position and col_index <= data.bbs[0].column_span:
+            if len(data.bbs) and 0 < display.scroll_y_position and col_index <= data.bbs[0].column_span:
                 cname = data.dfs[0].columns[vcol_index - 1]
                 dtype = display.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
                 layout.set_font_description(body_font_desc)
@@ -438,7 +438,7 @@ class SheetRenderer(GObject.Object):
         while y < height:
             # Handle edge cases where the last row(s) are hidden
             if row_index - 1 == len(display.row_visible_series) and \
-                    0 < len(display.row_visible_series) and \
+                    len(display.row_visible_series) and \
                     display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) and \
                     not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
                 row_index += (len(display.row_visibility_flags) - 1) - (display.row_visible_series[-1] - 1) - 1

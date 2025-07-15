@@ -24,7 +24,8 @@ from .sheet_selection import SheetCell, SheetTopLocatorCell, SheetLeftLocatorCel
 class SheetCellMenu(Gtk.PopoverMenu):
     __gtype_name__ = 'SheetCellMenu'
 
-    def __init__(self, start_column: str, start_row: str, end_column: str, end_row: str, ctype: SheetCell, **kwargs) -> None:
+    def __init__(self, start_column: str, start_row: str, end_column: str, end_row: str, n_hidden_columns: int, n_hidden_rows: int,
+                 n_all_hidden_columns: int, n_all_hidden_rows: int, ctype: SheetCell, **kwargs) -> None:
         super().__init__(**kwargs)
 
         # self.set_flags(Gtk.PopoverMenuFlags.NESTED)
@@ -35,7 +36,8 @@ class SheetCellMenu(Gtk.PopoverMenu):
 
         self.create_cut_copy_paste_section(main_menu)
         self.create_insert_duplicate_delete_section(main_menu, start_column, start_row, end_column, end_row, ctype)
-        self.create_hide_autofit_section(main_menu, start_column, start_row, end_column, end_row, ctype)
+        self.create_hide_autofit_section(main_menu, start_column, start_row, end_column, end_row, n_hidden_columns, n_hidden_rows,
+                                         n_all_hidden_columns, n_all_hidden_rows, ctype)
         self.create_filter_sort_section(main_menu)
         self.create_convert_section(main_menu)
 
@@ -164,10 +166,9 @@ class SheetCellMenu(Gtk.PopoverMenu):
             main_menu.append_section(None, insert_duplicate_section)
             main_menu.append_section(None, delete_clear_section)
 
-    def create_hide_autofit_section(self, main_menu: Gio.Menu, start_column: str, start_row: str, end_column: str, end_row: str, ctype: SheetCell) -> None:
-        column_span = ord(end_column) - ord(start_column) + 1
-        row_span = int(end_row) - int(start_row) + 1
-
+    def create_hide_autofit_section(self, main_menu: Gio.Menu, start_column: str, start_row: str, end_column: str, end_row: str,
+                                    n_hidden_columns: int, n_hidden_rows: int, n_all_hidden_columns: int, n_all_hidden_rows: int,
+                                    ctype: SheetCell) -> None:
         row_name = start_row
         if start_row != end_row:
             row_name = f'{start_row}–{end_row}'
@@ -176,7 +177,6 @@ class SheetCellMenu(Gtk.PopoverMenu):
         if start_column != end_column:
             column_name = f'{start_column}–{end_column}'
 
-        # Hide Section
         hide_section = Gio.Menu.new()
 
         if ctype not in [SheetTopLocatorCell, SheetLeftLocatorCell]:
@@ -196,6 +196,20 @@ class SheetCellMenu(Gtk.PopoverMenu):
             hide_section.append(_('Hide Row {}').format(row_name), 'app.hide-row')
 
         main_menu.append_section(None, hide_section)
+
+        if ctype is SheetLeftLocatorCell:
+            if 0 < n_hidden_rows:
+                main_menu.append(_('Unhide {:,} Row(s)').format(n_hidden_rows), 'app.unhide-row')
+
+            if 0 < n_all_hidden_rows:
+                main_menu.append(_('Unhide All Rows'), 'app.unhide-all-rows')
+
+        if ctype is SheetTopLocatorCell:
+            if 0 < n_hidden_columns:
+                main_menu.append(_('Unhide {:,} Column(s)').format(n_hidden_columns), 'app.unhide-column')
+
+            if 0 < n_all_hidden_columns:
+                main_menu.append(_('Unhide All Columns'), 'app.unhide-all-columns')
 
     def create_filter_sort_section(self, main_menu: Gio.Menu) -> None:
         filter_menu = Gio.Menu.new()
