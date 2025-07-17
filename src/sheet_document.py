@@ -226,6 +226,10 @@ class SheetDocument(GObject.Object):
         else:
             (col_1, row_1), (col_2, row_2) = target_cell_position
 
+        # Clear the render caches when navigating by pressing the control key
+        if state == Gdk.ModifierType.CONTROL_MASK or state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
+            self.renderer.render_caches = {}
+
         self.update_selection_from_position(col_1, row_1, col_2, row_2, True, True, True)
 
     def on_update_selection_by_motion(self, source: GObject.Object, x: int, y: int) -> None:
