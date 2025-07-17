@@ -1219,8 +1219,8 @@ class SheetDocument(GObject.Object):
         globals.is_changing_state = True
 
         monitor = Gdk.Display.get_default().get_monitors()[0]
-        max_width = monitor.get_geometry().width // 12 # and 8 are widely used in UI design
-        sample_data = self.data.dfs[0].head(200) # been seeing this number several times
+        max_width = monitor.get_geometry().width // 12
+        sample_data = self.data.dfs[0].head(50).vstack(self.data.dfs[0].tail(50))
 
         font_desc = Gtk.Widget.create_pango_context(self.view.main_canvas).get_font_description()
         system_font = font_desc.get_family() if font_desc else 'Sans'
@@ -1233,10 +1233,11 @@ class SheetDocument(GObject.Object):
         for col_index, col_name in enumerate(self.data.dfs[0].columns):
             sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
             max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
-            if max_length is not None:
-                layout.set_text('0' * max_length, -1)
-            else:
-                layout.set_text('0', -1)
+            sample_text = sample_data.with_columns(polars.when(polars.col(col_name).str.len_chars() == max_length)
+                                                         .then(polars.col(col_name)).otherwise(None)
+                                                         .alias('sample_text')
+            ).drop_nulls('sample_text').sample(1).item(0, 'sample_text')
+            layout.set_text(str(sample_text), -1)
             text_width = layout.get_size()[0] / Pango.SCALE
             preferred_width = text_width + 2 * self.display.DEFAULT_CELL_PADDING
             self.display.column_widths[col_index] = max(self.display.DEFAULT_CELL_WIDTH, min(max_width, int(preferred_width)))
