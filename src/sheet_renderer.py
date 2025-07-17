@@ -314,6 +314,7 @@ class SheetRenderer(GObject.Object):
         context.clip()
 
         x = x_start
+        x_offset = 0
         while x < width:
             # Skipping columns that are hidden will result in double lines
             double_lines = False
@@ -330,6 +331,20 @@ class SheetRenderer(GObject.Object):
                     not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 double_lines = True
 
+            # Get the width of the next appearing column
+            cell_width = display.DEFAULT_CELL_WIDTH
+            if ncol_index < len(display.column_widths):
+                cell_width = display.column_widths[ncol_index]
+
+            # Offset the first appearing column to account for the scroll position if necessary
+            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
+                x_offset = display.scroll_x_position
+                if 0 < ncol_index <= len(display.cumulative_column_widths):
+                    x_offset -= display.cumulative_column_widths[ncol_index - 1]
+                elif len(display.cumulative_column_widths) < ncol_index:
+                    x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
+                x -= x_offset
+
             # Draw line(s) in the locator area
             if double_lines:
                 context.move_to(x - 2, 0)
@@ -343,20 +358,6 @@ class SheetRenderer(GObject.Object):
             # Draw line in the content area
             context.move_to(x, y_start)
             context.line_to(x, height)
-
-            # Get the width of the next appearing column
-            cell_width = display.DEFAULT_CELL_WIDTH
-            if ncol_index < len(display.column_widths):
-                cell_width = display.column_widths[ncol_index]
-
-            # Offset the first appearing column to account for the scroll position if necessary
-            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
-                x_offset = display.scroll_x_position
-                if 0 < ncol_index <= len(display.cumulative_column_widths):
-                    x_offset -= display.cumulative_column_widths[ncol_index - 1]
-                elif len(display.cumulative_column_widths) < ncol_index:
-                    x_offset -= display.cumulative_column_widths[-1]
-                x -= x_offset
 
             x += cell_width
             ncol_index += 1
@@ -400,6 +401,7 @@ class SheetRenderer(GObject.Object):
         # it's better to automatically adjust the cell widths to fit the text width if the text is overflowing?
         x_start = display.row_header_width
         x = x_start
+        x_offset = 0
         while x < width:
             # Handle edge cases where the last column(s) are hidden
             if col_index - 1 == len(display.column_visible_series) and \
@@ -419,7 +421,7 @@ class SheetRenderer(GObject.Object):
                 if 0 < col_index - 1 <= len(display.cumulative_column_widths):
                     x_offset -= display.cumulative_column_widths[col_index - 2]
                 elif len(display.cumulative_column_widths) < col_index - 1:
-                    x_offset -= display.cumulative_column_widths[-1]
+                    x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
                 x -= x_offset
 
             vcol_index = display.get_vcolumn_from_column(col_index)
@@ -526,30 +528,33 @@ class SheetRenderer(GObject.Object):
             nsurface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
             ncontext = cairo.Context(nsurface)
 
-            ncontext.save()
+            # Use cache if only the cache area will be visible in the viewport
+            # and the canvas movement is not diagonal.
+            if abs(x_offset) < width and abs(y_offset) < height and \
+                    (abs(x_offset) > 0 and y_offset == 0) or \
+                    (abs(y_offset) > 0 and x_offset == 0):
+                if x_offset > 0:
+                    nx_start = display.get_cell_x_from_point(width - x_offset)
+                    cwidth = nx_start - x_start
+                    ncontext.rectangle(x_start, y_start, cwidth, y_end)
+                elif x_offset < 0:
+                    nx_end = display.get_cell_x_from_point(x_start - x_offset)
+                    cwidth = display.get_cell_width_from_point(x_start - x_offset)
+                    ncontext.rectangle(nx_end + cwidth, y_start, x_end, y_end)
 
-            if x_offset > 0:
-                nx_start = display.get_cell_x_from_point(width - x_offset)
-                cwidth = nx_start - x_start
-                ncontext.rectangle(x_start, y_start, cwidth, y_end)
-            elif x_offset < 0:
-                nx_end = display.get_cell_x_from_point(x_start - x_offset)
-                cwidth = display.get_cell_width_from_point(x_start - x_offset)
-                ncontext.rectangle(nx_end + cwidth, y_start, x_end, y_end)
+                if y_offset > 0:
+                    ny_start = display.get_cell_y_from_point(height - y_offset)
+                    cheight = ny_start - y_start
+                    ncontext.rectangle(x_start, y_start, x_end, cheight)
+                elif y_offset < 0:
+                    ny_end = display.get_cell_y_from_point(y_start - y_offset)
+                    cheight = display.get_cell_height_from_point(y_start - y_offset)
+                    ncontext.rectangle(x_start, ny_end + cheight, x_end, y_end)
 
-            if y_offset > 0:
-                ny_start = display.get_cell_y_from_point(height - y_offset)
-                cheight = ny_start - y_start
-                ncontext.rectangle(x_start, y_start, x_end, cheight)
-            elif y_offset < 0:
-                ny_end = display.get_cell_y_from_point(y_start - y_offset)
-                cheight = display.get_cell_height_from_point(y_start - y_offset)
-                ncontext.rectangle(x_start, ny_end + cheight, x_end, y_end)
-
-            ncontext.clip()
-            ncontext.set_source_surface(rcache['surface'], -x_offset, -y_offset)
-            ncontext.paint()
-            ncontext.restore()
+                ncontext.clip()
+                ncontext.set_source_surface(rcache['surface'], -x_offset, -y_offset)
+                ncontext.paint()
+                ncontext.reset_clip()
 
             ccontext = ncontext
             rcache['surface'] = nsurface
@@ -581,6 +586,7 @@ class SheetRenderer(GObject.Object):
 
         # TODO: support multiple dataframes?
         x = x_start
+        x_offset = 0
         col_index = display.get_starting_column()
         while x < x_end:
             if data.bbs[0].column_span <= col_index:
@@ -601,7 +607,7 @@ class SheetRenderer(GObject.Object):
                 if 0 < col_index <= len(display.cumulative_column_widths):
                     x_offset -= display.cumulative_column_widths[col_index - 1]
                 elif len(display.cumulative_column_widths) < col_index:
-                    x_offset -= display.cumulative_column_widths[-1]
+                    x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
                 x -= x_offset
                 if nx_start == x_start:
                     nx_start -= x_offset
@@ -683,7 +689,8 @@ class SheetRenderer(GObject.Object):
         # Hide the top of the selection if it is exceeded by the scroll viewport
         if range_y < 0:
             range_height += range_y
-            range_y = 0
+            range_y = display.column_header_height
+            range_height -= display.column_header_height
         # Hide the entire selection if it is exceeded by the scroll viewport
         if range_height < 0:
             range_height = 0
@@ -698,7 +705,8 @@ class SheetRenderer(GObject.Object):
         # Hide the left of the selection if it is exceeded by the scroll viewport
         if range_x < 0:
             range_width += range_x
-            range_x = 0
+            range_x = display.row_header_width
+            range_width -= display.row_header_width
         # Hide the entire selection if it is exceeded by the scroll viewport
         if range_width < 0:
             range_width = 0

@@ -91,6 +91,8 @@ class SheetDocument(GObject.Object):
     def on_sheet_view_scrolled(self, source: GObject.Object) -> None:
         self.display.scroll_y_position = self.view.vertical_scrollbar.get_adjustment().get_value()
         self.display.scroll_x_position = self.view.horizontal_scrollbar.get_adjustment().get_value()
+
+        # Transform continuous scroll position to discrete
         self.display.scroll_y_position = round(self.display.scroll_y_position / self.display.DEFAULT_CELL_HEIGHT) * self.display.DEFAULT_CELL_HEIGHT
         self.display.scroll_x_position = round(self.display.scroll_x_position / self.display.DEFAULT_CELL_WIDTH) * self.display.DEFAULT_CELL_WIDTH
 
@@ -225,10 +227,6 @@ class SheetDocument(GObject.Object):
             col_2, row_2 = col_1, row_1
         else:
             (col_1, row_1), (col_2, row_2) = target_cell_position
-
-        # Clear the render caches when navigating by pressing the control key
-        if state == Gdk.ModifierType.CONTROL_MASK or state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
-            self.renderer.render_caches = {}
 
         self.update_selection_from_position(col_1, row_1, col_2, row_2, True, True, True)
 
@@ -1325,6 +1323,10 @@ class SheetDocument(GObject.Object):
             column = self.selection.current_active_cell.column
             row = self.selection.current_active_cell.row
             self.display.scroll_to_position(column, row, viewport_height, viewport_width)
+
+        # Transform continuous scroll position to discrete
+        self.display.scroll_y_position = round(self.display.scroll_y_position / self.display.DEFAULT_CELL_HEIGHT) * self.display.DEFAULT_CELL_HEIGHT
+        self.display.scroll_x_position = round(self.display.scroll_x_position / self.display.DEFAULT_CELL_WIDTH) * self.display.DEFAULT_CELL_WIDTH
 
         self.auto_adjust_scrollbars_by_scroll()
         self.auto_adjust_locators_size_by_scroll()
