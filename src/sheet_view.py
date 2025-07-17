@@ -316,10 +316,25 @@ class SheetView(Gtk.Box):
             new_width = self.document.display.DEFAULT_CELL_WIDTH * 3 + 2
             new_height = self.document.display.DEFAULT_CELL_HEIGHT * 7 + 2
 
+            # I had been trying to make it intelligently resize itself, but sadly I didn't succeed.
+            # My PangoCairo calculation is always different than what I perceived on the GtkEntry,
+            # even after setting the right font size and some other things. The problem with the
+            # current implementation is that it's too big for cells with small sizes and it can be
+            # too small for cells with large sizes. Plus, the scroll functionality isn't really
+            # working as I expected.
+            active_cell = self.document.selection.current_active_cell
+            cell_width = self.document.display.get_cell_width_from_column(active_cell.column)
+            cell_height = self.document.display.get_cell_height_from_row(active_cell.row)
+
+            if new_width < cell_width:
+                new_width = cell_width + 2
+            if new_height < cell_height:
+                new_height = cell_height + 2
+
             if self.main_canvas_width < new_x + new_width:
-                new_x = new_x - new_width / 3 * 2 + 2
+                new_x = new_x - new_width + cell_width + 2
             if self.main_canvas_height < new_y + new_height:
-                new_y = new_y - new_height / 7 * 6 + 2
+                new_y = new_y - new_height + cell_height + 2
 
             allocation.x = new_x
             allocation.y = new_y
