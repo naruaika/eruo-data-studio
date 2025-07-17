@@ -7,12 +7,6 @@
     <property name="default-width">1200</property>
     <property name="default-height">800</property>
     <property name="focusable">true</property>
-    <child>
-      <object class="AdwBreakpoint">
-        <condition>max-width: 600sp</condition>
-        <setter object="split_view" property="collapsed">true</setter>
-      </object>
-    </child>
     <property name="content">
       <object class="AdwNavigationSplitView" id="split_view">
         <property name="collapsed">true</property>
@@ -110,6 +104,8 @@
                     <property name="title-widget">
                       <object class="GtkBox">
                         <property name="orientation">horizontal</property>
+                        <property name="margin-start">30</property>
+                        <property name="margin-end">30</property>
                         <property name="spacing">6</property>
                         <child>
                           <object class="GtkEntry" id="name_box">

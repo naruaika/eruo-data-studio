@@ -217,9 +217,9 @@ class SheetRenderer(GObject.Object):
         # because the active cell is the only one that its data is appearing in the input bar.
         # Here we reset the color of the drawing context back to the canvas background color.
         if self.prefers_dark:
-            context.set_source_rgb(0.11, 0.11, 0.13)
+            context.set_source_rgb(0.13, 0.13, 0.15)
         else:
-            context.set_source_rgb(1.0, 1.0, 1.0)
+            context.set_source_rgb(0.98, 0.98, 0.98)
 
         # Highlight the active cell if the user is currently editing it
         if globals.is_editing_cells:
@@ -270,8 +270,8 @@ class SheetRenderer(GObject.Object):
         context.rectangle(0, display.column_header_height, width, height)
         context.clip()
 
+        # TODO: add support for custom row heights
         while y < height:
-            # TODO: add support for custom row heights
             context.move_to(x_start, y)
             context.line_to(width, y)
 
@@ -306,22 +306,15 @@ class SheetRenderer(GObject.Object):
         context.stroke()
 
         # Draw vertical lines
-        x_offset = display.scroll_x_position % display.DEFAULT_CELL_WIDTH
-        cell_width = display.DEFAULT_CELL_WIDTH - x_offset
-        x = x_start
-
-        ncol_index = int((x - display.row_header_width) // cell_width + display.get_starting_column())
+        ncol_index = display.get_starting_column()
         pcol_index = ncol_index
 
         context.reset_clip()
         context.rectangle(display.row_header_width, 0, width, height)
         context.clip()
 
+        x = x_start
         while x < width:
-            # TODO: add support for custom column widths
-            context.move_to(x, y_start)
-            context.line_to(x, height)
-
             # Skipping columns that are hidden will result in double lines
             double_lines = False
             if ncol_index < len(display.column_visible_series):
@@ -337,25 +330,37 @@ class SheetRenderer(GObject.Object):
                     not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 double_lines = True
 
-            x_offset = 0
-            if x == display.row_header_width:
-                x_offset = display.DEFAULT_CELL_WIDTH - cell_width
-            x_line = x - x_offset
-
+            # Draw line(s) in the locator area
             if double_lines:
-                context.move_to(x_line - 2, 0)
-                context.line_to(x_line - 2, y_start)
-                context.move_to(x_line + 2, 0)
-                context.line_to(x_line + 2, y_start)
+                context.move_to(x - 2, 0)
+                context.line_to(x - 2, y_start)
+                context.move_to(x + 2, 0)
+                context.line_to(x + 2, y_start)
             else:
-                context.move_to(x_line, 0)
-                context.line_to(x_line, y_start)
+                context.move_to(x, 0)
+                context.line_to(x, y_start)
+
+            # Draw line in the content area
+            context.move_to(x, y_start)
+            context.line_to(x, height)
+
+            # Get the width of the next appearing column
+            cell_width = display.DEFAULT_CELL_WIDTH
+            if ncol_index < len(display.column_widths):
+                cell_width = display.column_widths[ncol_index]
+
+            # Offset the first appearing column to account for the scroll position if necessary
+            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
+                x_offset = display.scroll_x_position
+                if 0 < ncol_index <= len(display.cumulative_column_widths):
+                    x_offset -= display.cumulative_column_widths[ncol_index - 1]
+                elif len(display.cumulative_column_widths) < ncol_index:
+                    x_offset -= display.cumulative_column_widths[-1]
+                x -= x_offset
 
             x += cell_width
             ncol_index += 1
             pcol_index += 1
-
-            cell_width = display.DEFAULT_CELL_WIDTH
 
         context.stroke()
 
@@ -384,13 +389,17 @@ class SheetRenderer(GObject.Object):
 
         # Determine the starting column label
         col_index = display.get_starting_column() + 1
-        x_offset = display.scroll_x_position % display.DEFAULT_CELL_WIDTH
-        cell_width = display.DEFAULT_CELL_WIDTH - x_offset
+
+        context.save()
+        context.rectangle(display.row_header_width, 0, width, height)
+        context.clip()
 
         # Draw column headers texts (centered)
         # It's so rare to see a worksheet go beyond Z*9 columns, but it's better to be prepared for it anyway
-        # by having defining the clip region to prevent the text from overflowing to the next cells.
-        x = display.row_header_width
+        # by having defining the clip region to prevent the text from overflowing to the next cells. TODO: maybe
+        # it's better to automatically adjust the cell widths to fit the text width if the text is overflowing?
+        x_start = display.row_header_width
+        x = x_start
         while x < width:
             # Handle edge cases where the last column(s) are hidden
             if col_index - 1 == len(display.column_visible_series) and \
@@ -399,9 +408,23 @@ class SheetRenderer(GObject.Object):
                     not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 col_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1) - 1
 
+            # Get the width of the next appearing column
+            cell_width = display.DEFAULT_CELL_WIDTH
+            if col_index - 1 < len(display.column_widths):
+                cell_width = display.column_widths[col_index - 1]
+
+            # Offset the first appearing column to account for the scroll position if necessary
+            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
+                x_offset = display.scroll_x_position
+                if 0 < col_index - 1 <= len(display.cumulative_column_widths):
+                    x_offset -= display.cumulative_column_widths[col_index - 2]
+                elif len(display.cumulative_column_widths) < col_index - 1:
+                    x_offset -= display.cumulative_column_widths[-1]
+                x -= x_offset
+
             vcol_index = display.get_vcolumn_from_column(col_index)
 
-            # Draw column name
+            # Draw dataframe header
             if len(data.bbs) and 0 < display.scroll_y_position and col_index <= data.bbs[0].column_span:
                 cname = data.dfs[0].columns[vcol_index - 1]
                 dtype = display.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
@@ -409,13 +432,13 @@ class SheetRenderer(GObject.Object):
                 layout.set_text(f'{cname} ({dtype})', -1)
                 x_text = x + display.DEFAULT_CELL_PADDING
 
-            # Draw column symbol
+            # Draw column name
             else:
                 cell_text = display.get_column_name_from_column(vcol_index)
                 layout.set_font_description(header_font_desc)
                 layout.set_text(cell_text, -1)
                 text_width = layout.get_size()[0] / Pango.SCALE
-                x_text = x + (display.DEFAULT_CELL_WIDTH - text_width) / 2
+                x_text = x + (cell_width - text_width) / 2
 
             context.save()
             context.rectangle(x, 0, cell_width - 1, display.column_header_height)
@@ -426,7 +449,8 @@ class SheetRenderer(GObject.Object):
 
             x += cell_width
             col_index += 1
-            cell_width = display.DEFAULT_CELL_WIDTH
+
+        context.restore()
 
         layout.set_font_description(header_font_desc)
 
@@ -462,15 +486,77 @@ class SheetRenderer(GObject.Object):
         if len(data.dfs) == 0:
             return
 
+        # Drawing loop boundaries
+        x_start = display.row_header_width
+        y_start = display.column_header_height
+        x_end = width
+        y_end = height
+
+        # Boundaries for non-cached area
+        nx_start = x_start
+        ny_start = y_start
+        nx_end = x_end
+        ny_end = y_end
+
+        use_cache = True
+
+        # Create the cache if it doesn't exist
         if 'content' not in self.render_caches:
             self.render_caches['content'] = {
                 'surface': cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height),
-                'width': width,
-                'height': height,
                 'x_pos': display.scroll_x_position,
                 'y_pos': display.scroll_y_position,
-                'blank': True,
             }
+            use_cache = False
+
+        rcache = self.render_caches['content']
+        ccontext = cairo.Context(rcache['surface'])
+
+        if use_cache:
+            # Calculate the scroll position offset
+            x_offset = display.scroll_x_position - rcache['x_pos']
+            y_offset = display.scroll_y_position - rcache['y_pos']
+
+            # Prevent the canvas from being re-drawn when the scroll isn't changed
+            if x_offset == 0 and y_offset == 0:
+                context.set_source_surface(rcache['surface'], 0, 0)
+                context.paint()
+                return
+
+            nsurface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+            ncontext = cairo.Context(nsurface)
+
+            ncontext.save()
+
+            if x_offset > 0:
+                nx_start = display.get_cell_x_from_point(width - x_offset)
+                cwidth = nx_start - x_start
+                ncontext.rectangle(x_start, y_start, cwidth, y_end)
+            elif x_offset < 0:
+                nx_end = display.get_cell_x_from_point(x_start - x_offset)
+                cwidth = display.get_cell_width_from_point(x_start - x_offset)
+                ncontext.rectangle(nx_end + cwidth, y_start, x_end, y_end)
+
+            if y_offset > 0:
+                ny_start = display.get_cell_y_from_point(height - y_offset)
+                cheight = ny_start - y_start
+                ncontext.rectangle(x_start, y_start, x_end, cheight)
+            elif y_offset < 0:
+                ny_end = display.get_cell_y_from_point(y_start - y_offset)
+                cheight = display.get_cell_height_from_point(y_start - y_offset)
+                ncontext.rectangle(x_start, ny_end + cheight, x_end, y_end)
+
+            ncontext.clip()
+            ncontext.set_source_surface(rcache['surface'], -x_offset, -y_offset)
+            ncontext.paint()
+            ncontext.restore()
+
+            ccontext = ncontext
+            rcache['surface'] = nsurface
+            rcache['x_pos'] = display.scroll_x_position
+            rcache['y_pos'] = display.scroll_y_position
+
+        self.setup_cairo_context(ccontext)
 
         # Use system default font family for drawing text
         font_desc = Gtk.Widget.create_pango_context(canvas).get_font_description()
@@ -478,78 +564,11 @@ class SheetRenderer(GObject.Object):
         header_font_desc = Pango.font_description_from_string(f'{font_family} Normal Bold {display.FONT_SIZE}px')
         body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Regular {display.FONT_SIZE}px')
 
-        x_start = display.row_header_width
-        y_start = display.column_header_height
-        x_end = width
-        y_end = height
+        layout = PangoCairo.create_layout(ccontext)
 
-        rcache = self.render_caches['content']
-        ccontext = cairo.Context(rcache['surface'])
-
-        # Draw from the cached surface
-        if not rcache['blank']:
-            scroll_x_offset = display.scroll_x_position - rcache['x_pos']
-            scroll_y_offset = display.scroll_y_position - rcache['y_pos']
-
-            # Prevent the canvas from being drawn when the scroll isn't changed
-            if scroll_x_offset == 0 and scroll_y_offset == 0:
-                x_end = 0
-
-            if not (scroll_x_offset == 0 and scroll_y_offset == 0):
-                nsurface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
-                ncontext = cairo.Context(nsurface)
-
-                if abs(scroll_y_offset) < height or abs(scroll_x_offset) < width:
-                    clip_x = display.row_header_width
-                    clip_y = display.column_header_height
-
-                    if scroll_x_offset > 0:
-                        # Basically we want to minimize the glitches when scrolling to the right or bottom where cells
-                        # near the right/bottom edges are getting bolder when scrolling due to getting multiple redraws.
-                        # TODO: this should be taken care as we'll add support for non-uniform column sizes
-                        # TODO: remember that we currently don't have support for continuous scrolling too
-                        clip_width = width - display.row_header_width
-                        clip_width = clip_width - (display.DEFAULT_CELL_WIDTH * scroll_x_offset / display.DEFAULT_CELL_WIDTH)
-                        clip_width = clip_width - (width - display.row_header_width) % display.DEFAULT_CELL_WIDTH
-                        clip_height = height - display.column_header_height
-                    elif scroll_y_offset > 0:
-                        clip_width = width - display.row_header_width
-                        clip_height = height - display.column_header_height
-                        clip_height = clip_height - (display.DEFAULT_CELL_HEIGHT * scroll_y_offset / display.DEFAULT_CELL_HEIGHT)
-                        clip_height = clip_height - (height - display.column_header_height) % display.DEFAULT_CELL_HEIGHT
-                    else:
-                        clip_width = width - display.row_header_width
-                        clip_height = height - display.column_header_height
-
-                    ncontext.save()
-                    ncontext.rectangle(clip_x, clip_y, clip_width, clip_height)
-                    ncontext.clip()
-                    ncontext.set_source_surface(rcache['surface'], -scroll_x_offset, -scroll_y_offset)
-                    ncontext.paint()
-                    ncontext.restore()
-
-                ccontext = ncontext
-                rcache['surface'] = nsurface
-                rcache['x_pos'] = display.scroll_x_position
-                rcache['y_pos'] = display.scroll_y_position
-
-                if scroll_x_offset > 0:
-                    x_start = x_end - scroll_x_offset
-                    x_start = x_start - (x_start - display.row_header_width) % display.DEFAULT_CELL_WIDTH
-                    x_start = max(x_start, display.row_header_width)
-                elif scroll_x_offset < 0:
-                    x_end = x_start - scroll_x_offset
-                    x_end = min(x_end, width)
-
-                if scroll_y_offset > 0:
-                    y_start = y_end - scroll_y_offset
-                    y_start = y_start - (y_start - display.column_header_height) % display.DEFAULT_CELL_HEIGHT
-                    y_start = max(y_start, display.column_header_height)
-                elif scroll_y_offset < 0:
-                    y_end = y_start - scroll_y_offset
-                    y_end = min(y_end, height)
-
-        self.setup_cairo_context(ccontext)
+        ccontext.save()
+        ccontext.rectangle(x_start, y_start, x_end, y_end)
+        ccontext.clip()
 
         # We use the same color scheme as the headers
         if self.prefers_dark:
@@ -557,28 +576,52 @@ class SheetRenderer(GObject.Object):
         else:
             ccontext.set_source_rgb(0.0, 0.0, 0.0)
 
-        layout = PangoCairo.create_layout(ccontext)
-
         cell_width = display.DEFAULT_CELL_WIDTH
         cell_height = display.DEFAULT_CELL_HEIGHT
 
         # TODO: support multiple dataframes?
         x = x_start
-        col_index = int((x - display.row_header_width) // cell_width + display.get_starting_column())
+        col_index = display.get_starting_column()
         while x < x_end:
             if data.bbs[0].column_span <= col_index:
                 width = x # prevent iteration over empty cells
                 break
+
+            y = y_start
+            row_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
+
+            # Get the width of the next appearing column
+            cell_width = display.DEFAULT_CELL_WIDTH
+            if col_index < len(display.column_widths):
+                cell_width = display.column_widths[col_index]
+
+            # Offset the first appearing column to account for the scroll position if necessary
+            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
+                x_offset = display.scroll_x_position
+                if 0 < col_index <= len(display.cumulative_column_widths):
+                    x_offset -= display.cumulative_column_widths[col_index - 1]
+                elif len(display.cumulative_column_widths) < col_index:
+                    x_offset -= display.cumulative_column_widths[-1]
+                x -= x_offset
+                if nx_start == x_start:
+                    nx_start -= x_offset
+
             ccontext.save()
             ccontext.rectangle(x, display.column_header_height, cell_width - 1, height)
             ccontext.clip()
-            y = y_start
-            row_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
+
             while y < y_end:
+                if y < ny_start or ny_end < y or x < nx_start or nx_end < x:
+                    y += cell_height
+                    row_index += 1
+                    continue # skip cached area
+
                 if data.bbs[0].row_span <= row_index:
-                    height = y # prevent iteration over empty cells
-                    break
-                if row_index == 0: # dataframe header
+                    height = y
+                    break # prevent iteration over empty cells
+
+                # Draw dataframe header
+                if row_index == 0:
                     layout.set_font_description(header_font_desc)
                     if col_index < len(display.column_visible_series):
                         vcol_index = display.column_visible_series[col_index]
@@ -587,7 +630,9 @@ class SheetRenderer(GObject.Object):
                     cname = data.dfs[0].columns[vcol_index]
                     dtype = display.get_dtype_symbol(data.dfs[0].dtypes[vcol_index])
                     cell_text = f'{cname} ({dtype})'
-                else: # dataframe content
+
+                # Draw dataframe content
+                else:
                     layout.set_font_description(body_font_desc)
                     if row_index < len(display.row_visible_series):
                         vrow_index = display.row_visible_series[row_index]
@@ -598,27 +643,33 @@ class SheetRenderer(GObject.Object):
                     else:
                         vcol_index = col_index
                     cell_text = data.dfs[0][vrow_index - 1, vcol_index]
+
                 if cell_text in ['', None]:
-                    y += cell_height # skip empty cells
+                    y += cell_height
                     row_index += 1
-                    continue
+                    continue # skip empty cells
+
                 # Truncate before the first line break to prevent overflow
                 cell_text = str(cell_text).split('\n', 1)[0]
                 # Truncate the contents for performance reasons
-                cell_text = cell_text[:int(cell_width * 0.2)] # FIXME: 0.2 is a magic number
+                cell_text = cell_text[:int(cell_width * 0.2)] # TODO: 0.2 is a magic number
+
                 ccontext.move_to(x + display.DEFAULT_CELL_PADDING, y + 2)
                 layout.set_text(cell_text, -1)
                 PangoCairo.show_layout(ccontext, layout)
+
+                # TODO: add support for custom row heights
                 y += cell_height
                 row_index += 1
+
             ccontext.restore()
             x += cell_width
             col_index += 1
 
-        context.set_source_surface(self.render_caches['content']['surface'], 0, 0)
-        context.paint()
+        ccontext.restore()
 
-        self.render_caches['content']['blank'] = False
+        context.set_source_surface(rcache['surface'], 0, 0)
+        context.paint()
 
     def draw_selection_borders(self, context: cairo.Context, width: int, height: int, display: SheetDisplay, selection: SheetSelection) -> None:
         context.save()

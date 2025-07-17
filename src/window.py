@@ -155,7 +155,7 @@ class Window(Adw.ApplicationWindow):
 
     @Gtk.Template.Callback()
     def on_search_box_changed(self, widget: Gtk.Widget) -> None:
-        print(widget.get_text())
+        pass
 
     @Gtk.Template.Callback()
     def on_name_box_activated(self, widget: Gtk.Widget) -> None:
@@ -275,6 +275,7 @@ class Window(Adw.ApplicationWindow):
         if len(self.sheet_manager.sheets) == 0:
             self.name_box.set_sensitive(False)
             self.formula_bar.set_sensitive(False)
+            self.update_inputbar('', '')
             self.grab_focus()
 
     def on_selection_changed(self, source: GObject.Object, sel_name: str, sel_value: str) -> None:

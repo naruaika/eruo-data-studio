@@ -71,8 +71,6 @@ pip install -r requirements-devel.txt
 
 To add new dependencies using [`pip`](https://packaging.python.org/en/latest/key_projects/#pip) to the [`flatpak-builder`](https://docs.flatpak.org/en/latest/flatpak-builder.html) manifest json file, you can use the [`flatpak-pip-generator`](https://github.com/flatpak/flatpak-builder-tools/tree/master/pip). Either adding the reference to the `com.macipra.eruo*.json` files or copy-pasting the content directly into the manifest files and delete the generated file. Do not forget to update the `requirements*.txt` files as well.
 
-<!-- TODO: add instructions on packaging -->
-
 Here are some useful references for the project development:
 
 - Flatpak: https://docs.flatpak.org/en/latest/index.html

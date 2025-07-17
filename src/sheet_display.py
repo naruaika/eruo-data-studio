@@ -49,13 +49,20 @@ class SheetDisplay(GObject.Object):
     row_visible_series: polars.Series = polars.Series(dtype=polars.UInt32)
     column_visible_series: polars.Series = polars.Series(dtype=polars.UInt32)
 
+    row_heights: polars.Series = polars.Series(dtype=polars.UInt32)
+    column_widths: polars.Series = polars.Series(dtype=polars.UInt32)
+
+    cumulative_row_heights: polars.Series = polars.Series(dtype=polars.UInt32)
+    cumulative_column_widths: polars.Series = polars.Series(dtype=polars.UInt32)
+
     def __init__(self, document: SheetDocument) -> None:
         super().__init__()
 
         self.document = document
 
+    # FIXME: functions don't share their coordinate system
+
     def get_vcolumn_from_column(self, column: int) -> int:
-        # TODO: should we support dataframe starting from column > 1?
         if column < len(self.column_visible_series):
             return self.column_visible_series[column - 1] + 1
         if len(self.column_visible_series):
@@ -63,38 +70,45 @@ class SheetDisplay(GObject.Object):
         return column
 
     def get_vrow_from_row(self, row: int) -> int:
-        # TODO: should we support dataframe starting from row > 1?
         if row < len(self.row_visible_series):
             return self.row_visible_series[row - 1] + 1
         if len(self.row_visible_series):
             return self.row_visible_series[-1] + row - len(self.row_visible_series) + 1
         return row
 
-    def get_column_from_vcolumn(self, vcolumn: int) -> int:
+    def get_column_from_vcolumn(self, vcolumn: int, side = 'left') -> int:
         if len(self.column_visible_series):
             if vcolumn - 1 <= self.column_visible_series[-1]:
-                return self.column_visible_series.search_sorted(vcolumn - 1, 'left') + 1
+                return self.column_visible_series.search_sorted(vcolumn - 1, side) + 1
             else:
                 return len(self.column_visible_series) + vcolumn - self.column_visible_series[-1] - 1
         return vcolumn
 
-    def get_row_from_vrow(self, vrow: int) -> int:
+    def get_row_from_vrow(self, vrow: int, side = 'left') -> int:
         if len(self.row_visible_series):
             if vrow - 1 <= self.row_visible_series[-1]:
-                return self.row_visible_series.search_sorted(vrow - 1, 'left') + 1
+                return self.row_visible_series.search_sorted(vrow - 1, side) + 1
             else:
                 return len(self.row_visible_series) + vrow - self.row_visible_series[-1] - 1
         return vrow
 
-    def get_starting_column(self, offset: int = None) -> int:
+    def get_starting_column(self, offset: int = None, side = 'right') -> int:
         if offset is None:
             offset = self.scroll_x_position
-        return int(offset // self.DEFAULT_CELL_WIDTH)
+        if len(self.cumulative_column_widths) == 0:
+            return int(offset // self.DEFAULT_CELL_WIDTH)
+        if self.cumulative_column_widths[-1] <= offset:
+            return len(self.cumulative_column_widths) + (offset - self.cumulative_column_widths[-1]) // self.DEFAULT_CELL_WIDTH
+        return self.cumulative_column_widths.search_sorted(offset, side)
 
-    def get_starting_row(self, offset: int = None) -> int:
+    def get_starting_row(self, offset: int = None, side = 'right') -> int:
         if offset is None:
             offset = self.scroll_y_position
-        return int(offset // self.DEFAULT_CELL_HEIGHT)
+        if len(self.cumulative_row_heights) == 0:
+            return int(offset // self.DEFAULT_CELL_HEIGHT)
+        if self.cumulative_row_heights[-1] <= offset:
+            return len(self.cumulative_row_heights) + (offset - self.cumulative_row_heights[-1]) // self.DEFAULT_CELL_HEIGHT
+        return self.cumulative_row_heights.search_sorted(offset, side)
 
     def get_n_hidden_columns(self, col_1: int, col_2: int) -> int:
         if len(self.column_visible_series):
@@ -132,54 +146,80 @@ class SheetDisplay(GObject.Object):
             return 'A' * (len(name) + 1)
         return name[:i] + str(int(name[i]) + 1) + 'A' * (len(name) - i - 1)
 
-    def get_column_from_point(self, x: int = 0) -> int:
+    def get_column_from_point(self, x: int = 0, side = 'left') -> int:
         if x <= self.row_header_width:
             return 0
-        return int(x + self.scroll_x_position - self.row_header_width) // self.DEFAULT_CELL_WIDTH + 1
+        x = int(x + self.scroll_x_position - self.row_header_width)
+        if len(self.cumulative_column_widths):
+            if x <= self.cumulative_column_widths[-1]:
+                return self.cumulative_column_widths.search_sorted(x, side) + 1
+            return len(self.cumulative_column_widths) + (x - self.cumulative_column_widths[-1]) // self.DEFAULT_CELL_WIDTH + 1
+        return x // self.DEFAULT_CELL_WIDTH + 1
 
-    def get_row_from_point(self, y: int = 0) -> int:
+    def get_row_from_point(self, y: int = 0, side = 'left') -> int:
         if y <= self.column_header_height:
             return 0
-        return int(y + self.scroll_y_position - self.column_header_height) // self.DEFAULT_CELL_HEIGHT + 1
+        y = int(y + self.scroll_y_position - self.column_header_height)
+        if len(self.cumulative_row_heights):
+            if y <= self.cumulative_row_heights[-1]:
+                return self.cumulative_row_heights.search_sorted(y, side) + 1
+            return len(self.cumulative_row_heights) + (y - self.cumulative_row_heights[-1]) // self.DEFAULT_CELL_HEIGHT + 1
+        return y // self.DEFAULT_CELL_HEIGHT + 1
 
     def get_cell_x_from_point(self, x: int = 0) -> int:
-        if (column := self.get_column_from_point(x)) == 0:
-            return 0
-        return (column - 1) * self.DEFAULT_CELL_WIDTH + self.row_header_width - self.scroll_x_position
+        column = self.get_column_from_point(x)
+        return self.get_cell_x_from_column(column)
 
     def get_cell_y_from_point(self, y: int = 0) -> int:
-        if (row := self.get_row_from_point(y)) == 0:
-            return 0
-        return (row - 1) * self.DEFAULT_CELL_HEIGHT + self.column_header_height - self.scroll_y_position
+        row = self.get_row_from_point(y)
+        return self.get_cell_y_from_row(row)
 
     def get_cell_x_from_column(self, column: int) -> int:
         if column == 0:
             return 0
-        return (column - 1) * self.DEFAULT_CELL_WIDTH + self.row_header_width - self.scroll_x_position
+        x = self.row_header_width - self.scroll_x_position
+        if column == 1:
+            return x
+        df_width = len(self.cumulative_column_widths)
+        if df_width:
+            if column <= df_width:
+                return x + self.cumulative_column_widths[column - 2]
+            return x + self.cumulative_column_widths[-1] + (column - 1 - df_width) * self.DEFAULT_CELL_WIDTH
+        return x + (column - 1) * self.DEFAULT_CELL_WIDTH
 
     def get_cell_y_from_row(self, row: int) -> int:
         if row == 0:
             return 0
-        return (row - 1) * self.DEFAULT_CELL_HEIGHT + self.column_header_height - self.scroll_y_position
+        y = self.column_header_height - self.scroll_y_position
+        if row == 1:
+            return y
+        df_height = len(self.cumulative_row_heights)
+        if df_height:
+            if row <= df_height:
+                return y + self.cumulative_row_heights[row - 2]
+            return y + self.cumulative_row_heights[-1] + (row - 1 - df_height) * self.DEFAULT_CELL_HEIGHT
+        return y + (row - 1) * self.DEFAULT_CELL_HEIGHT
 
     def get_cell_width_from_point(self, x: int = 0) -> int:
-        if self.get_column_from_point(x) == 0:
-            return self.row_header_width
-        return self.DEFAULT_CELL_WIDTH
+        column = self.get_column_from_point(x)
+        return self.get_cell_width_from_column(column)
 
     def get_cell_height_from_point(self, y: int = 0) -> int:
-        if self.get_row_from_point(y) == 0:
-            return self.column_header_height
-        return self.DEFAULT_CELL_HEIGHT
+        row = self.get_row_from_point(y)
+        return self.get_cell_height_from_row(row)
 
     def get_cell_width_from_column(self, column: int) -> int:
         if column == 0:
             return self.row_header_width
+        if column <= len(self.column_widths):
+            return self.column_widths[column - 1]
         return self.DEFAULT_CELL_WIDTH
 
     def get_cell_height_from_row(self, row: int) -> int:
         if row == 0:
             return self.column_header_height
+        if row <= len(self.row_heights):
+            return self.row_heights[row - 1]
         return self.DEFAULT_CELL_HEIGHT
 
     def get_column_name_from_column(self, column: int = 0) -> str:
@@ -204,6 +244,9 @@ class SheetDisplay(GObject.Object):
     def get_cell_position_from_name(self, name: str) -> tuple[int, int]:
         """
         Parses a cell name (e.g., 'A10', 'ABC123', '5', 'H') into a (column, row) tuple.
+
+        Disclaimer: this function was written by genAI under my own supervision.
+        I've tested over all the potential cases, but there's no guarantee.
 
         Interpretation of inputs:
         - For 'A10', 'AA5', 'ABC123': column is 1-based (A=1, AA=27), row is 1-based.
@@ -273,6 +316,10 @@ class SheetDisplay(GObject.Object):
         """
         Parses a cell range (e.g., 'A10:a20', 'AA5:BB20', '5:10', 'h:H') or a single cell
         (e.g., 'a10', '123', 'HIJ', 'ABC123') into a tuple of (start_col, start_row, end_col, end_row).
+
+        Disclaimer: this function was written by genAI under my own supervision.
+        I've tested over all the potential cases, but there's no guarantee.
+
         Returns (-1, -1, -1, -1) if the name cannot be parsed.
         """
         cell_part_pattern = r"([A-Za-z]*\d*|[A-Za-z]*\d*)"
@@ -325,10 +372,13 @@ class SheetDisplay(GObject.Object):
         return '?'
 
     def scroll_to_position(self, column: int, row: int, viewport_height: int, viewport_width: int) -> bool:
-        bottom_offset = row * self.DEFAULT_CELL_HEIGHT
-        top_offset = (row - 1) * self.DEFAULT_CELL_HEIGHT
-        right_offset = column * self.DEFAULT_CELL_WIDTH
-        left_offset = (column - 1) * self.DEFAULT_CELL_WIDTH
+        x_offset = self.row_header_width - self.scroll_x_position
+        y_offset = self.column_header_height - self.scroll_y_position
+
+        bottom_offset = self.get_cell_y_from_row(row) + self.get_cell_height_from_row(row) - y_offset
+        top_offset = self.get_cell_y_from_row(row) - y_offset
+        right_offset = self.get_cell_x_from_column(column) + self.get_cell_width_from_column(column) - x_offset
+        left_offset = self.get_cell_x_from_column(column) - x_offset
 
         # Skip if the target cell is already visible
         if self.scroll_y_position <= top_offset and bottom_offset <= self.scroll_y_position + viewport_height and \

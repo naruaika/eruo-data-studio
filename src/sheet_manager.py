@@ -45,13 +45,13 @@ class SheetManager(GObject.Object):
                     sheet_number = max(sheet_number, int(match.group(1)) + 1)
             title = f'Sheet {sheet_number}'
 
-        did = self.sheet_counter
+        docid = self.sheet_counter
         self.sheet_counter += 1
 
-        sheet = SheetDocument(did, title, dataframe)
-        self.sheets[did] = sheet
+        sheet = SheetDocument(docid, title, dataframe)
+        self.sheets[docid] = sheet
 
         return sheet.view
 
     def delete_sheet(self, sheet_view: SheetView) -> None:
-        self.sheets.pop(sheet_view.document.did)
+        self.sheets.pop(sheet_view.document.docid)

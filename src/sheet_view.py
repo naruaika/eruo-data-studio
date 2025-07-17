@@ -34,9 +34,6 @@ class SheetView(Gtk.Box):
         'update-cell-data': (GObject.SIGNAL_RUN_FIRST, None, (str,)),
     }
 
-    SCROLL_X_MULTIPLIER: int = 65
-    SCROLL_Y_MULTIPLIER: int = 60
-
     main_overlay = Gtk.Template.Child()
 
     horizontal_scrollbar = Gtk.Template.Child()
@@ -49,9 +46,6 @@ class SheetView(Gtk.Box):
         super().__init__(**kwargs)
 
         self.document = document
-
-        self.SCROLL_X_MULTIPLIER = self.document.display.DEFAULT_CELL_WIDTH * 1
-        self.SCROLL_Y_MULTIPLIER = self.document.display.DEFAULT_CELL_HEIGHT * 3
 
         scroll_event_controller = Gtk.EventControllerScroll()
         scroll_event_controller.set_flags(Gtk.EventControllerScrollFlags.BOTH_AXES)
@@ -110,14 +104,6 @@ class SheetView(Gtk.Box):
 
         self.context_menu = None
 
-        self.is_initialized = False
-
-    def do_state_flags_changed(self, previous_state_flags: Gtk.StateFlags) -> None:
-        if not self.is_initialized and self.get_height():
-            self.document.auto_adjust_scrollbars_by_scroll()
-            self.main_canvas.queue_draw()
-            self.is_initialized = True
-
     def on_main_canvas_scrolled(self, event: Gtk.EventControllerScroll, dx: float, dy: float) -> bool:
         # Change direction of scroll based on shift key
         if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dy < 0 or 0 < dy):
@@ -125,8 +111,9 @@ class SheetView(Gtk.Box):
         elif event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dx < 0 or 0 < dx):
             dy, dx = dx, 0
 
-        dx = int(dx * self.SCROLL_X_MULTIPLIER)
-        dy = int(dy * self.SCROLL_Y_MULTIPLIER)
+        # Convert to scroll unit (in pixels)
+        dx = int(dx * self.document.display.DEFAULT_CELL_WIDTH) # cell width is usually 2-3x the cell height
+        dy = int(dy * self.document.display.DEFAULT_CELL_HEIGHT * self.document.display.scroll_increment)
 
         scroll_y_position = self.vertical_scrollbar.get_adjustment().get_value()
         scroll_x_position = self.horizontal_scrollbar.get_adjustment().get_value()

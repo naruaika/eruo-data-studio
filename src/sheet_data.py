@@ -81,8 +81,7 @@ class SheetData(GObject.Object):
         if dataframe is None:
             return
         self.dfs = [dataframe]
-        # TODO: should we support dataframe starting from row > 1?
-        # TODO: should we support dataframe starting from column > 1?
+        # TODO: should we support dataframe starting from row > 1 and/or column > 1?
         self.bbs = [SheetCellBoundingBox(1, 1, dataframe.width, dataframe.height + 1)]
         self.fes = [None]
 
@@ -223,7 +222,6 @@ class SheetData(GObject.Object):
         stop = min(row + row_span, row_count)
 
         for column in range(column, end_column):
-            # TODO: support updating over multiple dataframes?
             if self.dfs[dfi].width <= column:
                 break
 
@@ -304,7 +302,6 @@ class SheetData(GObject.Object):
 
         content_index = -1
         for column in range(column, end_column):
-            # TODO: support updating over multiple dataframes?
             if self.dfs[dfi].width <= column:
                 break
 
@@ -391,9 +388,10 @@ class SheetData(GObject.Object):
         return True
 
     def delete_rows_from_metadata(self, row: int, row_span: int, dfi: int) -> bool:
-        # TODO: should shift all dataframes below the current selection up?
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
+
+        # TODO: should we shift all dataframes below the current selection up?
 
         row -= 1
 
@@ -410,9 +408,10 @@ class SheetData(GObject.Object):
         return True
 
     def delete_columns_from_metadata(self, column: int, column_span: int, dfi: int) -> bool:
-        # TODO: should shift all dataframes on the right side of the current selection to the left?
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
+
+        # TODO: should we shift all dataframes on the right side of the current selection to the left?
 
         column_names = self.dfs[dfi].columns[column:column + column_span]
         self.dfs[dfi] = self.dfs[dfi].drop(column_names)

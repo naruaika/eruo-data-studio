@@ -36,14 +36,43 @@ class State(GObject.Object):
     scroll_x: int
     scroll_y: int
 
+    # Optionals
+    range: SheetCell
+    active: SheetCell
+    cursor: SheetCell
+
     def __init__(self) -> None:
         super().__init__()
 
         self.timestamp = time.time()
 
+        # TODO: should we also store the scrollbar uppers?
         document = globals.history.document
         self.scroll_x = document.display.scroll_x_position
         self.scroll_y = document.display.scroll_y_position
+
+    def save_selection(self) -> None:
+        document = globals.history.document
+        self.range = document.selection.current_active_range
+        self.active = document.selection.current_active_cell
+        self.cursor = document.selection.current_cursor_cell
+
+    def restore_selection(self, notify: bool = True) -> None:
+        document = globals.history.document
+
+        document.selection.current_active_range = self.range
+        document.selection.current_active_cell = self.active
+        document.selection.current_cursor_cell = self.cursor
+
+        if notify:
+            document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+
+    def write_snapshot(self, dataframe: polars.DataFrame) -> str:
+        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
+            # TODO: we leave uncompressed for now, but we may want to determine
+            # the compression level based on the size of the dataframe later.
+            dataframe.write_parquet(file_path.name, compression='uncompressed', statistics=False)
+            return file_path.name
 
 
 
@@ -59,10 +88,6 @@ class SelectionState(State):
     follow_cursor: bool
     auto_scroll: bool
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, col_1: int, row_1: int, col_2: int, row_2: int,
                  keep_order: bool, follow_cursor: bool, auto_scroll: bool) -> None:
         super().__init__()
@@ -76,19 +101,10 @@ class SelectionState(State):
         self.follow_cursor = follow_cursor
         self.auto_scroll = auto_scroll
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
-        document = globals.history.document
-
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
-
-        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -103,20 +119,13 @@ class InsertBlankRowState(State):
     row_span: int
     above: bool
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, row_span: int, above: bool) -> None:
         super().__init__()
 
         self.row_span = row_span
         self.above = above
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
@@ -132,11 +141,7 @@ class InsertBlankRowState(State):
 
         self.range.row_span = prow_span
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
-
-        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -150,20 +155,13 @@ class InsertBlankColumnState(State):
     column_span: int
     left: bool
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, column_span: int, left: bool) -> None:
         super().__init__()
 
         self.column_span = column_span
         self.left = left
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
@@ -179,11 +177,7 @@ class InsertBlankColumnState(State):
 
         self.range.column_span = pcolumn_span
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
-
-        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -221,18 +215,15 @@ class UpdateDataState(State):
                 self.content = None
                 self.file_path = None
             else:
-                with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-                    # TODO: we leave uncompressed for now, but we may want to determine
-                    # the compression level based on the size of the dataframe later.
-                    content.write_parquet(file_path.name, compression='uncompressed', statistics=False)
-                    self.content = None
-                    self.file_path = file_path.name
+                self.content = None
+                self.file_path = self.write_snapshot(content)
         else:
             self.content = content
             self.file_path = None
 
     def undo(self) -> None:
         document = globals.history.document
+
         if self.file_path is not None:
             document.update_current_cells([self.header, polars.read_parquet(self.file_path)])
         else:
@@ -250,20 +241,13 @@ class DuplicateRowState(State):
     row_span: int
     above: bool
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, row_span: int, above: bool) -> None:
         super().__init__()
 
         self.row_span = row_span
         self.above = above
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
@@ -279,11 +263,7 @@ class DuplicateRowState(State):
 
         self.range.row_span = prow_span
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
-
-        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -297,20 +277,13 @@ class DuplicateColumnState(State):
     column_span: int
     left: bool
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, column_span: int, left: bool) -> None:
         super().__init__()
 
         self.column_span = column_span
         self.left = left
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
@@ -326,11 +299,7 @@ class DuplicateColumnState(State):
 
         self.range.column_span = pcolumn_span
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
-
-        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -343,48 +312,37 @@ class DeleteRowState(State):
 
     file_path: str
     vflags_path: str
+    rheights_path: str
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
-    def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series) -> None:
+    def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series, rheights: polars.Series) -> None:
         super().__init__()
 
         if dataframe is None:
             self.file_path = None
             return
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            dataframe.write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.file_path = file_path.name
+        self.file_path = self.write_snapshot(dataframe)
 
-        if vflags is None:
+        if vflags is not None:
+            self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+        else:
             self.vflags_path = None
-            return
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.vflags_path = file_path.name
+        if rheights is not None:
+            self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights}))
+        else:
+            self.rheights_path = None
 
     def undo(self) -> None:
         document = globals.history.document
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
+        self.restore_selection(False)
 
         document.insert_from_current_rows(polars.read_parquet(self.file_path),
-                                          polars.read_parquet(self.vflags_path).to_series(0) if self.vflags_path is not None else None)
+                                          polars.read_parquet(self.vflags_path).to_series(0) if self.vflags_path is not None else None,
+                                          polars.read_parquet(self.rheights_path).to_series(0) if self.rheights_path is not None else None)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -397,48 +355,37 @@ class DeleteColumnState(State):
 
     file_path: str
     vflags_path: str
+    cwidths_path: str
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
-    def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series) -> None:
+    def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series, cwidths: polars.Series) -> None:
         super().__init__()
 
         if dataframe is None:
             self.file_path = None
             return
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            dataframe.write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.file_path = file_path.name
+        self.file_path = self.write_snapshot(dataframe)
 
-        if vflags is None:
+        if vflags is not None:
+            self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+        else:
             self.vflags_path = None
-            return
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.vflags_path = file_path.name
+        if cwidths is not None:
+            self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths}))
+        else:
+            self.cwidths_path = None
 
     def undo(self) -> None:
         document = globals.history.document
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
+        self.restore_selection(False)
 
         document.insert_from_current_columns(polars.read_parquet(self.file_path),
-                                             polars.read_parquet(self.vflags_path).to_series(0) if self.vflags_path is not None else None)
+                                             polars.read_parquet(self.vflags_path).to_series(0) if self.vflags_path is not None else None,
+                                             polars.read_parquet(self.cwidths_path).to_series(0) if self.cwidths_path is not None else None)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -451,27 +398,19 @@ class HideRowState(State):
 
     row_span: int
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, row_span: int) -> None:
         super().__init__()
 
         self.row_span = row_span
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
+        self.restore_selection(False)
 
+        # Update row visibility flags
         document.display.row_visibility_flags = polars.concat([document.display.row_visibility_flags[:self.range.metadata.row],
                                                                polars.Series([True] * self.row_span),
                                                                document.display.row_visibility_flags[self.range.metadata.row + self.row_span:]])
@@ -489,27 +428,19 @@ class HideColumnState(State):
 
     column_span: int
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, column_span: int) -> None:
         super().__init__()
 
         self.column_span = column_span
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
+        self.restore_selection(False)
 
+        # Update column visibility flags
         document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:self.range.metadata.column],
                                                                   polars.Series([True] * self.column_span),
                                                                   document.display.column_visibility_flags[self.range.metadata.column + self.column_span:]])
@@ -528,42 +459,42 @@ class UnhideRowState(State):
     row_span: int
 
     vflags_path: str
+    rheights_path: str
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
-    def __init__(self, row_span: int, vflags: polars.Series) -> None:
+    def __init__(self, row_span: int, vflags: polars.Series, rheights: polars.Series) -> None:
         super().__init__()
 
         self.row_span = row_span
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.vflags_path = file_path.name
+        self.save_selection()
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+
+        if rheights is None:
+            self.rheights_path = None
+            return
+
+        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights}))
 
     def undo(self) -> None:
         document = globals.history.document
+        mrow = self.range.metadata.row
 
-        # TODO: support unhiding over multiple dataframes?
-        document.display.row_visibility_flags = polars.concat([document.display.row_visibility_flags[:self.range.metadata.row],
+        # Update row visibility flags
+        document.display.row_visibility_flags = polars.concat([document.display.row_visibility_flags[:mrow],
                                                                polars.read_parquet(self.vflags_path).to_series(0),
-                                                               document.display.row_visibility_flags[self.range.metadata.row + self.row_span:]])
+                                                               document.display.row_visibility_flags[mrow + self.row_span:]])
         document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
         document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
+        # Update row heights
+        if self.rheights_path is not None:
+            document.display.row_heights = polars.concat([document.display.row_heights[:mrow],
+                                                          polars.read_parquet(self.rheights_path).to_series(0),
+                                                          document.display.row_heights[mrow:]])
+            document.display.cumulative_row_heights = polars.Series('cumulative_row_heights', document.display.row_heights).cum_sum()
 
-        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -576,37 +507,22 @@ class UnhideAllRowState(State):
 
     vflags_path: str
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, vflags: polars.Series) -> None:
         super().__init__()
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.vflags_path = file_path.name
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
 
-        # TODO: support unhiding over multiple dataframes?
+        # Update row visibility flags
         document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
         document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
         document.data.bbs[0].row_span = len(document.display.row_visible_series)
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
-
-        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -620,42 +536,42 @@ class UnhideColumnState(State):
     column_span: int
 
     vflags_path: str
+    cwidths_path: str
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
-    def __init__(self, column_span: int, vflags: polars.Series) -> None:
+    def __init__(self, column_span: int, vflags: polars.Series, cwidths: polars.Series) -> None:
         super().__init__()
 
         self.column_span = column_span
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.vflags_path = file_path.name
+        self.save_selection()
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+
+        if cwidths is None:
+            self.cwidths_path = None
+            return
+
+        self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths}))
 
     def undo(self) -> None:
         document = globals.history.document
+        mcolumn = self.range.metadata.column
 
-        # TODO: support unhiding over multiple dataframes?
-        document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:self.range.metadata.column],
+        # Update column visibility flags
+        document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:mcolumn],
                                                                   polars.read_parquet(self.vflags_path).to_series(0),
-                                                                  document.display.column_visibility_flags[self.range.metadata.column + self.column_span:]])
+                                                                  document.display.column_visibility_flags[mcolumn + self.column_span:]])
         document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
         document.data.bbs[self.range.metadata.dfi].column_span = len(document.display.column_visible_series)
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
+        # Update column widths
+        if self.cwidths_path is not None:
+            document.display.column_widths = polars.concat([document.display.column_widths[:mcolumn],
+                                                            polars.read_parquet(self.cwidths_path).to_series(0),
+                                                            document.display.column_widths[mcolumn:]])
+            document.display.cumulative_column_widths = polars.Series('cumulative_column_widths', document.display.column_widths).cum_sum()
 
-        document.notify_selection_changed(self.active.column, self.active.column, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -668,37 +584,22 @@ class UnhideAllColumnState(State):
 
     vflags_path: str
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, vflags: polars.Series) -> None:
         super().__init__()
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.vflags_path = file_path.name
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
 
-        # TODO: support unhiding over multiple dataframes?
+        # Update column visibility flags
         document.display.column_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
         document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
         document.data.bbs[0].column_span = len(document.display.column_visible_series)
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
-
-        document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -713,10 +614,6 @@ class FilterRowState(State):
 
     expression: polars.Expr
 
-    range: SheetCell
-    active: SheetCell
-    cursor: SheetCell
-
     def __init__(self, dfi: int, expression: polars.Expr) -> None:
         super().__init__()
 
@@ -724,18 +621,13 @@ class FilterRowState(State):
 
         self.expression = expression
 
-        document = globals.history.document
-        self.range = document.selection.current_active_range
-        self.active = document.selection.current_active_cell
-        self.cursor = document.selection.current_cursor_cell
+        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
         document.data.fes[self.dfi] = self.expression
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
+        self.restore_selection(False)
 
         if self.expression is not None:
             document.display.row_visibility_flags = polars.concat([polars.Series([True]), # for header row
@@ -754,9 +646,7 @@ class FilterRowState(State):
         document = globals.history.document
         document.data.fes[self.dfi] = self.expression
 
-        document.selection.current_active_range = self.range
-        document.selection.current_active_cell = self.active
-        document.selection.current_cursor_cell = self.cursor
+        self.restore_selection(False)
 
         document.filter_current_rows()
 
@@ -777,21 +667,13 @@ class SortRowState(State):
         self.descending = descending
         self.dfi = dfi
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame(rindex).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.file_path = file_path.name
+        self.file_path = self.write_snapshot(polars.DataFrame(rindex))
 
         if vflags is None:
             self.vflags_path = None
             return
 
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            # TODO: we leave uncompressed for now, but we may want to determine
-            # the compression level based on the size of the dataframe later.
-            polars.DataFrame({'vflags': vflags}).write_parquet(file_path.name, compression='uncompressed', statistics=False)
-            self.vflags_path = file_path.name
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
     def undo(self) -> None:
         document = globals.history.document
@@ -807,6 +689,7 @@ class SortRowState(State):
     def redo(self) -> None:
         document = globals.history.document
         document.sort_current_rows(self.descending)
+
 
 
 class ConvertDataState(State):
@@ -912,6 +795,8 @@ class HistoryManager(GObject.Object):
         globals.is_changing_state = False
 
     def restore_scroll_position(self, scroll_y: float, scroll_x: float) -> None:
+        # TODO: if the target element is already visible, I don't think we need to scroll
+
         canvas_height = self.document.view.main_canvas.get_height()
         canvas_width = self.document.view.main_canvas.get_width()
 
