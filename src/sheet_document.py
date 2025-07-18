@@ -456,7 +456,7 @@ class SheetDocument(GObject.Object):
                     self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
                                                               polars.Series([self.display.DEFAULT_CELL_WIDTH] * dataframe.width),
                                                               self.display.row_heights[mrow:]])
-                self.display.cumulative_row_heights = polars.Series('cumulative_row_heights', self.display.row_heights).cum_sum()
+                self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, False)
@@ -510,7 +510,7 @@ class SheetDocument(GObject.Object):
                 self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
                                                           polars.Series([self.display.DEFAULT_CELL_WIDTH] * row_span),
                                                           self.display.row_heights[mrow:]])
-                self.display.cumulative_row_heights = polars.Series('cumulative_row_heights', self.display.row_heights).cum_sum()
+                self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
@@ -559,7 +559,7 @@ class SheetDocument(GObject.Object):
                     self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
                                                                 polars.Series([self.display.DEFAULT_CELL_WIDTH] * dataframe.width),
                                                                 self.display.column_widths[mcolumn:]])
-                self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
+                self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, False)
@@ -611,7 +611,7 @@ class SheetDocument(GObject.Object):
                 self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
                                                             polars.Series([self.display.DEFAULT_CELL_WIDTH] * column_span),
                                                             self.display.column_widths[mcolumn:]])
-                self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
+                self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
@@ -725,7 +725,7 @@ class SheetDocument(GObject.Object):
                 self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
                                                           self.display.row_heights[mrow:mrow + row_span],
                                                           self.display.row_heights[mrow:]])
-                self.display.cumulative_row_heights = polars.Series('cumulative_row_heights', self.display.row_heights).cum_sum()
+                self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
@@ -775,7 +775,7 @@ class SheetDocument(GObject.Object):
                 self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
                                                             self.display.column_widths[mcolumn:mcolumn + column_span],
                                                             self.display.column_widths[mcolumn:]])
-                self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
+                self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
@@ -824,7 +824,7 @@ class SheetDocument(GObject.Object):
             if len(self.display.row_heights):
                 self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
                                                           self.display.row_heights[mrow + row_span:]])
-                self.display.cumulative_row_heights = polars.Series('cumulative_row_heights', self.display.row_heights).cum_sum()
+                self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, True)
@@ -873,7 +873,7 @@ class SheetDocument(GObject.Object):
             if len(self.display.column_widths):
                 self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
                                                             self.display.column_widths[mcolumn + column_span:]])
-                self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
+                self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
             self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, True)
@@ -894,10 +894,13 @@ class SheetDocument(GObject.Object):
             end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
             row_span = end_vrow - start_vrow + 1
 
+        if range.btt:
+            mrow = mrow - row_span + 1
+
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import HideRowState
-            state = HideRowState(row_span)
+            state = HideRowState(self.display.row_heights[range.row - 1:range.row - 1 + range.row_span] if len(self.display.row_heights) else None)
 
         # Update row visibility flags
         if len(self.display.row_visibility_flags):
@@ -915,9 +918,9 @@ class SheetDocument(GObject.Object):
 
         # Update row heights
         if len(self.display.row_heights):
-            self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
-                                                      self.display.row_heights[mrow + row_span:]])
-            self.display.cumulative_row_heights = polars.Series('cumulative_row_heights', self.display.row_heights).cum_sum()
+            self.display.row_heights = polars.concat([self.display.row_heights[:range.row - 1],
+                                                      self.display.row_heights[range.row - 1 + row_span:]])
+            self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
         # Save snapshot
         if not globals.is_changing_state:
@@ -938,10 +941,13 @@ class SheetDocument(GObject.Object):
             end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
             column_span = end_vcolumn - start_vcolumn + 1
 
+        if range.rtl:
+            mcolumn = mcolumn - column_span + 1
+
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import HideColumnState
-            state = HideColumnState(column_span)
+            state = HideColumnState(self.display.column_widths[range.column - 1:range.column - 1 + range.column_span] if len(self.display.column_widths) else None)
 
         # Update column visibility flags
         if len(self.display.column_visibility_flags):
@@ -957,9 +963,9 @@ class SheetDocument(GObject.Object):
 
         # Update column widths
         if len(self.display.column_widths):
-            self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
-                                                        self.display.column_widths[mcolumn + column_span:]])
-            self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
+            self.display.column_widths = polars.concat([self.display.column_widths[:range.column - 1],
+                                                        self.display.column_widths[range.column - 1 + range.column_span:]])
+            self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
         # Save snapshot
         if not globals.is_changing_state:
@@ -968,7 +974,7 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, True)
 
-    def unhide_current_rows(self) -> None:
+    def unhide_current_rows(self, rheights: polars.Series = None) -> None:
         range = self.selection.current_active_range
 
         mrow = range.metadata.row
@@ -979,6 +985,9 @@ class SheetDocument(GObject.Object):
             start_vrow = self.display.get_vrow_from_row(range.row)
             end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
             row_span = end_vrow - start_vrow + 1
+
+        if range.btt:
+            mrow = mrow - row_span + 1
 
         # Save snapshot
         if not globals.is_changing_state:
@@ -997,7 +1006,16 @@ class SheetDocument(GObject.Object):
 
         # Update row heights
         if len(self.display.row_heights):
-            pass # FIXME: how to recover the row heights?
+            if rheights is not None:
+                self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
+                                                          rheights,
+                                                          self.display.row_heights[mrow:]])
+            else:
+                # FIXME: how to recover the row heights?
+                self.display.row_heights = polars.concat([self.display.row_heights[:range.row - 1],
+                                                          polars.Series([self.display.DEFAULT_CELL_WIDTH] * row_span),
+                                                          self.display.row_heights[range.row - 1 + row_span:]])
+            self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
         self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, False)
@@ -1016,12 +1034,13 @@ class SheetDocument(GObject.Object):
 
         # Update row heights
         if len(self.display.row_heights):
-            pass # FIXME: how to recover the row heights?
+            # FIXME: how to recover the row heights?
+            pass
 
         self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, False)
 
-    def unhide_current_columns(self) -> None:
+    def unhide_current_columns(self, cwidths: polars.Series = None) -> None:
         range = self.selection.current_active_range
 
         mcolumn = range.metadata.column
@@ -1032,6 +1051,9 @@ class SheetDocument(GObject.Object):
             start_vcolumn = self.display.get_vcolumn_from_column(range.column)
             end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
             column_span = end_vcolumn - start_vcolumn + 1
+
+        if range.rtl:
+            mcolumn = mcolumn - column_span + 1
 
         # Save snapshot
         if not globals.is_changing_state:
@@ -1050,11 +1072,16 @@ class SheetDocument(GObject.Object):
 
         # Update column widths
         if len(self.display.column_widths):
-            # FIXME: how to recover the column widths?
-            self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
-                                                        polars.Series([self.display.DEFAULT_CELL_WIDTH] * column_span),
-                                                        self.display.column_widths[mcolumn + column_span:]])
-            self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
+            if cwidths is not None:
+                self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
+                                                            cwidths,
+                                                            self.display.column_widths[mcolumn:]])
+            else:
+                # FIXME: how to recover the column widths?
+                self.display.column_widths = polars.concat([self.display.column_widths[:range.column - 1],
+                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH] * column_span),
+                                                            self.display.column_widths[range.column - 1:]])
+            self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
         self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, False)
@@ -1092,6 +1119,8 @@ class SheetDocument(GObject.Object):
         self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
 
         # TODO: update row heights
+        if len(self.display.row_heights):
+            pass
 
         if len(self.display.row_visibility_flags) == 0:
             return # shouldn't happen, but for completeness
@@ -1248,13 +1277,13 @@ class SheetDocument(GObject.Object):
         # Handle edge cases where the last column(s) are hidden
         if column - 1 == len(self.display.column_visible_series) and \
                 column < len(self.display.column_visibility_flags) and \
-                not self.display.column_visibility_flags[column + 1]:
+                not self.display.column_visibility_flags[column]:
             column += (len(self.display.column_visibility_flags) - 1) - (self.display.column_visible_series[-1] - 1) - 1
 
         # Handle edge cases where the last row(s) are hidden
         if row - 1 == len(self.display.row_visible_series) and \
                 row < len(self.display.row_visibility_flags) and \
-                not self.display.row_visibility_flags[row + 1]:
+                not self.display.row_visibility_flags[row]:
             row += (len(self.display.row_visibility_flags) - 1) - (self.display.row_visible_series[-1] - 1) - 1
 
         # Cache the selected cell data usually for resetting the input bar
@@ -1301,7 +1330,7 @@ class SheetDocument(GObject.Object):
             preferred_width = text_width + 2 * self.display.DEFAULT_CELL_PADDING
             self.display.column_widths[col_index] = max(self.display.DEFAULT_CELL_WIDTH, min(max_width, int(preferred_width)))
 
-        self.display.cumulative_column_widths = polars.Series('cumulative_column_widths', self.display.column_widths).cum_sum()
+        self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
         globals.is_changing_state = False
 

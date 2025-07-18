@@ -396,26 +396,26 @@ class DeleteColumnState(State):
 class HideRowState(State):
     __gtype_name__ = 'HideRowState'
 
-    row_span: int
+    rheights_path: str
 
-    def __init__(self, row_span: int) -> None:
+    def __init__(self, rheights: polars.Series) -> None:
         super().__init__()
 
-        self.row_span = row_span
-
         self.save_selection()
+
+        if rheights is not None:
+            self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights}))
+        else:
+            self.rheights_path = None
 
     def undo(self) -> None:
         document = globals.history.document
 
         self.restore_selection(False)
 
-        # Update row visibility flags
-        document.display.row_visibility_flags = polars.concat([document.display.row_visibility_flags[:self.range.metadata.row],
-                                                               polars.Series([True] * self.row_span),
-                                                               document.display.row_visibility_flags[self.range.metadata.row + self.row_span:]])
-        document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
-        document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
+        document.unhide_current_rows(polars.read_parquet(self.rheights_path).to_series(0) if self.rheights_path is not None else None)
+
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -426,26 +426,26 @@ class HideRowState(State):
 class HideColumnState(State):
     __gtype_name__ = 'HideColumnState'
 
-    column_span: int
+    cwidths_path: str
 
-    def __init__(self, column_span: int) -> None:
+    def __init__(self, cwidths: polars.Series) -> None:
         super().__init__()
 
-        self.column_span = column_span
-
         self.save_selection()
+
+        if cwidths is not None:
+            self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths}))
+        else:
+            self.cwidths_path = None
 
     def undo(self) -> None:
         document = globals.history.document
 
         self.restore_selection(False)
 
-        # Update column visibility flags
-        document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:self.range.metadata.column],
-                                                                  polars.Series([True] * self.column_span),
-                                                                  document.display.column_visibility_flags[self.range.metadata.column + self.column_span:]])
-        document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
-        document.data.bbs[self.range.metadata.dfi].column_span = len(document.display.column_visible_series)
+        document.unhide_current_columns(polars.read_parquet(self.cwidths_path).to_series(0) if self.cwidths_path is not None else None)
+
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -492,7 +492,7 @@ class UnhideRowState(State):
             document.display.row_heights = polars.concat([document.display.row_heights[:mrow],
                                                           polars.read_parquet(self.rheights_path).to_series(0),
                                                           document.display.row_heights[mrow:]])
-            document.display.cumulative_row_heights = polars.Series('cumulative_row_heights', document.display.row_heights).cum_sum()
+            document.display.cumulative_row_heights = polars.Series('crheights', document.display.row_heights).cum_sum()
 
         self.restore_selection()
 
@@ -569,7 +569,7 @@ class UnhideColumnState(State):
             document.display.column_widths = polars.concat([document.display.column_widths[:mcolumn],
                                                             polars.read_parquet(self.cwidths_path).to_series(0),
                                                             document.display.column_widths[mcolumn:]])
-            document.display.cumulative_column_widths = polars.Series('cumulative_column_widths', document.display.column_widths).cum_sum()
+            document.display.cumulative_column_widths = polars.Series('ccwidths', document.display.column_widths).cum_sum()
 
         self.restore_selection()
 
