@@ -371,7 +371,7 @@ class SheetDisplay(GObject.Object):
                 return symbol['short'] if short else symbol['long']
         return '?'
 
-    def scroll_to_position(self, column: int, row: int, viewport_height: int, viewport_width: int) -> bool:
+    def scroll_to_position(self, column: int, row: int, viewport_height: int, viewport_width: int, scroll_axis: str = 'both') -> bool:
         cell_y = self.get_cell_y_from_row(row)
         cell_x = self.get_cell_x_from_column(column)
         cell_width = self.get_cell_width_from_column(column)
@@ -391,19 +391,19 @@ class SheetDisplay(GObject.Object):
             return False
 
         # Scroll down when the target cell is below the viewport so that the target cell is near the bottom of the viewport
-        if bottom_offset > self.scroll_y_position + viewport_height:
+        if scroll_axis in ['both', 'vertical'] and bottom_offset > self.scroll_y_position + viewport_height:
             self.scroll_y_position = top_offset - (viewport_height - (viewport_height % self.DEFAULT_CELL_HEIGHT)) + cell_height
 
         # Scroll up when the target cell is above the viewport so that the target cell is exactly at the top of the viewport
-        if top_offset < self.scroll_y_position:
+        if scroll_axis in ['both', 'vertical'] and top_offset < self.scroll_y_position:
             self.scroll_y_position = top_offset
 
         # Scroll to the right when the target cell is to the right of the viewport so that the target cell is near the right of the viewport
-        if right_offset > self.scroll_x_position + viewport_width:
+        if scroll_axis in ['both', 'horizontal'] and right_offset > self.scroll_x_position + viewport_width:
             self.scroll_x_position = left_offset - (viewport_width - (viewport_width % self.DEFAULT_CELL_WIDTH)) + cell_width
 
         # Scroll to the left when the target cell is to the left of the viewport so that the target cell is exactly at the left of the viewport
-        if left_offset < self.scroll_x_position:
+        if scroll_axis in ['both', 'horizontal'] and left_offset < self.scroll_x_position:
             self.scroll_x_position = left_offset
 
         return True
