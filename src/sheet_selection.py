@@ -105,6 +105,8 @@ class SheetSelection(GObject.Object):
     current_active_cell: SheetCell
     current_cursor_cell: SheetCell
 
+    current_search_range: SheetCell
+
     def __init__(self, document: SheetDocument) -> None:
         super().__init__()
 
@@ -115,3 +117,5 @@ class SheetSelection(GObject.Object):
 
         self.current_active_cell = self.current_active_range
         self.current_cursor_cell = self.current_active_range
+
+        self.current_search_range = None

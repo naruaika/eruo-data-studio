@@ -180,28 +180,51 @@ class Window(Adw.ApplicationWindow):
 
         text_value = widget.get_text()
 
-        if text_value == '':
-            self.search_status.set_text('Showing 0 of 0')
-            return # prevent empty search
+        match_case = self.search_match_case.get_active()
+        match_cell = self.search_match_cell.get_active()
+        within_selection = self.search_within_selection.get_active()
+        use_regexp = self.search_use_regexp.get_active()
 
         tab_page = self.tab_view.get_selected_page()
         sheet_view = tab_page.get_child()
         sheet_document = sheet_view.document
+
+        # Reset the current search range
+        if not within_selection:
+            sheet_document.selection.current_search_range = None
+
+        # Initialize the current search range
+        elif sheet_document.selection.current_search_range is None:
+            sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+
+        if text_value == '':
+            self.search_status.set_text('Showing 0 of 0')
+            return # prevent empty search
 
         # I know right that this is a bit hacky, but it works for now.
         # My mission is to prevent from performing the same search again
         # when nothing has changed.
         new_search_states = {
             'query': text_value,
-            'match_case': self.search_match_case.get_active(),
-            'match_cell': self.search_match_cell.get_active(),
-            'within_selection': self.search_within_selection.get_active(),
-            'use_regexp': self.search_use_regexp.get_active(),
+            'match_case': match_case,
+            'match_cell': match_cell,
+            'within_selection': within_selection,
+            'use_regexp': use_regexp,
+
             # TODO: support multiple dataframes?
             'table_id': id(sheet_document.data.dfs[0]),
             'table_rvs_id': id(sheet_document.display.row_visible_series),
             'table_cvs_id': id(sheet_document.display.column_visible_series),
         }
+
+        if within_selection:
+            csr_dict = sheet_document.selection.current_search_range.__dict__.copy()
+            new_search_states['selection'] = {
+                'column': csr_dict['column'],
+                'row': csr_dict['row'],
+                'column_span': csr_dict['column_span'],
+                'row_span': csr_dict['row_span'],
+            }
 
         # Continue previous search
         if new_search_states == self.search_states and self.search_results_length > 0:
@@ -214,8 +237,10 @@ class Window(Adw.ApplicationWindow):
             col_index = sheet_view.document.display.get_column_from_vcolumn(vcol_index)
             row_index = sheet_view.document.display.get_row_from_vrow(vrow_index)
 
-            # Try to scroll to the search item first in case the user has scrolled
-            if sheet_document.display.scroll_to_position(col_index, row_index, vheight, vwidth):
+            # Try to scroll to the search item first in case the user has scrolled.
+            # In addition, we force to continue previous search if the user chose to search within the selection
+            # when the user re-opens the search box.
+            if not within_selection and sheet_document.display.scroll_to_position(col_index, row_index, vheight, vwidth):
                 sheet_document.auto_adjust_scrollbars_by_selection()
                 sheet_document.renderer.render_caches = {}
                 sheet_document.view.main_canvas.queue_draw()
@@ -229,13 +254,9 @@ class Window(Adw.ApplicationWindow):
         self.search_states = new_search_states
 
         # Get the search results
-        match_case = self.search_match_case.get_active()
-        match_cell = self.search_match_cell.get_active()
-        within_selection = self.search_within_selection.get_active()
-        use_regexp = self.search_use_regexp.get_active()
         self.search_results, self.search_results_length = sheet_document.find_in_current_table(text_value,
-                                                                                            match_case, match_cell,
-                                                                                            within_selection, use_regexp)
+                                                                                               match_case, match_cell,
+                                                                                               within_selection, use_regexp)
 
         if self.search_results_length == 0:
             self.search_status.set_text('Showing 0 of 0')
@@ -450,9 +471,13 @@ class Window(Adw.ApplicationWindow):
         else:
             self.search_overlay.set_visible(False)
 
-        # Focus on the main canvas
         tab_page = self.tab_view.get_selected_page()
         sheet_view = tab_page.get_child()
+
+        # Reset the current search range
+        sheet_view.document.selection.current_search_range = None
+
+        # Focus on the main canvas
         sheet_view.main_canvas.set_focusable(True)
         sheet_view.main_canvas.grab_focus()
 

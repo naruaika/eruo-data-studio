@@ -680,43 +680,48 @@ class SheetRenderer(GObject.Object):
     def draw_selection_borders(self, context: cairo.Context, width: int, height: int, display: SheetDisplay, selection: SheetSelection) -> None:
         context.save()
 
+        def auto_adjust_selection_range(range_x: int, range_y: int, range_width: int, range_height: int) -> tuple[int, int, int, int]:
+            # Hide the top of the selection if it is exceeded by the scroll viewport
+            if range_y < 0:
+                range_height += range_y
+                range_y = display.column_header_height
+                range_height -= display.column_header_height
+            # Hide the entire selection if it is exceeded by the scroll viewport
+            if range_height < 0:
+                range_height = 0
+            # Hide the entire selection if the viewport has not reached it yet
+            if height < range_y:
+                range_y = height + 1
+                range_height = 0
+            # Hide the bottom of the selection if it is not yet in the viewport
+            if height < range_y + range_height:
+                range_height = height + 1 - range_y
+
+            # Hide the left of the selection if it is exceeded by the scroll viewport
+            if range_x < 0:
+                range_width += range_x
+                range_x = display.row_header_width
+                range_width -= display.row_header_width
+            # Hide the entire selection if it is exceeded by the scroll viewport
+            if range_width < 0:
+                range_width = 0
+            # Hide the entire selection if the viewport has not reached it yet
+            if width < range_x:
+                range_x = width + 1
+                range_width = 0
+            # Hide the right of the selection if it is not yet in the viewport
+            if width < range_x + range_width:
+                range_width = width + 1 - range_x
+
+            return range_x, range_y, range_width, range_height
+
         range = selection.current_active_range
-        range_x = range.x
-        range_y = range.y
-        range_width = range.width
-        range_height = range.height
+        range_x, range_y, range_width, range_height = auto_adjust_selection_range(range.x, range.y, range.width, range.height)
 
-        # Hide the top of the selection if it is exceeded by the scroll viewport
-        if range_y < 0:
-            range_height += range_y
-            range_y = display.column_header_height
-            range_height -= display.column_header_height
-        # Hide the entire selection if it is exceeded by the scroll viewport
-        if range_height < 0:
-            range_height = 0
-        # Hide the entire selection if the viewport has not reached it yet
-        if height < range_y:
-            range_y = height + 1
-            range_height = 0
-        # Hide the bottom of the selection if it is not yet in the viewport
-        if height < range_y + range_height:
-            range_height = height + 1 - range_y
-
-        # Hide the left of the selection if it is exceeded by the scroll viewport
-        if range_x < 0:
-            range_width += range_x
-            range_x = display.row_header_width
-            range_width -= display.row_header_width
-        # Hide the entire selection if it is exceeded by the scroll viewport
-        if range_width < 0:
-            range_width = 0
-        # Hide the entire selection if the viewport has not reached it yet
-        if width < range_x:
-            range_x = width + 1
-            range_width = 0
-        # Hide the right of the selection if it is not yet in the viewport
-        if width < range_x + range_width:
-            range_width = width + 1 - range_x
+        search_range = selection.current_search_range
+        if search_range is not None:
+            search_range_x, search_range_y, search_range_width, search_range_height = auto_adjust_selection_range(search_range.x, search_range.y,
+                                                                                                                  search_range.width, search_range.height)
 
         # Clipping for when the user selects the entire row(s). You may notice that
         # I didn't adjust the width and height as it's not worth the complexity.
@@ -740,6 +745,15 @@ class SheetRenderer(GObject.Object):
         if not (range_x == 0 and range_y == 0) and not globals.is_editing_cells:
             context.rectangle(range_x, range_y, range_width, range_height)
             context.stroke()
+
+            # Render the search range
+            if search_range is not None:
+                context.save()
+                context.set_line_width(1)
+                context.set_dash([4, 4], 0)
+                context.rectangle(search_range_x, search_range_y, search_range_width, search_range_height)
+                context.stroke()
+                context.restore()
 
         # Indicates that the user has selected the entire column(s) by drawing a vertical line
         # next to the row headers

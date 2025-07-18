@@ -230,6 +230,10 @@ class SheetDocument(GObject.Object):
 
         self.update_selection_from_position(col_1, row_1, col_2, row_2, True, True, True)
 
+        # Reset the current search range
+        if self.selection.current_search_range is not None:
+            self.selection.current_search_range = self.selection.current_active_range
+
     def on_update_selection_by_motion(self, source: GObject.Object, x: int, y: int) -> None:
         from .sheet_selection import SheetLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell
 
@@ -286,13 +290,22 @@ class SheetDocument(GObject.Object):
 
         self.update_selection_from_position(start_column, start_row, end_column, end_row, True, True, True, scroll_axis)
 
+        # Reset the current search range
+        if self.selection.current_search_range is not None:
+            self.selection.current_search_range = self.selection.current_active_range
+
     def on_update_inline_cell_data(self, source: GObject.Object, value: any) -> None:
         self.update_current_cells(value)
 
     def select_element_from_point(self, x: float, y: float) -> None:
         column = self.display.get_column_from_point(x)
         row = self.display.get_row_from_point(y)
+
         self.update_selection_from_position(column, row, column, row, False, False, False)
+
+        # Reset the current search range
+        if self.selection.current_search_range is not None:
+            self.selection.current_search_range = self.selection.current_active_range
 
     def update_selection_from_name(self, name: str) -> None:
         vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
@@ -1209,15 +1222,15 @@ class SheetDocument(GObject.Object):
             return polars.DataFrame(), 0
 
         # Prepare the search expression
-        sexpression = polars.all().str.contains_any([text_value], ascii_case_insensitive=not match_case)
+        filter_expression = polars.all().str.contains_any([text_value], ascii_case_insensitive=not match_case)
         if match_cell:
-            sexpression = polars.all().str.to_lowercase() == text_value.lower()
+            filter_expression = polars.all().str.to_lowercase() == text_value.lower()
             if match_case:
-                sexpression = polars.all().str == text_value
+                filter_expression = polars.all().str == text_value
         if use_regexp:
-            sexpression = polars.col(polars.String).str.contains(f'(?i){text_value}')
+            filter_expression = polars.col(polars.String).str.contains(f'(?i){text_value}')
             if match_case:
-                sexpression = polars.col(polars.String).str.contains(text_value)
+                filter_expression = polars.col(polars.String).str.contains(text_value)
 
         # Collect hidden column names
         hidden_column_names = []
@@ -1225,20 +1238,56 @@ class SheetDocument(GObject.Object):
             if not is_visible:
                 hidden_column_names.append(self.data.dfs[0].columns[col_index])
 
-        # TODO: add support for within selection search.
-        # We need also tell the user in which range the search results are performed,
-        # because the active cell indicators will change as the user iterates through
-        # the search results. I'm thinking of a new indicator (like dashed rectangle).
+        select_expression = polars.col(polars.String).exclude(hidden_column_names)
+
+        # Collect column names within the selection
+        if within_selection:
+            range = self.selection.current_search_range
+            column_span = range.column_span
+
+            # Take hidden column(s) into account
+            if len(self.display.column_visibility_flags):
+                start_vcolumn = self.display.get_vcolumn_from_column(range.column)
+                end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+                column_span = end_vcolumn - start_vcolumn + 1
+
+            selected_column_names = self.data.dfs[0].columns[range.metadata.column:range.metadata.column + column_span]
+
+            # Remove non-string column names
+            selected_column_names = [name for name in selected_column_names if self.data.dfs[0][name].dtype == polars.String]
+
+            # Reset the select expression
+            select_expression = polars.col(selected_column_names).exclude(hidden_column_names)
+
+        has_selected_rows = False
+
+        # Define row range within the selection
+        if within_selection:
+            range = self.selection.current_search_range
+
+            start_row = range.metadata.row - 1
+            row_span = range.row_span
+
+            # Handle edge cases where the user selected the entire column(s),
+            # so there's no point to filter by row.
+            has_selected_rows = row_span > 0
+
+            # Take hidden row(s) into account
+            if has_selected_rows and len(self.display.row_visibility_flags):
+                start_vrow = self.display.get_vrow_from_row(range.row)
+                end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+                row_span = end_vrow - start_vrow + 1
 
         # Get search results mask
         # TODO: support multiple dataframes?
-        search_results = self.data.dfs[0].select(polars.col(polars.String).exclude(hidden_column_names)) \
-                                         .with_columns(sexpression) \
+        search_results = self.data.dfs[0].select(select_expression) \
+                                         .with_columns(filter_expression) \
                                          .with_columns(polars.any_horizontal(polars.all()).alias('$rand')) \
                                          .with_row_index('$ridx') \
+                                         .filter((polars.col('$ridx') >= start_row) & (polars.col('$ridx') < start_row + row_span)
+                                                 if has_selected_rows else polars.lit(True)) \
                                          .filter(polars.col('$ridx').is_in(self.display.row_visible_series[1:] - 1)
-                                                 if len(self.display.row_visible_series)
-                                                 else polars.lit(True)) \
+                                                 if len(self.display.row_visible_series) else polars.lit(True)) \
                                          .filter(polars.col('$rand') == True) \
                                          .drop('$rand') \
                                          .fill_null(False)
@@ -1377,6 +1426,10 @@ class SheetDocument(GObject.Object):
 
         self.selection.current_active_cell.x = self.display.get_cell_x_from_column(self.selection.current_active_cell.column)
         self.selection.current_active_cell.y = self.display.get_cell_y_from_row(self.selection.current_active_cell.row)
+
+        if self.selection.current_search_range is not None:
+            self.selection.current_search_range.x = self.display.get_cell_x_from_column(self.selection.current_search_range.column)
+            self.selection.current_search_range.y = self.display.get_cell_y_from_row(self.selection.current_search_range.row)
 
         globals.is_changing_state = False
 

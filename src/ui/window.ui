@@ -268,8 +268,8 @@
                     <property name="margin-top">12</property>
                     <property name="orientation">vertical</property>
                     <child>
-                      <object class="GtkBox">
-                        <property name="orientation">horizontal</property>
+                      <object class="AdwWrapBox">
+                        <property name="natural-line-length">0</property>
                         <child>
                           <object class="GtkCheckButton" id="search_match_case">
                             <property name="label">Match case</property>
@@ -277,7 +277,7 @@
                         </child>
                         <child>
                           <object class="GtkCheckButton" id="search_match_cell">
-                            <property name="label">Match entire cell</property>
+                            <property name="label">Match entire cell contents</property>
                           </object>
                         </child>
                         <child>
@@ -285,12 +285,6 @@
                             <property name="label">Use RegExp</property>
                           </object>
                         </child>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkBox">
-                        <property name="orientation">horizontal</property>
-                        <property name="visible">false</property>
                         <child>
                           <object class="GtkCheckButton" id="search_within_selection">
                             <property name="label">Within selection only</property>
