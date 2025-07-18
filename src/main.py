@@ -177,31 +177,31 @@ class Application(Adw.Application):
     def on_toggle_search_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
 
-        # Open the sidebar if it's closed
-        if 'raised' not in window.toggle_sidebar.get_css_classes():
-            window.toggle_sidebar.activate()
-
-        # Exit the search mode
-        if 'raised' in window.toggle_search.get_css_classes() and window.toggle_search.has_focus():
-            window.toggle_search.remove_css_class('raised')
-            window.toggle_search.set_icon_name('system-search-symbolic')
-            window.search_box.set_visible(False)
-            window.window_title.set_visible(True)
-
-            # Focus on the main canvas
-            tab_page = window.tab_view.get_selected_page()
-            sheet_view = tab_page.get_child()
-            sheet_view.main_canvas.set_focusable(True)
-            sheet_view.main_canvas.grab_focus()
-
+        if window.search_overlay.get_visible():
             return
 
-        # Enter the search mode
-        window.toggle_search.add_css_class('raised')
-        window.toggle_search.set_icon_name('go-previous-symbolic')
-        window.window_title.set_visible(False)
-        window.search_box.set_visible(True)
-        window.search_box.grab_focus()
+        window.search_entry.set_size_request(450, 45)
+        window.search_status.set_visible(False)
+        window.search_navigation.set_visible(False)
+        window.search_options.set_visible(True)
+
+        window.search_box.remove_css_class('slide-down-dialog')
+        window.search_box.add_css_class('big-search-box')
+
+        window.search_overlay.add_css_class('floating-sheet')
+        window.search_overlay.set_valign(Gtk.Align.FILL)
+        window.search_overlay.set_halign(Gtk.Align.FILL)
+        window.search_overlay.set_margin_bottom(0)
+        window.search_overlay.set_visible(True)
+
+        window.search_box.add_css_class('zoom-in-dialog')
+
+        # Selects all text on the search entry
+        window.search_entry.select_region(0, len(window.search_entry.get_text()))
+        window.search_entry.get_first_child().set_focus_on_click(True)
+        window.search_entry.get_first_child().grab_focus()
+
+        window.search_entry.grab_focus()
 
     def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
@@ -209,7 +209,6 @@ class Application(Adw.Application):
             window.toggle_history.remove_css_class('raised')
         else:
             window.toggle_history.add_css_class('raised')
-        raise NotImplementedError
 
     def on_file_opened(self, source: GObject.Object, file_path: str) -> None:
         if not file_path:

@@ -347,24 +347,24 @@ class SheetDisplay(GObject.Object):
 
     def get_dtype_symbol(self, dtype: polars.DataType, short: bool = True) -> str:
         symbol_map = {
-            polars.Categorical: {'short': 'cat.',     'long': 'categorical'},
-            polars.Int8:        {'short': 'int8',     'long': 'integer8'},
-            polars.Int16:       {'short': 'int16',    'long': 'integer16'},
-            polars.Int32:       {'short': 'int32',    'long': 'integer32'},
-            polars.Int64:       {'short': 'int64',    'long': 'integer64'},
-            polars.UInt8:       {'short': 'uint8',    'long': 'unsigned integer8'},
-            polars.UInt16:      {'short': 'uint16',   'long': 'unsigned integer16'},
-            polars.UInt32:      {'short': 'uint32',   'long': 'unsigned integer32'},
-            polars.UInt64:      {'short': 'uint64',   'long': 'unsigned integer64'},
-            polars.Float32:     {'short': 'float32',  'long': 'float32'},
-            polars.Float64:     {'short': 'float64',  'long': 'float64'},
-            polars.Decimal:     {'short': 'decimal',  'long': 'decimal'},
-            polars.Date:        {'short': 'date',     'long': 'date'},
-            polars.Time:        {'short': 'time',     'long': 'time'},
-            polars.Datetime:    {'short': 'datetime', 'long': 'datetime'},
-            polars.Boolean:     {'short': 'bool.',    'long': 'boolean'},
-            polars.Utf8:        {'short': 'str.',     'long': 'string'},
-            polars.Null:        {'short': 'null',     'long': 'null'},
+            polars.Categorical: {'short': 'cat',   'long': 'categorical'},
+            polars.Int8:        {'short': 'i8',    'long': 'integer 8'},
+            polars.Int16:       {'short': 'i16',   'long': 'integer 16'},
+            polars.Int32:       {'short': 'i32',   'long': 'integer 32'},
+            polars.Int64:       {'short': 'i64',   'long': 'integer 64'},
+            polars.UInt8:       {'short': 'u8',    'long': 'unsigned integer 8'},
+            polars.UInt16:      {'short': 'u16',   'long': 'unsigned integer 16'},
+            polars.UInt32:      {'short': 'u32',   'long': 'unsigned integer 32'},
+            polars.UInt64:      {'short': 'u64',   'long': 'unsigned integer 64'},
+            polars.Float32:     {'short': 'f32',   'long': 'float 32'},
+            polars.Float64:     {'short': 'f64',   'long': 'float 64'},
+            polars.Decimal:     {'short': 'dec.',  'long': 'decimal'},
+            polars.Date:        {'short': 'date',  'long': 'date'},
+            polars.Time:        {'short': 'time',  'long': 'time'},
+            polars.Datetime:    {'short': 'date.', 'long': 'datetime'},
+            polars.Boolean:     {'short': 'bool',  'long': 'boolean'},
+            polars.Utf8:        {'short': 'str',   'long': 'string'},
+            polars.Null:        {'short': 'null',  'long': 'null'},
         }
         for dt, symbol in symbol_map.items():
             if dtype == dt or isinstance(dtype, dt):
@@ -372,13 +372,18 @@ class SheetDisplay(GObject.Object):
         return '?'
 
     def scroll_to_position(self, column: int, row: int, viewport_height: int, viewport_width: int) -> bool:
+        cell_y = self.get_cell_y_from_row(row)
+        cell_x = self.get_cell_x_from_column(column)
+        cell_width = self.get_cell_width_from_column(column)
+        cell_height = self.get_cell_height_from_row(row)
+
         x_offset = self.row_header_width - self.scroll_x_position
         y_offset = self.column_header_height - self.scroll_y_position
 
-        bottom_offset = self.get_cell_y_from_row(row) + self.get_cell_height_from_row(row) - y_offset
-        top_offset = self.get_cell_y_from_row(row) - y_offset
-        right_offset = self.get_cell_x_from_column(column) + self.get_cell_width_from_column(column) - x_offset
-        left_offset = self.get_cell_x_from_column(column) - x_offset
+        bottom_offset = cell_y + cell_height - y_offset
+        top_offset = cell_y - y_offset
+        right_offset = cell_x + cell_width - x_offset
+        left_offset = cell_x - x_offset
 
         # Skip if the target cell is already visible
         if self.scroll_y_position <= top_offset and bottom_offset <= self.scroll_y_position + viewport_height and \
@@ -387,7 +392,7 @@ class SheetDisplay(GObject.Object):
 
         # Scroll down when the target cell is below the viewport so that the target cell is near the bottom of the viewport
         if bottom_offset > self.scroll_y_position + viewport_height:
-            self.scroll_y_position = top_offset - (viewport_height - (viewport_height % self.DEFAULT_CELL_HEIGHT)) + self.DEFAULT_CELL_HEIGHT
+            self.scroll_y_position = top_offset - (viewport_height - (viewport_height % self.DEFAULT_CELL_HEIGHT)) + cell_height
 
         # Scroll up when the target cell is above the viewport so that the target cell is exactly at the top of the viewport
         if top_offset < self.scroll_y_position:
@@ -395,7 +400,7 @@ class SheetDisplay(GObject.Object):
 
         # Scroll to the right when the target cell is to the right of the viewport so that the target cell is near the right of the viewport
         if right_offset > self.scroll_x_position + viewport_width:
-            self.scroll_x_position = left_offset - (viewport_width - (viewport_width % self.DEFAULT_CELL_WIDTH)) + self.get_cell_width_from_column(column)
+            self.scroll_x_position = left_offset - (viewport_width - (viewport_width % self.DEFAULT_CELL_WIDTH)) + cell_width
 
         # Scroll to the left when the target cell is to the left of the viewport so that the target cell is exactly at the left of the viewport
         if left_offset < self.scroll_x_position:

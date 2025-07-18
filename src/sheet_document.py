@@ -289,12 +289,12 @@ class SheetDocument(GObject.Object):
         self.update_selection_from_position(column, row, column, row, False, False, False)
 
     def update_selection_from_name(self, name: str) -> None:
-        col_1, row_1, col_2, row_2 = self.display.get_cell_range_from_name(name)
-        vcol_1 = self.display.get_column_from_vcolumn(col_1)
-        vcol_2 = self.display.get_column_from_vcolumn(col_2)
-        vrow_1 = self.display.get_row_from_vrow(row_1)
-        vrow_2 = self.display.get_row_from_vrow(row_2)
-        self.update_selection_from_position(vcol_1, vrow_1, vcol_2, vrow_2, False, False, True)
+        vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
+        col_1 = self.display.get_column_from_vcolumn(vcol_1)
+        col_2 = self.display.get_column_from_vcolumn(vcol_2)
+        row_1 = self.display.get_row_from_vrow(vrow_1)
+        row_2 = self.display.get_row_from_vrow(vrow_2)
+        self.update_selection_from_position(col_1, row_1, col_2, row_2, False, False, True)
 
     def update_selection_from_position(self, col_1: int, row_1: int, col_2: int, row_2: int,
                                        keep_order: bool = False, follow_cursor: bool = True, auto_scroll: bool = True) -> None:
@@ -1009,6 +1009,7 @@ class SheetDocument(GObject.Object):
             state = UnhideAllRowState(self.display.row_visibility_flags)
             globals.history.save(state)
 
+        # TODO: support multiple dataframes?
         self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
         self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
         self.data.bbs[0].row_span = self.data.dfs[0].height + 1
@@ -1065,6 +1066,7 @@ class SheetDocument(GObject.Object):
             state = UnhideAllColumnState(self.display.column_visibility_flags)
             globals.history.save(state)
 
+        # TODO: support multiple dataframes?
         self.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
         self.display.column_visible_series = polars.Series(dtype=polars.UInt32)
         self.data.bbs[0].column_span = self.data.dfs[0].width
@@ -1166,6 +1168,64 @@ class SheetDocument(GObject.Object):
 
         return False
 
+    def find_in_current_table(self, text_value: str, match_case: bool, match_cell: bool, within_selection: bool, use_regexp: bool) -> int:
+        if text_value in ['', None]:
+            return polars.DataFrame(), 0
+
+        # Prepare the search expression
+        sexpression = polars.all().str.contains_any([text_value], ascii_case_insensitive=not match_case)
+        if match_cell:
+            sexpression = polars.all().str.to_lowercase() == text_value.lower()
+            if match_case:
+                sexpression = polars.all().str == text_value
+        if use_regexp:
+            sexpression = polars.col(polars.String).str.contains(f'(?i){text_value}')
+            if match_case:
+                sexpression = polars.col(polars.String).str.contains(text_value)
+
+        # Collect hidden column names
+        hidden_column_names = []
+        for col_index, is_visible in enumerate(self.display.column_visibility_flags):
+            if not is_visible:
+                hidden_column_names.append(self.data.dfs[0].columns[col_index])
+
+        # TODO: add support for within selection search.
+        # We need also tell the user in which range the search results are performed,
+        # because the active cell indicators will change as the user iterates through
+        # the search results. I'm thinking of a new indicator (like dashed rectangle).
+
+        # Get search results mask
+        # TODO: support multiple dataframes?
+        search_results = self.data.dfs[0].select(polars.col(polars.String).exclude(hidden_column_names)) \
+                                         .with_columns(sexpression) \
+                                         .with_columns(polars.any_horizontal(polars.all()).alias('$rand')) \
+                                         .with_row_index('$ridx') \
+                                         .filter(polars.col('$ridx').is_in(self.display.row_visible_series[1:] - 1)
+                                                 if len(self.display.row_visible_series)
+                                                 else polars.lit(True)) \
+                                         .filter(polars.col('$rand') == True) \
+                                         .drop('$rand') \
+                                         .fill_null(False)
+
+        # Drop column(s) without data
+        columns_to_drop = []
+        for column_name in search_results.columns:
+            if column_name == '$ridx':
+                continue
+            if search_results[column_name].sum() == 0:
+                columns_to_drop.append(column_name)
+        search_results = search_results.drop(columns_to_drop)
+
+        # Skip if no search results
+        if search_results.height == 0:
+            return polars.DataFrame(), 0
+
+        # Count the number of search result items
+        search_results_length = search_results.select(polars.all().exclude('$ridx')) \
+                                              .sum().sum_horizontal().item()
+
+        return search_results, search_results_length
+
     def check_selection_changed(self) -> bool:
         current_cell_clss = self.selection.current_active_range.__class__
         current_cell_attr = self.selection.current_active_range.__dict__.copy()
@@ -1216,6 +1276,7 @@ class SheetDocument(GObject.Object):
 
         globals.is_changing_state = True
 
+        # TODO: support multiple dataframes?
         monitor = Gdk.Display.get_default().get_monitors()[0]
         max_width = monitor.get_geometry().width // 12
         sample_data = self.data.dfs[0].head(50).vstack(self.data.dfs[0].tail(50))

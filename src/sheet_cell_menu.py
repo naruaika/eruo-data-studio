@@ -39,7 +39,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
         self.create_hide_autofit_section(main_menu, start_column, start_row, end_column, end_row, n_hidden_columns, n_hidden_rows,
                                          n_all_hidden_columns, n_all_hidden_rows, ctype)
         self.create_filter_sort_section(main_menu)
-        self.create_convert_section(main_menu)
+        self.create_convert_section(main_menu, ctype)
 
         self.set_menu_model(main_menu)
 
@@ -233,24 +233,27 @@ class SheetCellMenu(Gtk.PopoverMenu):
 
         main_menu.append_section(None, filter_sort_section)
 
-    def create_convert_section(self, main_menu: Gio.Menu) -> None:
+    def create_convert_section(self, main_menu: Gio.Menu, ctype: SheetCell) -> None:
+        if ctype is not SheetTopLocatorCell:
+            return
+
         convert_section = Gio.Menu.new()
 
         convert_int_section = Gio.Menu.new()
-        convert_int_section.append(_('Integer_8'), 'app.convert-to-int8')
-        convert_int_section.append(_('Integer_16'), 'app.convert-to-int16')
-        convert_int_section.append(_('Integer_32'), 'app.convert-to-int32')
-        convert_int_section.append(_('Integer_64'), 'app.convert-to-int64')
+        convert_int_section.append(_('Integer _8'), 'app.convert-to-int8')
+        convert_int_section.append(_('Integer _16'), 'app.convert-to-int16')
+        convert_int_section.append(_('Integer _32'), 'app.convert-to-int32')
+        convert_int_section.append(_('Integer _64'), 'app.convert-to-int64')
 
         convert_uint_section = Gio.Menu.new()
-        convert_uint_section.append(_('Unsigned Integer_8'), 'app.convert-to-uint8')
-        convert_uint_section.append(_('Unsigned Integer_16'), 'app.convert-to-uint16')
-        convert_uint_section.append(_('Unsigned Integer_32'), 'app.convert-to-uint32')
-        convert_uint_section.append(_('Unsigned Integer_64'), 'app.convert-to-uint64')
+        convert_uint_section.append(_('Unsigned Integer _8'), 'app.convert-to-uint8')
+        convert_uint_section.append(_('Unsigned Integer _16'), 'app.convert-to-uint16')
+        convert_uint_section.append(_('Unsigned Integer _32'), 'app.convert-to-uint32')
+        convert_uint_section.append(_('Unsigned Integer _64'), 'app.convert-to-uint64')
 
         convert_float_section = Gio.Menu.new()
-        convert_float_section.append(_('Float_32'), 'app.convert-to-float32')
-        convert_float_section.append(_('Float_64'), 'app.convert-to-float64')
+        convert_float_section.append(_('Float _32'), 'app.convert-to-float32')
+        convert_float_section.append(_('Float _64'), 'app.convert-to-float64')
         convert_float_section.append(_('_Decimal'), 'app.convert-to-decimal')
 
         convert_number_menu = Gio.Menu.new()

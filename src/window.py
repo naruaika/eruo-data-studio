@@ -18,7 +18,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from gi.repository import Adw, Gdk, Gio, GObject, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk
 import os
 import polars
 import re
@@ -36,7 +36,19 @@ class Window(Adw.ApplicationWindow):
 
     toggle_search = Gtk.Template.Child()
     toggle_history = Gtk.Template.Child()
+
+    search_overlay = Gtk.Template.Child()
     search_box = Gtk.Template.Child()
+    search_entry = Gtk.Template.Child()
+    search_status = Gtk.Template.Child()
+    search_navigation = Gtk.Template.Child()
+    search_options = Gtk.Template.Child()
+    search_options_toggler = Gtk.Template.Child()
+
+    search_match_case = Gtk.Template.Child()
+    search_match_cell = Gtk.Template.Child()
+    search_within_selection = Gtk.Template.Child()
+    search_use_regexp = Gtk.Template.Child()
 
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
@@ -44,6 +56,12 @@ class Window(Adw.ApplicationWindow):
     toast_overlay = Gtk.Template.Child()
     tab_view = Gtk.Template.Child()
     tab_bar = Gtk.Template.Child()
+
+    search_results = polars.DataFrame()
+    search_results_length: int = 0
+    search_cursor_position: int = 1
+    search_cursor_coordinate: tuple[int, str] = (0, '')
+    search_states: dict = {}
 
     def __init__(self, file: Gio.File, dataframe: polars.DataFrame, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -54,8 +72,12 @@ class Window(Adw.ApplicationWindow):
         self.sheet_manager = SheetManager()
 
         key_event_controller = Gtk.EventControllerKey()
-        key_event_controller.connect('key-pressed', self.on_search_box_key_pressed)
-        self.search_box.add_controller(key_event_controller)
+        key_event_controller.connect('key-pressed', self.on_search_overlay_key_pressed)
+        self.search_overlay.add_controller(key_event_controller)
+
+        key_event_controller = Gtk.EventControllerKey()
+        key_event_controller.connect('key-pressed', self.on_search_entry_key_pressed)
+        self.search_entry.add_controller(key_event_controller)
 
         # We override the default behavior of the Gtk.Entry for the name box,
         # so that it'll select all text when the user clicks on it for the first
@@ -129,33 +151,127 @@ class Window(Adw.ApplicationWindow):
         # for the user. We can add a verification to avoid that though.
         globals.send_notification = self.show_toast_message
 
-    def on_search_box_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+    def on_search_overlay_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
         if keyval == Gdk.KEY_Escape:
-            # Close the search box
-            self.toggle_search.remove_css_class('raised')
-            self.toggle_search.set_icon_name('system-search-symbolic')
-            self.search_box.set_visible(False)
-            self.window_title.set_visible(True)
+            self.close_search_box()
+            return
 
-            # Focus on the main canvas
-            tab_page = self.tab_view.get_selected_page()
-            sheet_view = tab_page.get_child()
-            sheet_view.main_canvas.set_focusable(True)
-            sheet_view.main_canvas.grab_focus()
-
+    def on_search_entry_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+        if keyval == Gdk.KEY_Escape:
+            self.close_search_box()
             return
 
     @Gtk.Template.Callback()
-    def on_search_box_activated(self, widget: Gtk.Widget) -> None:
-        # Focus on the main canvas without closing the search box
+    def on_search_entry_activated(self, widget: Gtk.Widget) -> None:
+        self.search_entry.set_size_request(-1, -1)
+        self.search_navigation.set_visible(True)
+        self.search_status.set_visible(True)
+
+        if not self.search_options_toggler.get_active():
+            self.search_options.set_visible(False)
+
+        self.search_overlay.remove_css_class('floating-sheet')
+        self.search_overlay.set_valign(Gtk.Align.END)
+        self.search_overlay.set_halign(Gtk.Align.CENTER)
+        self.search_overlay.set_margin_bottom(80)
+
+        self.search_box.remove_css_class('big-search-box')
+        self.search_box.add_css_class('slide-up-dialog')
+
+        text_value = widget.get_text()
+
+        if text_value == '':
+            self.search_status.set_text('Showing 0 of 0')
+            return # prevent empty search
+
         tab_page = self.tab_view.get_selected_page()
         sheet_view = tab_page.get_child()
-        sheet_view.main_canvas.set_focusable(True)
-        sheet_view.main_canvas.grab_focus()
+        sheet_document = sheet_view.document
+
+        # I know right that this is a bit hacky, but it works for now.
+        # My mission is to prevent from performing the same search again
+        # when nothing has changed.
+        new_search_states = {
+            'query': text_value,
+            'match_case': self.search_match_case.get_active(),
+            'match_cell': self.search_match_cell.get_active(),
+            'within_selection': self.search_within_selection.get_active(),
+            'use_regexp': self.search_use_regexp.get_active(),
+            # TODO: support multiple dataframes?
+            'table_id': id(sheet_document.data.dfs[0]),
+            'table_rvs_id': id(sheet_document.display.row_visible_series),
+            'table_cvs_id': id(sheet_document.display.column_visible_series),
+        }
+
+        # Continue previous search
+        if new_search_states == self.search_states and self.search_results_length > 0:
+            vheight = sheet_document.view.main_canvas.get_height() - sheet_document.display.column_header_height
+            vwidth = sheet_document.view.main_canvas.get_width() - sheet_document.display.row_header_width
+
+            cell_name = sheet_view.document.selection.cell_name
+            vcol_index, vrow_index = sheet_document.display.get_cell_position_from_name(cell_name)
+
+            col_index = sheet_view.document.display.get_column_from_vcolumn(vcol_index)
+            row_index = sheet_view.document.display.get_row_from_vrow(vrow_index)
+
+            # Try to scroll to the search item first in case the user has scrolled
+            if sheet_document.display.scroll_to_position(col_index, row_index, vheight, vwidth):
+                sheet_document.auto_adjust_scrollbars_by_selection()
+                sheet_document.renderer.render_caches = {}
+                sheet_document.view.main_canvas.queue_draw()
+                return
+
+            # Go to the next search item
+            self.find_next_search_occurrence()
+
+            return
+
+        self.search_states = new_search_states
+
+        # Get the search results
+        match_case = self.search_match_case.get_active()
+        match_cell = self.search_match_cell.get_active()
+        within_selection = self.search_within_selection.get_active()
+        use_regexp = self.search_use_regexp.get_active()
+        self.search_results, self.search_results_length = sheet_document.find_in_current_table(text_value,
+                                                                                            match_case, match_cell,
+                                                                                            within_selection, use_regexp)
+
+        if self.search_results_length == 0:
+            self.search_status.set_text('Showing 0 of 0')
+            return # prevent empty search
+
+        self.search_status.set_text(f'Showing 1 of {format(self.search_results_length, ',d')}')
+        self.search_status.set_visible(True)
+
+        # Set the search cursor to the first item
+        first_column_name = self.search_results.columns[0]
+        self.search_cursor_coordinate = (0, first_column_name)
+        self.search_cursor_position = 0
+
+        # Get the first occurrence of the search item index
+        self.find_next_search_occurrence()
 
     @Gtk.Template.Callback()
-    def on_search_box_changed(self, widget: Gtk.Widget) -> None:
-        pass
+    def on_find_previous_clicked(self, button: Gtk.Button) -> None:
+        self.find_previous_search_occurrence()
+
+    @Gtk.Template.Callback()
+    def on_find_next_clicked(self, button: Gtk.Button) -> None:
+        self.find_next_search_occurrence()
+
+    @Gtk.Template.Callback()
+    def on_search_close_clicked(self, button: Gtk.Button) -> None:
+        self.close_search_box()
+
+    @Gtk.Template.Callback()
+    def on_search_options_toggled(self, button: Gtk.Button) -> None:
+        if button.get_active():
+            button.add_css_class('raised')
+            self.search_options.set_visible(True)
+        else:
+            button.remove_css_class('raised')
+            self.search_options.set_visible(False)
 
     @Gtk.Template.Callback()
     def on_name_box_activated(self, widget: Gtk.Widget) -> None:
@@ -258,6 +374,11 @@ class Window(Adw.ApplicationWindow):
         # Update the global references to the current active document
         globals.history = sheet_view.document.history
 
+        # TODO: should be possible to continue the editing session
+        # For now, we just reset the flag because we don't want to
+        # see visual glitches.
+        globals.is_editing_cells = False
+
         # Reset the input bar to represent the current selection
         self.reset_inputbar()
 
@@ -318,6 +439,112 @@ class Window(Adw.ApplicationWindow):
     def update_inputbar(self, sel_name: str, sel_value: str) -> None:
         self.name_box.set_text(sel_name)
         self.formula_bar.set_text(sel_value)
+
+    def close_search_box(self) -> None:
+        # Close the search box
+        self.search_box.remove_css_class('zoom-in-dialog')
+        if 'slide-up-dialog' in self.search_box.get_css_classes():
+            self.search_box.remove_css_class('slide-up-dialog')
+            self.search_box.add_css_class('slide-down-dialog')
+            GLib.timeout_add(200, self.search_overlay.set_visible, False)
+        else:
+            self.search_overlay.set_visible(False)
+
+        # Focus on the main canvas
+        tab_page = self.tab_view.get_selected_page()
+        sheet_view = tab_page.get_child()
+        sheet_view.main_canvas.set_focusable(True)
+        sheet_view.main_canvas.grab_focus()
+
+    def find_previous_search_occurrence(self) -> None:
+        # Check if the cursor is at the end of the search results
+        cursor_at_first_row = self.search_cursor_coordinate[0] == 0
+        cursor_at_first_column = self.search_cursor_coordinate[1] == self.search_results.columns[1]
+
+        # Reset the cursor when hitting the end of the search results
+        if cursor_at_first_row and cursor_at_first_column:
+            last_column_name = self.search_results.columns[-1]
+            self.search_cursor_coordinate = (self.search_results.height - 1, last_column_name)
+            self.search_cursor_position = self.search_results_length + 1
+            self.find_previous_search_occurrence()
+            return
+
+        # Move the cursor to the previous row
+        if cursor_at_first_column:
+            last_column_name = self.search_results.columns[-1]
+            next_row_index = self.search_cursor_coordinate[0] - 1
+            self.search_cursor_coordinate = (next_row_index, last_column_name)
+
+        # Move the cursor to previous column
+        else:
+            current_column_index = self.search_results.columns.index(self.search_cursor_coordinate[1])
+            previous_column_name = self.search_results.columns[current_column_index - 1]
+            self.search_cursor_coordinate = (self.search_cursor_coordinate[0], previous_column_name)
+
+        # Check if the current cursor position is a search result
+        found_search_result_item = self.search_results[self.search_cursor_coordinate[1]][self.search_cursor_coordinate[0]]
+
+        # Continue to search if the current cursor position is not a search result
+        if not found_search_result_item:
+            self.find_previous_search_occurrence()
+
+        # Update the search states
+        else:
+            self.search_cursor_position -= 1
+            self.show_current_search_result_item()
+
+    def find_next_search_occurrence(self) -> None:
+        # Check if the cursor is at the end of the search results
+        cursor_at_last_row = self.search_cursor_coordinate[0] == self.search_results.height - 1
+        cursor_at_last_column = self.search_cursor_coordinate[1] == self.search_results.columns[-1]
+
+        # Reset the cursor when hitting the end of the search results
+        if cursor_at_last_column and cursor_at_last_row:
+            first_column_name = self.search_results.columns[0]
+            self.search_cursor_coordinate = (0, first_column_name)
+            self.search_cursor_position = 0
+            self.find_next_search_occurrence()
+            return
+
+        # Move the cursor to the next row
+        if cursor_at_last_column:
+            first_column_name = self.search_results.columns[1]
+            next_row_index = self.search_cursor_coordinate[0] + 1
+            self.search_cursor_coordinate = (next_row_index, first_column_name)
+
+        # Move the cursor to next column
+        else:
+            current_column_index = self.search_results.columns.index(self.search_cursor_coordinate[1])
+            next_column_name = self.search_results.columns[current_column_index + 1]
+            self.search_cursor_coordinate = (self.search_cursor_coordinate[0], next_column_name)
+
+        # Check if the current cursor position is a search result
+        found_search_result_item = self.search_results[self.search_cursor_coordinate[1]][self.search_cursor_coordinate[0]]
+
+        # Continue to search if the current cursor position is not a search result
+        if not found_search_result_item:
+            self.find_next_search_occurrence()
+
+        # Update the search states
+        else:
+            self.search_cursor_position += 1
+            self.show_current_search_result_item()
+
+    def show_current_search_result_item(self) -> None:
+        tab_page = self.tab_view.get_selected_page()
+        sheet_view = tab_page.get_child()
+
+        # TODO: re-adjust the viewport scroll to account the search box
+
+        # TODO: support multiple dataframes?
+        vcol_index = sheet_view.document.data.dfs[0].columns.index(self.search_cursor_coordinate[1]) + 1 # +1 for the locator
+        vrow_index = self.search_results['$ridx'][self.search_cursor_coordinate[0]] + 2 # +2 for the locator and the header
+
+        col_index = sheet_view.document.display.get_column_from_vcolumn(vcol_index)
+        row_index = sheet_view.document.display.get_row_from_vrow(vrow_index)
+
+        sheet_view.document.update_selection_from_position(col_index, row_index, col_index, row_index)
+        self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of {format(self.search_results_length, ',d')}')
 
     def show_toast_message(self, message: str) -> None:
         self.toast_overlay.add_toast(Adw.Toast.new(message))
