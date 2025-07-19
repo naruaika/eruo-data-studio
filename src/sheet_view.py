@@ -331,10 +331,16 @@ class SheetView(Gtk.Box):
             if new_height < cell_height:
                 new_height = cell_height + 2
 
+            new_x = max(0, new_x)
+            new_y = max(0, new_y)
+
             if self.main_canvas_width < new_x + new_width:
                 new_x = new_x - new_width + cell_width + 2
             if self.main_canvas_height < new_y + new_height:
                 new_y = new_y - new_height + cell_height + 2
+
+            new_x = min(self.main_canvas_width - new_width, new_x)
+            new_y = min(self.main_canvas_height - new_height, new_y)
 
             allocation.x = new_x
             allocation.y = new_y
