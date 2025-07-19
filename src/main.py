@@ -52,7 +52,8 @@ class Application(Adw.Application):
         self.create_action('save', self.on_save_file_action, ['<primary>s'])
         self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
         self.create_action('toggle-search', self.on_toggle_search_action, ['<primary>f'])
-        self.create_action('toggle-history', self.on_toggle_history_action, ['<primary>h'])
+        self.create_action('toggle-replace', self.on_toggle_replace_action, ['<primary>h'])
+        self.create_action('toggle-history', self.on_toggle_history_action)
         self.create_action('new-sheet', self.on_new_sheet_action, ['<primary>t'])
         self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
         self.create_action('undo', self.on_undo_action, ['<primary>z'])
@@ -174,15 +175,13 @@ class Application(Adw.Application):
 
         self.file_manager.save_as_file(window)
 
+    # Weird naming, because this function only handles the opening of the search box
     def on_toggle_search_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
 
         if window.search_overlay.get_visible():
             window.search_entry.grab_focus()
             return
-
-        if not window.search_options_toggler.get_active():
-            window.search_options.set_visible(False)
 
         if window.search_results_length == 0:
             window.search_status.set_visible(False)
@@ -197,7 +196,59 @@ class Application(Adw.Application):
         window.search_entry.get_first_child().set_focus_on_click(True)
         window.search_entry.get_first_child().grab_focus()
 
+        globals.is_searching_cells = True
+
         window.search_entry.grab_focus()
+
+    def on_toggle_replace_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+
+        overlay_visible = window.search_overlay.get_visible()
+        overlay_in_focus = window.search_overlay.get_focus_child()
+        search_entry_in_focus = window.search_entry.get_focus_child()
+        replace_section_visible = window.replace_section.get_visible()
+
+        # Open the search overlay
+        if not overlay_visible:
+            window.search_overlay.set_visible(True)
+            window.search_box.add_css_class('slide-up-dialog')
+            GLib.timeout_add(200, window.search_box.remove_css_class, 'slide-up-dialog')
+
+            globals.is_searching_cells = True
+
+            if window.search_results_length == 0:
+                window.search_status.set_visible(False)
+
+        # In case the user wants to jump between the search and replace entry
+        if overlay_visible and replace_section_visible and overlay_in_focus and search_entry_in_focus:
+            window.replace_toggler.set_icon_name('go-down-symbolic')
+            window.replace_section.set_visible(True)
+
+            # Selects all text on the replace entry
+            window.replace_entry.select_region(0, len(window.replace_entry.get_text()))
+            window.replace_entry.get_first_child().set_focus_on_click(True)
+            window.replace_entry.get_first_child().grab_focus()
+
+            window.replace_entry.grab_focus()
+
+        # Hide the replace section and grab focus on the search entry
+        elif overlay_visible and replace_section_visible and overlay_in_focus:
+            window.replace_toggler.set_icon_name('go-next-symbolic')
+            window.replace_section.set_visible(False)
+
+            window.search_entry.grab_focus()
+
+        # Show and grab focus on the replace entry
+        else:
+            window.replace_toggler.set_icon_name('go-down-symbolic')
+            window.replace_section.set_visible(True)
+
+            # Selects all text on the replace entry
+            window.replace_entry.select_region(0, len(window.replace_entry.get_text()))
+            window.replace_entry.get_first_child().set_focus_on_click(True)
+            window.replace_entry.get_first_child().grab_focus()
+
+            window.replace_entry.grab_focus()
 
     def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()

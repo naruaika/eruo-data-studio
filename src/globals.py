@@ -43,6 +43,11 @@ is_changing_state: bool = False
 is_editing_cells: bool = False
 
 
+# This is specifically to tell the renderer that there's
+# a search going on, or a search box is open to be precise.
+is_searching_cells: bool = False
+
+
 # This is supposed to be set by any current window
 # to enable any module to send notifications, e.g.
 # error messages when something goes wrong. It'll

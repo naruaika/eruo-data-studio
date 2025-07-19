@@ -21,6 +21,7 @@
 from gi.repository import Gdk, GObject, Gtk, Pango, PangoCairo
 import cairo
 import polars
+import re
 
 from . import globals
 
@@ -55,17 +56,23 @@ class SheetDocument(GObject.Object):
         self.selection = SheetSelection(self)
         self.view = SheetView(self)
 
-        self.setup_history_manager()
         self.setup_main_canvas()
         self.setup_scrollbars()
 
         self.auto_adjust_column_widths()
         self.auto_adjust_scrollbars_by_scroll()
 
-        self.setup_workspace()
+        self.setup_document()
 
-    def setup_history_manager(self) -> None:
+    def setup_document(self) -> None:
         globals.history = self.history
+
+        # Initialize the selection
+        globals.is_changing_state = True
+        self.update_selection_from_name('A1')
+        globals.is_changing_state = False
+
+        # Initialize the undo stack
         self.history.setup()
 
     def setup_main_canvas(self) -> None:
@@ -82,11 +89,6 @@ class SheetDocument(GObject.Object):
         horizontal_adjustment = Gtk.Adjustment.new(0, 0, 0, self.display.scroll_increment, self.display.page_increment, 0)
         horizontal_adjustment.connect('value-changed', self.on_sheet_view_scrolled)
         self.view.horizontal_scrollbar.set_adjustment(horizontal_adjustment)
-
-    def setup_workspace(self) -> None:
-        globals.is_changing_state = True
-        self.select_element_from_point(self.display.row_header_width + 1, self.display.column_header_height + 1)
-        globals.is_changing_state = False
 
     def on_sheet_view_scrolled(self, source: GObject.Object) -> None:
         self.display.scroll_y_position = self.view.vertical_scrollbar.get_adjustment().get_value()
@@ -230,10 +232,6 @@ class SheetDocument(GObject.Object):
 
         self.update_selection_from_position(col_1, row_1, col_2, row_2, True, True, True)
 
-        # Reset the current search range
-        if self.selection.current_search_range is not None:
-            self.selection.current_search_range = self.selection.current_active_range
-
     def on_update_selection_by_motion(self, source: GObject.Object, x: int, y: int) -> None:
         from .sheet_selection import SheetLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell
 
@@ -290,22 +288,13 @@ class SheetDocument(GObject.Object):
 
         self.update_selection_from_position(start_column, start_row, end_column, end_row, True, True, True, scroll_axis)
 
-        # Reset the current search range
-        if self.selection.current_search_range is not None:
-            self.selection.current_search_range = self.selection.current_active_range
-
     def on_update_inline_cell_data(self, source: GObject.Object, value: any) -> None:
         self.update_current_cells(value)
 
     def select_element_from_point(self, x: float, y: float) -> None:
         column = self.display.get_column_from_point(x)
         row = self.display.get_row_from_point(y)
-
         self.update_selection_from_position(column, row, column, row, False, False, False)
-
-        # Reset the current search range
-        if self.selection.current_search_range is not None:
-            self.selection.current_search_range = self.selection.current_active_range
 
     def update_selection_from_name(self, name: str) -> None:
         vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
@@ -433,6 +422,10 @@ class SheetDocument(GObject.Object):
             self.notify_selection_changed(col_1, row_1, cell_metadata)
         else:
             self.notify_selection_changed(start_column, start_row, cell_metadata)
+
+        # Reset the current search range
+        if not globals.is_changing_state and self.selection.current_search_range is not None:
+            self.selection.current_search_range = self.selection.current_active_range
 
         self.view.main_canvas.queue_draw()
 
@@ -644,7 +637,7 @@ class SheetDocument(GObject.Object):
     # TODO: currently update, duplicate, delete, hide, and unhide functions don't support multiple dataframes.
     #       Should we add the support? I still don't wrap my head around it.
 
-    def update_current_cells(self, value: any) -> bool:
+    def update_current_cells(self, replace_with: any, search_pattern: str = None, match_case: bool = False) -> bool:
         range = self.selection.current_active_range
 
         mcolumn = range.metadata.column
@@ -683,14 +676,14 @@ class SheetDocument(GObject.Object):
             if range.metadata.row == 0: # includes header row
                 state = UpdateDataState(self.data.read_cell_data_from_metadata(mcolumn, mrow, column_span, 1, range.metadata.dfi),
                                         self.data.read_cell_data_from_metadata(mcolumn, mrow + 1, column_span, row_span - 1, range.metadata.dfi),
-                                        value)
+                                        replace_with, search_pattern, match_case)
             else: # excludes header row
                 state = UpdateDataState(None,
                                         self.data.read_cell_data_from_metadata(mcolumn, mrow, column_span, row_span, range.metadata.dfi),
-                                        value)
+                                        replace_with, search_pattern, match_case)
 
         # Update data
-        if self.data.update_cell_data_from_metadata(mcolumn, mrow, column_span, row_span, range.metadata.dfi, value):
+        if self.data.update_cell_data_from_metadata(mcolumn, mrow, column_span, row_span, range.metadata.dfi, replace_with, search_pattern, match_case):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -1279,16 +1272,20 @@ class SheetDocument(GObject.Object):
                 end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
                 row_span = end_vrow - start_vrow + 1
 
+        selected_rows_expression = (polars.col('$ridx') >= start_row) & (polars.col('$ridx') < start_row + row_span) \
+                                   if has_selected_rows else polars.lit(True)
+
+        # -1 because we exclude the header row
+        visible_rows_expression = polars.col('$ridx').is_in(self.display.row_visible_series[1:] - 1) \
+                                  if len(self.display.row_visible_series) else polars.lit(True)
+
         # Get search results mask
         # TODO: support multiple dataframes?
         search_results = self.data.dfs[0].select(select_expression) \
                                          .with_columns(filter_expression) \
                                          .with_columns(polars.any_horizontal(polars.all()).alias('$rand')) \
                                          .with_row_index('$ridx') \
-                                         .filter((polars.col('$ridx') >= start_row) & (polars.col('$ridx') < start_row + row_span)
-                                                 if has_selected_rows else polars.lit(True)) \
-                                         .filter(polars.col('$ridx').is_in(self.display.row_visible_series[1:] - 1)
-                                                 if len(self.display.row_visible_series) else polars.lit(True)) \
+                                         .filter(selected_rows_expression & visible_rows_expression) \
                                          .filter(polars.col('$rand') == True) \
                                          .drop('$rand') \
                                          .fill_null(False)
@@ -1311,6 +1308,111 @@ class SheetDocument(GObject.Object):
                                               .sum().sum_horizontal().item()
 
         return search_results, search_results_length
+
+    def replace_all_in_current_table(self, search_pattern: str, replace_with: str, match_case: bool, match_cell: bool, within_selection: bool, use_regexp: bool) -> None:
+        if search_pattern in ['', None]:
+            return polars.DataFrame(), 0
+
+        # Collect hidden column names
+        hidden_column_names = []
+        for col_index, is_visible in enumerate(self.display.column_visibility_flags):
+            if not is_visible:
+                hidden_column_names.append(self.data.dfs[0].columns[col_index])
+
+        select_expression = polars.col(polars.String).exclude(hidden_column_names)
+
+        # Collect column names within the selection
+        if within_selection:
+            range = self.selection.current_search_range
+            column_span = range.column_span
+
+            # Take hidden column(s) into account
+            if len(self.display.column_visibility_flags):
+                start_vcolumn = self.display.get_vcolumn_from_column(range.column)
+                end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+                column_span = end_vcolumn - start_vcolumn + 1
+
+            selected_column_names = self.data.dfs[0].columns[range.metadata.column:range.metadata.column + column_span]
+
+            # Remove non-string column names
+            selected_column_names = [name for name in selected_column_names if self.data.dfs[0][name].dtype == polars.String]
+
+            # Reset the select expression
+            select_expression = polars.col(selected_column_names).exclude(hidden_column_names)
+
+        has_selected_rows = False
+        start_row = -1
+        row_span = -1
+
+        # Define row range within the selection
+        if within_selection:
+            range = self.selection.current_search_range
+
+            start_row = range.metadata.row - 1
+            row_span = range.row_span
+
+            # Handle edge cases where the user selected the entire column(s),
+            # so there's no point to filter by row.
+            has_selected_rows = row_span > 0
+
+            # Take hidden row(s) into account
+            if has_selected_rows and len(self.display.row_visibility_flags):
+                start_vrow = self.display.get_vrow_from_row(range.row)
+                end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+                row_span = end_vrow - start_vrow + 1
+
+        target_column_names = self.data.dfs[0].select(select_expression).columns
+
+        selected_rows_expression = (polars.col('$ridx') >= start_row) & (polars.col('$ridx') < start_row + row_span) \
+                                   if has_selected_rows else polars.lit(True)
+
+        # -1 because we exclude the header row
+        visible_rows_expression = polars.col('$ridx').is_in(self.display.row_visible_series[1:] - 1) \
+                                  if len(self.display.row_visible_series) else polars.lit(True)
+
+        with_columns = {}
+
+        # Prepare for the replacement expressions
+        nsearch_pattern = search_pattern
+        if not use_regexp:
+            nsearch_pattern = re.escape(search_pattern)
+        if not match_case:
+            nsearch_pattern = f'(?i){search_pattern}'
+
+        for column_name in target_column_names:
+            # Prepare the search expression
+            filter_expression = polars.col(column_name).str.contains_any([search_pattern], ascii_case_insensitive=not match_case)
+            if match_cell:
+                filter_expression = polars.col(column_name).str.to_lowercase() == search_pattern.lower()
+                if match_case:
+                    filter_expression = polars.col(column_name).str == search_pattern
+            if use_regexp:
+                filter_expression = polars.col(column_name).str.contains(f'(?i){search_pattern}')
+                if match_case:
+                    filter_expression = polars.col(column_name).str.contains(search_pattern)
+
+            with_columns[column_name] = polars.when(filter_expression & selected_rows_expression & visible_rows_expression) \
+                                              .then(polars.col(column_name).str.replace_all(nsearch_pattern, replace_with)) \
+                                              .otherwise(polars.col(column_name))
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import ReplaceAllState
+            globals.history.save(ReplaceAllState(self.data.read_cell_data_chunks_from_metadata(target_column_names, start_row, row_span, 0),
+                                                 target_column_names, start_row, row_span, 0,
+                                                 search_pattern, replace_with, match_case, match_cell, within_selection, use_regexp))
+
+        # Bulk replace cells
+        # TODO: support multiple dataframes?
+        self.data.dfs[0] = self.data.dfs[0].with_row_index('$ridx') \
+                                           .with_columns(**with_columns) \
+                                           .drop('$ridx')
+
+        self.renderer.render_caches = {}
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
+        active_cell = self.selection.current_active_cell
+        self.notify_selection_changed(active_cell.column, active_cell.row, active_cell.metadata)
 
     def check_selection_changed(self) -> bool:
         current_cell_clss = self.selection.current_active_range.__class__

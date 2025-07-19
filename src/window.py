@@ -49,6 +49,12 @@ class Window(Adw.ApplicationWindow):
     search_within_selection = Gtk.Template.Child()
     search_use_regexp = Gtk.Template.Child()
 
+    replace_entry = Gtk.Template.Child()
+    replace_button = Gtk.Template.Child()
+    replace_all_button = Gtk.Template.Child()
+    replace_section = Gtk.Template.Child()
+    replace_toggler = Gtk.Template.Child()
+
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
 
@@ -77,6 +83,10 @@ class Window(Adw.ApplicationWindow):
         key_event_controller = Gtk.EventControllerKey()
         key_event_controller.connect('key-pressed', self.on_search_entry_key_pressed)
         self.search_entry.add_controller(key_event_controller)
+
+        key_event_controller = Gtk.EventControllerKey()
+        key_event_controller.connect('key-pressed', self.on_replace_entry_key_pressed)
+        self.replace_entry.add_controller(key_event_controller)
 
         # We override the default behavior of the Gtk.Entry for the name box,
         # so that it'll select all text when the user clicks on it for the first
@@ -156,18 +166,21 @@ class Window(Adw.ApplicationWindow):
             return
 
     def on_search_entry_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
-        if keyval == Gdk.KEY_Escape:
-            self.close_search_box()
-            return
-
         # Pressing enter/return key while holding shift key will
         # search for the previous search occurrence.
         if keyval == Gdk.KEY_Return and state == Gdk.ModifierType.SHIFT_MASK:
             if self.search_results_length == 0:
                 self.on_search_entry_activated(self.search_entry)
                 return
+
             self.find_previous_search_occurrence()
             return
+
+    def on_replace_entry_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+        # Pressing enter/return key while holding shift key will
+        # search for the previous search occurrence.
+        if keyval == Gdk.KEY_Return and state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK):
+            self.on_replace_all_button_clicked(self.replace_all_button)
 
     @Gtk.Template.Callback()
     def on_search_entry_activated(self, widget: Gtk.Widget) -> None:
@@ -196,8 +209,9 @@ class Window(Adw.ApplicationWindow):
             self.search_status.set_text('No results found')
             return # prevent empty search
 
-        # Continue previous search
         new_search_states = self.get_current_search_states()
+
+        # Continue previous search
         if new_search_states == self.search_states and self.search_results_length > 0:
             vheight = sheet_document.view.main_canvas.get_height() - sheet_document.display.column_header_height
             vwidth = sheet_document.view.main_canvas.get_width() - sheet_document.display.row_header_width
@@ -245,7 +259,7 @@ class Window(Adw.ApplicationWindow):
         self.find_next_search_occurrence()
 
     @Gtk.Template.Callback()
-    def on_find_all_clicked(self, button: Gtk.Button) -> None:
+    def on_find_all_button_clicked(self, button: Gtk.Button) -> None:
         pass
 
     @Gtk.Template.Callback()
@@ -254,6 +268,7 @@ class Window(Adw.ApplicationWindow):
                 or self.search_results_length == 0:
             self.on_search_entry_activated(self.search_entry)
             return
+
         self.find_previous_search_occurrence()
 
     @Gtk.Template.Callback()
@@ -262,11 +277,20 @@ class Window(Adw.ApplicationWindow):
                 or self.search_results_length == 0:
             self.on_search_entry_activated(self.search_entry)
             return
+
         self.find_next_search_occurrence()
 
     @Gtk.Template.Callback()
-    def on_search_close_clicked(self, button: Gtk.Button) -> None:
-        self.close_search_box()
+    def on_replace_entry_activated(self, entry: Gtk.Entry) -> None:
+        self.replace_current_search_result_item()
+
+    @Gtk.Template.Callback()
+    def on_replace_button_clicked(self, button: Gtk.Button) -> None:
+        self.replace_current_search_result_item()
+
+    @Gtk.Template.Callback()
+    def on_replace_all_button_clicked(self, button: Gtk.Button) -> None:
+        self.replace_all_search_occurences()
 
     @Gtk.Template.Callback()
     def on_search_options_toggled(self, button: Gtk.Button) -> None:
@@ -276,6 +300,10 @@ class Window(Adw.ApplicationWindow):
         else:
             button.remove_css_class('raised')
             self.search_options.set_visible(False)
+
+    @Gtk.Template.Callback()
+    def on_search_close_clicked(self, button: Gtk.Button) -> None:
+        self.close_search_box()
 
     @Gtk.Template.Callback()
     def on_name_box_activated(self, widget: Gtk.Widget) -> None:
@@ -445,16 +473,21 @@ class Window(Adw.ApplicationWindow):
         self.formula_bar.set_text(sel_value)
 
     def close_search_box(self) -> None:
-        # Close the search box
         self.search_box.add_css_class('slide-down-dialog')
         GLib.timeout_add(200, self.search_overlay.set_visible, False)
         GLib.timeout_add(200, self.search_box.remove_css_class, 'slide-down-dialog')
+
+        # Hide the replace section
+        self.replace_toggler.set_icon_name('go-next-symbolic')
+        self.replace_section.set_visible(False)
 
         tab_page = self.tab_view.get_selected_page()
         sheet_view = tab_page.get_child()
 
         # Reset the current search range
         sheet_view.document.selection.current_search_range = None
+
+        globals.is_searching_cells = False
 
         # Focus on the main canvas
         sheet_view.main_canvas.set_focusable(True)
@@ -489,6 +522,9 @@ class Window(Adw.ApplicationWindow):
         }
 
         if within_selection:
+            if sheet_document.selection.current_search_range is None:
+                sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+
             csr_dict = sheet_document.selection.current_search_range.__dict__.copy()
             search_states['selection'] = {
                 'column': csr_dict['column'],
@@ -576,6 +612,7 @@ class Window(Adw.ApplicationWindow):
     def show_current_search_result_item(self) -> None:
         tab_page = self.tab_view.get_selected_page()
         sheet_view = tab_page.get_child()
+        sheet_document = sheet_view.document
 
         # TODO: re-adjust the viewport scroll to account the search box
 
@@ -586,8 +623,58 @@ class Window(Adw.ApplicationWindow):
         col_index = sheet_view.document.display.get_column_from_vcolumn(vcol_index)
         row_index = sheet_view.document.display.get_row_from_vrow(vrow_index)
 
+        search_range = sheet_document.selection.current_search_range
+
         sheet_view.document.update_selection_from_position(col_index, row_index, col_index, row_index, with_offset=True)
+
+        sheet_document.selection.current_search_range = search_range
+
         self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of {format(self.search_results_length, ',d')}')
+        self.search_status.set_visible(True)
+
+    def replace_current_search_result_item(self) -> None:
+        if self.get_current_search_states() != self.search_states \
+                or self.search_results_length == 0:
+            self.on_search_entry_activated(self.search_entry)
+
+        if self.search_results_length == 0:
+            return
+
+        tab_page = self.tab_view.get_selected_page()
+        sheet_view = tab_page.get_child()
+
+        sheet_view.document.update_current_cells(self.replace_entry.get_text(),
+                                                 self.search_entry.get_text(),
+                                                 self.search_match_case.get_active())
+
+        self.find_next_search_occurrence()
+
+        self.search_status.set_text(f'{self.search_status.get_text()} (Out of sync)')
+
+    def replace_all_search_occurences(self) -> None:
+        search_pattern = self.search_entry.get_text()
+        replace_with = self.replace_entry.get_text()
+
+        match_case = self.search_match_case.get_active()
+        match_cell = self.search_match_cell.get_active()
+        within_selection = self.search_within_selection.get_active()
+        use_regexp = self.search_use_regexp.get_active()
+
+        tab_page = self.tab_view.get_selected_page()
+        sheet_view = tab_page.get_child()
+        sheet_document = sheet_view.document
+
+        # Reset the current search range
+        if not within_selection:
+            sheet_document.selection.current_search_range = None
+
+        # Initialize the current search range
+        elif sheet_document.selection.current_search_range is None:
+            sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+
+        sheet_document.replace_all_in_current_table(search_pattern, replace_with, match_case, match_cell, within_selection, use_regexp)
+
+        self.search_status.set_visible(False)
 
     def show_toast_message(self, message: str) -> None:
         self.toast_overlay.add_toast(Adw.Toast.new(message))

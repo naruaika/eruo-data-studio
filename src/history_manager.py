@@ -41,6 +41,8 @@ class State(GObject.Object):
     active: SheetCell
     cursor: SheetCell
 
+    search_range: SheetCell
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -53,9 +55,12 @@ class State(GObject.Object):
 
     def save_selection(self) -> None:
         document = globals.history.document
+
         self.range = document.selection.current_active_range
         self.active = document.selection.current_active_cell
         self.cursor = document.selection.current_cursor_cell
+
+        self.search_range = document.selection.current_search_range
 
     def restore_selection(self, notify: bool = True) -> None:
         document = globals.history.document
@@ -63,6 +68,8 @@ class State(GObject.Object):
         document.selection.current_active_range = self.range
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
+
+        document.selection.current_search_range = self.search_range
 
         if notify:
             document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
@@ -199,16 +206,23 @@ class UpdateDataState(State):
     content: any
     file_path: str
 
-    # The replacer is an object that'll be used to replace the data.
-    # It can be a single value or a numpy array. TODO: For now, only
-    # single value is supported.
-    replacer: any
+    # It can be a single value or a polars.DataFrame
+    # TODO: for now only single value is supported.
+    replace_with: any
 
-    def __init__(self, header: any, content: any, replacer: any) -> None:
+    # It can be None when there is no search pattern in case
+    # the user wants to replace all the cell contents.
+    search_pattern: str
+    match_case: bool
+
+    def __init__(self, header: any, content: any, replace_with: any, search_pattern: str, match_case: bool) -> None:
         super().__init__()
 
         self.header = header
-        self.replacer = replacer
+
+        self.replace_with = replace_with
+        self.search_pattern = search_pattern
+        self.match_case = match_case
 
         if isinstance(content, polars.DataFrame):
             if content.height == 0:
@@ -231,7 +245,7 @@ class UpdateDataState(State):
 
     def redo(self) -> None:
         document = globals.history.document
-        document.update_current_cells(self.replacer)
+        document.update_current_cells(self.replace_with, self.search_pattern, self.match_case)
 
 
 
@@ -714,6 +728,59 @@ class ConvertDataState(State):
 
 
 
+class ReplaceAllState(State):
+    __gtype_name__ = 'ReplaceAllState'
+
+    file_path: str
+
+    column_names: list[str]
+    row: int
+    row_span: int
+    dfi: int
+
+    search_pattern: str
+    replace_with: str
+    match_case: bool
+    match_cell: bool
+    within_selection: bool
+    use_regexp: bool
+
+    def __init__(self, content: any, column_names: list[str], row: int, row_span: int, dfi: int,
+                 search_pattern: str, replace_with: str, match_case: bool,
+                 match_cell: bool, within_selection: bool, use_regexp: bool) -> None:
+        super().__init__()
+
+        self.file_path = self.write_snapshot(content)
+
+        self.column_names = column_names
+        self.row = row
+        self.row_span = row_span
+        self.dfi = dfi
+
+        self.search_pattern = search_pattern
+        self.replace_with = replace_with
+        self.match_case = match_case
+        self.match_cell = match_cell
+        self.within_selection = within_selection
+        self.use_regexp = use_regexp
+
+        self.save_selection()
+
+    def undo(self) -> None:
+        document = globals.history.document
+        document.data.update_cell_data_with_chunk_from_metadata(self.column_names, self.row, self.row_span, self.dfi,
+                                                                polars.read_parquet(self.file_path))
+
+    def redo(self) -> None:
+        document = globals.history.document
+
+        self.restore_selection()
+
+        document.replace_all_in_current_table(self.search_pattern, self.replace_with, self.match_case,
+                                              self.match_cell, self.within_selection, self.use_regexp)
+
+
+
 class HistoryManager(GObject.Object):
     __gtype_name__ = 'HistoryManager'
 
@@ -737,7 +804,7 @@ class HistoryManager(GObject.Object):
 
     def setup(self) -> None:
         # We need to save the current state at the beginning
-        state = SelectionState(0, 0, 0, 0, True, True, True)
+        state = SelectionState(1, 1, 1, 1, True, True, True)
         self.undo_stack.append(state)
 
     def save(self, state: State) -> None:
@@ -753,21 +820,25 @@ class HistoryManager(GObject.Object):
         if len(self.undo_stack) > 1 \
                 and type(state) is type(self.undo_stack[-1]) \
                 and isinstance(state, SelectionState) \
-                and (state.timestamp - self.undo_stack[-1].timestamp) < self.TIME_THRESHOLD:
-            self.undo_stack.pop() # replace the last state
+                and abs(state.timestamp - self.undo_stack[-1].timestamp) < self.TIME_THRESHOLD:
+            self.undo_stack[-1].col_1 = state.col_1
+            self.undo_stack[-1].row_1 = state.row_1
+            self.undo_stack[-1].col_2 = state.col_2
+            self.undo_stack[-1].row_2 = state.row_2
+            return # update last selection states
 
         self.undo_stack.append(state)
         self.cleanup_redo_stack()
 
     def undo(self) -> None:
-        if len(self.undo_stack) == 1:
-            return # initial state isn't undoable
-
         globals.is_changing_state = True
 
-        state = self.undo_stack.pop()
-        state.undo()
-        self.redo_stack.append(state)
+        if len(self.undo_stack) == 1:
+            self.undo_stack[0].undo()
+        else:
+            state = self.undo_stack.pop()
+            state.undo()
+            self.redo_stack.append(state)
 
         scroll_y_position = globals.history.undo_stack[-1].scroll_y
         scroll_x_position = globals.history.undo_stack[-1].scroll_x

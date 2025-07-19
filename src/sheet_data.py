@@ -123,6 +123,14 @@ class SheetData(GObject.Object):
         else:
             return self.dfs[dfi][row:row + row_span, column:column + column_span]
 
+    def read_cell_data_chunks_from_metadata(self, column_names: list[str], row: int, row_span: int, dfi: int) -> any:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+
+        if row_span < 0:
+            return self.dfs[dfi].select(column_names)
+        return self.dfs[dfi].select(column_names)[row:row + row_span]
+
     def read_cell_bbox_from_metadata(self, dfi: int) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
@@ -200,16 +208,22 @@ class SheetData(GObject.Object):
 
         return True
 
-    def update_cell_data_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, value: any) -> bool:
+    def update_cell_data_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int,
+                                       replace_with: any, search_pattern: str, match_case: bool) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        if isinstance(value, list):
-            return self.update_cell_data_with_array_from_metadata(column, row, column_span, row_span, dfi, value)
+        if isinstance(replace_with, list):
+            return self.update_cell_data_with_array_from_metadata(column, row, column_span, row_span, dfi, replace_with)
 
-        return self.update_cell_data_with_single_from_metadata(column, row, column_span, row_span, dfi, value)
+        return self.update_cell_data_with_single_from_metadata(column, row, column_span, row_span, dfi,
+                                                               replace_with, search_pattern, match_case)
 
-    def update_cell_data_with_single_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, value: any) -> bool:
+    def update_cell_data_with_single_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int,
+                                                   replace_with: any, search_pattern: str, match_case: bool) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
         row -= 1
 
         row_count = self.dfs[dfi].height
@@ -229,8 +243,8 @@ class SheetData(GObject.Object):
             column_dtype = self.dfs[dfi].dtypes[column]
 
             # Cast empty string
-            if value == '':
-                value = None
+            if replace_with == '' and search_pattern is None:
+                replace_with = None
 
             # Convert the input value to the correct type
             if column_dtype in (polars.Date, polars.Datetime, polars.Time):
@@ -242,25 +256,34 @@ class SheetData(GObject.Object):
                     new_value = datetime.strptime(new_value, '%H:%M:%S').time()
             else:
                 try:
-                    new_value = polars.Series([value]).cast(column_dtype)[0]
+                    new_value = polars.Series([replace_with]).cast(column_dtype)[0]
                 except Exception:
-                    new_value = str(value)
+                    new_value = str(replace_with)
 
+            # FIXME: exclude the hidden row(s) from being updated
             # Update the entire column
             if row_span < 0:
-                self.dfs[dfi] = self.dfs[dfi].with_columns(
-                    **{
-                        column_name: polars.repeat(new_value, row_count, eager=True, dtype=column_dtype)
-                    }
-                )
+                self.dfs[dfi] = self.dfs[dfi].with_columns(polars.repeat(new_value, row_count, eager=True, dtype=column_dtype)
+                                                                 .alias(column_name))
             # Update the dataframe in range, excluding the header row
             elif stop - start > 0:
-                self.dfs[dfi] = self.dfs[dfi].with_columns(
-                    **{
-                        column_name: self.dfs[dfi][0:start, column].extend(polars.repeat(value, stop - start, eager=True, dtype=column_dtype))
-                                                                   .extend(self.dfs[dfi][stop:row_count, column])
-                    }
-                )
+                if search_pattern is None:
+                    self.dfs[dfi] = self.dfs[dfi].with_columns(
+                        self.dfs[dfi][0:start, column].extend(polars.repeat(replace_with, stop - start, eager=True, dtype=column_dtype))
+                                                      .extend(self.dfs[dfi][stop:row_count, column])
+                                                      .alias(column_name),
+                    )
+                else:
+                    # Pattern is used only for search and replace. The target should always be a single cell
+                    # and its value should always a string. Cast empty string if necessary. For the replace
+                    # all operation, we call a different function.
+                    if self.dfs[dfi][start, column] == search_pattern and replace_with == '':
+                        self.dfs[dfi][start, column] = None
+                    else:
+                        if match_case:
+                            self.dfs[dfi][start, column] = self.dfs[dfi][start, column].replace(search_pattern, replace_with)
+                        else:
+                            self.dfs[dfi][start, column] = re.sub(re.escape(search_pattern), replace_with, self.dfs[dfi][start, column], flags=re.IGNORECASE)
 
             if row >= 0:
                 continue # skip header cell
@@ -275,18 +298,21 @@ class SheetData(GObject.Object):
                         cnumber = max(cnumber, int(match.group(1)) + 1)
                 new_value = f'column_{cnumber}'
             else:
-                new_value = str(value)
+                new_value = str(replace_with)
 
             # Update the column name
             self.dfs[dfi] = self.dfs[dfi].rename({column_name: new_value})
 
         return True
 
-    def update_cell_data_with_array_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, value: list) -> bool:
+    def update_cell_data_with_array_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, content: list) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
         row -= 1
 
-        header = value[0]
-        content = value[1]
+        header = content[0]
+        content = content[1]
 
         row_count = self.dfs[dfi].height
 
@@ -313,17 +339,15 @@ class SheetData(GObject.Object):
             # Update the dataframe in range, excluding the header row
             if isinstance(content, polars.DataFrame):
                 self.dfs[dfi] = self.dfs[dfi].with_columns(
-                    **{
-                        column_name: self.dfs[dfi][0:start, column].extend(content[:, content_index].cast(column_dtype))
-                                                                   .extend(self.dfs[dfi][stop:row_count, column])
-                    }
+                    self.dfs[dfi][0:start, column].extend(content[:, content_index].cast(column_dtype))
+                                                  .extend(self.dfs[dfi][stop:row_count, column])
+                                                  .alias(column_name)
                 )
             elif content is not None:
                 self.dfs[dfi] = self.dfs[dfi].with_columns(
-                    **{
-                        column_name: self.dfs[dfi][0:start, column].extend(polars.Series([content]).cast(column_dtype))
-                                                                   .extend(self.dfs[dfi][stop:row_count, column])
-                    }
+                    self.dfs[dfi][0:start, column].extend(polars.Series([content]).cast(column_dtype))
+                                                  .extend(self.dfs[dfi][stop:row_count, column])
+                                                  .alias(column_name)
                 )
 
             if header is None:
@@ -334,6 +358,26 @@ class SheetData(GObject.Object):
                 self.dfs[dfi] = self.dfs[dfi].rename({column_name: header[content_index]})
             else:
                 self.dfs[dfi] = self.dfs[dfi].rename({column_name: header})
+
+        del content
+        gc.collect()
+
+        return True
+
+    def update_cell_data_with_chunk_from_metadata(self, column_names: list[str], row: int, row_span: int, dfi: int, content: polars.DataFrame) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        for column_name in column_names:
+            column = self.dfs[dfi].columns.index(column_name)
+            if row_span < 0: # update the entire column
+                self.dfs[dfi] = self.dfs[dfi].with_columns(content[column_name].alias(column_name))
+            else: # update within the range
+                self.dfs[dfi] = self.dfs[dfi].with_columns(
+                    self.dfs[dfi][0:row, column].extend(content[column_name])
+                                                .extend(self.dfs[dfi][row + row_span:, column])
+                                                .alias(column_name)
+                )
 
         del content
         gc.collect()
