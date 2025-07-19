@@ -25,7 +25,7 @@ import sys
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 
-from gi.repository import Adw, Gio, GObject, Gtk
+from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
 from . import globals
 from .file_manager import FileManager
@@ -181,21 +181,16 @@ class Application(Adw.Application):
             window.search_entry.grab_focus()
             return
 
-        window.search_entry.set_size_request(450, 45)
-        window.search_status.set_visible(False)
-        window.search_navigation.set_visible(False)
-        window.search_options.set_visible(True)
+        if not window.search_options_toggler.get_active():
+            window.search_options.set_visible(False)
 
-        window.search_box.remove_css_class('slide-down-dialog')
-        window.search_box.add_css_class('big-search-box')
+        if window.search_results_length == 0:
+            window.search_status.set_visible(False)
 
-        window.search_overlay.add_css_class('floating-sheet')
-        window.search_overlay.set_valign(Gtk.Align.FILL)
-        window.search_overlay.set_halign(Gtk.Align.FILL)
-        window.search_overlay.set_margin_bottom(0)
         window.search_overlay.set_visible(True)
 
-        window.search_box.add_css_class('zoom-in-dialog')
+        window.search_box.add_css_class('slide-up-dialog')
+        GLib.timeout_add(200, window.search_box.remove_css_class, 'slide-up-dialog')
 
         # Selects all text on the search entry
         window.search_entry.select_region(0, len(window.search_entry.get_text()))

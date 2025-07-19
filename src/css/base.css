@@ -32,32 +32,8 @@
     border-radius: 12px;
 }
 
-.big-search-box {
-    padding: 8px;
-    background-color: var(--view-bg-color);
-}
-.big-search-box entry {
-    padding-left: 14px;
-    padding-right: 14px;
-    font-size: 18px;
-}
-
 .search-status {
     font-size: 10px;
-}
-
-@keyframes zoom-in-animation {
-    from {
-        opacity: 0;
-        transform: scale(0.8);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-.zoom-in-dialog {
-    animation: zoom-in-animation 0.15s ease-out forwards;
 }
 
 @keyframes slide-up-animation {

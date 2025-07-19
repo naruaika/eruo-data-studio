@@ -41,7 +41,6 @@ class Window(Adw.ApplicationWindow):
     search_box = Gtk.Template.Child()
     search_entry = Gtk.Template.Child()
     search_status = Gtk.Template.Child()
-    search_navigation = Gtk.Template.Child()
     search_options = Gtk.Template.Child()
     search_options_toggler = Gtk.Template.Child()
 
@@ -164,27 +163,17 @@ class Window(Adw.ApplicationWindow):
         # Pressing enter/return key while holding shift key will
         # search for the previous search occurrence.
         if keyval == Gdk.KEY_Return and state == Gdk.ModifierType.SHIFT_MASK:
+            if self.search_results_length == 0:
+                self.on_search_entry_activated(self.search_entry)
+                return
             self.find_previous_search_occurrence()
             return
 
     @Gtk.Template.Callback()
     def on_search_entry_activated(self, widget: Gtk.Widget) -> None:
-        self.search_entry.set_size_request(-1, -1)
-        self.search_navigation.set_visible(True)
         self.search_status.set_visible(True)
 
-        if not self.search_options_toggler.get_active():
-            self.search_options.set_visible(False)
-
-        self.search_overlay.remove_css_class('floating-sheet')
-        self.search_overlay.set_valign(Gtk.Align.END)
-        self.search_overlay.set_halign(Gtk.Align.CENTER)
-        self.search_overlay.set_margin_bottom(80)
-
-        self.search_box.remove_css_class('big-search-box')
-        self.search_box.add_css_class('slide-up-dialog')
-
-        text_value = widget.get_text()
+        text_value = self.search_entry.get_text()
 
         match_case = self.search_match_case.get_active()
         match_cell = self.search_match_cell.get_active()
@@ -204,35 +193,11 @@ class Window(Adw.ApplicationWindow):
             sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
 
         if text_value == '':
-            self.search_status.set_text('Showing 0 of 0')
+            self.search_status.set_text('No results found')
             return # prevent empty search
 
-        # I know right that this is a bit hacky, but it works for now.
-        # My mission is to prevent from performing the same search again
-        # when nothing has changed.
-        new_search_states = {
-            'query': text_value,
-            'match_case': match_case,
-            'match_cell': match_cell,
-            'within_selection': within_selection,
-            'use_regexp': use_regexp,
-
-            # TODO: support multiple dataframes?
-            'table_id': id(sheet_document.data.dfs[0]),
-            'table_rvs_id': id(sheet_document.display.row_visible_series),
-            'table_cvs_id': id(sheet_document.display.column_visible_series),
-        }
-
-        if within_selection:
-            csr_dict = sheet_document.selection.current_search_range.__dict__.copy()
-            new_search_states['selection'] = {
-                'column': csr_dict['column'],
-                'row': csr_dict['row'],
-                'column_span': csr_dict['column_span'],
-                'row_span': csr_dict['row_span'],
-            }
-
         # Continue previous search
+        new_search_states = self.get_current_search_states()
         if new_search_states == self.search_states and self.search_results_length > 0:
             vheight = sheet_document.view.main_canvas.get_height() - sheet_document.display.column_header_height
             vwidth = sheet_document.view.main_canvas.get_width() - sheet_document.display.row_header_width
@@ -265,7 +230,7 @@ class Window(Adw.ApplicationWindow):
                                                                                                within_selection, use_regexp)
 
         if self.search_results_length == 0:
-            self.search_status.set_text('Showing 0 of 0')
+            self.search_status.set_text('No results found')
             return # prevent empty search
 
         self.search_status.set_text(f'Showing 1 of {format(self.search_results_length, ',d')}')
@@ -280,11 +245,23 @@ class Window(Adw.ApplicationWindow):
         self.find_next_search_occurrence()
 
     @Gtk.Template.Callback()
+    def on_find_all_clicked(self, button: Gtk.Button) -> None:
+        pass
+
+    @Gtk.Template.Callback()
     def on_find_previous_clicked(self, button: Gtk.Button) -> None:
+        if self.get_current_search_states() != self.search_states \
+                or self.search_results_length == 0:
+            self.on_search_entry_activated(self.search_entry)
+            return
         self.find_previous_search_occurrence()
 
     @Gtk.Template.Callback()
     def on_find_next_clicked(self, button: Gtk.Button) -> None:
+        if self.get_current_search_states() != self.search_states \
+                or self.search_results_length == 0:
+            self.on_search_entry_activated(self.search_entry)
+            return
         self.find_next_search_occurrence()
 
     @Gtk.Template.Callback()
@@ -469,13 +446,9 @@ class Window(Adw.ApplicationWindow):
 
     def close_search_box(self) -> None:
         # Close the search box
-        self.search_box.remove_css_class('zoom-in-dialog')
-        if 'slide-up-dialog' in self.search_box.get_css_classes():
-            self.search_box.remove_css_class('slide-up-dialog')
-            self.search_box.add_css_class('slide-down-dialog')
-            GLib.timeout_add(200, self.search_overlay.set_visible, False)
-        else:
-            self.search_overlay.set_visible(False)
+        self.search_box.add_css_class('slide-down-dialog')
+        GLib.timeout_add(200, self.search_overlay.set_visible, False)
+        GLib.timeout_add(200, self.search_box.remove_css_class, 'slide-down-dialog')
 
         tab_page = self.tab_view.get_selected_page()
         sheet_view = tab_page.get_child()
@@ -486,6 +459,45 @@ class Window(Adw.ApplicationWindow):
         # Focus on the main canvas
         sheet_view.main_canvas.set_focusable(True)
         sheet_view.main_canvas.grab_focus()
+
+    def get_current_search_states(self) -> bool:
+        text_value = self.search_entry.get_text()
+
+        match_case = self.search_match_case.get_active()
+        match_cell = self.search_match_cell.get_active()
+        within_selection = self.search_within_selection.get_active()
+        use_regexp = self.search_use_regexp.get_active()
+
+        tab_page = self.tab_view.get_selected_page()
+        sheet_view = tab_page.get_child()
+        sheet_document = sheet_view.document
+
+        # I know right that this is a bit hacky, but it works for now.
+        # My mission is to prevent from performing the same search again
+        # when nothing has changed.
+        search_states = {
+            'query': text_value,
+            'match_case': match_case,
+            'match_cell': match_cell,
+            'within_selection': within_selection,
+            'use_regexp': use_regexp,
+
+            # TODO: support multiple dataframes?
+            'table_id': id(sheet_document.data.dfs[0]),
+            'table_rvs_id': id(sheet_document.display.row_visible_series),
+            'table_cvs_id': id(sheet_document.display.column_visible_series),
+        }
+
+        if within_selection:
+            csr_dict = sheet_document.selection.current_search_range.__dict__.copy()
+            search_states['selection'] = {
+                'column': csr_dict['column'],
+                'row': csr_dict['row'],
+                'column_span': csr_dict['column_span'],
+                'row_span': csr_dict['row_span'],
+            }
+
+        return search_states
 
     def find_previous_search_occurrence(self) -> None:
         # Check if the cursor is at the end of the search results
