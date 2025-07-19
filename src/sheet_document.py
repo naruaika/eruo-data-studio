@@ -1123,9 +1123,11 @@ class SheetDocument(GObject.Object):
     def filter_current_rows(self) -> None:
         active = self.selection.current_active_cell
 
-        # Prepare for snapshot
-        if not globals.is_changing_state and 0 <= active.metadata.dfi < len(self.data.dfs):
-            pexpression = self.data.fes[active.metadata.dfi]
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import FilterRowState
+            globals.history.save(FilterRowState(self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None,
+                                                self.display.row_heights if len(self.display.row_heights) else None))
 
         # Update row visibility flags
         self.display.row_visibility_flags = self.data.filter_rows_from_metadata(active.metadata.column, active.metadata.row, active.metadata.dfi)
@@ -1135,14 +1137,6 @@ class SheetDocument(GObject.Object):
         # TODO: update row heights
         if len(self.display.row_heights):
             pass
-
-        if len(self.display.row_visibility_flags) == 0:
-            return # shouldn't happen, but for completeness
-
-        # Save snapshot
-        if not globals.is_changing_state:
-            from .history_manager import FilterRowState
-            globals.history.save(FilterRowState(active.metadata.dfi, pexpression))
 
         self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, True)
@@ -1182,6 +1176,8 @@ class SheetDocument(GObject.Object):
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
 
             # TODO: update row heights
+            if len(self.display.row_heights):
+                pass
 
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()

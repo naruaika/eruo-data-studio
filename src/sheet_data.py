@@ -71,7 +71,6 @@ class SheetData(GObject.Object):
 
     bbs: list[SheetCellBoundingBox] = [] # visual bounding boxes
     dfs: list[polars.DataFrame | numpy.ndarray] = []
-    fes: list[polars.Expr | None] = []
 
     def __init__(self, document: SheetDocument, dataframe: polars.DataFrame) -> None:
         super().__init__()
@@ -83,7 +82,6 @@ class SheetData(GObject.Object):
         self.dfs = [dataframe]
         # TODO: should we support dataframe starting from row > 1 and/or column > 1?
         self.bbs = [SheetCellBoundingBox(1, 1, dataframe.width, dataframe.height + 1)]
-        self.fes = [None]
 
     def get_cell_metadata_from_position(self, column: int, row: int) -> SheetCellMetadata:
         # Handle the locator cells
@@ -470,16 +468,12 @@ class SheetData(GObject.Object):
         column_name = self.dfs[dfi].columns[column]
         cell_value = self.read_cell_data_from_metadata(column, row, 1, 1, dfi)
 
-        # Update the filter expression
-        if self.fes[dfi] is None:
-            self.fes[dfi] = polars.col(column_name).is_in([cell_value], nulls_equal=True)
-        else:
-            self.fes[dfi] = self.fes[dfi] & polars.col(column_name).is_in([cell_value], nulls_equal=True)
+        filter_expression = polars.col(column_name).is_in([cell_value], nulls_equal=True)
 
         # We don't do the actual filtering on the original dataframe here, instead we
         # just want to get the boolean series to flag which rows should be visible.
         return polars.concat([polars.Series([True]), # for header row
-                              self.dfs[dfi].with_columns(self.fes[dfi].alias('$vrow'))['$vrow']])
+                              self.dfs[dfi].with_columns(filter_expression.alias('$vrow'))['$vrow']])
 
     def sort_rows_from_metadata(self, column: int, dfi: int, descending: bool = False) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:

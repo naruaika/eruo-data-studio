@@ -331,23 +331,13 @@ class DeleteRowState(State):
     def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series, rheights: polars.Series) -> None:
         super().__init__()
 
-        if dataframe is None:
-            self.file_path = None
-            return
-
         self.save_selection()
 
-        self.file_path = self.write_snapshot(dataframe)
+        self.file_path = self.write_snapshot(dataframe) if dataframe is not None else None
 
-        if vflags is not None:
-            self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
-        else:
-            self.vflags_path = None
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags})) if vflags is not None else None
 
-        if rheights is not None:
-            self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights}))
-        else:
-            self.rheights_path = None
+        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
 
     def undo(self) -> None:
         document = globals.history.document
@@ -374,23 +364,13 @@ class DeleteColumnState(State):
     def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series, cwidths: polars.Series) -> None:
         super().__init__()
 
-        if dataframe is None:
-            self.file_path = None
-            return
-
         self.save_selection()
 
-        self.file_path = self.write_snapshot(dataframe)
+        self.file_path = self.write_snapshot(dataframe) if dataframe is not None else None
 
-        if vflags is not None:
-            self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
-        else:
-            self.vflags_path = None
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags})) if vflags is not None else None
 
-        if cwidths is not None:
-            self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths}))
-        else:
-            self.cwidths_path = None
+        self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths})) if cwidths is not None else None
 
     def undo(self) -> None:
         document = globals.history.document
@@ -417,10 +397,7 @@ class HideRowState(State):
 
         self.save_selection()
 
-        if rheights is not None:
-            self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights}))
-        else:
-            self.rheights_path = None
+        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
 
     def undo(self) -> None:
         document = globals.history.document
@@ -447,10 +424,7 @@ class HideColumnState(State):
 
         self.save_selection()
 
-        if cwidths is not None:
-            self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths}))
-        else:
-            self.cwidths_path = None
+        self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths})) if cwidths is not None else None
 
     def undo(self) -> None:
         document = globals.history.document
@@ -484,11 +458,7 @@ class UnhideRowState(State):
 
         self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
-        if rheights is None:
-            self.rheights_path = None
-            return
-
-        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights}))
+        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
 
     def undo(self) -> None:
         document = globals.history.document
@@ -561,11 +531,7 @@ class UnhideColumnState(State):
 
         self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
-        if cwidths is None:
-            self.cwidths_path = None
-            return
-
-        self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths}))
+        self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths})) if cwidths is not None else None
 
     def undo(self) -> None:
         document = globals.history.document
@@ -624,41 +590,41 @@ class UnhideAllColumnState(State):
 class FilterRowState(State):
     __gtype_name__ = 'FilterRowState'
 
-    dfi: int
+    vflags_path: str
+    rheights_path: str
 
-    expression: polars.Expr
-
-    def __init__(self, dfi: int, expression: polars.Expr) -> None:
+    def __init__(self, vflags: polars.Series, rheights: polars.Series) -> None:
         super().__init__()
-
-        self.dfi = dfi
-
-        self.expression = expression
 
         self.save_selection()
 
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags})) if vflags is not None else None
+
+        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
+
     def undo(self) -> None:
         document = globals.history.document
-        document.data.fes[self.dfi] = self.expression
 
-        self.restore_selection(False)
-
-        if self.expression is not None:
-            document.display.row_visibility_flags = polars.concat([polars.Series([True]), # for header row
-                                                                   document.data.dfs[self.dfi].with_columns(self.expression.alias('$vrow'))['$vrow']])
+        # Update row visibility flags
+        if self.vflags_path is not None:
+            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+            document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+            document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
         else:
             document.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+            document.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+            document.data.bbs[self.range.metadata.dfi].row_span = document.data.dfs[self.range.metadata.dfi].height + 1
 
-        document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
-
-        if self.expression is not None:
-            document.data.bbs[self.dfi].row_span = len(document.display.row_visible_series)
+        # Update row heights
+        if self.rheights_path is not None:
+            document.display.row_heights = polars.read_parquet(self.rheights_path).to_series(0)
+            document.display.cumulative_row_heights = polars.Series('crheights', document.display.row_heights).cum_sum()
         else:
-            document.data.bbs[self.dfi].row_span = document.data.dfs[self.dfi].height
+            document.display.row_heights = polars.Series(dtype=polars.UInt32)
+            document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
 
     def redo(self) -> None:
         document = globals.history.document
-        document.data.fes[self.dfi] = self.expression
 
         self.restore_selection(False)
 
@@ -683,11 +649,7 @@ class SortRowState(State):
 
         self.file_path = self.write_snapshot(polars.DataFrame(rindex))
 
-        if vflags is None:
-            self.vflags_path = None
-            return
-
-        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags})) if vflags is not None else None
 
     def undo(self) -> None:
         document = globals.history.document
