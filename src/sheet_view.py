@@ -164,7 +164,7 @@ class SheetView(Gtk.Box):
 
             return
 
-        self.document.select_element_from_point(x, y)
+        self.document.select_element_from_point(x, y, event.get_current_event_state())
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
         if self.document.check_selection_changed():
@@ -259,6 +259,7 @@ class SheetView(Gtk.Box):
             self.inline_formula.set_visible(True)
             self.inline_formula.grab_focus()
             return
+
         if keyval == Gdk.KEY_BackSpace:
             self.inline_formula.get_buffer().set_text('')
             self.inline_formula.set_visible(True)

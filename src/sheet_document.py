@@ -291,10 +291,21 @@ class SheetDocument(GObject.Object):
     def on_update_inline_cell_data(self, source: GObject.Object, value: any) -> None:
         self.update_current_cells(value)
 
-    def select_element_from_point(self, x: float, y: float) -> None:
+    def select_element_from_point(self, x: float, y: float, state: Gdk.ModifierType) -> None:
         column = self.display.get_column_from_point(x)
         row = self.display.get_row_from_point(y)
-        self.update_selection_from_position(column, row, column, row, False, False, False)
+
+        start_column = column
+        start_row = row
+        end_column = column
+        end_row = row
+
+        if state == Gdk.ModifierType.SHIFT_MASK:
+            active = self.selection.current_active_cell
+            start_column = active.column
+            start_row = active.row
+
+        self.update_selection_from_position(start_column, start_row, end_column, end_row, True, False, False)
 
     def update_selection_from_name(self, name: str) -> None:
         vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
