@@ -161,6 +161,12 @@ class Window(Adw.ApplicationWindow):
             self.close_search_box()
             return
 
+        # Pressing enter/return key while holding shift key will
+        # search for the previous search occurrence.
+        if keyval == Gdk.KEY_Return and state == Gdk.ModifierType.SHIFT_MASK:
+            self.find_previous_search_occurrence()
+            return
+
     @Gtk.Template.Callback()
     def on_search_entry_activated(self, widget: Gtk.Widget) -> None:
         self.search_entry.set_size_request(-1, -1)

@@ -178,6 +178,7 @@ class Application(Adw.Application):
         window = self.get_active_window()
 
         if window.search_overlay.get_visible():
+            window.search_entry.grab_focus()
             return
 
         window.search_entry.set_size_request(450, 45)
