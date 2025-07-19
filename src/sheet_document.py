@@ -317,7 +317,8 @@ class SheetDocument(GObject.Object):
 
     def update_selection_from_position(self, col_1: int, row_1: int, col_2: int, row_2: int,
                                        keep_order: bool = False, follow_cursor: bool = True,
-                                       auto_scroll: bool = True, scroll_axis: str = 'both') -> None:
+                                       auto_scroll: bool = True, scroll_axis: str = 'both',
+                                       with_offset: bool = False) -> None:
         # Save snapshot
         if not globals.is_changing_state:
             from .history_manager import SelectionState
@@ -426,7 +427,7 @@ class SheetDocument(GObject.Object):
         self.selection.current_cursor_cell = SheetContentCell(x, y, col_2, row_2, width, height, 1, 1, cell_metadata)
 
         if auto_scroll:
-            self.auto_adjust_scrollbars_by_selection(follow_cursor, scroll_axis)
+            self.auto_adjust_scrollbars_by_selection(follow_cursor, scroll_axis, with_offset)
 
         if keep_order:
             self.notify_selection_changed(col_1, row_1, cell_metadata)
@@ -1460,23 +1461,19 @@ class SheetDocument(GObject.Object):
 
         globals.is_changing_state = False
 
-    def auto_adjust_scrollbars_by_selection(self, follow_cursor: bool = True, scroll_axis: str = 'both') -> None:
+    def auto_adjust_scrollbars_by_selection(self, follow_cursor: bool = True, scroll_axis: str = 'both', with_offset: bool = False) -> None:
         globals.is_changing_state = True
 
         column = self.selection.current_cursor_cell.column
         row = self.selection.current_cursor_cell.row
         viewport_height = self.view.main_canvas.get_height() - self.display.column_header_height
         viewport_width = self.view.main_canvas.get_width() - self.display.row_header_width
-        self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis)
+        self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis, with_offset)
 
         if not follow_cursor:
             column = self.selection.current_active_cell.column
             row = self.selection.current_active_cell.row
-            self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis)
-
-        # Transform continuous scroll position to discrete
-        self.display.scroll_y_position = round(self.display.scroll_y_position / self.display.DEFAULT_CELL_HEIGHT) * self.display.DEFAULT_CELL_HEIGHT
-        self.display.scroll_x_position = round(self.display.scroll_x_position / self.display.DEFAULT_CELL_WIDTH) * self.display.DEFAULT_CELL_WIDTH
+            self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis, with_offset)
 
         self.auto_adjust_scrollbars_by_scroll()
         self.auto_adjust_locators_size_by_scroll()

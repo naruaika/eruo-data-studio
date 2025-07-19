@@ -247,7 +247,7 @@ class Window(Adw.ApplicationWindow):
             # In addition, we force to continue previous search if the user chose to search within the selection
             # when the user re-opens the search box.
             if not within_selection and sheet_document.display.scroll_to_position(col_index, row_index, vheight, vwidth):
-                sheet_document.auto_adjust_scrollbars_by_selection()
+                sheet_document.auto_adjust_scrollbars_by_selection(with_offset=True)
                 sheet_document.renderer.render_caches = {}
                 sheet_document.view.main_canvas.queue_draw()
                 return
@@ -574,7 +574,7 @@ class Window(Adw.ApplicationWindow):
         col_index = sheet_view.document.display.get_column_from_vcolumn(vcol_index)
         row_index = sheet_view.document.display.get_row_from_vrow(vrow_index)
 
-        sheet_view.document.update_selection_from_position(col_index, row_index, col_index, row_index)
+        sheet_view.document.update_selection_from_position(col_index, row_index, col_index, row_index, with_offset=True)
         self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of {format(self.search_results_length, ',d')}')
 
     def show_toast_message(self, message: str) -> None:

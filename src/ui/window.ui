@@ -282,7 +282,7 @@
                         </child>
                         <child>
                           <object class="GtkCheckButton" id="search_use_regexp">
-                            <property name="label">Use RegExp</property>
+                            <property name="label">Use RegEx</property>
                           </object>
                         </child>
                         <child>
