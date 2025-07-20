@@ -31,18 +31,20 @@ class Window(Adw.ApplicationWindow):
     __gtype_name__ = 'Window'
 
     split_view = Gtk.Template.Child()
-    toggle_sidebar = Gtk.Template.Child()
     window_title = Gtk.Template.Child()
 
-    toggle_search = Gtk.Template.Child()
-    toggle_history = Gtk.Template.Child()
+    toggle_sidebar = Gtk.Template.Child()
+    sidebar_tab_view = Gtk.Template.Child()
 
-    content_overlay = Gtk.Template.Child()
+    open_search_all = Gtk.Template.Child()
+    open_history = Gtk.Template.Child()
 
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
 
     toast_overlay = Gtk.Template.Child()
+    content_overlay = Gtk.Template.Child()
+
     tab_view = Gtk.Template.Child()
     tab_bar = Gtk.Template.Child()
 
@@ -55,8 +57,12 @@ class Window(Adw.ApplicationWindow):
         self.sheet_manager = SheetManager()
 
         from .search_replace_overlay import SearchReplaceOverlay
-        self.search_overlay = SearchReplaceOverlay(self)
-        self.content_overlay.add_overlay(self.search_overlay)
+        self.search_replace_overlay = SearchReplaceOverlay(self)
+        self.content_overlay.add_overlay(self.search_replace_overlay)
+
+        from .search_replace_all_view import SearchReplaceAllView
+        self.search_replace_all_view = SearchReplaceAllView(self)
+        self.search_replace_all_page = self.sidebar_tab_view.append(self.search_replace_all_view)
 
         # We override the default behavior of the Gtk.Entry for the name box,
         # so that it'll select all text when the user clicks on it for the first
@@ -296,6 +302,23 @@ class Window(Adw.ApplicationWindow):
     def update_inputbar(self, sel_name: str, sel_value: str) -> None:
         self.name_box.set_text(sel_name)
         self.formula_bar.set_text(sel_value)
+
+    def do_toggle_sidebar(self) -> None:
+        # Close the sidebar when it's already open
+        if 'raised' in self.toggle_sidebar.get_css_classes():
+            self.toggle_sidebar.remove_css_class('raised')
+            self.split_view.set_collapsed(True)
+            tab_page = self.tab_view.get_selected_page()
+            sheet_view = tab_page.get_child()
+            sheet_view.document.selection.current_search_range = None
+            globals.is_searching_cells = False
+            return
+
+        # Open the sidebar
+        self.toggle_sidebar.add_css_class('raised')
+        self.split_view.set_collapsed(False)
+        if self.sidebar_tab_view.get_selected_page() == self.search_replace_all_page:
+            globals.is_searching_cells = True
 
     def show_toast_message(self, message: str) -> None:
         self.toast_overlay.add_toast(Adw.Toast.new(message))

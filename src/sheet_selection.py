@@ -54,8 +54,8 @@ class SheetCell(SheetElement):
     rtl: bool # right to left
     btt: bool # bottom to top
 
-    def __init__(self, x: int, y: int, column: int, row: int, width: int, height: int,
-                 column_span: int, row_span: int, metadata: SheetCellMetadata, rtl: bool = False, btt: bool = False) -> None:
+    def __init__(self, x: int, y: int, column: int, row: int, width: int, height: int, column_span: int, row_span: int,
+                 metadata: SheetCellMetadata, rtl: bool = False, btt: bool = False) -> None:
         super().__init__(x, y)
 
         self.column = column

@@ -51,13 +51,15 @@ class Application(Adw.Application):
         self.create_action('open', self.on_open_file_action, ['<primary>o'])
         self.create_action('save', self.on_save_file_action, ['<primary>s'])
         self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
-        self.create_action('toggle-search', self.on_toggle_search_action, ['<primary>f'])
+        self.create_action('open-search', self.on_open_search_action, ['<primary>f'])
         self.create_action('toggle-replace', self.on_toggle_replace_action, ['<primary>h'])
-        self.create_action('toggle-history', self.on_toggle_history_action)
+        self.create_action('open-search-all', self.on_open_search_all_action, ['<primary><shift>f'])
+        self.create_action('toggle-replace-all', self.on_toggle_replace_all_action, ['<primary><shift>h'])
+        self.create_action('open-history', self.on_open_history_action)
         self.create_action('new-sheet', self.on_new_sheet_action, ['<primary>t'])
         self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
         self.create_action('undo', self.on_undo_action, ['<primary>z'])
-        self.create_action('redo', self.on_redo_action, ['<shift><primary>z', '<primary>y'])
+        self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
         # self.create_action('cut', self.on_cut_action, ['<primary>x'])
         # self.create_action('copy', self.on_copy_action, ['<primary>c'])
         # self.create_action('paste', self.on_paste_action, ['<primary>v'])
@@ -128,7 +130,7 @@ class Application(Adw.Application):
         window.close()
 
     def on_about_action(self, action: Gio.SimpleAction, *args) -> None:
-        dialog = Adw.AboutDialog(application_name='Eruo Data Studio',
+        dialog = Adw.AboutDialog(application_name='Data Studio',
                                  application_icon='com.macipra.eruo',
                                  developer_name='Naufan Rusyda Faikar',
                                  version='0.1.0',
@@ -144,12 +146,7 @@ class Application(Adw.Application):
 
     def on_toggle_sidebar_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        if 'raised' in window.toggle_sidebar.get_css_classes():
-            window.toggle_sidebar.remove_css_class('raised')
-            window.split_view.set_collapsed(True)
-        else:
-            window.toggle_sidebar.add_css_class('raised')
-            window.split_view.set_collapsed(False)
+        window.do_toggle_sidebar()
 
     def on_open_file_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
@@ -176,20 +173,25 @@ class Application(Adw.Application):
         self.file_manager.save_as_file(window)
 
     # Weird naming, because this function only handles the opening of the search box
-    def on_toggle_search_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_open_search_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        window.search_overlay.open_search_box()
+        window.search_replace_overlay.open_search_box()
 
     def on_toggle_replace_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        window.search_overlay.toggle_replace_section()
+        window.search_replace_overlay.toggle_replace_section()
 
-    def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_open_search_all_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        if 'raised' in window.toggle_history.get_css_classes():
-            window.toggle_history.remove_css_class('raised')
-        else:
-            window.toggle_history.add_css_class('raised')
+        window.search_replace_all_view.open_search_view()
+
+    def on_toggle_replace_all_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        window.search_replace_all_view.toggle_replace_section()
+
+    def on_open_history_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        window.open_history.add_css_class('raised')
 
     def on_file_opened(self, source: GObject.Object, file_path: str) -> None:
         if not file_path:

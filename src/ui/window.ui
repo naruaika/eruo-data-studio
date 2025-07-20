@@ -19,10 +19,10 @@
                 <child type="top">
                   <object class="AdwHeaderBar">
                     <child type="start">
-                      <object class="GtkButton" id="toggle_search">
-                        <property name="icon-name">system-search-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">Search</property>
-                        <property name="action-name">app.toggle-search</property>
+                      <object class="GtkToggleButton" id="open_search_all">
+                        <property name="icon-name">edit-find-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">Search (Shift+Ctrl+F)</property>
+                        <property name="action-name">app.open-search-all</property>
                       </object>
                     </child>
                     <property name="title-widget">
@@ -35,25 +35,20 @@
                       </object>
                     </property>
                     <child type="end">
-                      <object class="GtkToggleButton" id="toggle_history">
+                      <object class="GtkToggleButton" id="open_history">
                         <property name="icon-name">history-undo-symbolic</property>
                         <property name="tooltip-text" translatable="yes">History</property>
-                        <property name="action-name">app.toggle-history</property>
+                        <property name="action-name">app.open-history</property>
                       </object>
                     </child>
                   </object>
                 </child>
                 <property name="content">
-                  <object class="GtkBox">
-                    <property name="orientation">vertical</property>
-                    <property name="margin-top">10</property>
-                    <property name="margin-bottom">10</property>
-                    <property name="margin-start">6</property>
-                    <property name="margin-end">6</property>
-                    <child>
-                      <object class="GtkListView">
-                      </object>
-                    </child>
+                  <object class="AdwTabView" id="sidebar_tab_view">
+                    <property name="valign">fill</property>
+                    <property name="halign">fill</property>
+                    <property name="hexpand">true</property>
+                    <property name="vexpand">true</property>
                   </object>
                 </property>
               </object>
@@ -202,7 +197,7 @@
     <section>
       <item>
         <attribute name="label" translatable="yes">_Find/Replace...</attribute>
-        <attribute name="action">app.toggle-search</attribute>
+        <attribute name="action">app.open-search</attribute>
       </item>
     </section>
     <section>
@@ -215,7 +210,7 @@
         <attribute name="action">win.show-help-overlay</attribute>
       </item>
       <item>
-        <attribute name="label" translatable="yes">_About Eruo Data Studio</attribute>
+        <attribute name="label" translatable="yes">_About Data Studio</attribute>
         <attribute name="action">app.about</attribute>
       </item>
     </section>

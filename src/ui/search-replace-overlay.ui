@@ -35,7 +35,6 @@
                 <property name="tooltip-text" translatable="yes">Toggle Replace</property>
                 <property name="action-name">app.toggle-replace</property>
                 <style>
-                  <class name="flat"/>
                   <class name="circular"/>
                 </style>
               </object>
@@ -88,8 +87,9 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkToggleButton" id="search_options_toggler">
+                      <object class="GtkToggleButton">
                         <property name="icon-name">view-more-horizontal-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">Toggle Search Options</property>
                         <signal name="toggled" handler="on_search_options_toggled" swapped="no" />
                       </object>
                     </child>

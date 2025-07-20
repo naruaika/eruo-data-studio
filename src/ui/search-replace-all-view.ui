@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="SearchReplaceAllView" parent="GtkBox">
+    <property name="orientation">vertical</property>
+    <child>
+      <object class="GtkBox">
+        <property name="orientation">horizontal</property>
+        <property name="margin-start">6</property>
+        <property name="margin-end">6</property>
+        <property name="spacing">6</property>
+        <child>
+          <object class="GtkToggleButton" id="toggle_replace">
+            <property name="valign">start</property>
+            <property name="icon-name">go-next-symbolic</property>
+            <property name="tooltip-text" translatable="yes">Toggle Replace</property>
+            <property name="action-name">app.toggle-replace-all</property>
+            <style>
+              <class name="circular"/>
+            </style>
+          </object>
+        </child>
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <property name="spacing">6</property>
+            <child>
+              <object class="GtkBox">
+                <property name="orientation">horizontal</property>
+                <property name="spacing">6</property>
+                <child>
+                  <object class="GtkEntry" id="search_entry">
+                    <property name="hexpand">true</property>
+                    <property name="placeholder-text">Search for text...</property>
+                    <property name="primary-icon-name">edit-find-symbolic</property>
+                    <signal name="activate" handler="on_search_entry_activated" swapped="no" />
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkToggleButton">
+                    <property name="icon-name">view-more-horizontal-symbolic</property>
+                    <property name="tooltip-text" translatable="yes">Toggle Search Options</property>
+                    <signal name="toggled" handler="on_search_options_toggled" swapped="no" />
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="GtkBox" id="search_options">
+                <property name="orientation">vertical</property>
+                <property name="visible">false</property>
+                <child>
+                  <object class="GtkCheckButton" id="search_match_case">
+                    <property name="label">Match case</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkCheckButton" id="search_match_cell">
+                    <property name="label">Match entire cell contents</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkCheckButton" id="search_within_selection">
+                    <property name="label">Within selection only</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkCheckButton" id="search_use_regexp">
+                    <property name="label">Use Regular Expression</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="GtkBox" id="replace_section">
+                <property name="orientation">horizontal</property>
+                <property name="spacing">6</property>
+                <property name="visible">false</property>
+                <child>
+                  <object class="GtkEntry" id="replace_entry">
+                    <property name="hexpand">true</property>
+                    <property name="placeholder-text">Replace all with...</property>
+                    <property name="primary-icon-name">edit-find-replace-symbolic</property>
+                    <signal name="activate" handler="on_replace_entry_activated" swapped="no" />
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="GtkLabel" id="search_status">
+        <property name="margin-top">4</property>
+        <property name="margin-bottom">6</property>
+        <property name="margin-start">54</property>
+        <property name="margin-end">10</property>
+        <property name="halign">start</property>
+        <property name="label">No results</property>
+        <property name="visible">false</property>
+        <property name="wrap">true</property>
+        <style>
+          <class name="search-status"/>
+        </style>
+      </object>
+    </child>
+    <child>
+      <object class="GtkScrolledWindow">
+        <property name="vexpand">true</property>
+        <child>
+          <object class="GtkListView" id="search_list_view">
+            <property name="single-click-activate">true</property>
+            <property name="model">
+              <object class="GtkSingleSelection">
+                <property name="model">
+                  <object class="GListStore" id="search_list_store"/>
+                </property>
+              </object>
+            </property>
+            <property name="factory">
+              <object class="GtkBuilderListItemFactory">
+                <property name="bytes"><![CDATA[
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <template class="GtkListItem">
+    <property name="activatable">true</property>
+    <property name="child">
+      <object class="GtkBox">
+        <property name="orientation">horizontal</property>
+        <property name="spacing">6</property>
+        <child>
+          <object class="GtkLabel">
+            <property name="halign">start</property>
+            <property name="hexpand">true</property>
+            <property name="ellipsize">end</property>
+            <binding name="label">
+              <lookup name="cvalue" type="SearchResultListItem">
+                <lookup name="item">GtkListItem</lookup>
+              </lookup>
+            </binding>
+          </object>
+        </child>
+        <child>
+          <object class="GtkLabel">
+            <property name="valign">center</property>
+            <binding name="label">
+              <lookup name="cname" type="SearchResultListItem">
+                <lookup name="item">GtkListItem</lookup>
+              </lookup>
+            </binding>
+            <style>
+              <class name="search-result-cname"/>
+              <class name="monospace"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </property>
+  </template>
+</interface>
+            ]]></property>
+              </object>
+            </property>
+            <style>
+              <class name="navigation-sidebar"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>

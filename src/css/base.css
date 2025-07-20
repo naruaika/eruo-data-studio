@@ -33,7 +33,12 @@
 }
 
 .search-status {
-    font-size: 10px;
+    font-size: 12px;
+}
+
+.search-result-cname {
+    font-size: 12px;
+    font-weight: bold;
 }
 
 @keyframes slide-up-animation {

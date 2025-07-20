@@ -34,7 +34,6 @@ class SearchReplaceOverlay(Adw.Bin):
     search_status = Gtk.Template.Child()
 
     search_options = Gtk.Template.Child()
-    search_options_toggler = Gtk.Template.Child()
 
     search_match_case = Gtk.Template.Child()
     search_match_cell = Gtk.Template.Child()
@@ -94,8 +93,6 @@ class SearchReplaceOverlay(Adw.Bin):
 
     @Gtk.Template.Callback()
     def on_search_entry_activated(self, widget: Gtk.Widget) -> None:
-        self.search_status.set_visible(True)
-
         text_value = self.search_entry.get_text()
 
         match_case = self.search_match_case.get_active()
@@ -114,6 +111,8 @@ class SearchReplaceOverlay(Adw.Bin):
         # Initialize the current search range
         elif sheet_document.selection.current_search_range is None:
             sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+
+        self.search_status.set_visible(True)
 
         if text_value == '':
             self.search_status.set_text('No results found')
@@ -157,7 +156,7 @@ class SearchReplaceOverlay(Adw.Bin):
             self.search_status.set_text('No results found')
             return # prevent empty search
 
-        self.search_status.set_text(f'Showing 1 of {format(self.search_results_length, ',d')}')
+        self.search_status.set_text(f'Showing 1 of {format(self.search_results_length, ',d')} results')
         self.search_status.set_visible(True)
 
         # Set the search cursor to the first item
@@ -203,6 +202,18 @@ class SearchReplaceOverlay(Adw.Bin):
         self.replace_all_search_occurences()
 
     @Gtk.Template.Callback()
+    def on_find_all_button_clicked(self, button: Gtk.Button) -> None:
+        self.window.search_replace_all_view.search_entry.set_text(self.search_entry.get_text())
+        self.window.search_replace_all_view.search_match_case.set_active(self.search_match_case.get_active())
+        self.window.search_replace_all_view.search_match_cell.set_active(self.search_match_cell.get_active())
+        self.window.search_replace_all_view.search_within_selection.set_active(self.search_within_selection.get_active())
+        self.window.search_replace_all_view.search_use_regexp.set_active(self.search_use_regexp.get_active())
+
+        self.close_search_box()
+
+        GLib.timeout_add(200, self.window.search_replace_all_view.open_search_view)
+
+    @Gtk.Template.Callback()
     def on_search_options_toggled(self, button: Gtk.Button) -> None:
         if button.get_active():
             button.add_css_class('raised')
@@ -245,14 +256,7 @@ class SearchReplaceOverlay(Adw.Bin):
 
         # Open the search overlay
         if not overlay_visible:
-            self.set_visible(True)
-            self.search_box.add_css_class('slide-up-dialog')
-            GLib.timeout_add(200, self.search_box.remove_css_class, 'slide-up-dialog')
-
-            globals.is_searching_cells = True
-
-            if self.search_results_length == 0:
-                self.search_status.set_visible(False)
+            self.open_search_box()
 
         # In case the user wants to jump between the search and replace entry
         if overlay_visible and replace_section_visible and overlay_in_focus and search_entry_in_focus:
@@ -452,7 +456,7 @@ class SearchReplaceOverlay(Adw.Bin):
             sheet_document.display.discretize_scroll_position()
             sheet_document.auto_adjust_scrollbars_by_selection()
 
-        self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of {format(self.search_results_length, ',d')}')
+        self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of {format(self.search_results_length, ',d')} results')
         self.search_status.set_visible(True)
 
     def replace_current_search_result_item(self) -> None:

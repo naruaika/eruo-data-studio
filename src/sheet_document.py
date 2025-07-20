@@ -288,7 +288,7 @@ class SheetDocument(GObject.Object):
     def on_update_inline_cell_data(self, source: GObject.Object, value: any) -> None:
         self.update_current_cells(value)
 
-    def select_element_from_point(self, x: float, y: float, state: Gdk.ModifierType) -> None:
+    def select_element_from_point(self, x: float, y: float, state: Gdk.ModifierType = None) -> None:
         column = self.display.get_column_from_point(x)
         row = self.display.get_row_from_point(y)
 
