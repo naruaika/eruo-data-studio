@@ -427,8 +427,6 @@ class SearchReplaceOverlay(Adw.Bin):
         sheet_view = tab_page.get_child()
         sheet_document = sheet_view.document
 
-        # TODO: re-adjust the viewport scroll to account the search box
-
         # TODO: support multiple dataframes?
         vcol_index = sheet_view.document.data.dfs[0].columns.index(self.search_cursor_coordinate[1]) + 1 # +1 for the locator
         vrow_index = self.search_results['$ridx'][self.search_cursor_coordinate[0]] + 2 # +2 for the locator and the header
@@ -438,9 +436,21 @@ class SearchReplaceOverlay(Adw.Bin):
 
         search_range = sheet_document.selection.current_search_range
 
-        sheet_view.document.update_selection_from_position(col_index, row_index, col_index, row_index, with_offset=True)
+        sheet_document.update_selection_from_position(col_index, row_index, col_index, row_index, with_offset=True)
 
         sheet_document.selection.current_search_range = search_range
+
+        column = sheet_document.selection.current_active_cell.column
+        row = sheet_document.selection.current_active_cell.row
+        viewport_height = sheet_document.view.main_canvas.get_height() - sheet_document.display.column_header_height
+        viewport_width = sheet_document.view.main_canvas.get_width() - sheet_document.display.row_header_width
+
+        # Scroll to account for the search box if neccessary
+        if 'bottom' in sheet_document.display.check_cell_position_near_edges(column, row, viewport_height, viewport_width):
+            offset_size = self.get_height() + self.get_margin_bottom() + sheet_document.display.DEFAULT_CELL_HEIGHT
+            sheet_document.display.scroll_y_position += offset_size
+            sheet_document.display.discretize_scroll_position()
+            sheet_document.auto_adjust_scrollbars_by_selection()
 
         self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of {format(self.search_results_length, ',d')}')
         self.search_status.set_visible(True)

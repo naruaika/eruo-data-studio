@@ -371,7 +371,43 @@ class SheetDisplay(GObject.Object):
                 return symbol['short'] if short else symbol['long']
         return '?'
 
-    def scroll_to_position(self, column: int, row: int, viewport_height: int, viewport_width: int, scroll_axis: str = 'both', with_offset: bool = False) -> bool:
+    def check_cell_position_near_edges(self, column: int, row: int, viewport_height: int, viewport_width: int) -> list[str]:
+        cell_y = self.get_cell_y_from_row(row)
+        cell_x = self.get_cell_x_from_column(column)
+        cell_width = self.get_cell_width_from_column(column)
+        cell_height = self.get_cell_height_from_row(row)
+
+        x_offset = self.row_header_width - self.scroll_x_position
+        y_offset = self.column_header_height - self.scroll_y_position
+
+        top_offset = cell_y - y_offset
+        left_offset = cell_x - x_offset
+
+        top_limit = top_offset - (viewport_height - (viewport_height % self.DEFAULT_CELL_HEIGHT)) + cell_height
+        left_limit = left_offset - (viewport_width - (viewport_width % self.DEFAULT_CELL_WIDTH)) + cell_width
+
+        near_edges = []
+
+        # Check if the target cell is near the bottom of the viewport
+        if abs(self.scroll_y_position - top_limit) <= self.DEFAULT_CELL_HEIGHT:
+            near_edges.append('bottom')
+
+        # Check if the target cell is near the top of the viewport
+        if abs(self.scroll_y_position - top_offset) <= self.DEFAULT_CELL_HEIGHT:
+            near_edges.append('top')
+
+        # Check if the target cell is near the right of the viewport
+        if abs(self.scroll_x_position - left_limit) <= self.DEFAULT_CELL_WIDTH:
+            near_edges.append('right')
+
+        # Check if the target cell is near the left of the viewport
+        if abs(self.scroll_x_position - left_offset) <= self.DEFAULT_CELL_WIDTH:
+            near_edges.append('left')
+
+        return near_edges
+
+    def scroll_to_position(self, column: int, row: int, viewport_height: int, viewport_width: int, scroll_axis: str = 'both',
+                           with_offset: bool = False, offset_size: int = 0) -> bool:
         cell_y = self.get_cell_y_from_row(row)
         cell_x = self.get_cell_x_from_column(column)
         cell_width = self.get_cell_width_from_column(column)
@@ -394,32 +430,34 @@ class SheetDisplay(GObject.Object):
         if scroll_axis in ['both', 'vertical'] and bottom_offset > self.scroll_y_position + viewport_height:
             self.scroll_y_position = top_offset - (viewport_height - (viewport_height % self.DEFAULT_CELL_HEIGHT)) + cell_height
             if with_offset:
-                self.scroll_y_position += self.DEFAULT_CELL_HEIGHT
+                self.scroll_y_position += offset_size or self.DEFAULT_CELL_HEIGHT
 
         # Scroll up when the target cell is above the viewport so that the target cell is exactly at the top of the viewport
         if scroll_axis in ['both', 'vertical'] and top_offset < self.scroll_y_position:
             self.scroll_y_position = top_offset
             if with_offset:
-                self.scroll_y_position -= self.DEFAULT_CELL_HEIGHT
+                self.scroll_y_position -= offset_size or self.DEFAULT_CELL_HEIGHT
 
         # Scroll to the right when the target cell is to the right of the viewport so that the target cell is near the right of the viewport
         if scroll_axis in ['both', 'horizontal'] and right_offset > self.scroll_x_position + viewport_width:
             self.scroll_x_position = left_offset - (viewport_width - (viewport_width % self.DEFAULT_CELL_WIDTH)) + cell_width
             if with_offset:
-                self.scroll_x_position += self.DEFAULT_CELL_WIDTH
+                self.scroll_x_position += offset_size or self.DEFAULT_CELL_WIDTH
 
         # Scroll to the left when the target cell is to the left of the viewport so that the target cell is exactly at the left of the viewport
         if scroll_axis in ['both', 'horizontal'] and left_offset < self.scroll_x_position:
             self.scroll_x_position = left_offset
             if with_offset:
-                self.scroll_x_position -= self.DEFAULT_CELL_WIDTH
+                self.scroll_x_position -= offset_size or self.DEFAULT_CELL_WIDTH
 
         self.scroll_y_position = max(0, self.scroll_y_position)
         self.scroll_x_position = max(0, self.scroll_x_position)
 
         if with_offset:
-            # Transform continuous scroll position to discrete
-            self.scroll_y_position = round(self.scroll_y_position / self.DEFAULT_CELL_HEIGHT) * self.DEFAULT_CELL_HEIGHT
-            self.scroll_x_position = round(self.scroll_x_position / self.DEFAULT_CELL_WIDTH) * self.DEFAULT_CELL_WIDTH
+            self.discretize_scroll_position()
 
         return True
+
+    def discretize_scroll_position(self) -> None:
+        self.scroll_y_position = round(self.scroll_y_position / self.DEFAULT_CELL_HEIGHT) * self.DEFAULT_CELL_HEIGHT
+        self.scroll_x_position = round(self.scroll_x_position / self.DEFAULT_CELL_WIDTH) * self.DEFAULT_CELL_WIDTH
