@@ -174,7 +174,7 @@
             <child>
               <object class="GtkButton">
                 <property name="valign">start</property>
-                <property name="icon-name">cross-large-symbolic</property>
+                <property name="icon-name">window-close-symbolic</property>
                 <property name="tooltip-text" translatable="yes">Close (Escape)</property>
                 <signal name="clicked" handler="on_search_close_clicked" swapped="no" />
                 <style>

@@ -482,6 +482,10 @@ class SearchReplaceOverlay(Adw.Bin):
         search_pattern = self.search_entry.get_text()
         replace_with = self.replace_entry.get_text()
 
+        if search_pattern == '':
+            self.search_status.set_visible(False)
+            return
+
         match_case = self.search_match_case.get_active()
         match_cell = self.search_match_cell.get_active()
         within_selection = self.search_within_selection.get_active()

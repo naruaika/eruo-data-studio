@@ -18,6 +18,5 @@
     <file preprocess="xml-stripblanks">history-undo-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">cross-large-symbolic.svg</file>
   </gresource>
 </gresources>
