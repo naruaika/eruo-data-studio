@@ -25,7 +25,6 @@ import os
 from .file_save_as_csv_view import FileSaveAsCsvView
 from .file_save_as_json_view import FileSaveAsJsonView
 from .file_save_as_parquet_view import FileSaveAsParquetView
-from .sheet_data import SheetData
 from .window import Window
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/file-save-as-dialog.ui')

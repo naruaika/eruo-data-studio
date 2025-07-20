@@ -6,6 +6,7 @@
     <file preprocess="xml-stripblanks">ui/file-save-as-csv-view.ui</file>
     <file preprocess="xml-stripblanks">ui/file-save-as-json-view.ui</file>
     <file preprocess="xml-stripblanks">ui/file-save-as-parquet-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/search-replace-overlay.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/window.ui</file>
     <file alias="base.css">css/base.css</file>

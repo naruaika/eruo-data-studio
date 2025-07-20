@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="SearchReplaceOverlay" parent="AdwBin">
+    <property name="visible">false</property>
+    <property name="valign">end</property>
+    <property name="halign">center</property>
+    <property name="margin-bottom">30</property>
+    <property name="visible">false</property>
+    <child>
+      <object class="GtkBox" id="search_box">
+        <property name="orientation">vertical</property>
+        <property name="halign">center</property>
+        <property name="valign">center</property>
+        <child>
+          <object class="GtkLabel" id="search_status">
+            <property name="margin-bottom">4</property>
+            <property name="margin-start">44</property>
+            <property name="halign">start</property>
+            <property name="label">Showing 0 of 0</property>
+            <style>
+              <class name="search-status"/>
+            </style>
+          </object>
+        </child>
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <child>
+              <object class="GtkToggleButton" id="replace_toggler">
+                <property name="valign">start</property>
+                <property name="icon-name">go-next-symbolic</property>
+                <property name="tooltip-text" translatable="yes">Toggle Replace</property>
+                <property name="action-name">app.toggle-replace</property>
+                <style>
+                  <class name="flat"/>
+                  <class name="circular"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkBox">
+                <property name="orientation">vertical</property>
+                <property name="spacing">6</property>
+                <child>
+                  <object class="GtkBox">
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">6</property>
+                    <child>
+                      <object class="GtkEntry" id="search_entry">
+                        <property name="placeholder-text">Search for text...</property>
+                        <property name="primary-icon-name">edit-find-symbolic</property>
+                        <signal name="activate" handler="on_search_entry_activated" swapped="no" />
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <child>
+                          <object class="GtkButton">
+                            <property name="icon-name">arrow2-up-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Previous Match (Shift+Enter)</property>
+                            <signal name="clicked" handler="on_find_previous_clicked" swapped="no" />
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton">
+                            <property name="icon-name">arrow2-down-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Next Match (Enter)</property>
+                            <signal name="clicked" handler="on_find_next_clicked" swapped="no" />
+                          </object>
+                        </child>
+                        <style>
+                          <class name="linked"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton">
+                        <signal name="clicked" handler="on_find_all_button_clicked" swapped="no" />
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="label">Find all</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkToggleButton" id="search_options_toggler">
+                        <property name="icon-name">view-more-horizontal-symbolic</property>
+                        <signal name="toggled" handler="on_search_options_toggled" swapped="no" />
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox" id="search_options">
+                    <property name="orientation">vertical</property>
+                    <property name="visible">false</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <child>
+                          <object class="GtkCheckButton" id="search_match_case">
+                            <property name="label">Match case</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkCheckButton" id="search_match_cell">
+                            <property name="label">Match entire cell contents</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <child>
+                          <object class="GtkCheckButton" id="search_within_selection">
+                            <property name="label">Within selection only</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkCheckButton" id="search_use_regexp">
+                            <property name="label">Use Regular Expression</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox" id="replace_section">
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">6</property>
+                    <property name="visible">false</property>
+                    <child>
+                      <object class="GtkEntry" id="replace_entry">
+                        <property name="placeholder-text">Replace with...</property>
+                        <property name="primary-icon-name">edit-find-replace-symbolic</property>
+                        <signal name="activate" handler="on_replace_entry_activated" swapped="no" />
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="replace_button">
+                        <property name="hexpand">true</property>
+                        <property name="tooltip-text" translatable="yes">Replace (Enter)</property>
+                        <signal name="clicked" handler="on_replace_button_clicked" swapped="no" />
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="label">Replace</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="replace_all_button">
+                        <property name="hexpand">true</property>
+                        <property name="tooltip-text" translatable="yes">Replace All (Ctrl+Alt+Enter)</property>
+                        <signal name="clicked" handler="on_replace_all_button_clicked" swapped="no" />
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="label">Replace all</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="valign">start</property>
+                <property name="icon-name">cross-large-symbolic</property>
+                <property name="tooltip-text" translatable="yes">Close (Escape)</property>
+                <signal name="clicked" handler="on_search_close_clicked" swapped="no" />
+                <style>
+                  <class name="flat"/>
+                  <class name="circular"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <style>
+          <class name="frame"/>
+          <class name="search-box"/>
+        </style>
+      </object>
+    </child>
+  </template>
+</interface>
