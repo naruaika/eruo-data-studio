@@ -37,8 +37,28 @@
 }
 
 .search-result-cname {
+    padding: 2px 8px;
+    border-radius: 18px;
     font-size: 12px;
     font-weight: bold;
+    background: var(--view-bg-color);
+}
+.search-list-view {
+    padding: 6px;
+    background-color: inherit;
+}
+.search-list-view row {
+    padding: 4px;
+    padding-left: 12px;
+    border-radius: 12px;
+}
+.search-list-view row:selected {
+    background-color: var(--card-bg-color);
+}
+
+.status_bar {
+    font-size: 12px;
+    padding: 0 12px;
 }
 
 @keyframes slide-up-animation {

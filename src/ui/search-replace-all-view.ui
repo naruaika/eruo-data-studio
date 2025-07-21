@@ -164,7 +164,7 @@
               </object>
             </property>
             <style>
-              <class name="navigation-sidebar"/>
+              <class name="search-list-view"/>
             </style>
           </object>
         </child>
