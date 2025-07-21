@@ -79,7 +79,6 @@ class SheetDocument(GObject.Object):
         self.view.main_canvas.set_draw_func(self.renderer.render)
         self.view.connect('select-by-keypress', self.on_update_selection_by_keypress)
         self.view.connect('select-by-motion', self.on_update_selection_by_motion)
-        self.view.connect('update-cell-data', self.on_update_inline_cell_data)
 
     def setup_scrollbars(self) -> None:
         vertical_adjustment = Gtk.Adjustment.new(0, 0, 0, self.display.scroll_increment, self.display.page_increment, 0)
@@ -284,9 +283,6 @@ class SheetDocument(GObject.Object):
             scroll_axis = 'vertical'
 
         self.update_selection_from_position(start_column, start_row, end_column, end_row, True, True, True, scroll_axis)
-
-    def on_update_inline_cell_data(self, source: GObject.Object, value: any) -> None:
-        self.update_current_cells(value)
 
     def select_element_from_point(self, x: float, y: float, state: Gdk.ModifierType = None) -> None:
         column = self.display.get_column_from_point(x)

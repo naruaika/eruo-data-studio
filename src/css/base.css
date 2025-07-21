@@ -56,11 +56,6 @@
     background-color: var(--card-bg-color);
 }
 
-.status_bar {
-    font-size: 12px;
-    padding: 0 12px;
-}
-
 @keyframes slide-up-animation {
     from {
         transform: translateY(200px);
