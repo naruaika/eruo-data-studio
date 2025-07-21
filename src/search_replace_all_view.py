@@ -150,14 +150,15 @@ class SearchReplaceAllView(Gtk.Box):
                     list_item = SearchResultListItem(cname, cvalue)
 
                     if item_counter == 0:
+                        first_list_item = list_item
                         def update_selection():
                             search_range = sheet_document.selection.current_search_range
-                            sheet_document.update_selection_from_name(list_item.cname)
+                            sheet_document.update_selection_from_name(first_list_item.cname)
                             sheet_document.selection.current_search_range = search_range
                         GLib.idle_add(update_selection)
+                    item_counter += 1
 
                     GLib.idle_add(self.search_list_store.append, list_item)
-                    item_counter += 1
 
             if more_items_to_discover:
                 # TODO: should we really show all the results?
