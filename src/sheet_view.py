@@ -177,7 +177,11 @@ class SheetView(Gtk.Box):
             return
 
         # Prevent from interrupting any application actions
-        if state == Gdk.ModifierType.CONTROL_MASK or state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK):
+        if state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK) \
+                or state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK) \
+                or state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK) \
+                or state == Gdk.ModifierType.CONTROL_MASK \
+                or state == Gdk.ModifierType.ALT_MASK:
             return
 
         if Gdk.KEY_space <= keyval <= Gdk.KEY_asciitilde:
