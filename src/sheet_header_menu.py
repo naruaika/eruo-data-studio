@@ -106,10 +106,9 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
     def bind_factory_check_button(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
         item_data = list_item.get_item()
 
-        list_item.check_button.set_active(item_data.active)
-        list_item.check_button.set_inconsistent(item_data.inconsistent)
-        list_item.check_button.bind_property('active', item_data, 'active', GObject.BindingFlags.BIDIRECTIONAL)
-        list_item.check_button.bind_property('inconsistent', item_data, 'inconsistent', GObject.BindingFlags.BIDIRECTIONAL)
+        item_data.bind_property('active', list_item.check_button, 'active', GObject.BindingFlags.SYNC_CREATE)
+        item_data.bind_property('inconsistent', list_item.check_button, 'inconsistent', GObject.BindingFlags.SYNC_CREATE)
+
         list_item.check_button.connect('toggled', self.on_filter_list_item_check_button_toggled, item_data)
 
         list_item.label.set_label(item_data.cvalue)
@@ -119,11 +118,12 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         list_item.label = None
 
     def on_filter_list_item_check_button_toggled(self, button: Gtk.Button, item_data: FilterListItem) -> None:
-        item_data.active = button.get_active()
-
         if self.is_manually_toggling:
             return
         self.is_manually_toggling = True
+
+        # Update the active flag
+        item_data.active = button.get_active()
 
         # Update the cvalues flags
         if item_data.mvalue == '$all':
@@ -133,24 +133,25 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             else:
                 self.cvalues_to_show = []
                 self.cvalues_to_hide = ['$all']
-            for item in self.filter_list_store:
-                if item.cvalue != '$all':
-                    item.active = item_data.active
+            for idata in self.filter_list_store:
+                if idata.mvalue == '$all':
+                    continue
+                idata.active = item_data.active
             item_data.inconsistent = False
 
         elif item_data.mvalue == '$results':
-            for item in self.filter_list_store:
-                if item.cvalue in ['$all', '$results']:
+            for idata in self.filter_list_store:
+                if idata.mvalue in ['$all', '$results']:
                     continue
                 if item_data.active:
-                    self.cvalues_to_show.append(item.cvalue)
-                    if item.cvalue in self.cvalues_to_hide:
-                        self.cvalues_to_hide.remove(item.cvalue)
+                    self.cvalues_to_show.append(idata.cvalue)
+                    if idata.cvalue in self.cvalues_to_hide:
+                        self.cvalues_to_hide.remove(idata.cvalue)
                 else:
-                    self.cvalues_to_hide.append(item.cvalue)
-                    if item.cvalue in self.cvalues_to_show:
-                        self.cvalues_to_show.remove(item.cvalue)
-                item.active = item_data.active
+                    self.cvalues_to_hide.append(idata.cvalue)
+                    if idata.cvalue in self.cvalues_to_show:
+                        self.cvalues_to_show.remove(idata.cvalue)
+                idata.active = item_data.active
 
         elif item_data.mvalue == '$blanks':
             if item_data.active:
