@@ -419,11 +419,11 @@ class SearchReplaceOverlay(Adw.Bin):
         sheet_document = self.window.get_current_active_document()
 
         # TODO: support multiple dataframes?
-        vcol_index = sheet_view.document.data.dfs[0].columns.index(self.search_cursor_coordinate[1]) + 1 # +1 for the locator
+        vcol_index = sheet_document.data.dfs[0].columns.index(self.search_cursor_coordinate[1]) + 1 # +1 for the locator
         vrow_index = self.search_results['$ridx'][self.search_cursor_coordinate[0]] + 2 # +2 for the locator and the header
 
-        col_index = sheet_view.document.display.get_column_from_vcolumn(vcol_index)
-        row_index = sheet_view.document.display.get_row_from_vrow(vrow_index)
+        col_index = sheet_document.display.get_column_from_vcolumn(vcol_index)
+        row_index = sheet_document.display.get_row_from_vrow(vrow_index)
 
         search_range = sheet_document.selection.current_search_range
 
