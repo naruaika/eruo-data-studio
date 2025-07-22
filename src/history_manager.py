@@ -388,207 +388,207 @@ class DeleteColumnState(State):
 
 
 
-class HideRowState(State):
-    __gtype_name__ = 'HideRowState'
+# class HideRowState(State):
+#     __gtype_name__ = 'HideRowState'
 
-    rheights_path: str
+#     rheights_path: str
 
-    def __init__(self, rheights: polars.Series) -> None:
-        super().__init__()
+#     def __init__(self, rheights: polars.Series) -> None:
+#         super().__init__()
 
-        self.save_selection()
+#         self.save_selection()
 
-        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
+#         self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
 
-    def undo(self) -> None:
-        document = globals.history.document
+#     def undo(self) -> None:
+#         document = globals.history.document
 
-        self.restore_selection(False)
+#         self.restore_selection(False)
 
-        document.unhide_current_rows(polars.read_parquet(self.rheights_path).to_series(0) if self.rheights_path is not None else None)
+#         document.unhide_current_rows(polars.read_parquet(self.rheights_path).to_series(0) if self.rheights_path is not None else None)
 
-        self.restore_selection()
+#         self.restore_selection()
 
-    def redo(self) -> None:
-        document = globals.history.document
-        document.hide_current_rows()
+#     def redo(self) -> None:
+#         document = globals.history.document
+#         document.hide_current_rows()
 
 
 
-class HideColumnState(State):
-    __gtype_name__ = 'HideColumnState'
+# class HideColumnState(State):
+#     __gtype_name__ = 'HideColumnState'
 
-    cwidths_path: str
+#     cwidths_path: str
 
-    def __init__(self, cwidths: polars.Series) -> None:
-        super().__init__()
+#     def __init__(self, cwidths: polars.Series) -> None:
+#         super().__init__()
 
-        self.save_selection()
+#         self.save_selection()
 
-        self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths})) if cwidths is not None else None
+#         self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths})) if cwidths is not None else None
 
-    def undo(self) -> None:
-        document = globals.history.document
+#     def undo(self) -> None:
+#         document = globals.history.document
 
-        self.restore_selection(False)
+#         self.restore_selection(False)
 
-        document.unhide_current_columns(polars.read_parquet(self.cwidths_path).to_series(0) if self.cwidths_path is not None else None)
+#         document.unhide_current_columns(polars.read_parquet(self.cwidths_path).to_series(0) if self.cwidths_path is not None else None)
 
-        self.restore_selection()
+#         self.restore_selection()
 
-    def redo(self) -> None:
-        document = globals.history.document
-        document.hide_current_columns()
+#     def redo(self) -> None:
+#         document = globals.history.document
+#         document.hide_current_columns()
 
 
 
-class UnhideRowState(State):
-    __gtype_name__ = 'UnhideRowState'
+# class UnhideRowState(State):
+#     __gtype_name__ = 'UnhideRowState'
 
-    row_span: int
+#     row_span: int
 
-    vflags_path: str
-    rheights_path: str
+#     vflags_path: str
+#     rheights_path: str
 
-    def __init__(self, row_span: int, vflags: polars.Series, rheights: polars.Series) -> None:
-        super().__init__()
+#     def __init__(self, row_span: int, vflags: polars.Series, rheights: polars.Series) -> None:
+#         super().__init__()
 
-        self.row_span = row_span
+#         self.row_span = row_span
 
-        self.save_selection()
+#         self.save_selection()
 
-        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+#         self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
-        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
+#         self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
 
-    def undo(self) -> None:
-        document = globals.history.document
-        mrow = self.range.metadata.row
+#     def undo(self) -> None:
+#         document = globals.history.document
+#         mrow = self.range.metadata.row
 
-        # Update row visibility flags
-        document.display.row_visibility_flags = polars.concat([document.display.row_visibility_flags[:mrow],
-                                                               polars.read_parquet(self.vflags_path).to_series(0),
-                                                               document.display.row_visibility_flags[mrow + self.row_span:]])
-        document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
-        document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
+#         # Update row visibility flags
+#         document.display.row_visibility_flags = polars.concat([document.display.row_visibility_flags[:mrow],
+#                                                                polars.read_parquet(self.vflags_path).to_series(0),
+#                                                                document.display.row_visibility_flags[mrow + self.row_span:]])
+#         document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+#         document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
 
-        # Update row heights
-        if self.rheights_path is not None:
-            document.display.row_heights = polars.concat([document.display.row_heights[:mrow],
-                                                          polars.read_parquet(self.rheights_path).to_series(0),
-                                                          document.display.row_heights[mrow:]])
-            document.display.cumulative_row_heights = polars.Series('crheights', document.display.row_heights).cum_sum()
+#         # Update row heights
+#         if self.rheights_path is not None:
+#             document.display.row_heights = polars.concat([document.display.row_heights[:mrow],
+#                                                           polars.read_parquet(self.rheights_path).to_series(0),
+#                                                           document.display.row_heights[mrow:]])
+#             document.display.cumulative_row_heights = polars.Series('crheights', document.display.row_heights).cum_sum()
 
-        self.restore_selection()
+#         self.restore_selection()
 
-    def redo(self) -> None:
-        document = globals.history.document
-        document.unhide_current_rows()
+#     def redo(self) -> None:
+#         document = globals.history.document
+#         document.unhide_current_rows()
 
 
 
-class UnhideAllRowState(State):
-    __gtype_name__ = 'UnhideAllRowState'
+# class UnhideAllRowState(State):
+#     __gtype_name__ = 'UnhideAllRowState'
 
-    vflags_path: str
+#     vflags_path: str
 
-    def __init__(self, vflags: polars.Series) -> None:
-        super().__init__()
+#     def __init__(self, vflags: polars.Series) -> None:
+#         super().__init__()
 
-        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+#         self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
-        self.save_selection()
+#         self.save_selection()
 
-    def undo(self) -> None:
-        document = globals.history.document
+#     def undo(self) -> None:
+#         document = globals.history.document
 
-        # Update row visibility flags
-        document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
-        document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
-        document.data.bbs[0].row_span = len(document.display.row_visible_series)
+#         # Update row visibility flags
+#         document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+#         document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+#         document.data.bbs[0].row_span = len(document.display.row_visible_series)
 
-        self.restore_selection()
+#         self.restore_selection()
 
-    def redo(self) -> None:
-        document = globals.history.document
-        document.unhide_all_rows()
+#     def redo(self) -> None:
+#         document = globals.history.document
+#         document.unhide_all_rows()
 
 
 
-class UnhideColumnState(State):
-    __gtype_name__ = 'UnhideColumnState'
+# class UnhideColumnState(State):
+#     __gtype_name__ = 'UnhideColumnState'
 
-    column_span: int
+#     column_span: int
 
-    vflags_path: str
-    cwidths_path: str
+#     vflags_path: str
+#     cwidths_path: str
 
-    def __init__(self, column_span: int, vflags: polars.Series, cwidths: polars.Series) -> None:
-        super().__init__()
+#     def __init__(self, column_span: int, vflags: polars.Series, cwidths: polars.Series) -> None:
+#         super().__init__()
 
-        self.column_span = column_span
+#         self.column_span = column_span
 
-        self.save_selection()
+#         self.save_selection()
 
-        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+#         self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
-        self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths})) if cwidths is not None else None
+#         self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths})) if cwidths is not None else None
 
-    def undo(self) -> None:
-        document = globals.history.document
-        mcolumn = self.range.metadata.column
+#     def undo(self) -> None:
+#         document = globals.history.document
+#         mcolumn = self.range.metadata.column
 
-        # Update column visibility flags
-        document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:mcolumn],
-                                                                  polars.read_parquet(self.vflags_path).to_series(0),
-                                                                  document.display.column_visibility_flags[mcolumn + self.column_span:]])
-        document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
-        document.data.bbs[self.range.metadata.dfi].column_span = len(document.display.column_visible_series)
+#         # Update column visibility flags
+#         document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:mcolumn],
+#                                                                   polars.read_parquet(self.vflags_path).to_series(0),
+#                                                                   document.display.column_visibility_flags[mcolumn + self.column_span:]])
+#         document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
+#         document.data.bbs[self.range.metadata.dfi].column_span = len(document.display.column_visible_series)
 
-        # Update column widths
-        if self.cwidths_path is not None:
-            document.display.column_widths = polars.concat([document.display.column_widths[:mcolumn],
-                                                            polars.read_parquet(self.cwidths_path).to_series(0),
-                                                            document.display.column_widths[mcolumn:]])
-            document.display.cumulative_column_widths = polars.Series('ccwidths', document.display.column_widths).cum_sum()
+#         # Update column widths
+#         if self.cwidths_path is not None:
+#             document.display.column_widths = polars.concat([document.display.column_widths[:mcolumn],
+#                                                             polars.read_parquet(self.cwidths_path).to_series(0),
+#                                                             document.display.column_widths[mcolumn:]])
+#             document.display.cumulative_column_widths = polars.Series('ccwidths', document.display.column_widths).cum_sum()
 
-        document.repopulate_auto_filter_widgets()
+#         document.repopulate_auto_filter_widgets()
 
-        self.restore_selection()
+#         self.restore_selection()
 
-    def redo(self) -> None:
-        document = globals.history.document
-        document.unhide_current_columns()
+#     def redo(self) -> None:
+#         document = globals.history.document
+#         document.unhide_current_columns()
 
 
 
-class UnhideAllColumnState(State):
-    __gtype_name__ = 'UnhideAllColumnState'
+# class UnhideAllColumnState(State):
+#     __gtype_name__ = 'UnhideAllColumnState'
 
-    vflags_path: str
+#     vflags_path: str
 
-    def __init__(self, vflags: polars.Series) -> None:
-        super().__init__()
+#     def __init__(self, vflags: polars.Series) -> None:
+#         super().__init__()
 
-        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+#         self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
 
-        self.save_selection()
+#         self.save_selection()
 
-    def undo(self) -> None:
-        document = globals.history.document
+#     def undo(self) -> None:
+#         document = globals.history.document
 
-        # Update column visibility flags
-        document.display.column_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
-        document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
-        document.data.bbs[0].column_span = len(document.display.column_visible_series)
+#         # Update column visibility flags
+#         document.display.column_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+#         document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
+#         document.data.bbs[0].column_span = len(document.display.column_visible_series)
 
-        document.repopulate_auto_filter_widgets()
+#         document.repopulate_auto_filter_widgets()
 
-        self.restore_selection()
+#         self.restore_selection()
 
-    def redo(self) -> None:
-        document = globals.history.document
-        document.unhide_all_columns()
+#     def redo(self) -> None:
+#         document = globals.history.document
+#         document.unhide_all_columns()
 
 
 
