@@ -445,12 +445,6 @@ class Window(Adw.ApplicationWindow):
         column_span = col_2 - col_1 + 1
         row_span = row_2 - row_1 + 1
 
-        n_hidden_columns = sheet_document.display.get_n_hidden_columns(col_1, col_2)
-        n_hidden_rows = sheet_document.display.get_n_hidden_rows(row_1, row_2)
-
-        n_all_hidden_columns = sheet_document.display.get_n_all_hidden_columns()
-        n_all_hidden_rows = sheet_document.display.get_n_all_hidden_rows()
-
         ctype = type(sheet_document.selection.current_active_range)
 
         x = sheet_document.display.get_cell_x_from_point(x + 1)
@@ -463,9 +457,7 @@ class Window(Adw.ApplicationWindow):
         # Create context menu
         if self.context_menu is not None:
             self.context_menu.unparent()
-        self.context_menu = SheetCellMenu(start_column, start_row, end_column, end_row, column_span, row_span,
-                                          n_hidden_columns, n_hidden_rows, n_all_hidden_columns, n_all_hidden_rows,
-                                          ctype)
+        self.context_menu = SheetCellMenu(start_column, start_row, end_column, end_row, column_span, row_span, ctype)
         self.context_menu.set_parent(self.content_overlay)
 
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
