@@ -30,8 +30,10 @@ class SheetView(Gtk.Box):
     __gsignals__ = {
         'select-by-keypress': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
         'select-by-motion': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
+        'pointer-moved': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
+        'pointer-released': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
         'open-inline-formula': (GObject.SIGNAL_RUN_FIRST, None, (str,)),
-        'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
+        'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
     }
 
     horizontal_scrollbar = Gtk.Template.Child()
@@ -63,10 +65,12 @@ class SheetView(Gtk.Box):
 
         click_event_controller = Gtk.GestureClick()
         click_event_controller.connect('pressed', self.on_main_canvas_lmb_pressed)
+        click_event_controller.connect('released', self.on_main_canvas_lmb_released)
         self.main_canvas.add_controller(click_event_controller)
 
         click_event_controller = Gtk.GestureClick()
         click_event_controller.set_button(3)
+        click_event_controller.connect('pressed', self.on_main_canvas_rmb_pressed)
         click_event_controller.connect('released', self.on_main_canvas_rmb_released)
         self.main_canvas.add_controller(click_event_controller)
 
@@ -78,7 +82,8 @@ class SheetView(Gtk.Box):
         self.main_canvas_height = 0
         self.main_canvas.connect('resize', self.on_main_canvas_resized)
 
-        self.main_canvas.set_cursor(Gdk.Cursor.new_from_name('cell', Gdk.Cursor.new_from_name('default')))
+        self.default_cursor = Gdk.Cursor.new_from_name('cell', Gdk.Cursor.new_from_name('default'))
+        self.main_canvas.set_cursor(self.default_cursor)
 
         motion_event_controller = Gtk.EventControllerMotion()
         motion_event_controller.connect('enter', self.on_scrollbar_entered)
@@ -126,7 +131,7 @@ class SheetView(Gtk.Box):
         self.emit('select-by-motion', *end_coord)
 
     def on_main_canvas_motion(self, event: Gtk.EventControllerMotion, x: float, y: float) -> None:
-        pass
+        self.emit('pointer-moved', x, y)
 
     def on_main_canvas_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         self.main_canvas.set_focusable(False)
@@ -150,6 +155,12 @@ class SheetView(Gtk.Box):
         if self.document.check_selection_changed():
             self.main_canvas.queue_draw()
 
+    def on_main_canvas_lmb_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        self.emit('pointer-released', x, y)
+
+    def on_main_canvas_rmb_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        pass
+
     def on_main_canvas_rmb_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
         if not self.document.check_selection_contains_point(x, y):
             self.document.select_element_from_point(x, y)
@@ -161,7 +172,8 @@ class SheetView(Gtk.Box):
         if cell_x == 0 and cell_y == 0:
             return # no applicable context menu for corner locator
 
-        self.emit('open-context-menu', x, y)
+        self.emit('pointer-released', x, y)
+        self.emit('open-context-menu', x, y, 'cell')
 
     def on_main_canvas_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
         if keyval in [

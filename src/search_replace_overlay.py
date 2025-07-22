@@ -100,9 +100,7 @@ class SearchReplaceOverlay(Adw.Bin):
         within_selection = self.search_within_selection.get_active()
         use_regexp = self.search_use_regexp.get_active()
 
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
+        sheet_document = self.window.get_current_active_document()
 
         # Reset the current search range
         if not within_selection:
@@ -168,10 +166,6 @@ class SearchReplaceOverlay(Adw.Bin):
         self.find_next_search_occurrence()
 
     @Gtk.Template.Callback()
-    def on_find_all_button_clicked(self, button: Gtk.Button) -> None:
-        pass
-
-    @Gtk.Template.Callback()
     def on_find_previous_clicked(self, button: Gtk.Button) -> None:
         if self.get_current_search_states() != self.search_states \
                 or self.search_results_length == 0:
@@ -216,10 +210,8 @@ class SearchReplaceOverlay(Adw.Bin):
     @Gtk.Template.Callback()
     def on_search_options_toggled(self, button: Gtk.Button) -> None:
         if button.get_active():
-            button.add_css_class('raised')
             self.search_options.set_visible(True)
         else:
-            button.remove_css_class('raised')
             self.search_options.set_visible(False)
 
     @Gtk.Template.Callback()
@@ -298,8 +290,7 @@ class SearchReplaceOverlay(Adw.Bin):
         self.replace_toggler.set_icon_name('go-next-symbolic')
         self.replace_section.set_visible(False)
 
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
+        sheet_view = self.window.get_current_active_view()
 
         # Reset the current search range
         sheet_view.document.selection.current_search_range = None
@@ -318,9 +309,7 @@ class SearchReplaceOverlay(Adw.Bin):
         within_selection = self.search_within_selection.get_active()
         use_regexp = self.search_use_regexp.get_active()
 
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
+        sheet_document = self.window.get_current_active_document()
 
         # I know right that this is a bit hacky, but it works for now.
         # My mission is to prevent from performing the same search again
@@ -427,9 +416,7 @@ class SearchReplaceOverlay(Adw.Bin):
             self.show_current_search_result_item()
 
     def show_current_search_result_item(self) -> None:
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
+        sheet_document = self.window.get_current_active_document()
 
         # TODO: support multiple dataframes?
         vcol_index = sheet_view.document.data.dfs[0].columns.index(self.search_cursor_coordinate[1]) + 1 # +1 for the locator
@@ -444,12 +431,14 @@ class SearchReplaceOverlay(Adw.Bin):
 
         sheet_document.selection.current_search_range = search_range
 
+        sheet_document.view.main_canvas.queue_draw()
+
         column = sheet_document.selection.current_active_cell.column
         row = sheet_document.selection.current_active_cell.row
         viewport_height = sheet_document.view.main_canvas.get_height() - sheet_document.display.column_header_height
         viewport_width = sheet_document.view.main_canvas.get_width() - sheet_document.display.row_header_width
 
-        # Scroll to account for the search box if neccessary
+        # Scroll to account for the search box if necessary
         if 'bottom' in sheet_document.display.check_cell_position_near_edges(column, row, viewport_height, viewport_width):
             offset_size = self.get_height() + self.get_margin_bottom() + sheet_document.display.DEFAULT_CELL_HEIGHT
             sheet_document.display.scroll_y_position += offset_size
@@ -467,12 +456,11 @@ class SearchReplaceOverlay(Adw.Bin):
         if self.search_results_length == 0:
             return
 
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
+        sheet_document = self.window.get_current_active_document()
 
-        sheet_view.document.update_current_cells(self.replace_entry.get_text(),
-                                                 self.search_entry.get_text(),
-                                                 self.search_match_case.get_active())
+        sheet_document.update_current_cells(self.replace_entry.get_text(),
+                                            self.search_entry.get_text(),
+                                            self.search_match_case.get_active())
 
         self.find_next_search_occurrence()
 
@@ -491,9 +479,7 @@ class SearchReplaceOverlay(Adw.Bin):
         within_selection = self.search_within_selection.get_active()
         use_regexp = self.search_use_regexp.get_active()
 
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
+        sheet_document = self.window.get_current_active_document()
 
         # Reset the current search range
         if not within_selection:

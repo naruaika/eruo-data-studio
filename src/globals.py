@@ -45,6 +45,8 @@ is_editing_cells: bool = False
 
 # This is specifically to tell the renderer that there's
 # a search going on, or a search box is open to be precise.
+# FIXME: we should do a better way, since this approach is
+# prone to bugs when the user switches between windows.
 is_searching_cells: bool = False
 
 

@@ -71,9 +71,7 @@ class SearchReplaceAllView(Gtk.Box):
         self.search_list_view.connect('activate', self.on_search_list_view_item_activated)
 
     def on_search_list_view_item_activated(self, list_view: Gtk.ListView, position: int) -> None:
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
+        sheet_document = self.window.get_current_active_document()
 
         search_range = sheet_document.selection.current_search_range
 
@@ -90,9 +88,7 @@ class SearchReplaceAllView(Gtk.Box):
         within_selection = self.search_within_selection.get_active()
         use_regexp = self.search_use_regexp.get_active()
 
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
+        sheet_document = self.window.get_current_active_document()
 
         # Reset the current search range
         if not within_selection:
@@ -120,7 +116,7 @@ class SearchReplaceAllView(Gtk.Box):
         self.search_status.set_text(f'Found {format(self.search_results_length, ',d')} results')
         self.search_status.set_visible(True)
 
-        def update_search_list():
+        def update_search_list() -> None:
             globals.is_changing_state = True
 
             item_counter = 0
@@ -179,16 +175,14 @@ class SearchReplaceAllView(Gtk.Box):
     @Gtk.Template.Callback()
     def on_search_options_toggled(self, button: Gtk.Button) -> None:
         if button.get_active():
-            button.add_css_class('raised')
             self.search_options.set_visible(True)
         else:
-            button.remove_css_class('raised')
             self.search_options.set_visible(False)
 
     def open_search_view(self) -> None:
         self.window.split_view.set_collapsed(False)
-        self.window.open_search_all.add_css_class('raised')
-        self.window.toggle_sidebar.add_css_class('raised')
+        self.window.open_search_all.set_active(True)
+        self.window.toggle_sidebar.set_active(True)
 
         if self.search_results_length == 0:
             self.search_status.set_visible(False)
@@ -215,7 +209,6 @@ class SearchReplaceAllView(Gtk.Box):
 
         # In case the user wants to jump between the search and replace entry
         if view_is_visible and replace_section_visible and view_is_in_focus and search_entry_in_focus:
-            self.toggle_replace.add_css_class('raised')
             self.toggle_replace.set_icon_name('go-down-symbolic')
             self.replace_section.set_visible(True)
 
@@ -228,7 +221,6 @@ class SearchReplaceAllView(Gtk.Box):
 
         # Hide the replace section and grab focus on the search entry
         elif view_is_visible and replace_section_visible and view_is_in_focus:
-            self.toggle_replace.remove_css_class('raised')
             self.toggle_replace.set_icon_name('go-next-symbolic')
             self.replace_section.set_visible(False)
 
@@ -236,7 +228,6 @@ class SearchReplaceAllView(Gtk.Box):
 
         # Show and grab focus on the replace entry
         else:
-            self.toggle_replace.add_css_class('raised')
             self.toggle_replace.set_icon_name('go-down-symbolic')
             self.replace_section.set_visible(True)
 
@@ -260,9 +251,7 @@ class SearchReplaceAllView(Gtk.Box):
         within_selection = self.search_within_selection.get_active()
         use_regexp = self.search_use_regexp.get_active()
 
-        tab_page = self.window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
+        sheet_document = self.window.get_current_active_document()
 
         # Reset the current search range
         if not within_selection:
@@ -279,6 +268,6 @@ class SearchReplaceAllView(Gtk.Box):
     def close_search_view(self) -> None:
         self.window.split_view.set_collapsed(True)
         self.window.open_search_all.remove_css_class('raised')
-        self.window.toggle_sidebar.remove_css_class('raised')
+        self.window.toggle_sidebar.set_active(False)
 
         globals.is_searching_cells = False

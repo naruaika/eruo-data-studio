@@ -83,6 +83,8 @@ class Application(Adw.Application):
         self.create_action('filter-cell-value', self.on_filter_cell_value_action)
         # self.create_action('filter-cell-color', self.on_filter_cell_color_action)
         # self.create_action('filter-font-color', self.on_filter_font_color_action)
+        self.create_action('filter-cell-values', self.on_filter_cell_values_action)
+        self.create_action('reset-all-filters', self.on_reset_all_filters_action)
         self.create_action('sort-smallest-to-largest', self.on_sort_smallest_to_largest_action)
         self.create_action('sort-largest-to-smallest', self.on_sort_largest_to_smallest_action)
         self.create_action('convert-to-int8', self.on_convert_to_int8_action)
@@ -191,7 +193,7 @@ class Application(Adw.Application):
 
     def on_open_history_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        window.open_history.add_css_class('raised')
+        window.open_history.set_active(True)
 
     def on_file_opened(self, source: GObject.Object, file_path: str) -> None:
         if not file_path:
@@ -313,6 +315,14 @@ class Application(Adw.Application):
         document = self.get_current_active_document()
         document.filter_current_rows()
 
+    def on_filter_cell_values_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.filter_current_rows(multiple=True)
+
+    def on_reset_all_filters_action(self, action: Gio.SimpleAction, *args) -> None:
+        document = self.get_current_active_document()
+        document.reset_all_filters()
+
     def on_filter_cell_color_action(self, action: Gio.SimpleAction, *args) -> None:
         pass
 
@@ -384,9 +394,7 @@ class Application(Adw.Application):
 
     def get_current_active_document(self) -> SheetDocument:
         window = self.get_active_window()
-        tab_page = window.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        return sheet_view.document
+        return window.get_current_active_document()
 
     def create_action(self, name: str, callback: callable, shortcuts: list = None) -> None:
         action = Gio.SimpleAction.new(name, None)

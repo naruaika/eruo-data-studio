@@ -24,7 +24,7 @@ import polars
 import re
 
 from . import globals
-from .sheet_cell_menu import SheetCellMenu
+from .sheet_document import SheetDocument
 from .sheet_view import SheetView
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/window.ui')
@@ -115,6 +115,15 @@ class Window(Adw.ApplicationWindow):
         sheet_view = self.sheet_manager.create_sheet(dataframe, sheet_name)
         self.add_new_tab(sheet_view)
 
+    def get_current_active_view(self) -> SheetView:
+        tab_page = self.tab_view.get_selected_page()
+        return tab_page.get_child()
+
+    def get_current_active_document(self) -> SheetDocument:
+        tab_page = self.tab_view.get_selected_page()
+        sheet_view = tab_page.get_child()
+        return sheet_view.document
+
     def do_focus(self, direction: Gtk.DirectionType) -> bool:
         # When focusing on the main canvas, pressing tab key
         # will keep the focus on the main canvas.
@@ -132,6 +141,8 @@ class Window(Adw.ApplicationWindow):
 
     def on_focus_received(self, event: Gtk.EventControllerFocus) -> None:
         tab_page = self.tab_view.get_selected_page()
+        if tab_page is None:
+            return
         sheet_view = tab_page.get_child()
 
         # We use a global state to reference to the current history
@@ -153,8 +164,7 @@ class Window(Adw.ApplicationWindow):
         globals.send_notification = self.show_toast_message
 
     def on_inline_formula_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
-        tab_page = self.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
+        sheet_view = self.get_current_active_view()
 
         if keyval == Gdk.KEY_Escape:
             globals.is_editing_cells = False
@@ -181,8 +191,7 @@ class Window(Adw.ApplicationWindow):
         globals.is_editing_cells = False
         self.inline_formula.set_visible(False)
 
-        tab_page = self.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
+        sheet_view = self.get_current_active_view()
         sheet_view.main_canvas.queue_draw()
 
     def on_inline_formula_buffer_changed(self, buffer):
@@ -190,8 +199,7 @@ class Window(Adw.ApplicationWindow):
 
     def on_content_overlay_get_child_position(self, overlay: Gtk.Overlay, widget: Gtk.Widget, allocation: Gdk.Rectangle) -> bool:
         if widget == self.inline_formula:
-            tab_page = self.tab_view.get_selected_page()
-            sheet_view = tab_page.get_child()
+            sheet_view = self.get_current_active_view()
             sheet_document = sheet_view.document
 
             # I had been trying to make it intelligently resize itself, but sadly I didn't succeed.
@@ -264,8 +272,7 @@ class Window(Adw.ApplicationWindow):
 
         # Activating (pressing enter/return key) the name box will update
         # the selection accordingly and move the focus back to the main canvas.
-        tab_page = self.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
+        sheet_view = self.get_current_active_view()
         sheet_view.document.update_selection_from_name(input_text)
         sheet_view.main_canvas.set_focusable(True)
         sheet_view.main_canvas.grab_focus()
@@ -278,8 +285,7 @@ class Window(Adw.ApplicationWindow):
         # Looking at other applications, it should always commit the update,
         # but make the cells appear in some way e.g. "######" whenever there's
         # an error or something that the user should do in response.
-        tab_page = self.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
+        sheet_view = self.get_current_active_view()
         sheet_view.document.update_current_cells(entry.get_text())
         sheet_view.main_canvas.set_focusable(True)
         sheet_view.main_canvas.grab_focus()
@@ -311,8 +317,7 @@ class Window(Adw.ApplicationWindow):
         # return the focus to the main canvas back.
         if keyval == Gdk.KEY_Escape:
             self.reset_inputbar()
-            tab_page = self.tab_view.get_selected_page()
-            sheet_view = tab_page.get_child()
+            sheet_view = self.get_current_active_view()
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
             return
@@ -322,8 +327,7 @@ class Window(Adw.ApplicationWindow):
         # return the focus to the main canvas back.
         if keyval == Gdk.KEY_Escape:
             self.reset_inputbar()
-            tab_page = self.tab_view.get_selected_page()
-            sheet_view = tab_page.get_child()
+            sheet_view = self.get_current_active_view()
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
             return
@@ -370,11 +374,57 @@ class Window(Adw.ApplicationWindow):
         self.inline_formula.get_buffer().set_text(sel_value)
         self.inline_formula.set_visible(True)
         self.inline_formula.grab_focus()
+        self.inline_formula.grab_focus()
 
-    def on_context_menu_opened(self, source: GObject.Object, x: int, y: int) -> None:
-        tab_page = self.tab_view.get_selected_page()
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
+    def on_context_menu_opened(self, source: GObject.Object, x: int, y: int, type: str) -> None:
+        if type == 'header':
+            self.open_header_context_menu(x, y)
+            return
+
+        if type == 'cell':
+            self.open_cell_context_menu(x, y)
+            return
+
+    def open_header_context_menu(self, x: int, y: int) -> None:
+        sheet_document = self.get_current_active_document()
+
+        active_cell = sheet_document.selection.current_active_cell
+
+        column = active_cell.metadata.column
+
+        x = sheet_document.display.get_cell_x_from_point(x + 1)
+        y = sheet_document.display.get_cell_y_from_point(y + 1)
+        width = sheet_document.display.get_cell_width_from_point(x + 1)
+        height = sheet_document.display.get_cell_height_from_point(y + 1)
+
+        from .sheet_header_menu import SheetHeaderMenu
+
+        # Create context menu
+        if self.context_menu is not None:
+            self.context_menu.unparent()
+        self.context_menu = SheetHeaderMenu(self, column)
+        self.context_menu.set_parent(self.content_overlay)
+
+        def on_context_menu_closed(widget: Gtk.Widget) -> None:
+            sheet_document.view.main_canvas.set_sensitive(True)
+            sheet_document.view.main_canvas.set_focusable(True)
+            sheet_document.view.main_canvas.grab_focus()
+        sheet_document.view.main_canvas.set_sensitive(False)
+        self.context_menu.connect('closed', on_context_menu_closed)
+
+        # Position context menu
+        rectangle = Gdk.Rectangle()
+        rectangle.x = int(x + width / 2)
+        rectangle.y = y + height
+        rectangle.height = 1
+        rectangle.width = 1
+        self.context_menu.set_pointing_to(rectangle)
+
+        # Show context menu
+        self.context_menu.popup()
+
+    def open_cell_context_menu(self, x: int, y: int) -> None:
+        sheet_document = self.get_current_active_document()
 
         cursor_cell = sheet_document.selection.current_cursor_cell
         active_cell = sheet_document.selection.current_active_cell
@@ -392,6 +442,9 @@ class Window(Adw.ApplicationWindow):
         end_column = sheet_document.display.get_column_name_from_column(col_2)
         end_row = str(row_2)
 
+        column_span = col_2 - col_1 + 1
+        row_span = row_2 - row_1 + 1
+
         n_hidden_columns = sheet_document.display.get_n_hidden_columns(col_1, col_2)
         n_hidden_rows = sheet_document.display.get_n_hidden_rows(row_1, row_2)
 
@@ -405,17 +458,21 @@ class Window(Adw.ApplicationWindow):
         width = sheet_document.display.get_cell_width_from_point(x + 1)
         height = sheet_document.display.get_cell_height_from_point(y + 1)
 
+        from .sheet_cell_menu import SheetCellMenu
+
         # Create context menu
         if self.context_menu is not None:
             self.context_menu.unparent()
-            del self.context_menu
-        self.context_menu = SheetCellMenu(start_column, start_row, end_column, end_row, n_hidden_columns, n_hidden_rows,
-                                          n_all_hidden_columns, n_all_hidden_rows, ctype)
+        self.context_menu = SheetCellMenu(start_column, start_row, end_column, end_row, column_span, row_span,
+                                          n_hidden_columns, n_hidden_rows, n_all_hidden_columns, n_all_hidden_rows,
+                                          ctype)
         self.context_menu.set_parent(self.content_overlay)
 
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
+            sheet_document.view.main_canvas.set_sensitive(True)
             sheet_document.view.main_canvas.set_focusable(True)
             sheet_document.view.main_canvas.grab_focus()
+        sheet_document.view.main_canvas.set_sensitive(False)
         self.context_menu.connect('closed', on_context_menu_closed)
 
         # Position context menu
@@ -436,6 +493,7 @@ class Window(Adw.ApplicationWindow):
         # Setup proper handling of signals and bindings
         tab_page.bind_property('title', sheet_view.document, 'title', GObject.BindingFlags.BIDIRECTIONAL)
         sheet_view.document.connect('selection-changed', self.on_selection_changed)
+        sheet_view.document.connect('open-context-menu', self.on_context_menu_opened)
         sheet_view.document.view.connect('open-inline-formula', self.on_inline_formula_opened)
         sheet_view.document.view.connect('open-context-menu', self.on_context_menu_opened)
 
@@ -456,10 +514,11 @@ class Window(Adw.ApplicationWindow):
             self.update_inputbar('', '')
             return
 
+        sheet_document = self.get_current_active_document()
+
         # Reset the input bar to represent the current selection
-        sheet_view = tab_page.get_child()
-        cell_name = sheet_view.document.selection.cell_name
-        cell_data = sheet_view.document.selection.cell_data
+        cell_name = sheet_document.selection.cell_name
+        cell_data = sheet_document.selection.cell_data
         if cell_data is None:
             cell_data = ''
         cell_data = str(cell_data)
@@ -471,17 +530,16 @@ class Window(Adw.ApplicationWindow):
 
     def do_toggle_sidebar(self) -> None:
         # Close the sidebar when it's already open
-        if 'raised' in self.toggle_sidebar.get_css_classes():
-            self.toggle_sidebar.remove_css_class('raised')
+        if self.toggle_sidebar.get_active():
+            self.toggle_sidebar.set_active(False)
             self.split_view.set_collapsed(True)
-            tab_page = self.tab_view.get_selected_page()
-            sheet_view = tab_page.get_child()
-            sheet_view.document.selection.current_search_range = None
+            sheet_document = self.get_current_active_document()
+            sheet_document.selection.current_search_range = None
             globals.is_searching_cells = False
             return
 
         # Open the sidebar
-        self.toggle_sidebar.add_css_class('raised')
+        self.toggle_sidebar.set_active(True)
         self.split_view.set_collapsed(False)
         if self.sidebar_tab_view.get_selected_page() == self.search_replace_all_page:
             globals.is_searching_cells = True

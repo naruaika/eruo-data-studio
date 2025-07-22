@@ -31,7 +31,7 @@ class SheetDisplay(GObject.Object):
     DEFAULT_CELL_WIDTH: int = 65
     DEFAULT_CELL_PADDING: int = 6
 
-    ICON_SIZE: int = 10
+    ICON_SIZE: float = 12
     FONT_SIZE: float = 12
 
     row_header_width: int = 40

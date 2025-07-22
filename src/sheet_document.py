@@ -18,8 +18,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from gi.repository import Gdk, GObject, Gtk, Pango, PangoCairo
+from gi.repository import Gdk, GLib, GObject, Gtk, Pango, PangoCairo
 import cairo
+import copy
 import polars
 import re
 
@@ -30,6 +31,7 @@ class SheetDocument(GObject.Object):
 
     __gsignals__ = {
         'selection-changed': (GObject.SIGNAL_RUN_FIRST, None, (str, str,)),
+        'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
     }
 
     docid = GObject.Property(type=int, default=0)
@@ -40,6 +42,9 @@ class SheetDocument(GObject.Object):
 
         self.docid = docid
         self.title = title
+
+        from .sheet_widget import SheetWidget
+        self.widgets: list[SheetWidget] = []
 
         from .history_manager import HistoryManager
         self.history = HistoryManager(self)
@@ -62,23 +67,23 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_column_widths()
         self.auto_adjust_scrollbars_by_scroll()
 
-        self.setup_document()
+        self.setup_document_history()
+        self.repopulate_auto_filter_widgets()
 
-    def setup_document(self) -> None:
-        globals.history = self.history
+        self.hovered_widget: SheetWidget = None
+        self.focused_widget: SheetWidget = None
 
-        # Initialize the selection
-        globals.is_changing_state = True
-        self.update_selection_from_name('A1')
-        globals.is_changing_state = False
+        self.is_selecting_cells: bool = False
 
-        # Initialize the undo stack
-        self.history.setup()
+        self.pending_filters = {}
+        self.current_filters = {}
 
     def setup_main_canvas(self) -> None:
         self.view.main_canvas.set_draw_func(self.renderer.render)
         self.view.connect('select-by-keypress', self.on_update_selection_by_keypress)
         self.view.connect('select-by-motion', self.on_update_selection_by_motion)
+        self.view.connect('pointer-moved', self.on_update_pointer_moved)
+        self.view.connect('pointer-released', self.on_update_pointer_released)
 
     def setup_scrollbars(self) -> None:
         vertical_adjustment = Gtk.Adjustment.new(0, 0, 0, self.display.scroll_increment, self.display.page_increment, 0)
@@ -88,6 +93,17 @@ class SheetDocument(GObject.Object):
         horizontal_adjustment = Gtk.Adjustment.new(0, 0, 0, self.display.scroll_increment, self.display.page_increment, 0)
         horizontal_adjustment.connect('value-changed', self.on_sheet_view_scrolled)
         self.view.horizontal_scrollbar.set_adjustment(horizontal_adjustment)
+
+    def setup_document_history(self) -> None:
+        globals.history = self.history
+
+        # Initialize the selection
+        globals.is_changing_state = True
+        self.update_selection_from_name('A1')
+        globals.is_changing_state = False
+
+        # Initialize the undo stack
+        self.history.setup()
 
     def on_sheet_view_scrolled(self, source: GObject.Object) -> None:
         self.display.scroll_y_position = self.view.vertical_scrollbar.get_adjustment().get_value()
@@ -227,8 +243,13 @@ class SheetDocument(GObject.Object):
             (col_1, row_1), (col_2, row_2) = target_cell_position
 
         self.update_selection_from_position(col_1, row_1, col_2, row_2, True, True, True)
+        self.view.main_canvas.queue_draw()
 
     def on_update_selection_by_motion(self, source: GObject.Object, x: int, y: int) -> None:
+        if self.focused_widget is not None:
+            return
+        self.is_selecting_cells = True
+
         from .sheet_selection import SheetLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell
 
         active_range = self.selection.current_active_range
@@ -283,8 +304,32 @@ class SheetDocument(GObject.Object):
             scroll_axis = 'vertical'
 
         self.update_selection_from_position(start_column, start_row, end_column, end_row, True, True, True, scroll_axis)
+        self.view.main_canvas.queue_draw()
+
+    def on_update_pointer_moved(self, source: GObject.Object, x: int, y: int) -> None:
+        if self.is_selecting_cells:
+            return
+        hovered_widget = None
+
+        for widget in self.widgets:
+            if widget.contains(x, y):
+                hovered_widget = widget
+
+        if hovered_widget is not None:
+            self.view.main_canvas.set_cursor(hovered_widget.cursor)
+        else:
+            self.view.main_canvas.set_cursor(self.view.default_cursor)
+
+        self.hovered_widget = hovered_widget
+
+    def on_update_pointer_released(self, source: GObject.Object, x: int, y: int) -> None:
+        self.is_selecting_cells = False
 
     def select_element_from_point(self, x: float, y: float, state: Gdk.ModifierType = None) -> None:
+        # Trigger the on_click event of the hovered widget if the pointer is under one,
+        # otherwise select the hovered cell.
+        self.focused_widget = self.hovered_widget
+
         column = self.display.get_column_from_point(x)
         row = self.display.get_row_from_point(y)
 
@@ -299,6 +344,10 @@ class SheetDocument(GObject.Object):
             start_row = active.row
 
         self.update_selection_from_position(start_column, start_row, end_column, end_row, True, False, False)
+        self.view.main_canvas.queue_draw()
+
+        if self.focused_widget is not None:
+            self.focused_widget.do_on_click(x, y)
 
     def update_selection_from_name(self, name: str) -> None:
         vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
@@ -307,6 +356,7 @@ class SheetDocument(GObject.Object):
         row_1 = self.display.get_row_from_vrow(vrow_1)
         row_2 = self.display.get_row_from_vrow(vrow_2)
         self.update_selection_from_position(col_1, row_1, col_2, row_2, False, False, True)
+        self.view.main_canvas.queue_draw()
 
     def update_selection_from_position(self, col_1: int, row_1: int, col_2: int, row_2: int,
                                        keep_order: bool = False, follow_cursor: bool = True,
@@ -431,8 +481,6 @@ class SheetDocument(GObject.Object):
         if not globals.is_changing_state and self.selection.current_search_range is not None:
             self.selection.current_search_range = self.selection.current_active_range
 
-        self.view.main_canvas.queue_draw()
-
     def insert_from_current_rows(self, dataframe: polars.DataFrame, vflags: polars.Series = None, rheights: polars.Series = None) -> bool:
         range = self.selection.current_active_range
         active = self.selection.current_active_cell
@@ -476,8 +524,9 @@ class SheetDocument(GObject.Object):
                                                               self.display.row_heights[mrow:]])
                 self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
-            self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, False)
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 
@@ -530,8 +579,9 @@ class SheetDocument(GObject.Object):
                                                           self.display.row_heights[mrow:]])
                 self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
-            self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 
@@ -579,8 +629,9 @@ class SheetDocument(GObject.Object):
                                                                 self.display.column_widths[mcolumn:]])
                 self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
-            self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, False)
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 
@@ -631,8 +682,10 @@ class SheetDocument(GObject.Object):
                                                             self.display.column_widths[mcolumn:]])
                 self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
-            self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
+            self.repopulate_auto_filter_widgets()
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 
@@ -745,8 +798,9 @@ class SheetDocument(GObject.Object):
                                                           self.display.row_heights[mrow:]])
                 self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
-            self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 
@@ -795,8 +849,10 @@ class SheetDocument(GObject.Object):
                                                             self.display.column_widths[mcolumn:]])
                 self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
-            self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
+            self.repopulate_auto_filter_widgets()
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 
@@ -844,8 +900,9 @@ class SheetDocument(GObject.Object):
                                                           self.display.row_heights[mrow + row_span:]])
                 self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
-            self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, True)
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 
@@ -893,12 +950,24 @@ class SheetDocument(GObject.Object):
                                                             self.display.column_widths[mcolumn + column_span:]])
                 self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
-            self.renderer.render_caches = {}
             self.auto_adjust_selections_by_crud(0, 0, True)
+            self.repopulate_auto_filter_widgets()
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 
         return False
+
+    # FIXME: hide/unhide features especially for rows is very unstable and likely to break things
+    #        when combined with filter/sort features. Trying to fix the current implementation is
+    #        relatively expensive. Either completely remove them or re-write them entirely. In fact,
+    #        I don't have some good use cases for them. Maybe the user want to compare some columns
+    #        or rows that are far apart, but it can be done later by introducing the split view.
+    #        If we want to keep the feature, we should convert the requested row/column indices to
+    #        polars.Expr somehow but without introducing a permanent row_index column whenever possible;
+    #        or it might a better idea after all to include the row_index column since we also need it
+    #        for a couple of things already?
 
     def hide_current_rows(self) -> None:
         range = self.selection.current_active_range
@@ -944,8 +1013,9 @@ class SheetDocument(GObject.Object):
         if not globals.is_changing_state:
             globals.history.save(state)
 
-        self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, True)
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
     def hide_current_columns(self) -> None:
         range = self.selection.current_active_range
@@ -989,8 +1059,10 @@ class SheetDocument(GObject.Object):
         if not globals.is_changing_state:
             globals.history.save(state)
 
-        self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, True)
+        self.repopulate_auto_filter_widgets()
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
     def unhide_current_rows(self, rheights: polars.Series = None) -> None:
         range = self.selection.current_active_range
@@ -1035,8 +1107,9 @@ class SheetDocument(GObject.Object):
                                                           self.display.row_heights[range.row - 1 + row_span:]])
             self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
-        self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
     def unhide_all_rows(self) -> None:
         # Save snapshot
@@ -1052,11 +1125,11 @@ class SheetDocument(GObject.Object):
 
         # Update row heights
         if len(self.display.row_heights):
-            # FIXME: how to recover the row heights?
-            pass
+            pass # FIXME: how to recover the row heights?
 
-        self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
     def unhide_current_columns(self, cwidths: polars.Series = None) -> None:
         range = self.selection.current_active_range
@@ -1101,8 +1174,10 @@ class SheetDocument(GObject.Object):
                                                             self.display.column_widths[range.column - 1:]])
             self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
 
-        self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_auto_filter_widgets()
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
     def unhide_all_columns(self) -> None:
         # Save snapshot
@@ -1121,29 +1196,86 @@ class SheetDocument(GObject.Object):
             # FIXME: how to recover the column widths?
             self.auto_adjust_column_widths()
 
-        self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_auto_filter_widgets()
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
-    def filter_current_rows(self) -> None:
+    def filter_current_rows(self, multiple: bool = False) -> None:
         active = self.selection.current_active_cell
+        metadata = active.metadata
 
         # Save snapshot
         if not globals.is_changing_state:
             from .history_manager import FilterRowState
             globals.history.save(FilterRowState(self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None,
-                                                self.display.row_heights if len(self.display.row_heights) else None))
+                                                self.display.row_heights if len(self.display.row_heights) else None,
+                                                multiple,
+                                                copy.deepcopy(self.current_filters),
+                                                copy.deepcopy(self.pending_filters)))
+
+        # Update current filters
+        if not multiple:
+            column_name = self.data.dfs[metadata.dfi].columns[metadata.column]
+            cell_value = self.data.read_cell_data_from_metadata(metadata.column, metadata.row, 1, 1, metadata.dfi)
+            if column_name not in self.current_filters:
+                self.current_filters[column_name] = {'show': [str(cell_value)],
+                                                     'hide': ['$all']}
+            else:
+                self.current_filters[column_name]['show'].append(cell_value)
+        else:
+            for column_name in self.pending_filters:
+                if column_name not in self.current_filters:
+                    self.current_filters[column_name] = self.pending_filters[column_name]
+                else:
+                    self.current_filters[column_name]['show'] = list(set(self.current_filters[column_name]['show']) \
+                                                                     .difference(self.pending_filters[column_name]['hide']) \
+                                                                     .union(self.pending_filters[column_name]['show']))
+                    self.current_filters[column_name]['hide'] = list(set(self.current_filters[column_name]['hide']) \
+                                                                     .difference(self.pending_filters[column_name]['show']) \
+                                                                     .union(self.pending_filters[column_name]['hide']))
+        self.pending_filters = {}
 
         # Update row visibility flags
-        self.display.row_visibility_flags = self.data.filter_rows_from_metadata(active.metadata.column, active.metadata.row, active.metadata.dfi)
+        self.display.row_visibility_flags = self.data.filter_rows_from_metadata(self.current_filters, metadata.dfi)
         self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
-        self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+        if len(self.display.row_visible_series):
+            self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+        else:
+            self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
 
         # TODO: update row heights
         if len(self.display.row_heights):
-            pass
+            pass # FIXME: how to recover the row heights?
 
-        self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, True)
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+    def reset_all_filters(self) -> None:
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import ResetFilterRowState
+            globals.history.save(ResetFilterRowState(self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None,
+                                                     self.display.row_heights if len(self.display.row_heights) else None,
+                                                     copy.deepcopy(self.current_filters)))
+
+        # Update current filters
+        self.current_filters = {}
+        self.pending_filters = {}
+
+        # TODO: support multiple dataframes?
+        self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+        self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+        self.data.bbs[0].row_span = self.data.dfs[0].height + 1
+
+        # TODO: update row heights
+        if len(self.display.row_heights):
+            pass # FIXME: how to recover the row heights?
+
+        self.auto_adjust_selections_by_crud(0, 0, True)
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
     def sort_current_rows(self, descending: bool = False, vflags: polars.Series = None) -> bool:
         active = self.selection.current_active_cell
@@ -1408,8 +1540,9 @@ class SheetDocument(GObject.Object):
                                            .with_columns(**with_columns) \
                                            .drop('$ridx')
 
-        self.renderer.render_caches = {}
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
         active_cell = self.selection.current_active_cell
         self.notify_selection_changed(active_cell.column, active_cell.row, active_cell.metadata)
@@ -1434,15 +1567,15 @@ class SheetDocument(GObject.Object):
 
     def notify_selection_changed(self, column: int, row: int, metadata) -> None:
         # Handle edge cases where the last column(s) are hidden
-        if column - 1 == len(self.display.column_visible_series) and \
-                column < len(self.display.column_visibility_flags) and \
-                not self.display.column_visibility_flags[column]:
+        if column - 1 == len(self.display.column_visible_series) \
+                and column < len(self.display.column_visibility_flags) \
+                and not self.display.column_visibility_flags[column]:
             column += (len(self.display.column_visibility_flags) - 1) - (self.display.column_visible_series[-1] - 1) - 1
 
         # Handle edge cases where the last row(s) are hidden
-        if row - 1 == len(self.display.row_visible_series) and \
-                row < len(self.display.row_visibility_flags) and \
-                not self.display.row_visibility_flags[row]:
+        if row - 1 == len(self.display.row_visible_series) \
+                and row < len(self.display.row_visibility_flags) \
+                and not self.display.row_visibility_flags[row]:
             row += (len(self.display.row_visibility_flags) - 1) - (self.display.row_visible_series[-1] - 1) - 1
 
         # Cache the selected cell data usually for resetting the input bar
@@ -1457,6 +1590,35 @@ class SheetDocument(GObject.Object):
             cell_data = ''
         cell_data = str(cell_data)
         self.emit('selection-changed', self.selection.cell_name, cell_data)
+
+    def repopulate_auto_filter_widgets(self) -> None:
+        if len(self.data.dfs) == 0:
+            return
+
+        from .sheet_widget import SheetAutoFilter
+
+        # Remove existing auto filter widgets
+        self.widgets = [widget for widget in self.widgets if not isinstance(widget, SheetAutoFilter)]
+
+        icon_size = self.display.ICON_SIZE
+
+        cell_y = self.display.get_cell_y_from_row(1)
+        cell_height = self.display.get_cell_height_from_row(1)
+        y = cell_y + (cell_height - icon_size) / 2
+
+        def open_header_context_menu(x: int, y: int) -> None:
+            GLib.idle_add(self.emit, 'open-context-menu', x, y, 'header')
+
+        # TODO: support multiple dataframes?
+        n_columns = len(self.data.dfs[0].columns)
+        if len(self.display.column_visible_series):
+            n_columns = len(self.display.column_visible_series)
+        for column in range(n_columns):
+            cell_x = self.display.get_cell_x_from_column(column + 1)
+            cell_width = self.display.get_cell_width_from_column(column + 1)
+            x = cell_x + cell_width - icon_size - 3
+            sheet_auto_filter = SheetAutoFilter(x, y,  icon_size, icon_size, self.display, open_header_context_menu)
+            self.widgets.append(sheet_auto_filter)
 
     def auto_adjust_column_widths(self) -> None:
         if len(self.data.dfs) == 0:
@@ -1478,12 +1640,12 @@ class SheetDocument(GObject.Object):
 
         self.display.column_widths = polars.Series([0] * self.data.dfs[0].width)
         for col_index, col_name in enumerate(self.data.dfs[0].columns):
-            sample_data = sample_data.with_columns(polars.col(col_name).cast(polars.Utf8))
+            sample_data = sample_data.with_columns(polars.col(col_name).fill_null('[Blank]').cast(polars.Utf8))
             max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
             sample_text = sample_data.with_columns(polars.when(polars.col(col_name).str.len_chars() == max_length)
                                                          .then(polars.col(col_name)).otherwise(None)
-                                                         .alias('sample_text')
-            ).drop_nulls('sample_text').sample(1).item(0, 'sample_text')
+                                                         .alias('sample_text')) \
+                                     .drop_nulls('sample_text').sample(1).item(0, 'sample_text')
             layout.set_text(str(sample_text), -1)
             text_width = layout.get_size()[0] / Pango.SCALE
             preferred_width = text_width + 2 * self.display.DEFAULT_CELL_PADDING

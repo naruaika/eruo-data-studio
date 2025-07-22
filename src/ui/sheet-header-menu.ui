@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <menu id="sheet_header_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Sort Smallest to Largest</attribute>
+        <attribute name="action">app.sort-smallest-to-largest</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Sort Largest to Smallest</attribute>
+        <attribute name="action">app.sort-largest-to-smallest</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="custom">filter_box</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Apply Filter</attribute>
+        <attribute name="action">app.filter-cell-values</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Custom Filter...</attribute>
+        <attribute name="action">app.open-custom-filter</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Reset All Filters</attribute>
+        <attribute name="action">app.reset-all-filters</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Convert</attribute>
+        <link name="submenu">
+          <item>
+            <attribute name="label" translatable="yes">To _Categorical</attribute>
+            <attribute name="action">app.convert-to-categorical</attribute>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">To _Number</attribute>
+            <link name="submenu">
+              <section>
+                <item>
+                  <attribute name="label" translatable="yes">Integer _8</attribute>
+                  <attribute name="action">app.convert-to-int8</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">Integer _16</attribute>
+                  <attribute name="action">app.convert-to-int16</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">Integer _32</attribute>
+                  <attribute name="action">app.convert-to-int32</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">Integer _64</attribute>
+                  <attribute name="action">app.convert-to-int64</attribute>
+                </item>
+              </section>
+              <section>
+                <item>
+                  <attribute name="label" translatable="yes">Unsigned Integer _8</attribute>
+                  <attribute name="action">app.convert-to-uint8</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">Unsigned Integer _16</attribute>
+                  <attribute name="action">app.convert-to-uint16</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">Unsigned Integer _32</attribute>
+                  <attribute name="action">app.convert-to-uint32</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">Unsigned Integer _64</attribute>
+                  <attribute name="action">app.convert-to-uint64</attribute>
+                </item>
+              </section>
+              <section>
+                <item>
+                  <attribute name="label" translatable="yes">Float _32</attribute>
+                  <attribute name="action">app.convert-to-float32</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">Float _64</attribute>
+                  <attribute name="action">app.convert-to-float64</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Decimal</attribute>
+                  <attribute name="action">app.convert-to-decimal</attribute>
+                </item>
+              </section>
+            </link>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">To _Date/Time</attribute>
+            <link name="submenu">
+              <section>
+                <item>
+                  <attribute name="label" translatable="yes">_Date</attribute>
+                  <attribute name="action">app.convert-to-date</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">_Time</attribute>
+                  <attribute name="action">app.convert-to-time</attribute>
+                </item>
+                <item>
+                  <attribute name="label" translatable="yes">D_atetime</attribute>
+                  <attribute name="action">app.convert-to-datetime</attribute>
+                </item>
+              </section>
+            </link>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">To _Boolean</attribute>
+            <attribute name="action">app.convert-to-boolean</attribute>
+          </item>
+          <item>
+            <attribute name="label" translatable="yes">To _Text</attribute>
+            <attribute name="action">app.convert-to-text</attribute>
+          </item>
+        </link>
+      </item>
+    </section>
+  </menu>
+  <template class="SheetHeaderMenu" parent="GtkPopoverMenu">
+    <property name="menu-model">sheet_header_menu</property>
+    <child type="filter_box">
+      <object class="GtkBox">
+        <property name="orientation">vertical</property>
+        <property name="height-request">280</property>
+        <property name="width-request">280</property>
+        <child>
+          <object class="GtkBox" id="filter_search_box">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">6</property>
+            <child>
+              <object class="GtkEntry" id="filter_search_entry">
+                <property name="hexpand">true</property>
+                <property name="placeholder-text">Search for text...</property>
+                <property name="primary-icon-name">edit-find-symbolic</property>
+                <signal name="activate" handler="on_filter_search_entry_activated" swapped="no" />
+              </object>
+            </child>
+            <child>
+              <object class="GtkToggleButton" id="filter_use_regexp">
+                <property name="tooltip-text" translatable="yes">Use Regex</property>
+                <property name="icon-name">regex-symbolic</property>
+                <style>
+                  <class name="inline"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkLabel" id="filter_status">
+            <property name="margin-top">4</property>
+            <property name="margin-bottom">10</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="valign">start</property>
+            <property name="halign">start</property>
+            <property name="label">Please wait...</property>
+            <property name="wrap">true</property>
+            <property name="wrap-mode">word-char</property>
+            <property name="max-width-chars">33</property>
+            <style>
+              <class name="search-status"/>
+            </style>
+          </object>
+        </child>
+        <child>
+          <object class="GtkOverlay">
+            <property name="halign">fill</property>
+            <property name="valign">fill</property>
+            <child>
+              <object class="GtkScrolledWindow">
+                <property name="vexpand">true</property>
+                <child>
+                  <object class="GtkListView" id="filter_list_view">
+                    <property name="single-click-activate">true</property>
+                    <property name="model">
+                      <object class="GtkSingleSelection">
+                        <property name="model">
+                          <object class="GListStore" id="filter_list_store"/>
+                        </property>
+                      </object>
+                    </property>
+                    <style>
+                      <class name="filter-list-view"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child type="overlay">
+              <object class="GtkButton" id="filter_continue">
+                <property name="halign">start</property>
+                <property name="valign">start</property>
+                <property name="margin-start">6</property>
+                <property name="label">Continue</property>
+                <property name="visible">false</property>
+                <signal name="clicked" handler="on_filter_continue_button_clicked" swapped="no"/>
+                <style>
+                  <class name="search-status-button"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <style>
+      <class name="context-menu"/>
+    </style>
+  </template>
+</interface>

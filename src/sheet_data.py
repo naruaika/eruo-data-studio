@@ -19,6 +19,7 @@
 
 
 from gi.repository import GObject
+import copy
 import datetime
 import gc
 import numpy
@@ -77,11 +78,10 @@ class SheetData(GObject.Object):
 
         self.document = document
 
-        if dataframe is None:
-            return
-        self.dfs = [dataframe]
-        # TODO: should we support dataframe starting from row > 1 and/or column > 1?
-        self.bbs = [SheetCellBoundingBox(1, 1, dataframe.width, dataframe.height + 1)]
+        if dataframe is not None:
+            self.dfs = [dataframe]
+            # TODO: should we support dataframe starting from row > 1 and/or column > 1?
+            self.bbs = [SheetCellBoundingBox(1, 1, dataframe.width, dataframe.height + 1)]
 
     def get_cell_metadata_from_position(self, column: int, row: int) -> SheetCellMetadata:
         # Handle the locator cells
@@ -129,6 +129,44 @@ class SheetData(GObject.Object):
             return self.dfs[dfi].select(column_names)
         return self.dfs[dfi].select(column_names)[row:row + row_span]
 
+    def read_cell_data_n_unique_approx_from_metadata(self, column: int, dfi: int) -> any:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+        column_name = self.dfs[dfi].columns[column]
+        return self.dfs[dfi].select(polars.col(column_name).approx_n_unique()).item()
+
+    def read_cell_data_n_unique_from_metadata(self, column: int, dfi: int, search_query: str = None, use_regexp: bool = False) -> any:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+
+        column_name = self.dfs[dfi].columns[column]
+
+        filter_expression = polars.lit(True)
+        if search_query is not None:
+            filter_expression = polars.col(column_name).str.contains_any([search_query], ascii_case_insensitive=True)
+            if use_regexp:
+                filter_expression = polars.col(column_name).str.contains(f'(?i){search_query}')
+
+        return self.dfs[dfi].filter(filter_expression).select(polars.col(column_name).n_unique()).item()
+
+    def read_cell_data_unique_from_metadata(self, column: int, dfi: int, sample_only: bool = False, search_query: str = None, use_regexp: bool = False) -> any:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+
+        column_name = self.dfs[dfi].columns[column]
+
+        filter_expression = polars.lit(True)
+        if search_query is not None:
+            filter_expression = polars.col(column_name).str.contains_any([search_query], ascii_case_insensitive=True)
+            if use_regexp:
+                filter_expression = polars.col(column_name).str.contains(f'(?i){search_query}')
+
+        if sample_only:
+            return self.dfs[dfi].filter(filter_expression).get_column(column_name) \
+                                .sample(1_000_000, seed=99, with_replacement=True).unique().sort()
+
+        return self.dfs[dfi].filter(filter_expression).get_column(column_name).unique().sort()
+
     def read_cell_bbox_from_metadata(self, dfi: int) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
@@ -139,11 +177,8 @@ class SheetData(GObject.Object):
             return False
 
         empty_rows = polars.DataFrame({
-            column_name: polars.Series(
-                values=[None] * row_span,
-                dtype=column_dtype,
-            )
-            for column_name, column_dtype in self.dfs[dfi].schema.items()
+            column_name: polars.Series(values=[None] * row_span, dtype=column_dtype)
+                         for column_name, column_dtype in self.dfs[dfi].schema.items()
         })
 
         self.dfs[dfi] = polars.concat([
@@ -461,14 +496,44 @@ class SheetData(GObject.Object):
 
         return True
 
-    def filter_rows_from_metadata(self, column: int, row: int, dfi: int) -> polars.Series:
+    def filter_rows_from_metadata(self, filters: dict, dfi: int) -> polars.Series:
         if dfi < 0 or len(self.dfs) <= dfi:
             return polars.Series(dtype=polars.Boolean)
 
-        column_name = self.dfs[dfi].columns[column]
-        cell_value = self.read_cell_data_from_metadata(column, row, 1, 1, dfi)
+        filter_expression = polars.lit(True)
 
-        filter_expression = polars.col(column_name).is_in([cell_value], nulls_equal=True)
+        for column_name in filters:
+            cvalue_to_show = copy.deepcopy(filters[column_name]['show'])
+            cvalue_to_hide = copy.deepcopy(filters[column_name]['hide'])
+
+            column_dtype = self.dfs[dfi].schema[column_name]
+
+            if '$all' in cvalue_to_show and len(cvalue_to_hide) == 0:
+                continue
+
+            if '$all' in cvalue_to_show:
+                if exclude_nulls := '$blanks' in cvalue_to_hide:
+                    cvalue_to_hide.remove('$blanks')
+                try:
+                    cvalue_to_hide = polars.Series(cvalue_to_hide).cast(column_dtype, strict=False)
+                except Exception:
+                    continue # FIXME: shouldn't happen, but if it does, what should we do instead?
+                fexpr = polars.col(column_name).is_in(cvalue_to_hide).not_()
+                if exclude_nulls:
+                    fexpr &= polars.col(column_name).is_not_null()
+                filter_expression &= fexpr
+
+            if '$all' in cvalue_to_hide and len(cvalue_to_show) > 0:
+                if include_nulls := '$blanks' in cvalue_to_show:
+                    cvalue_to_show.remove('$blanks')
+                try:
+                    cvalue_to_show = polars.Series(cvalue_to_show).cast(column_dtype, strict=False)
+                except Exception:
+                    continue # FIXME: shouldn't happen, but if it does, what should we do instead?
+                fexpr = polars.col(column_name).is_in(cvalue_to_show)
+                if include_nulls:
+                    fexpr |= polars.col(column_name).is_null()
+                filter_expression &= fexpr
 
         # We don't do the actual filtering on the original dataframe here, instead we
         # just want to get the boolean series to flag which rows should be visible.
@@ -492,12 +557,10 @@ class SheetData(GObject.Object):
             dtype = polars.Categorical('lexical')
 
         try:
-            self.dfs[dfi] = self.dfs[dfi].with_columns(
-                **{
-                    column_name: polars.col(column_name).cast(dtype)
-                        for column, column_name in enumerate(self.dfs[dfi].columns[column:column + column_span], column)
-                }
-            )
+            self.dfs[dfi] = self.dfs[dfi].with_columns({
+                column_name: polars.col(column_name).cast(dtype)
+                             for column, column_name in enumerate(self.dfs[dfi].columns[column:column + column_span], column)
+            })
         except Exception:
             globals.send_notification(f'Cannot convert to: {dtype}')
             return False

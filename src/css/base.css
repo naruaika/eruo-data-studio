@@ -20,9 +20,15 @@
 .context-menu {
     font-size: 14px;
 }
+.context-menu entry,
+.context-menu button,
+.context-menu .text-button,
 .context-menu modelbutton {
     min-height: 28px;
-    padding: 0px 8px;
+    padding: 0 8px;
+}
+.context-menu button.inline {
+    padding: 0 4px;
 }
 
 .search-box {
@@ -34,6 +40,9 @@
 
 .search-status {
     font-size: 12px;
+}
+.search-status-button {
+    margin-top: -4px;
 }
 
 .search-result-cname {
@@ -54,6 +63,15 @@
 }
 .search-list-view row:selected {
     background-color: var(--card-bg-color);
+}
+
+.filter-list-view {
+    padding: 0;
+}
+.filter-list-view row {
+    margin: 0;
+    padding: 2px 4px;
+    border-radius: 12px;
 }
 
 @keyframes slide-up-animation {

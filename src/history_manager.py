@@ -21,6 +21,7 @@
 from collections import deque
 from gi.repository import GObject
 from tempfile import NamedTemporaryFile
+import copy
 import polars
 import time
 
@@ -551,6 +552,8 @@ class UnhideColumnState(State):
                                                             document.display.column_widths[mcolumn:]])
             document.display.cumulative_column_widths = polars.Series('ccwidths', document.display.column_widths).cum_sum()
 
+        document.repopulate_auto_filter_widgets()
+
         self.restore_selection()
 
     def redo(self) -> None:
@@ -579,6 +582,8 @@ class UnhideAllColumnState(State):
         document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
         document.data.bbs[0].column_span = len(document.display.column_visible_series)
 
+        document.repopulate_auto_filter_widgets()
+
         self.restore_selection()
 
     def redo(self) -> None:
@@ -593,7 +598,11 @@ class FilterRowState(State):
     vflags_path: str
     rheights_path: str
 
-    def __init__(self, vflags: polars.Series, rheights: polars.Series) -> None:
+    multiple: bool
+    cfilters: dict
+    pfilters: dict
+
+    def __init__(self, vflags: polars.Series, rheights: polars.Series, multiple: bool, cfilters: dict, pfilters: dict) -> None:
         super().__init__()
 
         self.save_selection()
@@ -602,8 +611,16 @@ class FilterRowState(State):
 
         self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
 
+        self.multiple = multiple
+        self.cfilters = cfilters
+        self.pfilters = pfilters
+
     def undo(self) -> None:
         document = globals.history.document
+
+        # Update current filters
+        document.current_filters = copy.deepcopy(self.cfilters)
+        document.pending_filters = {}
 
         # Update row visibility flags
         if self.vflags_path is not None:
@@ -628,7 +645,60 @@ class FilterRowState(State):
 
         self.restore_selection(False)
 
-        document.filter_current_rows()
+        document.current_filters = copy.deepcopy(self.cfilters)
+        document.pending_filters = copy.deepcopy(self.pfilters)
+
+        document.filter_current_rows(self.multiple)
+
+
+
+class ResetFilterRowState(State):
+    __gtype_name__ = 'ResetFilterRowState'
+
+    vflags_path: str
+    rheights_path: str
+
+    cfilters: dict
+
+    def __init__(self, vflags: polars.Series, rheights: polars.Series, cfilters: dict) -> None:
+        super().__init__()
+
+        self.save_selection()
+
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags})) if vflags is not None else None
+
+        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
+
+        self.cfilters = cfilters
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        # Update current filters
+        document.current_filters = copy.deepcopy(self.cfilters)
+        document.pending_filters = {}
+
+        # Update row visibility flags
+        if self.vflags_path is not None:
+            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+            document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+            document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
+        else:
+            document.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+            document.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+            document.data.bbs[self.range.metadata.dfi].row_span = document.data.dfs[self.range.metadata.dfi].height + 1
+
+        # Update row heights
+        if self.rheights_path is not None:
+            document.display.row_heights = polars.read_parquet(self.rheights_path).to_series(0)
+            document.display.cumulative_row_heights = polars.Series('crheights', document.display.row_heights).cum_sum()
+        else:
+            document.display.row_heights = polars.Series(dtype=polars.UInt32)
+            document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.reset_all_filters()
 
 
 

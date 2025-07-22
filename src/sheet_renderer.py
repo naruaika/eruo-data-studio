@@ -26,6 +26,7 @@ from .sheet_document import SheetDocument
 from .sheet_data import SheetData
 from .sheet_display import SheetDisplay
 from .sheet_selection import SheetSelection
+from .sheet_widget import SheetWidget
 
 class SheetRenderer(GObject.Object):
     __gtype_name__ = 'SheetRenderer'
@@ -44,6 +45,7 @@ class SheetRenderer(GObject.Object):
         display = self.document.display
         data = self.document.data
         selection = self.document.selection
+        widgets = self.document.widgets
 
         # We may not want to change the order of these calls as it can causes
         # unoptimal rendering results :)
@@ -54,6 +56,7 @@ class SheetRenderer(GObject.Object):
         self.draw_headers_contents(canvas, context, width, height, display, data)
         self.draw_cells_contents(canvas, context, width, height, display, data)
         self.draw_selection_borders(context, width, height, display, selection)
+        self.draw_virtual_widgets(context, width, height, display, widgets)
 
     def setup_cairo_context(self, context: cairo.Context) -> None:
         # We want that the canvas color scheme respects the system color scheme
@@ -284,10 +287,10 @@ class SheetRenderer(GObject.Object):
                     prow_index = vrow_index
 
             # Handle edge cases where the last row(s) are hidden
-            elif nrow_index == len(display.row_visible_series) and \
-                    len(display.row_visible_series) and \
-                    display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) and \
-                    not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
+            elif nrow_index == len(display.row_visible_series) \
+                    and len(display.row_visible_series) \
+                    and display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) \
+                    and not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
                 double_lines = True
 
             if double_lines:
@@ -325,10 +328,10 @@ class SheetRenderer(GObject.Object):
                     pcol_index = vcol_index
 
             # Handle edge cases where the last column(s) are hidden
-            elif ncol_index == len(display.column_visible_series) and \
-                    len(display.column_visible_series) and \
-                    display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) and \
-                    not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
+            elif ncol_index == len(display.column_visible_series) \
+                    and len(display.column_visible_series) \
+                    and display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) \
+                    and not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 double_lines = True
 
             # Get the width of the next appearing column
@@ -404,10 +407,10 @@ class SheetRenderer(GObject.Object):
         x_offset = 0
         while x < width:
             # Handle edge cases where the last column(s) are hidden
-            if col_index - 1 == len(display.column_visible_series) and \
-                    len(display.column_visible_series) and \
-                    display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) and \
-                    not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
+            if col_index - 1 == len(display.column_visible_series) \
+                    and len(display.column_visible_series) \
+                    and display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) \
+                    and not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 col_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1) - 1
 
             # Get the width of the next appearing column
@@ -465,10 +468,10 @@ class SheetRenderer(GObject.Object):
         y = display.column_header_height
         while y < height:
             # Handle edge cases where the last row(s) are hidden
-            if row_index - 1 == len(display.row_visible_series) and \
-                    len(display.row_visible_series) and \
-                    display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) and \
-                    not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
+            if row_index - 1 == len(display.row_visible_series) \
+                    and len(display.row_visible_series) \
+                    and display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) \
+                    and not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
                 row_index += (len(display.row_visibility_flags) - 1) - (display.row_visible_series[-1] - 1) - 1
 
             cell_text = display.get_vrow_from_row(row_index)
@@ -776,5 +779,24 @@ class SheetRenderer(GObject.Object):
             context.move_to(display.row_header_width, range_y)
             context.line_to(display.row_header_width, range_y + range_height)
             context.stroke()
+
+        context.restore()
+
+    def draw_virtual_widgets(self, context: cairo.Context, width: int, height: int, display: SheetDisplay, widgets: list[SheetWidget]) -> None:
+        context.save()
+
+        context.set_antialias(cairo.Antialias.DEFAULT)
+
+        for widget in widgets:
+            # Check if the widget will be visible, otherwise skip it
+            if widget.get_x() + widget.get_width() < display.scroll_x_position \
+                    or widget.get_y() + widget.get_height() < display.scroll_y_position \
+                    or display.scroll_x_position + width < widget.get_x() \
+                    or display.scroll_y_position + height < widget.get_y():
+                continue
+
+            context.save()
+            widget.do_render(context, width, height, self.prefers_dark)
+            context.restore()
 
         context.restore()

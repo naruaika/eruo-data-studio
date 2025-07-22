@@ -8,6 +8,7 @@
     <file preprocess="xml-stripblanks">ui/file-save-as-parquet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/search-replace-all-view.ui</file>
     <file preprocess="xml-stripblanks">ui/search-replace-overlay.ui</file>
+    <file preprocess="xml-stripblanks">ui/sheet-header-menu.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/window.ui</file>
     <file alias="base.css">css/base.css</file>
@@ -18,5 +19,6 @@
     <file preprocess="xml-stripblanks">history-undo-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">regex-symbolic.svg</file>
   </gresource>
 </gresources>
