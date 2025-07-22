@@ -1613,13 +1613,13 @@ class SheetDocument(GObject.Object):
             GLib.idle_add(self.emit, 'open-context-menu', x, y, 'header')
 
         # TODO: support multiple dataframes?
-        n_columns = len(self.data.dfs[0].columns)
+        n_columns = self.data.dfs[0].width
         if len(self.display.column_visible_series):
             n_columns = len(self.display.column_visible_series)
         for column in range(n_columns):
             cell_x = self.display.get_cell_x_from_column(column + 1)
             cell_width = self.display.get_cell_width_from_column(column + 1)
-            x = cell_x + cell_width - icon_size - 3
+            x = cell_x + self.display.scroll_x_position + cell_width - icon_size - 3
             sheet_auto_filter = SheetAutoFilter(x, y,  icon_size, icon_size, self.display, open_header_context_menu)
             self.widgets.append(sheet_auto_filter)
 
