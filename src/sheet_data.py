@@ -557,10 +557,10 @@ class SheetData(GObject.Object):
             dtype = polars.Categorical('lexical')
 
         try:
-            self.dfs[dfi] = self.dfs[dfi].with_columns({
-                column_name: polars.col(column_name).cast(dtype)
-                             for column, column_name in enumerate(self.dfs[dfi].columns[column:column + column_span], column)
-            })
+            self.dfs[dfi] = self.dfs[dfi].with_columns(
+                polars.col(column_name).cast(dtype).alias(column_name)
+                for column, column_name in enumerate(self.dfs[dfi].columns[column:column + column_span], column)
+            )
         except Exception:
             globals.send_notification(f'Cannot convert to: {dtype}')
             return False
