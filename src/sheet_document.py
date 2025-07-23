@@ -1391,7 +1391,7 @@ class SheetDocument(GObject.Object):
 
         font_desc = Gtk.Widget.create_pango_context(self.view.main_canvas).get_font_description()
         system_font = font_desc.get_family() if font_desc else 'Sans'
-        font_desc = Pango.font_description_from_string(f'{system_font} Normal Regular {self.display.FONT_SIZE}px')
+        font_desc = Pango.font_description_from_string(f'{system_font} Normal Regular {self.display.FONT_SIZE}px #tnum=1')
         context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0))
         layout = PangoCairo.create_layout(context)
         layout.set_font_description(font_desc)

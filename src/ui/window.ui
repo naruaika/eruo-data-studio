@@ -92,6 +92,9 @@
                             <property name="halign">fill</property>
                             <property name="hexpand">True</property>
                             <signal name="activate" handler="on_formula_bar_activated" swapped="no" />
+                            <style>
+                              <class name="formula-bar"/>
+                            </style>
                           </object>
                         </child>
                       </object>

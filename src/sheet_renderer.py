@@ -570,8 +570,8 @@ class SheetRenderer(GObject.Object):
         # Use system default font family for drawing text
         font_desc = Gtk.Widget.create_pango_context(canvas).get_font_description()
         font_family = font_desc.get_family() if font_desc else 'Sans'
-        header_font_desc = Pango.font_description_from_string(f'{font_family} Normal Bold {display.FONT_SIZE}px')
-        body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Regular {display.FONT_SIZE}px')
+        header_font_desc = Pango.font_description_from_string(f'{font_family} Normal Bold {display.FONT_SIZE}px #tnum=1')
+        body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Regular {display.FONT_SIZE}px #tnum=1')
 
         layout = PangoCairo.create_layout(ccontext)
 
@@ -630,6 +630,8 @@ class SheetRenderer(GObject.Object):
                     height = y
                     break # prevent iteration over empty cells
 
+                x_text = x + display.DEFAULT_CELL_PADDING
+
                 # Draw dataframe header
                 if row_index == 0:
                     layout.set_font_description(header_font_desc)
@@ -640,6 +642,7 @@ class SheetRenderer(GObject.Object):
                     cname = data.dfs[0].columns[vcol_index]
                     dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index])
                     cell_text = f'{cname} ({dtype})'
+                    layout.set_text(cell_text, -1)
 
                 # Draw dataframe content
                 else:
@@ -653,19 +656,29 @@ class SheetRenderer(GObject.Object):
                     else:
                         vcol_index = col_index
                     cell_text = data.dfs[0][vrow_index - 1, vcol_index]
+                    col_dtype = data.dfs[0].dtypes[vcol_index]
+
+                    # Right-align numeric and temporal values
+                    if col_dtype.is_numeric() or col_dtype.is_temporal():
+                        cell_text = str(cell_text)
+                        layout.set_text(cell_text, -1)
+                        text_width = layout.get_size()[0] / Pango.SCALE
+                        x_text = x + cell_width - text_width - display.DEFAULT_CELL_PADDING
+
+                    # Otherwise keep it left-aligned
+                    else:
+                        # Truncate before the first line break to prevent overflow
+                        cell_text = str(cell_text).split('\n', 1)[0]
+                        # Truncate the contents for performance reasons
+                        cell_text = cell_text[:int(cell_width * 0.2)] # TODO: 0.2 is a magic number
+                        layout.set_text(cell_text, -1)
 
                 if cell_text in ['', None]:
                     y += cell_height
                     row_index += 1
                     continue # skip empty cells
 
-                # Truncate before the first line break to prevent overflow
-                cell_text = str(cell_text).split('\n', 1)[0]
-                # Truncate the contents for performance reasons
-                cell_text = cell_text[:int(cell_width * 0.2)] # TODO: 0.2 is a magic number
-
-                ccontext.move_to(x + display.DEFAULT_CELL_PADDING, y + 2)
-                layout.set_text(cell_text, -1)
+                ccontext.move_to(x_text, y + 2)
                 PangoCairo.show_layout(ccontext, layout)
 
                 # TODO: add support for custom row heights

@@ -1,11 +1,15 @@
 .name-box {
     font-family: monospace;
 }
+.formula-bar {
+    font-feature-settings: "tnum" 1;
+}
 .inline-formula {
     padding: 0 5px;
     font-size: 12px;
     line-height: 1.25;
     border: 2px solid var(--accent-bg-color);
+    font-feature-settings: "tnum" 1;
 }
 
 .tab-view scrollbar.vertical {
