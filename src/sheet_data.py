@@ -567,7 +567,7 @@ class SheetData(GObject.Object):
                 dtype = polars.Categorical('lexical')
                 expressions.append(polars.col(column_name).cast(dtype).alias(column_name))
 
-            if dtype in (polars.Datetime, polars.Date, polars.Time):
+            elif dtype in (polars.Datetime, polars.Date, polars.Time):
                 original_dtype = self.dfs[dfi].schema[column_name]
                 first_non_null = self.dfs[dfi].filter(polars.col(column_name).is_not_null()).head(1)[column_name].item()
 
@@ -576,6 +576,9 @@ class SheetData(GObject.Object):
                     expressions.append(polars.col(column_name).str.strip_chars().str.strptime(dtype, dformat).alias(column_name))
                 else:
                     expressions.append(polars.col(column_name).cast(dtype).alias(column_name))
+
+            else:
+                expressions.append(polars.col(column_name).cast(dtype).alias(column_name))
 
         try:
             self.dfs[dfi] = self.dfs[dfi].with_columns(expressions)
