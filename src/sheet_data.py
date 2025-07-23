@@ -19,14 +19,15 @@
 
 
 from gi.repository import GObject
+from datetime import datetime
 import copy
-import datetime
 import gc
 import numpy
 import polars
 import re
 
 from . import globals
+from . import utils
 from .sheet_document import SheetDocument
 
 class SheetCellBoundingBox(GObject.Object):
@@ -280,21 +281,22 @@ class SheetData(GObject.Object):
                 replace_with = None
 
             # Convert the input value to the correct type
-            if column_dtype in (polars.Date, polars.Datetime, polars.Time):
-                if column_dtype == polars.Date:
-                    new_value = datetime.strptime(new_value, '%Y-%m-%d').date()
-                elif column_dtype == polars.Datetime:
-                    new_value = datetime.strptime(new_value, '%Y-%m-%d %H:%M:%S')
-                else: # polars.Time
-                    new_value = datetime.strptime(new_value, '%H:%M:%S').time()
-            else:
-                try:
-                    new_value = polars.Series([replace_with]).cast(column_dtype)[0]
-                except Exception:
-                    new_value = str(replace_with)
+            if row >= 0: # skip the header row
+                if column_dtype in (polars.Date, polars.Datetime, polars.Time):
+                    if column_dtype == polars.Date:
+                        new_value = datetime.strptime(new_value, '%Y-%m-%d').date()
+                    elif column_dtype == polars.Datetime:
+                        new_value = datetime.strptime(new_value, '%Y-%m-%d %H:%M:%S')
+                    else: # polars.Time
+                        new_value = datetime.strptime(new_value, '%H:%M:%S').time()
+                else:
+                    try:
+                        new_value = polars.Series([replace_with]).cast(column_dtype)[0]
+                    except Exception:
+                        new_value = str(replace_with)
 
-            # FIXME: exclude the hidden row(s) from being updated
             # Update the entire column
+            # FIXME: exclude the hidden row(s) from being updated
             if row_span < 0:
                 self.dfs[dfi] = self.dfs[dfi].with_columns(polars.repeat(new_value, row_count, eager=True, dtype=column_dtype)
                                                                  .alias(column_name))
@@ -551,18 +553,30 @@ class SheetData(GObject.Object):
 
     def convert_columns_dtype_from_metadata(self, column: int, column_span: int, dfi: int, dtype: polars.DataType) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
-            return
+            return False
 
-        if isinstance(dtype, polars.Categorical):
-            dtype = polars.Categorical('lexical')
+        expressions = []
+
+        for column, column_name in enumerate(self.dfs[dfi].columns[column:column + column_span], column):
+            if isinstance(dtype, polars.Categorical):
+                dtype = polars.Categorical('lexical')
+                expressions.append(polars.col(column_name).cast(dtype).alias(column_name))
+
+            if dtype in (polars.Datetime, polars.Date, polars.Time):
+                original_dtype = self.dfs[dfi].schema[column_name]
+                first_non_null = self.dfs[dfi].filter(polars.col(column_name).is_not_null()).head(1)[column_name].item()
+
+                if isinstance(original_dtype, polars.String) and first_non_null:
+                    dformat = utils.get_date_format_string(first_non_null)
+                    expressions.append(polars.col(column_name).str.strip_chars().str.strptime(dtype, dformat).alias(column_name))
+                else:
+                    expressions.append(polars.col(column_name).cast(dtype).alias(column_name))
 
         try:
-            self.dfs[dfi] = self.dfs[dfi].with_columns(
-                polars.col(column_name).cast(dtype).alias(column_name)
-                for column, column_name in enumerate(self.dfs[dfi].columns[column:column + column_span], column)
-            )
+            self.dfs[dfi] = self.dfs[dfi].with_columns(expressions)
         except Exception:
-            globals.send_notification(f'Cannot convert to: {dtype}')
+            dtype = utils.get_dtype_symbol(dtype, False)
+            globals.send_notification(f'One or more columns couldn\'t be converted to: {dtype}')
             return False
 
         return True

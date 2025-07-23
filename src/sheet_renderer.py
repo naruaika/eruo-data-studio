@@ -22,6 +22,7 @@ from gi.repository import Adw, GObject, Gtk, Pango, PangoCairo
 import cairo
 
 from . import globals
+from . import utils
 from .sheet_document import SheetDocument
 from .sheet_data import SheetData
 from .sheet_display import SheetDisplay
@@ -432,7 +433,7 @@ class SheetRenderer(GObject.Object):
             # Draw dataframe header
             if len(data.bbs) and 0 < display.scroll_y_position and col_index <= data.bbs[0].column_span:
                 cname = data.dfs[0].columns[vcol_index - 1]
-                dtype = display.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
+                dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
                 layout.set_font_description(body_font_desc)
                 layout.set_text(f'{cname} ({dtype})', -1)
                 x_text = x + display.DEFAULT_CELL_PADDING
@@ -637,7 +638,7 @@ class SheetRenderer(GObject.Object):
                     else:
                         vcol_index = col_index
                     cname = data.dfs[0].columns[vcol_index]
-                    dtype = display.get_dtype_symbol(data.dfs[0].dtypes[vcol_index])
+                    dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index])
                     cell_text = f'{cname} ({dtype})'
 
                 # Draw dataframe content

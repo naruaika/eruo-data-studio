@@ -311,7 +311,6 @@ class SheetDisplay(GObject.Object):
 
         return (col, row)
 
-
     def get_cell_range_from_name(self, name: str) -> tuple[int, int, int, int]:
         """
         Parses a cell range (e.g., 'A10:a20', 'AA5:BB20', '5:10', 'h:H') or a single cell
@@ -344,32 +343,6 @@ class SheetDisplay(GObject.Object):
             return (*start_pos, *end_pos)
         else: # It's a single cell name
             return (*start_pos, *start_pos)
-
-    def get_dtype_symbol(self, dtype: polars.DataType, short: bool = True) -> str:
-        symbol_map = {
-            polars.Categorical: {'short': 'cat',   'long': 'categorical'},
-            polars.Int8:        {'short': 'i8',    'long': 'integer 8'},
-            polars.Int16:       {'short': 'i16',   'long': 'integer 16'},
-            polars.Int32:       {'short': 'i32',   'long': 'integer 32'},
-            polars.Int64:       {'short': 'i64',   'long': 'integer 64'},
-            polars.UInt8:       {'short': 'u8',    'long': 'unsigned integer 8'},
-            polars.UInt16:      {'short': 'u16',   'long': 'unsigned integer 16'},
-            polars.UInt32:      {'short': 'u32',   'long': 'unsigned integer 32'},
-            polars.UInt64:      {'short': 'u64',   'long': 'unsigned integer 64'},
-            polars.Float32:     {'short': 'f32',   'long': 'float 32'},
-            polars.Float64:     {'short': 'f64',   'long': 'float 64'},
-            polars.Decimal:     {'short': 'dec.',  'long': 'decimal'},
-            polars.Date:        {'short': 'date',  'long': 'date'},
-            polars.Time:        {'short': 'time',  'long': 'time'},
-            polars.Datetime:    {'short': 'date.', 'long': 'datetime'},
-            polars.Boolean:     {'short': 'bool',  'long': 'boolean'},
-            polars.Utf8:        {'short': 'str',   'long': 'string'},
-            polars.Null:        {'short': 'null',  'long': 'null'},
-        }
-        for dt, symbol in symbol_map.items():
-            if dtype == dt or isinstance(dtype, dt):
-                return symbol['short'] if short else symbol['long']
-        return '?'
 
     def check_cell_position_near_edges(self, column: int, row: int, viewport_height: int, viewport_width: int) -> list[str]:
         cell_y = self.get_cell_y_from_row(row)
