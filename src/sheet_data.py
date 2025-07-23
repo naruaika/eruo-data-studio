@@ -133,8 +133,13 @@ class SheetData(GObject.Object):
     def read_cell_data_n_unique_approx_from_metadata(self, column: int, dfi: int) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
+
         column_name = self.dfs[dfi].columns[column]
-        return self.dfs[dfi].select(polars.col(column_name).approx_n_unique()).item()
+
+        try:
+            return self.dfs[dfi].select(polars.col(column_name).approx_n_unique()).item()
+        except Exception:
+            return self.dfs[dfi].select(polars.col(column_name).n_unique()).item()
 
     def read_cell_data_n_unique_from_metadata(self, column: int, dfi: int, search_query: str = None, use_regexp: bool = False) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
