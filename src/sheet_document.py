@@ -1073,6 +1073,7 @@ class SheetDocument(GObject.Object):
             if len(self.display.row_heights):
                 pass
 
+            self.auto_adjust_selections_by_crud(0, 0, True)
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1082,20 +1083,31 @@ class SheetDocument(GObject.Object):
 
     def convert_current_columns_dtype(self, dtype: polars.DataType) -> bool:
         range = self.selection.current_active_range
+        column_span = range.column_span
+
+        # Take hidden column(s) into account
+        if len(self.display.column_visibility_flags):
+            start_vcolumn = self.display.get_vcolumn_from_column(range.column)
+            end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+            column_span = end_vcolumn - start_vcolumn + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import ConvertDataState
+            # FIXME: this doesn't handle different data types well even though usually they are the same
             ndtype = self.data.read_column_dtype_from_metadata(range.metadata.column, range.metadata.dfi)
             state = ConvertDataState(ndtype, dtype)
 
-        if self.data.convert_columns_dtype_from_metadata(range.metadata.column, range.column_span, range.metadata.dfi, dtype):
-            self.renderer.render_caches = {}
-            self.view.main_canvas.queue_draw()
-
+        # FIXME: datetime to string conversion doesn't recover the original content.
+        # Maybe for numerical and temporal data, we should store the entire content? Or just the string format?
+        if self.data.convert_columns_dtype_from_metadata(range.metadata.column, column_span, range.metadata.dfi, dtype):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
+
+            self.auto_adjust_selections_by_crud(0, 0, True)
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
 
             return True
 

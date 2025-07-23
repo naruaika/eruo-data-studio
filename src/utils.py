@@ -96,7 +96,7 @@ def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
         Time:        {'short': 'time',  'long': 'time'},
         Datetime:    {'short': 'date.', 'long': 'datetime'},
         Boolean:     {'short': 'bool',  'long': 'boolean'},
-        Utf8:        {'short': 'str',   'long': 'string'},
+        Utf8:        {'short': 'text',  'long': 'text'},
         Null:        {'short': 'null',  'long': 'null'},
     }
     for dt, symbol in symbol_map.items():
