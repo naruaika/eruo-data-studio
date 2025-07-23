@@ -658,6 +658,11 @@ class SheetRenderer(GObject.Object):
                     cell_text = data.dfs[0][vrow_index - 1, vcol_index]
                     col_dtype = data.dfs[0].dtypes[vcol_index]
 
+                    if cell_text in ['', None]:
+                        y += cell_height
+                        row_index += 1
+                        continue # skip empty cells
+
                     # Right-align numeric and temporal values
                     if col_dtype.is_numeric() or col_dtype.is_temporal():
                         cell_text = str(cell_text)
@@ -672,11 +677,6 @@ class SheetRenderer(GObject.Object):
                         # Truncate the contents for performance reasons
                         cell_text = cell_text[:int(cell_width * 0.2)] # TODO: 0.2 is a magic number
                         layout.set_text(cell_text, -1)
-
-                if cell_text in ['', None]:
-                    y += cell_height
-                    row_index += 1
-                    continue # skip empty cells
 
                 ccontext.move_to(x_text, y + 2)
                 PangoCairo.show_layout(ccontext, layout)
