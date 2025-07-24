@@ -53,9 +53,9 @@ class Application(Adw.Application):
         self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
         self.create_action('open-search', self.on_open_search_action, ['<primary>f'])
         self.create_action('toggle-replace', self.on_toggle_replace_action, ['<primary>h'])
-        self.create_action('open-search-all', self.on_open_search_all_action, ['<primary><shift>f'])
+        self.create_action('toggle-search-all', self.on_toggle_search_all_action, ['<primary><shift>f'])
         self.create_action('toggle-replace-all', self.on_toggle_replace_all_action, ['<primary><shift>h'])
-        self.create_action('open-history', self.on_open_history_action)
+        self.create_action('toggle-history', self.on_toggle_history_action)
         self.create_action('new-sheet', self.on_new_sheet_action, ['<primary>t'])
         self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
         self.create_action('undo', self.on_undo_action, ['<primary>z'])
@@ -177,17 +177,25 @@ class Application(Adw.Application):
         window = self.get_active_window()
         window.search_replace_overlay.toggle_replace_section()
 
-    def on_open_search_all_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_toggle_search_all_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        window.search_replace_all_view.open_search_view()
+
+        tab_page = window.search_replace_all_page
+        tab_view = window.search_replace_all_view
+
+        if window.sidebar_tab_view.get_selected_page() == tab_page:
+            tab_view.close_search_view()
+            window.sidebar_home_view.open_home_view()
+        else:
+            tab_view.open_search_view()
 
     def on_toggle_replace_all_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        window.search_replace_all_view.toggle_replace_section()
+        tab_view = window.search_replace_all_view
+        tab_view.toggle_replace_section()
 
-    def on_open_history_action(self, action: Gio.SimpleAction, *args) -> None:
-        window = self.get_active_window()
-        window.open_history.set_active(True)
+    def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
+        pass
 
     def on_file_opened(self, source: GObject.Object, file_path: str) -> None:
         if not file_path:

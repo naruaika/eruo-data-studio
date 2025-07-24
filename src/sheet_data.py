@@ -289,16 +289,18 @@ class SheetData(GObject.Object):
             if row >= 0: # skip the header row
                 if column_dtype in (polars.Date, polars.Datetime, polars.Time):
                     if column_dtype == polars.Date:
-                        new_value = datetime.strptime(new_value, '%Y-%m-%d').date()
+                        new_value = datetime.strptime(replace_with, '%Y-%m-%d').date()
                     elif column_dtype == polars.Datetime:
-                        new_value = datetime.strptime(new_value, '%Y-%m-%d %H:%M:%S')
+                        new_value = datetime.strptime(replace_with, '%Y-%m-%d %H:%M:%S')
                     else: # polars.Time
-                        new_value = datetime.strptime(new_value, '%H:%M:%S').time()
+                        new_value = datetime.strptime(replace_with, '%H:%M:%S').time()
                 else:
                     try:
                         new_value = polars.Series([replace_with]).cast(column_dtype)[0]
                     except Exception:
                         new_value = str(replace_with)
+            else:
+                new_value = replace_with
 
             # Update the entire column
             # FIXME: exclude the hidden row(s) from being updated

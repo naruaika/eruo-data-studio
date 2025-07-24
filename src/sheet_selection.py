@@ -98,6 +98,7 @@ class SheetSelection(GObject.Object):
 
     cell_name: str
     cell_data: str
+    cell_dtype: str
 
     current_active_range: SheetCell
     previous_active_range: SheetCell

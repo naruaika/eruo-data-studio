@@ -126,18 +126,9 @@ class SheetAutoFilter(SheetWidget):
 
         context.set_source_rgb(*background_color)
 
+        # Draw the background fill
         context.rectangle(x, y, self.width, self.height)
         context.fill()
-
-        if prefers_dark:
-            stroke_color = (0.25, 0.25, 0.25)
-        else:
-            stroke_color = (0.75, 0.75, 0.75)
-
-        context.set_source_rgb(*stroke_color)
-
-        context.rectangle(x, y, self.width, self.height)
-        context.stroke()
 
         stroke_color = (1.0, 1.0, 1.0)
         if prefers_dark:
@@ -146,6 +137,7 @@ class SheetAutoFilter(SheetWidget):
         context.set_source_rgb(*stroke_color)
         context.set_hairline(True)
 
+        # Draw the left diagonal line
         start_x = x + 3
         start_y = y + 4
         end_x = x + self.width / 2
@@ -153,6 +145,7 @@ class SheetAutoFilter(SheetWidget):
         context.move_to(start_x, start_y)
         context.line_to(end_x, end_y)
 
+        # Draw the right diagonal line
         start_x = x + self.width / 2
         start_y = y + self.height - 4
         end_x = x + self.width - 3

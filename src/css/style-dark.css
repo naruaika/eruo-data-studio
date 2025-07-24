@@ -1,5 +1,9 @@
 @import url('resource://com/macipra/eruo/base.css');
 
+.toolbar-view {
+    background-color: rgb(52, 52, 54);
+}
+
 .main-canvas {
     background-color: rgb(25, 25, 25);
 }

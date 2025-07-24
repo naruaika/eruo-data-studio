@@ -1,9 +1,48 @@
+.toolbar-tab button {
+    padding: 0 8px;
+    font-size: 12px;
+}
+
+.toolbar-view {
+    margin: 6px;
+    margin-top: 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px var(--headerbar-backdrop-color);
+    -gtk-icon-size: 20px;
+}
+.toolbar-view separator.vertical {
+    background-color: transparent;
+}
+.toolbar-view .linked > button {
+    padding-right: 2px;
+}
+.toolbar-view .linked > menubutton button {
+    padding: 0;
+    min-width: 12px;
+}
+
+.search-command-entry {
+    min-height: 28px;
+    font-size: 14px;
+    -gtk-icon-size: 12px;
+}
+
 .name-box {
     font-family: monospace;
 }
+
 .formula-bar {
     font-feature-settings: "tnum" 1;
 }
+.formula-bar-dtype {
+    margin-right: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    background: var(--view-bg-color);
+}
+
 .inline-formula {
     padding: 0 5px;
     font-size: 12px;
@@ -42,37 +81,50 @@
     border-radius: 12px;
 }
 
-.search-status {
+.status-text {
     font-size: 12px;
 }
-.search-status-button {
+.status-text-button {
     margin-top: -4px;
 }
 
-.search-result-cname {
+.sidebar-list-view {
+    padding: 6px;
+    background-color: inherit;
+    background-color: transparent;
+}
+.sidebar-list-view row {
+    padding: 4px;
+    padding-left: 12px;
+    border-radius: 12px;
+}
+.sidebar-list-view row:selected {
+    background-color: var(--card-bg-color);
+}
+.sidebar-list-view check {
+    background-color: transparent;
+}
+
+.sidebar-list-item-badge {
     padding: 2px 8px;
     border-radius: 18px;
     font-size: 12px;
     font-weight: bold;
     background: var(--view-bg-color);
 }
-.search-list-view {
-    padding: 6px;
-    background-color: inherit;
-}
-.search-list-view row {
-    padding: 4px;
-    padding-left: 12px;
-    border-radius: 12px;
-}
-.search-list-view row:selected {
-    background-color: var(--card-bg-color);
-}
 
-.filter-list-view {
+.sidebar-expander-row row {
     padding: 0;
 }
-.filter-list-view row {
+.sidebar-expander-row .view row {
+    padding: 1px 2px;
+}
+
+.sidebar-expander-row,
+.popover-list-view {
+    padding: 0;
+}
+.popover-list-view row {
     margin: 0;
     padding: 2px 4px;
     border-radius: 12px;

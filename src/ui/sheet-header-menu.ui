@@ -29,7 +29,7 @@
     </section>
     <section>
       <item>
-        <attribute name="label" translatable="yes">Reset All Filters</attribute>
+        <attribute name="label" translatable="yes">Clear All Filters</attribute>
         <attribute name="action">app.reset-all-filters</attribute>
       </item>
     </section>
@@ -170,7 +170,7 @@
             <property name="wrap-mode">word-char</property>
             <property name="max-width-chars">33</property>
             <style>
-              <class name="search-status"/>
+              <class name="status-text"/>
             </style>
           </object>
         </child>
@@ -192,7 +192,7 @@
                       </object>
                     </property>
                     <style>
-                      <class name="filter-list-view"/>
+                      <class name="popover-list-view"/>
                     </style>
                   </object>
                 </child>
@@ -207,7 +207,7 @@
                 <property name="visible">false</property>
                 <signal name="clicked" handler="on_filter_continue_button_clicked" swapped="no"/>
                 <style>
-                  <class name="search-status-button"/>
+                  <class name="status-text-button"/>
                 </style>
               </object>
             </child>

@@ -431,7 +431,10 @@ class FilterRowState(State):
         # Update row heights
         if self.rheights_path is not None:
             document.display.row_heights = polars.read_parquet(self.rheights_path).to_series(0)
-            document.display.cumulative_row_heights = polars.Series('crheights', document.display.row_heights).cum_sum()
+            row_heights_visible_only = document.display.row_heights
+            if len(document.display.row_visibility_flags):
+                row_heights_visible_only = row_heights_visible_only.filter(document.display.row_visibility_flags)
+            document.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
         else:
             document.display.row_heights = polars.Series(dtype=polars.UInt32)
             document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
@@ -487,7 +490,10 @@ class ResetFilterRowState(State):
         # Update row heights
         if self.rheights_path is not None:
             document.display.row_heights = polars.read_parquet(self.rheights_path).to_series(0)
-            document.display.cumulative_row_heights = polars.Series('crheights', document.display.row_heights).cum_sum()
+            row_heights_visible_only = document.display.row_heights
+            if len(document.display.row_visibility_flags):
+                row_heights_visible_only = row_heights_visible_only.filter(document.display.row_visibility_flags)
+            document.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
         else:
             document.display.row_heights = polars.Series(dtype=polars.UInt32)
             document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
@@ -504,7 +510,7 @@ class SortRowState(State):
     descending: bool
     dfi: int
 
-    file_path: str
+    rindex_path: str
     vflags_path: str
 
     def __init__(self, descending: bool, dfi: int, rindex: polars.DataFrame, vflags: polars.Series) -> None:
@@ -513,20 +519,32 @@ class SortRowState(State):
         self.descending = descending
         self.dfi = dfi
 
-        self.file_path = self.write_snapshot(polars.DataFrame(rindex))
+        self.rindex_path = self.write_snapshot(polars.DataFrame(rindex))
 
         self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags})) if vflags is not None else None
 
     def undo(self) -> None:
         document = globals.history.document
 
-        document.data.dfs[self.dfi].insert_column(0, polars.read_parquet(self.file_path).to_series(0))
+        document.data.dfs[self.dfi].insert_column(0, polars.read_parquet(self.rindex_path).to_series(0))
         document.data.sort_rows_from_metadata(0, self.dfi, False)
-        document.data.dfs[self.dfi].drop_in_place('$ridx')
 
+        # Update row visibility flags
         if self.vflags_path is not None:
             document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
             document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+
+        # Update row heights
+        if len(document.display.row_heights):
+            sorted_row_heights = polars.DataFrame({'rheights': document.display.row_heights[1:],
+                                                   '$ridx': document.data.dfs[self.dfi]['$ridx']}).sort('$ridx').to_series(0)
+            document.display.row_heights = polars.concat([polars.Series([True]), sorted_row_heights])
+            row_heights_visible_only = document.display.row_heights
+            if len(document.display.row_visibility_flags):
+                row_heights_visible_only = row_heights_visible_only.filter(document.display.row_visibility_flags)
+            document.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
+
+        document.data.dfs[self.dfi].drop_in_place('$ridx')
 
     def redo(self) -> None:
         document = globals.history.document
@@ -534,8 +552,8 @@ class SortRowState(State):
 
 
 
-class ConvertDataState(State):
-    __gtype_name__ = 'ConvertDataState'
+class ConvertColumnDataTypeState(State):
+    __gtype_name__ = 'ConvertColumnDataTypeState'
 
     before: polars.DataType
     after: polars.DataType
@@ -607,6 +625,27 @@ class ReplaceAllState(State):
         document.replace_all_in_current_table(self.search_pattern, self.replace_with, self.match_case,
                                               self.match_cell, self.within_selection, self.use_regexp)
 
+
+
+class ToggleColumnVisibilityState(State):
+    __gtype_name__ = 'ToggleColumnVisibilityState'
+
+    column: int
+    show: bool
+
+    def __init__(self, column: int, show: bool) -> None:
+        super().__init__()
+
+        self.column = column
+        self.show = show
+
+    def undo(self) -> None:
+        document = globals.history.document
+        document.toggle_column_visibility(self.column, not self.show)
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.toggle_column_visibility(self.column, self.show)
 
 
 class HistoryManager(GObject.Object):

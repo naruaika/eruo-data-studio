@@ -293,6 +293,7 @@ class SheetRenderer(GObject.Object):
                     and display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) \
                     and not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
                 double_lines = True
+                nrow_index += (len(display.row_visibility_flags) - 1) - (display.row_visible_series[-1] - 1)
 
             if double_lines:
                 context.move_to(0, y - 2)
@@ -334,11 +335,14 @@ class SheetRenderer(GObject.Object):
                     and display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) \
                     and not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 double_lines = True
+                ncol_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1)
+
+            vcol_index = display.get_vcolumn_from_column(ncol_index + 1)
 
             # Get the width of the next appearing column
             cell_width = display.DEFAULT_CELL_WIDTH
-            if ncol_index < len(display.column_widths):
-                cell_width = display.column_widths[ncol_index]
+            if vcol_index - 1 < len(display.column_widths):
+                cell_width = display.column_widths[vcol_index - 1]
 
             # Offset the first appearing column to account for the scroll position if necessary
             if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
@@ -414,10 +418,12 @@ class SheetRenderer(GObject.Object):
                     and not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
                 col_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1) - 1
 
+            vcol_index = display.get_vcolumn_from_column(col_index)
+
             # Get the width of the next appearing column
             cell_width = display.DEFAULT_CELL_WIDTH
-            if col_index - 1 < len(display.column_widths):
-                cell_width = display.column_widths[col_index - 1]
+            if vcol_index - 1 < len(display.column_widths):
+                cell_width = display.column_widths[vcol_index - 1]
 
             # Offset the first appearing column to account for the scroll position if necessary
             if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
@@ -428,14 +434,12 @@ class SheetRenderer(GObject.Object):
                     x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
                 x -= x_offset
 
-            vcol_index = display.get_vcolumn_from_column(col_index)
-
             # Draw dataframe header
             if len(data.bbs) and 0 < display.scroll_y_position and col_index <= data.bbs[0].column_span:
                 cname = data.dfs[0].columns[vcol_index - 1]
                 dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
                 layout.set_font_description(body_font_desc)
-                layout.set_text(f'{cname} ({dtype})', -1)
+                layout.set_text(f'{cname} [{dtype}]', -1)
                 x_text = x + display.DEFAULT_CELL_PADDING
 
             # Draw column name
@@ -597,13 +601,12 @@ class SheetRenderer(GObject.Object):
                 width = x # prevent iteration over empty cells
                 break
 
-            y = y_start
-            row_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
+            vcol_index = display.get_vcolumn_from_column(col_index + 1)
 
             # Get the width of the next appearing column
             cell_width = display.DEFAULT_CELL_WIDTH
-            if col_index < len(display.column_widths):
-                cell_width = display.column_widths[col_index]
+            if vcol_index - 1 < len(display.column_widths):
+                cell_width = display.column_widths[vcol_index - 1]
 
             # Offset the first appearing column to account for the scroll position if necessary
             if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
@@ -619,6 +622,9 @@ class SheetRenderer(GObject.Object):
             ccontext.save()
             ccontext.rectangle(x, display.column_header_height, cell_width - 1, height)
             ccontext.clip()
+
+            y = y_start
+            row_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
 
             while y < y_end:
                 if y < ny_start or ny_end < y or x < nx_start or nx_end < x:
@@ -641,7 +647,7 @@ class SheetRenderer(GObject.Object):
                         vcol_index = col_index
                     cname = data.dfs[0].columns[vcol_index]
                     dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index])
-                    cell_text = f'{cname} ({dtype})'
+                    cell_text = f'{cname} [{dtype}]'
                     layout.set_text(cell_text, -1)
 
                 # Draw dataframe content

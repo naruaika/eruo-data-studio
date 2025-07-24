@@ -112,7 +112,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
             insert_duplicate_delete_section.append_item(delete_menu_item)
 
             # Clear Contents
-            clear_contents_item = Gio.MenuItem.new(_('_Clear Contents'), 'app.clear-contents')
+            clear_contents_item = Gio.MenuItem.new(_('_Clear Content(s)'), 'app.clear-contents')
             insert_duplicate_delete_section.append_item(clear_contents_item)
 
             main_menu.append_section(None, insert_duplicate_delete_section)
@@ -133,7 +133,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
             delete_clear_section.append(_('Delete {:,} Column(s)').format(column_span), 'app.delete-column')
 
             # Clear Contents
-            delete_clear_section.append(_('_Clear Contents'), 'app.clear-contents')
+            delete_clear_section.append(_('_Clear Content(s)'), 'app.clear-contents')
 
             main_menu.append_section(None, insert_duplicate_section)
             main_menu.append_section(None, delete_clear_section)
@@ -154,7 +154,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
             delete_clear_section.append(_('Delete {:,} Row(s)').format(row_span), 'app.delete-row')
 
             # Clear Contents
-            delete_clear_section.append(_('_Clear Contents'), 'app.clear-contents')
+            delete_clear_section.append(_('_Clear Content(s)'), 'app.clear-contents')
 
             main_menu.append_section(None, insert_duplicate_section)
             main_menu.append_section(None, delete_clear_section)

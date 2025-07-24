@@ -181,7 +181,7 @@ class SearchReplaceAllView(Gtk.Box):
 
     def open_search_view(self) -> None:
         self.window.split_view.set_collapsed(False)
-        self.window.open_search_all.set_active(True)
+        self.window.toggle_search_all.set_active(True)
         self.window.toggle_sidebar.set_active(True)
 
         if self.search_results_length == 0:
@@ -266,8 +266,6 @@ class SearchReplaceAllView(Gtk.Box):
         self.search_status.set_visible(False)
 
     def close_search_view(self) -> None:
-        self.window.split_view.set_collapsed(True)
-        self.window.open_search_all.remove_css_class('raised')
-        self.window.toggle_sidebar.set_active(False)
+        self.window.toggle_search_all.set_active(False)
 
         globals.is_searching_cells = False

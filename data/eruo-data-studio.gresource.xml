@@ -8,6 +8,7 @@
     <file preprocess="xml-stripblanks">ui/file-save-as-parquet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/search-replace-all-view.ui</file>
     <file preprocess="xml-stripblanks">ui/search-replace-overlay.ui</file>
+    <file preprocess="xml-stripblanks">ui/sidebar-home-view.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-header-menu.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/window.ui</file>
@@ -20,5 +21,19 @@
     <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
     <file preprocess="xml-stripblanks">regex-symbolic.svg</file>
+
+    <!-- Carbon Design System -->
+    <file preprocess="xml-stripblanks">undo-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">redo-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">cut-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">copy-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">paste-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">row-insert-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">column-insert-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">row-delete-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">column-delete-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">erase-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">search-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">chevron-down-symbolic.svg</file>
   </gresource>
 </gresources>

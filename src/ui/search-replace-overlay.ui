@@ -20,7 +20,7 @@
             <property name="halign">start</property>
             <property name="label">Showing 0 of 0</property>
             <style>
-              <class name="search-status"/>
+              <class name="status-text"/>
             </style>
           </object>
         </child>

@@ -37,11 +37,12 @@ class Window(Adw.ApplicationWindow):
     toggle_sidebar = Gtk.Template.Child()
     sidebar_tab_view = Gtk.Template.Child()
 
-    open_search_all = Gtk.Template.Child()
-    open_history = Gtk.Template.Child()
+    toggle_search_all = Gtk.Template.Child()
+    toggle_history = Gtk.Template.Child()
 
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
+    formula_bar_dtype = Gtk.Template.Child()
     inline_formula = Gtk.Template.Child()
 
     toast_overlay = Gtk.Template.Child()
@@ -61,6 +62,11 @@ class Window(Adw.ApplicationWindow):
         from .search_replace_overlay import SearchReplaceOverlay
         self.search_replace_overlay = SearchReplaceOverlay(self)
         self.content_overlay.add_overlay(self.search_replace_overlay)
+
+        from .sidebar_home_view import SidebarHomeView
+        self.sidebar_home_view = SidebarHomeView(self)
+        self.sidebar_home_page = self.sidebar_tab_view.append(self.sidebar_home_view)
+        self.sidebar_tab_view.set_selected_page(self.sidebar_home_page)
 
         from .search_replace_all_view import SearchReplaceAllView
         self.search_replace_all_view = SearchReplaceAllView(self)
@@ -114,6 +120,10 @@ class Window(Adw.ApplicationWindow):
             sheet_name = os.path.basename(file.get_path())
         sheet_view = self.sheet_manager.create_sheet(dataframe, sheet_name)
         self.add_new_tab(sheet_view)
+
+        # Populate the field list
+        if file is not None:
+            self.sidebar_home_view.repopulate_field_list()
 
     def get_current_active_view(self) -> SheetView:
         tab_page = self.tab_view.get_selected_page()
@@ -363,11 +373,14 @@ class Window(Adw.ApplicationWindow):
         if len(self.sheet_manager.sheets) == 0:
             self.name_box.set_sensitive(False)
             self.formula_bar.set_sensitive(False)
-            self.update_inputbar('', '')
+            self.update_inputbar()
             self.grab_focus()
 
-    def on_selection_changed(self, source: GObject.Object, sel_name: str, sel_value: str) -> None:
-        self.update_inputbar(sel_name, sel_value)
+    def on_selection_changed(self, source: GObject.Object) -> None:
+        self.reset_inputbar()
+
+    def on_columns_changed(self, source: GObject.Object, dfi: int) -> None:
+        self.sidebar_home_view.repopulate_field_list(dfi)
 
     def on_inline_formula_opened(self, source: GObject.Object, sel_value: str) -> None:
         globals.is_editing_cells = True
@@ -482,9 +495,15 @@ class Window(Adw.ApplicationWindow):
         tab_page = self.tab_view.append(sheet_view)
         tab_page.set_title(sheet_view.document.title)
 
+        # Shrink the tab box size
+        # self.tab_bar.get_first_child().get_first_child().get_first_child() \
+        #             .get_next_sibling().get_next_sibling().get_first_child() \
+        #             .set_halign(Gtk.Align.START)
+
         # Setup proper handling of signals and bindings
         tab_page.bind_property('title', sheet_view.document, 'title', GObject.BindingFlags.BIDIRECTIONAL)
         sheet_view.document.connect('selection-changed', self.on_selection_changed)
+        sheet_view.document.connect('columns-changed', self.on_columns_changed)
         sheet_view.document.connect('open-context-menu', self.on_context_menu_opened)
         sheet_view.document.view.connect('open-inline-formula', self.on_inline_formula_opened)
         sheet_view.document.view.connect('open-context-menu', self.on_context_menu_opened)
@@ -503,7 +522,7 @@ class Window(Adw.ApplicationWindow):
 
         # Empty the input bar when no sheet is open
         if tab_page is None:
-            self.update_inputbar('', '')
+            self.update_inputbar()
             return
 
         sheet_document = self.get_current_active_document()
@@ -511,14 +530,21 @@ class Window(Adw.ApplicationWindow):
         # Reset the input bar to represent the current selection
         cell_name = sheet_document.selection.cell_name
         cell_data = sheet_document.selection.cell_data
+        cell_dtype = sheet_document.selection.cell_dtype
         if cell_data is None:
             cell_data = ''
         cell_data = str(cell_data)
-        self.update_inputbar(cell_name, cell_data)
+        self.update_inputbar(cell_name, cell_data, cell_dtype)
 
-    def update_inputbar(self, sel_name: str, sel_value: str) -> None:
+    def update_inputbar(self, sel_name: str = '', sel_value: str = '', sel_dtype: str = None) -> None:
         self.name_box.set_text(sel_name)
         self.formula_bar.set_text(sel_value)
+
+        if sel_dtype is not None:
+            self.formula_bar_dtype.set_text(sel_dtype)
+            self.formula_bar_dtype.set_visible(True)
+        else:
+            self.formula_bar_dtype.set_visible(False)
 
     def do_toggle_sidebar(self) -> None:
         # Close the sidebar when it's already open

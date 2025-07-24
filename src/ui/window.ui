@@ -19,10 +19,10 @@
                 <child type="top">
                   <object class="AdwHeaderBar">
                     <child type="start">
-                      <object class="GtkToggleButton" id="open_search_all">
+                      <object class="GtkToggleButton" id="toggle_search_all">
                         <property name="icon-name">edit-find-symbolic</property>
                         <property name="tooltip-text" translatable="yes">Search (Shift+Ctrl+F)</property>
-                        <property name="action-name">app.open-search-all</property>
+                        <property name="action-name">app.toggle-search-all</property>
                       </object>
                     </child>
                     <property name="title-widget">
@@ -35,10 +35,10 @@
                       </object>
                     </property>
                     <child type="end">
-                      <object class="GtkToggleButton" id="open_history">
+                      <object class="GtkToggleButton" id="toggle_history">
                         <property name="icon-name">history-undo-symbolic</property>
                         <property name="tooltip-text" translatable="yes">History</property>
-                        <property name="action-name">app.open-history</property>
+                        <property name="action-name">app.toggle-history</property>
                       </object>
                     </child>
                   </object>
@@ -64,47 +64,97 @@
                 <child type="top">
                   <object class="AdwHeaderBar">
                     <child type="start">
-                      <object class="GtkToggleButton" id="toggle_sidebar">
-                        <property name="icon-name">sidebar-show-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">Toggle Sidebar</property>
-                        <property name="action-name">app.toggle-sidebar</property>
-                      </object>
-                    </child>
-                    <property name="title-widget">
                       <object class="GtkBox">
                         <property name="orientation">horizontal</property>
-                        <property name="margin-start">30</property>
-                        <property name="margin-end">30</property>
-                        <property name="spacing">6</property>
+                        <property name="spacing">10</property>
                         <child>
-                          <object class="GtkEntry" id="name_box">
-                            <property name="tooltip-text">Name Box</property>
-                            <property name="halign">fill</property>
-                            <signal name="activate" handler="on_name_box_activated" swapped="no" />
-                            <style>
-                              <class name="name-box"/>
-                            </style>
+                          <object class="GtkToggleButton" id="toggle_sidebar">
+                            <property name="icon-name">sidebar-show-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Toggle Sidebar</property>
+                            <property name="action-name">app.toggle-sidebar</property>
                           </object>
                         </child>
                         <child>
-                          <object class="GtkEntry" id="formula_bar">
-                            <property name="tooltip-text">Formula Bar</property>
-                            <property name="halign">fill</property>
-                            <property name="hexpand">True</property>
-                            <signal name="activate" handler="on_formula_bar_activated" swapped="no" />
+                          <object class="GtkBox">
+                            <property name="orientation">horizontal</property>
+                            <property name="valign">center</property>
+                            <property name="spacing">3</property>
+                            <child>
+                              <object class="GtkToggleButton" id="home_toggle_button">
+                                <property name="label">Home</property>
+                                <property name="active">true</property>
+                                <style>
+                                  <class name="flat"/>
+                                </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkToggleButton" id="insert_toggle_button">
+                                <property name="label">Insert</property>
+                                <property name="group">home_toggle_button</property>
+                                <style>
+                                  <class name="flat"/>
+                                </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkToggleButton" id="formulas_toggle_button">
+                                <property name="label">Formulas</property>
+                                <property name="group">home_toggle_button</property>
+                                <style>
+                                  <class name="flat"/>
+                                </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkToggleButton" id="data_toggle_button">
+                                <property name="label">Data</property>
+                                <property name="group">home_toggle_button</property>
+                                <style>
+                                  <class name="flat"/>
+                                </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkToggleButton" id="view_toggle_button">
+                                <property name="label">View</property>
+                                <property name="group">home_toggle_button</property>
+                                <style>
+                                  <class name="flat"/>
+                                </style>
+                              </object>
+                            </child>
                             <style>
-                              <class name="formula-bar"/>
+                              <class name="toolbar-tab"/>
                             </style>
                           </object>
                         </child>
                       </object>
-                    </property>
+                    </child>
+                    <property name="show-title">false</property>
                     <child type="end">
-                      <object class="GtkMenuButton">
-                        <property name="primary">true</property>
-                        <property name="icon-name">open-menu-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">Main Menu</property>
-                        <property name="menu-model">primary_menu</property>
+                      <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">10</property>
+                        <child>
+                          <object class="GtkEntry" id="search_command_entry">
+                            <property name="valign">center</property>
+                            <property name="placeholder-text">Search</property>
+                            <property name="primary-icon-name">edit-find-symbolic</property>
+                            <property name="visible">false</property>
+                            <style>
+                              <class name="search-command-entry"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkMenuButton">
+                            <property name="primary">true</property>
+                            <property name="icon-name">open-menu-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Main Menu</property>
+                            <property name="menu-model">primary_menu</property>
+                          </object>
+                        </child>
                       </object>
                     </child>
                   </object>
@@ -114,6 +164,244 @@
                     <child>
                       <object class="GtkBox">
                         <property name="orientation">vertical</property>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">horizontal</property>
+                            <child>
+                              <object class="GtkScrolledWindow">
+                                <property name="vscrollbar-policy">never</property>
+                                <property name="hscrollbar-policy">external</property>
+                                <property name="hexpand">true</property>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">horizontal</property>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">undo-symbolic</property>
+                                        <property name="tooltip-text">Undo (Ctrl+Z)</property>
+                                        <property name="action-name">app.undo</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">redo-symbolic</property>
+                                        <property name="tooltip-text">Redo (Shift+Ctrl+Z)</property>
+                                        <property name="action-name">app.redo</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkSeparator">
+                                        <property name="orientation">vertical</property>
+                                        <property name="margin-top">6</property>
+                                        <property name="margin-bottom">6</property>
+                                        <property name="margin-start">6</property>
+                                        <property name="margin-end">6</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">cut-symbolic</property>
+                                        <property name="tooltip-text">Cut (Ctrl+X)</property>
+                                        <property name="action-name">app.cut</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">copy-symbolic</property>
+                                        <property name="tooltip-text">Copy (Ctrl+C)</property>
+                                        <property name="action-name">app.copy</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">paste-symbolic</property>
+                                        <property name="tooltip-text">Paste (Ctrl+V)</property>
+                                        <property name="action-name">app.paste</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkSeparator">
+                                        <property name="orientation">vertical</property>
+                                        <property name="margin-top">6</property>
+                                        <property name="margin-bottom">6</property>
+                                        <property name="margin-start">6</property>
+                                        <property name="margin-end">6</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="orientation">horizontal</property>
+                                        <child>
+                                          <object class="GtkButton">
+                                            <property name="icon-name">row-insert-symbolic</property>
+                                            <property name="tooltip-text">Insert Row(s) Above</property>
+                                            <property name="action-name">app.insert-row-above</property>
+                                            <style>
+                                              <class name="flat"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child>
+                                          <object class="GtkMenuButton">
+                                            <property name="icon-name">chevron-down-symbolic</property>
+                                            <property name="tooltip-text" translatable="yes">More Options</property>
+                                            <property name="menu-model">home_row_menu</property>
+                                            <style>
+                                              <class name="flat"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <style>
+                                          <class name="linked"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="orientation">horizontal</property>
+                                        <child>
+                                          <object class="GtkButton">
+                                            <property name="icon-name">column-insert-symbolic</property>
+                                            <property name="tooltip-text">Insert Column(s) Right</property>
+                                            <property name="action-name">app.insert-column-right</property>
+                                            <style>
+                                              <class name="flat"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child>
+                                          <object class="GtkMenuButton">
+                                            <property name="icon-name">chevron-down-symbolic</property>
+                                            <property name="tooltip-text" translatable="yes">More Options</property>
+                                            <property name="menu-model">home_column_menu</property>
+                                            <style>
+                                              <class name="flat"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <style>
+                                          <class name="linked"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">row-delete-symbolic</property>
+                                        <property name="tooltip-text">Delete Row(s)</property>
+                                        <property name="action-name">app.delete-row</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">column-delete-symbolic</property>
+                                        <property name="tooltip-text">Delete Column(s)</property>
+                                        <property name="action-name">app.delete-column</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkSeparator">
+                                        <property name="orientation">vertical</property>
+                                        <property name="margin-top">6</property>
+                                        <property name="margin-bottom">6</property>
+                                        <property name="margin-start">6</property>
+                                        <property name="margin-end">6</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">erase-symbolic</property>
+                                        <property name="tooltip-text">Clear Content(s)</property>
+                                        <property name="action-name">app.clear-contents</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
+                                        <property name="icon-name">search-symbolic</property>
+                                        <property name="tooltip-text">Open Search</property>
+                                        <property name="action-name">app.open-search</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <style>
+                              <class name="toolbar-view"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-start">6</property>
+                            <property name="margin-end">6</property>
+                            <property name="margin-bottom">6</property>
+                            <child>
+                              <object class="GtkEntry" id="name_box">
+                                <property name="tooltip-text">Name Box</property>
+                                <property name="halign">fill</property>
+                                <signal name="activate" handler="on_name_box_activated" swapped="no" />
+                                <style>
+                                  <class name="name-box"/>
+                                </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkOverlay">
+                                <child>
+                                  <object class="GtkEntry" id="formula_bar">
+                                    <property name="tooltip-text">Formula Bar</property>
+                                    <property name="halign">fill</property>
+                                    <property name="hexpand">True</property>
+                                    <signal name="activate" handler="on_formula_bar_activated" swapped="no" />
+                                    <style>
+                                      <class name="formula-bar"/>
+                                    </style>
+                                  </object>
+                                </child>
+                                <child type="overlay">
+                                  <object class="GtkLabel" id="formula_bar_dtype">
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="label">text</property>
+                                    <property name="visible">false</property>
+                                    <style>
+                                      <class name="formula-bar-dtype"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
                         <child>
                           <object class="GtkSeparator">
                             <property name="orientation">horizontal</property>
@@ -236,6 +524,50 @@
       <item>
         <attribute name="label" translatable="yes">_Quit</attribute>
         <attribute name="action">app.quit</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="home_row_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Insert Row(s) _Above</attribute>
+        <attribute name="action">app.insert-row-above</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Insert Row(s) _Below</attribute>
+        <attribute name="action">app.insert-row-below</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Duplicate Row(s) _Above</attribute>
+        <attribute name="action">app.duplicate-to-above</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Duplicate Row(s) _Below</attribute>
+        <attribute name="action">app.duplicate-to-below</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="home_column_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Insert Column(s) _Left</attribute>
+        <attribute name="action">app.insert-column-left</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Insert Column(s) _Right</attribute>
+        <attribute name="action">app.insert-column-right</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Duplicate Column(s) _Left</attribute>
+        <attribute name="action">app.duplicate-to-left</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Duplicate Column(s) _Right</attribute>
+        <attribute name="action">app.duplicate-to-right</attribute>
       </item>
     </section>
   </menu>

@@ -102,7 +102,7 @@
         <property name="visible">false</property>
         <property name="wrap">true</property>
         <style>
-          <class name="search-status"/>
+          <class name="status-text"/>
         </style>
       </object>
     </child>
@@ -151,7 +151,7 @@
               </lookup>
             </binding>
             <style>
-              <class name="search-result-cname"/>
+              <class name="sidebar-list-item-badge"/>
               <class name="monospace"/>
             </style>
           </object>
@@ -164,7 +164,7 @@
               </object>
             </property>
             <style>
-              <class name="search-list-view"/>
+              <class name="sidebar-list-view"/>
             </style>
           </object>
         </child>
