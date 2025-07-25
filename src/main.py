@@ -52,6 +52,7 @@ class Application(Adw.Application):
         self.create_action('save', self.on_save_file_action, ['<primary>s'])
         self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
         self.create_action('open-search', self.on_open_search_action, ['<primary>f'])
+        self.create_action('open-sort-filter', self.on_open_sort_filter_action)
         self.create_action('toggle-replace', self.on_toggle_replace_action, ['<primary>h'])
         self.create_action('toggle-search-all', self.on_toggle_search_all_action, ['<primary><shift>f'])
         self.create_action('toggle-replace-all', self.on_toggle_replace_all_action, ['<primary><shift>h'])
@@ -168,10 +169,18 @@ class Application(Adw.Application):
 
         self.file_manager.save_as_file(window)
 
-    # Weird naming, because this function only handles the opening of the search box
     def on_open_search_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
         window.search_replace_overlay.open_search_box()
+
+    def on_open_sort_filter_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+
+        # Close all possible views on the sidebar to reveal the home view
+        window.search_replace_all_view.close_search_view()
+
+        # Open the home view
+        window.sidebar_home_view.open_home_view()
 
     def on_toggle_replace_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()

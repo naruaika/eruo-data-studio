@@ -341,6 +341,16 @@
                                     </child>
                                     <child>
                                       <object class="GtkButton">
+                                        <property name="icon-name">filter-symbolic</property>
+                                        <property name="tooltip-text">Open Sort &amp; Filter</property>
+                                        <property name="action-name">app.open-sort-filter</property>
+                                        <style>
+                                          <class name="flat"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton">
                                         <property name="icon-name">search-symbolic</property>
                                         <property name="tooltip-text">Open Search</property>
                                         <property name="action-name">app.open-search</property>
