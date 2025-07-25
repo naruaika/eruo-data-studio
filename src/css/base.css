@@ -95,10 +95,13 @@
 .sidebar-expander-row .sidebar-list-view > row {
     padding: 1px 2px;
 }
-.sidebar-expander-row listview header {
+.sidebar-expander-row listview > header {
     padding: 1px 3px;
     padding-bottom: 3px;
     font-size: 12px;
+}
+.sidebar-expander-row listview > row {
+    border-radius: 12px;
 }
 
 .sidebar-list-view {
@@ -125,7 +128,8 @@
     background-color: transparent;
 }
 .sidebar-list-view-box dropdown .toggle {
-    padding: 2px 8px;
+    font-weight: normal;
+    padding: 2px 4px 2px 8px;
 }
 .sidebar-list-view-box .image-button {
     padding: 1px;

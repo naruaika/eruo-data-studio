@@ -113,7 +113,7 @@
                         <child>
                           <object class="GtkBox">
                             <property name="orientation">horizontal</property>
-                            <property name="margin-top">3</property>
+                            <property name="margin-top">6</property>
                             <property name="margin-bottom">3</property>
                             <property name="margin-start">3</property>
                             <property name="margin-end">3</property>
@@ -129,15 +129,24 @@
                               </object>
                             </child>
                             <child>
+                              <object class="GtkBox">
+                                <property name="hexpand">true</property>
+                              </object>
+                            </child>
+                            <child>
                               <object class="GtkButton">
                                 <property name="icon-name">checkmark-symbolic</property>
                                 <property name="tooltip-text">Apply sort</property>
                                 <signal name="clicked" handler="on_apply_sort_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="flat"/>
-                                  <class name="success"/>
                                   <class name="status-text-button"/>
                                 </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="margin-end">34</property>
                               </object>
                             </child>
                           </object>

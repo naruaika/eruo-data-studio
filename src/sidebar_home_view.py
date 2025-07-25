@@ -28,7 +28,7 @@ class FieldListItem(GObject.Object):
     __gtype_name__ = 'FieldListItem'
 
     cindex = GObject.Property(type=int, default=1)
-    cname = GObject.Property(type=str, default='[Blank]')
+    cname = GObject.Property(type=str, default='column_1')
     dtype = GObject.Property(type=str, default='text')
     active = GObject.Property(type=bool, default=True)
 
@@ -200,7 +200,7 @@ class SidebarHomeView(Adw.Bin):
         label.set_label('Order')
         subbox.append(label)
 
-        # Setup add button
+        # Add a spacer to the right
         spacer = Gtk.Box()
         spacer.set_margin_end(28)
         box.append(spacer)
@@ -362,7 +362,6 @@ class SidebarHomeView(Adw.Bin):
         delete_button.set_icon_name('user-trash-symbolic')
         delete_button.set_tooltip_text('Delete sort')
         delete_button.add_css_class('flat')
-        delete_button.add_css_class('destructive-action')
         delete_button.set_margin_end(2)
         box.append(delete_button)
 
