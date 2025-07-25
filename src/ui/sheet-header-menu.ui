@@ -24,7 +24,7 @@
       </item>
       <item>
         <attribute name="label" translatable="yes">Custom Filter...</attribute>
-        <attribute name="action">app.open-custom-filter</attribute>
+        <attribute name="action">app.open-sort-filter</attribute>
       </item>
     </section>
     <section>

@@ -1096,8 +1096,7 @@ class SheetDocument(GObject.Object):
             self.current_sorts = self.pending_sorts
         else:
             column_name = self.data.dfs[mdfi].columns[mcolumn]
-            self.current_sorts = {column_name: {'cindex': active.metadata.column,
-                                                'descending': descending}}
+            self.current_sorts = {column_name: {'descending': descending}}
         self.pending_sorts = {}
 
         success = False

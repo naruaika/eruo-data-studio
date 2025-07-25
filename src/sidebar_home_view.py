@@ -71,6 +71,8 @@ class SidebarHomeView(Adw.Bin):
     sort_list_view = Gtk.Template.Child()
     sort_list_store = Gtk.Template.Child()
 
+    filter_list_status = Gtk.Template.Child()
+
     def __init__(self, window: Window, **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -101,6 +103,9 @@ class SidebarHomeView(Adw.Bin):
         factory.connect('bind', self.bind_factory_sort)
         factory.connect('teardown', self.teardown_factory_sort)
         self.sort_list_view.set_factory(factory)
+
+        # Setup the filter section
+        self.filter_list_status.get_parent().set_activatable(False)
 
     def setup_factory_field(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
         check_button = Gtk.CheckButton()
@@ -425,9 +430,10 @@ class SidebarHomeView(Adw.Bin):
         self.sort_list_store.remove_all()
 
         document = self.window.get_current_active_document()
+        column_names = document.data.dfs[dfi].columns
 
         for cname in document.current_sorts:
-            cindex = document.current_sorts[cname]['cindex']
+            cindex = column_names.index(cname)
             descending = document.current_sorts[cname]['descending']
             order = 'Descending' if descending else 'Ascending'
             self.sort_list_store.append(SortListItem(cindex, cname, order))
