@@ -21,6 +21,7 @@
     <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
     <file preprocess="xml-stripblanks">regex-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">checkmark-symbolic.svg</file>
 
     <!-- Carbon Design System -->
     <file preprocess="xml-stripblanks">undo-symbolic.svg</file>

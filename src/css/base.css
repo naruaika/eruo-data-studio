@@ -1,3 +1,5 @@
+/* TOOLBAR */
+
 .toolbar-tab button {
     padding: 0 8px;
     font-size: 12px;
@@ -19,12 +21,6 @@
 .toolbar-view .linked > menubutton button {
     padding: 0;
     min-width: 12px;
-}
-
-.search-command-entry {
-    min-height: 28px;
-    font-size: 14px;
-    -gtk-icon-size: 12px;
 }
 
 .name-box {
@@ -51,6 +47,8 @@
     font-feature-settings: "tnum" 1;
 }
 
+/* TABVIEW */
+
 .tab-view scrollbar.vertical {
     padding-left: 5px;
     margin-bottom: 24px;
@@ -60,13 +58,15 @@
     margin-right: 24px;
 }
 
+/* POPOVER */
+
 .context-menu {
     font-size: 14px;
 }
 .context-menu entry,
 .context-menu button,
-.context-menu .text-button,
-.context-menu modelbutton {
+.context-menu modelbutton,
+.context-menu .text-button {
     min-height: 28px;
     padding: 0 8px;
 }
@@ -74,35 +74,72 @@
     padding: 0 4px;
 }
 
-.search-box {
-    padding: 6px;
-    background-color: var(--popover-bg-color);
-    box-shadow: 0 0 40px var(--popover-shade-color);
+.popover-list-view {
+    padding: 0;
+}
+.popover-list-view row {
+    margin: 0;
+    padding: 2px 4px;
     border-radius: 12px;
 }
 
-.status-text {
-    font-size: 12px;
+/* SIDEBAR */
+
+.sidebar-expander-row,
+.sidebar-expander-row > row {
+    padding: 0;
 }
-.status-text-button {
-    margin-top: -4px;
+.sidebar-expander-row .sidebar-list-view {
+    padding: 4px;
+}
+.sidebar-expander-row .sidebar-list-view > row {
+    padding: 1px 2px;
+}
+.sidebar-expander-row listview header {
+    padding: 1px 3px;
+    padding-bottom: 3px;
+    font-size: 12px;
 }
 
 .sidebar-list-view {
     padding: 6px;
-    background-color: inherit;
     background-color: transparent;
 }
-.sidebar-list-view row {
+.sidebar-list-view > row {
     padding: 4px;
     padding-left: 12px;
     border-radius: 12px;
 }
-.sidebar-list-view row:selected {
+.sidebar-list-view > row:selected {
     background-color: var(--card-bg-color);
 }
 .sidebar-list-view check {
     background-color: transparent;
+}
+
+.sidebar-list-view-box {
+    padding: 2px;
+    background-color: transparent;
+}
+.sidebar-list-view-box > row:selected {
+    background-color: transparent;
+}
+.sidebar-list-view-box dropdown .toggle {
+    padding: 2px 8px;
+}
+.sidebar-list-view-box .image-button {
+    padding: 1px;
+    -gtk-icon-size: 14px;
+}
+.sidebar-list-view-box .image-button,
+.sidebar-expander-row .status-text-button,
+.sidebar-expander-row .status-text .image-button {
+    padding: 1px;
+    -gtk-icon-size: 14px;
+}
+.sidebar-list-view-box popover row {
+    padding: 4px 8px;
+    border-radius: 12px;
 }
 
 .sidebar-list-item-badge {
@@ -113,44 +150,41 @@
     background: var(--view-bg-color);
 }
 
-.sidebar-expander-row row {
-    padding: 0;
-}
-.sidebar-expander-row .view row {
-    padding: 1px 2px;
-}
+/* CUSTOMS */
 
-.sidebar-expander-row,
-.popover-list-view {
-    padding: 0;
-}
-.popover-list-view row {
-    margin: 0;
-    padding: 2px 4px;
+.search-box {
+    padding: 6px;
+    background-color: var(--popover-bg-color);
+    box-shadow: 0 0 40px var(--popover-shade-color);
     border-radius: 12px;
 }
 
-@keyframes slide-up-animation {
-    from {
-        transform: translateY(200px);
-    }
-    to {
-        transform: translateY(0);
-    }
+.search-command-entry {
+    min-height: 28px;
+    font-size: 14px;
+    -gtk-icon-size: 12px;
 }
+
+.status-text {
+    font-size: 12px;
+}
+.status-text-button {
+    margin-top: -4px;
+}
+
+/* ANIMATIONS */
+
 .slide-up-dialog {
     animation: slide-up-animation 0.2s ease-out forwards;
 }
-
-@keyframes slide-down-animation {
-    from {
-        transform: translateY(0);
-    }
-    to {
-        transform: translateY(200px);
-
-    }
-}
 .slide-down-dialog {
     animation: slide-down-animation 0.2s ease-out forwards;
+}
+@keyframes slide-up-animation {
+    from { transform: translateY(200px); }
+    to { transform: translateY(0); }
+}
+@keyframes slide-down-animation {
+    from { transform: translateY(0); }
+    to { transform: translateY(200px); }
 }

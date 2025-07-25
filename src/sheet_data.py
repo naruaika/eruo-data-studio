@@ -549,12 +549,18 @@ class SheetData(GObject.Object):
         return polars.concat([polars.Series([True]), # for header row
                               self.dfs[dfi].with_columns(filter_expression.alias('$vrow'))['$vrow']])
 
-    def sort_rows_from_metadata(self, column: int, dfi: int, descending: bool = False) -> bool:
+    def sort_rows_from_metadata(self, sorts: dict, dfi: int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        column_name = self.dfs[dfi].columns[column]
-        self.dfs[dfi] = self.dfs[dfi].sort(column_name, descending=descending, nulls_last=True)
+        sort_cnames = []
+        sort_descendings = []
+
+        for column_name in sorts:
+            sort_cnames.append(column_name)
+            sort_descendings.append(sorts[column_name]['descending'])
+
+        self.dfs[dfi] = self.dfs[dfi].sort(sort_cnames, descending=sort_descendings, nulls_last=True)
 
         return True
 

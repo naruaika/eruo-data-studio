@@ -16,7 +16,7 @@
             <child>
               <object class="AdwPreferencesGroup">
                 <child>
-                  <object class="AdwExpanderRow" id="field_section">
+                  <object class="AdwExpanderRow">
                     <property name="title">Fields</property>
                     <property name="subtitle">Manage which fields are visible</property>
                     <child>
@@ -58,17 +58,114 @@
               <object class="AdwPreferencesGroup">
                 <child>
                   <object class="AdwExpanderRow">
-                    <property name="title">Sort &amp;amp; Filter</property>
-                    <property name="subtitle">Manage how data is displayed</property>
+                    <property name="title">Sorts</property>
+                    <property name="subtitle">Manage how row data is sorted</property>
                     <property name="activatable">false</property>
                     <property name="selectable">false</property>
                     <child>
-                      <object class="GtkLabel" id="sort_filter_status">
+                      <object class="GtkBox" id="sort_list_status">
+                        <property name="orientation">horizontal</property>
+                        <property name="margin-top">3</property>
+                        <property name="margin-bottom">3</property>
+                        <property name="margin-start">6</property>
+                        <property name="margin-end">6</property>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="halign">start</property>
+                            <property name="hexpand">true</property>
+                            <property name="label">No sorts added</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton">
+                            <property name="margin-end">1</property>
+                            <property name="icon-name">list-add-symbolic</property>
+                            <property name="tooltip-text">Add sort</property>
+                            <signal name="clicked" handler="on_add_sort_button_clicked" swapped="no"/>
+                            <style>
+                              <class name="flat"/>
+                            </style>
+                          </object>
+                        </child>
+                        <style>
+                          <class name="status-text"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox" id="sort_list_view_box">
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="GtkListView" id="sort_list_view">
+                            <property name="single-click-activate">true</property>
+                            <property name="model">
+                              <object class="GtkSingleSelection">
+                                <property name="model">
+                                  <object class="GListStore" id="sort_list_store"/>
+                                </property>
+                              </object>
+                            </property>
+                            <style>
+                              <class name="sidebar-list-view-box"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">horizontal</property>
+                            <property name="margin-top">3</property>
+                            <property name="margin-bottom">3</property>
+                            <property name="margin-start">3</property>
+                            <property name="margin-end">3</property>
+                            <child>
+                              <object class="GtkButton">
+                                <property name="icon-name">list-add-symbolic</property>
+                                <property name="tooltip-text">Add sort</property>
+                                <signal name="clicked" handler="on_add_sort_button_clicked" swapped="no"/>
+                                <style>
+                                  <class name="flat"/>
+                                  <class name="status-text-button"/>
+                                </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkButton">
+                                <property name="icon-name">checkmark-symbolic</property>
+                                <property name="tooltip-text">Apply sort</property>
+                                <signal name="clicked" handler="on_apply_sort_button_clicked" swapped="no"/>
+                                <style>
+                                  <class name="flat"/>
+                                  <class name="success"/>
+                                  <class name="status-text-button"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <style>
+                      <class name="sidebar-expander-row"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup">
+                <child>
+                  <object class="AdwExpanderRow">
+                    <property name="title">Filters</property>
+                    <property name="subtitle">Manage how row data is filtered</property>
+                    <property name="activatable">false</property>
+                    <property name="selectable">false</property>
+                    <child>
+                      <object class="GtkLabel" id="filter_list_status">
                         <property name="margin-top">6</property>
                         <property name="margin-bottom">6</property>
                         <property name="margin-start">12</property>
                         <property name="margin-end">12</property>
-                        <property name="label">No sort &amp; filter available</property>
+                        <property name="label">No filters added</property>
                         <property name="halign">start</property>
                         <style>
                           <class name="status-text"/>

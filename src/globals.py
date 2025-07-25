@@ -34,6 +34,10 @@ history: HistoryManager = None
 is_changing_state: bool = False
 
 
+# Useful to break the event loop when refreshing UIs
+is_refreshing_uis: bool = False
+
+
 # The idea is to make the current active window to behave in a
 # certain way, e.g. when editing cells and the user wants to do
 # a vlookup to another window, the current window should show

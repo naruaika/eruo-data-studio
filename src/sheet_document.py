@@ -33,6 +33,7 @@ class SheetDocument(GObject.Object):
     __gsignals__ = {
         'selection-changed': (GObject.SIGNAL_RUN_FIRST, None, ()),
         'columns-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
+        'sorts-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
         'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
     }
 
@@ -77,6 +78,9 @@ class SheetDocument(GObject.Object):
 
         self.is_selecting_cells: bool = False
 
+        self.pending_sorts = {}
+        self.current_sorts = {}
+
         self.pending_filters = {}
         self.current_filters = {}
 
@@ -115,6 +119,7 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_scrollbars_by_scroll()
         self.auto_adjust_locators_size_by_scroll()
         self.auto_adjust_selections_by_scroll()
+        self.repopulate_auto_filter_widgets()
 
         self.view.main_canvas.queue_draw()
 
@@ -473,6 +478,9 @@ class SheetDocument(GObject.Object):
 
         if auto_scroll:
             self.auto_adjust_scrollbars_by_selection(follow_cursor, scroll_axis, with_offset)
+            self.auto_adjust_locators_size_by_scroll()
+            self.auto_adjust_selections_by_scroll()
+            self.repopulate_auto_filter_widgets()
 
         if keep_order:
             self.notify_selection_changed(col_1, row_1, cell_metadata)
@@ -1033,6 +1041,8 @@ class SheetDocument(GObject.Object):
             self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
         self.auto_adjust_selections_by_crud(0, 0, True)
+        self.auto_adjust_locators_size_by_scroll()
+        self.repopulate_auto_filter_widgets()
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
@@ -1061,62 +1071,76 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
-    def sort_current_rows(self, descending: bool = False, vflags: polars.Series = None) -> bool:
+    def sort_current_rows(self, descending: bool = False, multiple: bool = False) -> None:
         active = self.selection.current_active_cell
         mdfi = active.metadata.dfi
+        mcolumn = active.metadata.column
+
+        if mdfi < 0 or len(self.data.dfs) <= mdfi:
+            return False
 
         # This approach will also sort hidden rows which is different from other applications,
         # I haven't made up my mind yet if we should follow other applications behavior.
-        if 0 <= mdfi < len(self.data.dfs):
-            self.data.dfs[mdfi] = self.data.dfs[mdfi].with_row_index('$ridx')
-            if len(self.display.row_visibility_flags):
-                self.data.dfs[mdfi] = self.data.dfs[mdfi].with_columns(self.display.row_visibility_flags[1:].alias('$vrow'))
-            active.metadata.column += 1
+        self.data.dfs[mdfi] = self.data.dfs[mdfi].with_row_index('$ridx')
+        if len(self.display.row_visibility_flags):
+            self.data.dfs[mdfi] = self.data.dfs[mdfi].with_columns(self.display.row_visibility_flags[1:].alias('$vrow'))
+        mcolumn += 1
+
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            csorts = copy.deepcopy(self.current_sorts)
+            psorts = copy.deepcopy(self.pending_sorts)
+
+        # Update current filters
+        if multiple:
+            self.current_sorts = self.pending_sorts
+        else:
+            column_name = self.data.dfs[mdfi].columns[mcolumn]
+            self.current_sorts = {column_name: {'cindex': active.metadata.column,
+                                                'descending': descending}}
+        self.pending_sorts = {}
+
+        success = False
 
         # Sorting is expensive; we can see double in memory usage. Anything we can do? I think, no :(
-        if self.data.sort_rows_from_metadata(active.metadata.column, mdfi, descending):
-            # Save snapshot
-            if not globals.is_changing_state:
-                from .history_manager import SortRowState
-                globals.history.save(SortRowState(descending, mdfi,
-                                                  self.data.dfs[mdfi]['$ridx'],
-                                                  self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None))
+        self.data.sort_rows_from_metadata(self.current_sorts, mdfi)
 
-            # Update row visibility flags
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import SortRowState
+            globals.history.save(SortRowState(self.data.dfs[mdfi]['$ridx'],
+                                              self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None,
+                                              mdfi, descending, multiple,
+                                              csorts, psorts))
+
+        # Update row visibility flags
+        if len(self.display.row_visibility_flags):
+            self.display.row_visibility_flags = polars.concat([polars.Series([True]), self.data.dfs[mdfi]['$vrow']])
+            self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+
+        # Update row heights
+        if len(self.display.row_heights):
+            sorted_row_heights = polars.DataFrame({'rheights': self.display.row_heights[1:],
+                                                    '$ridx': self.data.dfs[mdfi]['$ridx']}).sort('$ridx').to_series(0)
+            self.display.row_heights = polars.concat([polars.Series([True]), sorted_row_heights])
+            row_heights_visible_only = self.display.row_heights
             if len(self.display.row_visibility_flags):
-                if vflags is not None:
-                    self.display.row_visibility_flags = polars.concat([polars.Series([True]), vflags])
-                else:
-                    self.display.row_visibility_flags = polars.concat([polars.Series([True]), self.data.dfs[mdfi]['$vrow']])
-                self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+                row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
+            self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
-            # Update row heights
-            if len(self.display.row_heights):
-                sorted_row_heights = polars.DataFrame({'rheights': self.display.row_heights[1:],
-                                                       '$ridx': self.data.dfs[mdfi]['$ridx']}).sort('$ridx').to_series(0)
-                self.display.row_heights = polars.concat([polars.Series([True]), sorted_row_heights])
-                row_heights_visible_only = self.display.row_heights
-                if len(self.display.row_visibility_flags):
-                    row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
-                self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
-
-            self.data.dfs[mdfi].drop_in_place('$ridx')
-            if len(self.display.row_visibility_flags):
-                self.data.dfs[mdfi].drop_in_place('$vrow')
-            active.metadata.column -= 1
-
-            self.auto_adjust_selections_by_crud(0, 0, True)
-            self.renderer.render_caches = {}
-            self.view.main_canvas.queue_draw()
-
-            return True
-
+        # Clean up the temporary helper columns
         self.data.dfs[mdfi].drop_in_place('$ridx')
         if len(self.display.row_visibility_flags):
             self.data.dfs[mdfi].drop_in_place('$vrow')
-        active.metadata.column -= 1
 
-        return False
+        self.auto_adjust_selections_by_crud(0, 0, True)
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        if not globals.is_refreshing_uis:
+            self.emit('sorts-changed', mdfi)
+
+        return success
 
     def convert_current_columns_dtype(self, dtype: polars.DataType) -> bool:
         range = self.selection.current_active_range
@@ -1390,7 +1414,8 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
-        self.emit('columns-changed', 0)
+        if not globals.is_refreshing_uis:
+            self.emit('columns-changed', 0)
 
     def check_selection_changed(self) -> bool:
         current_cell_clss = self.selection.current_active_range.__class__
@@ -1448,7 +1473,7 @@ class SheetDocument(GObject.Object):
 
         cell_y = self.display.get_cell_y_from_row(1)
         cell_height = self.display.get_cell_height_from_row(1)
-        y = cell_y + (cell_height - icon_size) / 2
+        y = cell_y + (cell_height - icon_size) / 2 + self.display.scroll_y_position
 
         def open_header_context_menu(x: int, y: int) -> None:
             GLib.idle_add(self.emit, 'open-context-menu', x, y, 'header')
@@ -1549,7 +1574,6 @@ class SheetDocument(GObject.Object):
         y_start = self.display.column_header_height
         cell_height = self.display.DEFAULT_CELL_HEIGHT
 
-        # FIXME: sometimes not correct after filtering data; needs further investigation
         max_row_number = int(self.display.get_starting_row()) + 1 + int((canvas_height - y_start) // cell_height)
         max_row_number = self.display.get_vrow_from_row(max_row_number)
 
@@ -1584,8 +1608,6 @@ class SheetDocument(GObject.Object):
             self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis, with_offset)
 
         self.auto_adjust_scrollbars_by_scroll()
-        self.auto_adjust_locators_size_by_scroll()
-        self.auto_adjust_selections_by_scroll()
 
         vertical_adjustment = self.view.vertical_scrollbar.get_adjustment()
         horizontal_adjustment = self.view.horizontal_scrollbar.get_adjustment()

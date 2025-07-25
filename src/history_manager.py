@@ -439,6 +439,8 @@ class FilterRowState(State):
             document.display.row_heights = polars.Series(dtype=polars.UInt32)
             document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
 
+        self.restore_selection()
+
     def redo(self) -> None:
         document = globals.history.document
 
@@ -507,17 +509,27 @@ class ResetFilterRowState(State):
 class SortRowState(State):
     __gtype_name__ = 'SortRowState'
 
-    descending: bool
     dfi: int
+    descending: bool
+    multiple: bool
+
+    csorts: int
+    psorts: int
 
     rindex_path: str
     vflags_path: str
 
-    def __init__(self, descending: bool, dfi: int, rindex: polars.DataFrame, vflags: polars.Series) -> None:
+    def __init__(self, rindex: polars.DataFrame, vflags: polars.Series, dfi: int, descending: bool, multiple: bool, csorts: dict, psorts: dict) -> None:
         super().__init__()
 
-        self.descending = descending
+        self.save_selection()
+
         self.dfi = dfi
+        self.descending = descending
+        self.multiple = multiple
+
+        self.csorts = csorts
+        self.psorts = psorts
 
         self.rindex_path = self.write_snapshot(polars.DataFrame(rindex))
 
@@ -527,7 +539,7 @@ class SortRowState(State):
         document = globals.history.document
 
         document.data.dfs[self.dfi].insert_column(0, polars.read_parquet(self.rindex_path).to_series(0))
-        document.data.sort_rows_from_metadata(0, self.dfi, False)
+        document.data.sort_rows_from_metadata({'$ridx': {'descending': False}}, self.dfi)
 
         # Update row visibility flags
         if self.vflags_path is not None:
@@ -546,9 +558,23 @@ class SortRowState(State):
 
         document.data.dfs[self.dfi].drop_in_place('$ridx')
 
+        # Update current sorts
+        document.current_sorts = copy.deepcopy(self.csorts)
+        document.pending_sorts = {}
+
+        self.restore_selection()
+
+        document.emit('sorts-changed', self.dfi)
+
     def redo(self) -> None:
         document = globals.history.document
-        document.sort_current_rows(self.descending)
+
+        self.restore_selection(False)
+
+        document.current_sorts = copy.deepcopy(self.csorts)
+        document.pending_sorts = copy.deepcopy(self.psorts)
+
+        document.sort_current_rows(self.descending, self.multiple)
 
 
 

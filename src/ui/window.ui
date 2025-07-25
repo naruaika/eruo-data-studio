@@ -11,6 +11,7 @@
       <object class="AdwNavigationSplitView" id="split_view">
         <property name="collapsed">true</property>
         <property name="show-content">true</property>
+        <property name="min-sidebar-width">280sp</property>
         <property name="sidebar">
           <object class="AdwNavigationPage">
             <property name="title">Data Studio</property>
