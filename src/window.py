@@ -77,6 +77,10 @@ class Window(Adw.ApplicationWindow):
         # time in a while (when the widget is currently not in focus, to be precise).
         self.name_box.get_first_child().set_focus_on_click(False)
 
+        # We add some margin to the formula bar to prevent its content from being hidden
+        # by the dtype indicator tag.
+        self.formula_bar.get_first_child().set_margin_end(45)
+
         click_event_controller = Gtk.GestureClick()
         click_event_controller.connect('pressed', self.on_name_box_pressed)
         self.name_box.add_controller(click_event_controller)
