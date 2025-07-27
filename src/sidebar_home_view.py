@@ -520,6 +520,9 @@ class SidebarHomeView(Adw.Bin):
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
             dfi = 0 # TODO: add support for hiding field section?
 
+        self.field_list_view.get_parent().set_visible(True)
+        self.field_list_status.get_parent().set_visible(False)
+
         schema = sheet_document.data.dfs[dfi].schema
         bboxes = sheet_document.data.bbs[dfi]
         vflags = sheet_document.display.column_visibility_flags
@@ -658,6 +661,9 @@ class SidebarHomeView(Adw.Bin):
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
             dfi = 0 # TODO: add support for hiding sort section?
+
+        self.sort_list_view_box.get_parent().set_visible(True)
+        self.sort_list_status.get_parent().set_visible(False)
 
         column_names = sheet_document.data.dfs[dfi].columns
 
@@ -838,6 +844,9 @@ class SidebarHomeView(Adw.Bin):
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
             dfi = 0 # TODO: add support for hiding filter section?
+
+        self.filter_list_view_box.get_parent().set_visible(True)
+        self.filter_list_status.get_parent().set_visible(False)
 
         for afilter in sheet_document.current_filters:
             builder = afilter['query-builder']
