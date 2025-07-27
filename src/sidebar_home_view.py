@@ -1270,7 +1270,7 @@ class SidebarHomeView(Adw.Bin):
     def create_general_text_view(self, text: str = '') -> Gtk.TextView:
         text_view = Gtk.TextView()
         text_view.set_hexpand(True)
-        text_view.set_size_request(-1, 65)
+        text_view.set_size_request(-1, 28)
 
         buffer = Gtk.TextBuffer()
         buffer.set_text(text)

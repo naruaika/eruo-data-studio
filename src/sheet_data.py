@@ -247,18 +247,30 @@ class SheetData(GObject.Object):
         return True
 
     def update_cell_data_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int,
-                                       replace_with: any, search_pattern: str, match_case: bool) -> bool:
+                                       replace_with: any, search_pattern: str, match_case: bool,
+                                       column_vseries: polars.Series, row_vseries: polars.Series) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
+        # Currently, no other use cases than undo/redo for this one
         if isinstance(replace_with, list):
-            return self.update_cell_data_with_array_from_metadata(column, row, column_span, row_span, dfi, replace_with)
+            return self.update_cell_data_with_array_from_metadata(column, row, column_span, row_span, dfi,
+                                                                  replace_with)
 
-        return self.update_cell_data_with_single_from_metadata(column, row, column_span, row_span, dfi,
-                                                               replace_with, search_pattern, match_case)
+        # This is the default use case
+        try:
+            return self.update_cell_data_with_single_from_metadata(column, row, column_span, row_span, dfi,
+                                                                   replace_with, search_pattern, match_case,
+                                                                   column_vseries, row_vseries)
+        except Exception as e:
+            globals.send_notification(f'Cannot update the selected cells')
+            print(e)
+
+        return False
 
     def update_cell_data_with_single_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int,
-                                                   replace_with: any, search_pattern: str, match_case: bool) -> bool:
+                                                   replace_with: any, search_pattern: str, match_case: bool,
+                                                   column_vseries: polars.Series, row_vseries: polars.Series) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -274,6 +286,11 @@ class SheetData(GObject.Object):
         stop = min(row + row_span, row_count)
 
         for column in range(column, end_column):
+            # Skip if the column is hidden
+            if len(column_vseries) and column not in column_vseries:
+                continue
+
+            # Skip out of range columns
             if self.dfs[dfi].width <= column:
                 break
 
@@ -302,22 +319,24 @@ class SheetData(GObject.Object):
                 new_value = replace_with
 
             # Update the entire column
-            # FIXME: exclude the hidden row(s) from being updated
             if row_span < 0:
                 self.dfs[dfi] = self.dfs[dfi].with_columns(polars.repeat(new_value, row_count, eager=True, dtype=column_dtype)
                                                                  .alias(column_name))
             # Update the dataframe in range, excluding the header row
             elif stop - start > 0:
+                # The default behaviour is to replace cells within the selection range
                 if search_pattern is None:
-                    self.dfs[dfi] = self.dfs[dfi].with_columns(
-                        self.dfs[dfi][0:start, column].extend(polars.repeat(replace_with, stop - start, eager=True, dtype=column_dtype))
-                                                      .extend(self.dfs[dfi][stop:row_count, column])
-                                                      .alias(column_name),
-                    )
+                    self.dfs[dfi] = self.dfs[dfi].with_row_index('$ridx') \
+                                                 .with_columns(polars.when(polars.col('$ridx').is_between(start, stop - 1) & \
+                                                                           polars.col('$ridx').is_in(row_vseries[1:] - 1))
+                                                                     .then(polars.lit(new_value)).otherwise(polars.col(column_name))
+                                                                     .alias(column_name)) \
+                                                 .drop('$ridx')
+
+                # Pattern is used only for search and replace. The target should always be a single cell
+                # and its value should always a string. Cast empty string if necessary. For the replace
+                # all operation, we don't call this function.
                 else:
-                    # Pattern is used only for search and replace. The target should always be a single cell
-                    # and its value should always a string. Cast empty string if necessary. For the replace
-                    # all operation, we call a different function.
                     if self.dfs[dfi][start, column] == search_pattern and replace_with == '':
                         self.dfs[dfi][start, column] = None
                     else:
@@ -343,7 +362,7 @@ class SheetData(GObject.Object):
 
             # Remove leading '$' to prevent collision
             # from the internal column name
-            new_value = re.sub(r'^\$', '', new_value)
+            new_value = new_value.strip('$')
 
             # Update the column name
             self.dfs[dfi] = self.dfs[dfi].rename({column_name: new_value})
@@ -489,9 +508,9 @@ class SheetData(GObject.Object):
             row = 0
             row_span -= 1
 
-        self.dfs[dfi] = self.dfs[dfi].with_row_index() \
-                                     .remove(polars.col('index').is_in(range(row, row + row_span))) \
-                                     .drop('index')
+        self.dfs[dfi] = self.dfs[dfi].with_row_index('$ridx') \
+                                     .remove(polars.col('$ridx').is_in(range(row, row + row_span))) \
+                                     .drop('$ridx')
         self.bbs[dfi].row_span -= row_span
 
         return True
@@ -570,9 +589,11 @@ class SheetData(GObject.Object):
 
         try:
             self.dfs[dfi] = self.dfs[dfi].with_columns(expressions)
-        except Exception:
+            return True
+
+        except Exception as e:
             dtype = utils.get_dtype_symbol(dtype, False)
             globals.send_notification(f'One or more columns couldn\'t be converted to: {dtype}')
-            return False
+            print(e)
 
-        return True
+        return False

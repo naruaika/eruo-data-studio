@@ -62,8 +62,9 @@ class FileManager(GObject.Object):
                 write_methods[file_format](file_path, **kwargs)
                 return True
             raise ValueError(f"Unsupported file format: {file_format}")
-        except Exception:
+        except Exception as e:
             globals.send_notification(f'Cannot write file: {file_path}')
+            print(e)
         return False
 
     def delete_file(self, file_path: str) -> bool:
@@ -71,6 +72,7 @@ class FileManager(GObject.Object):
             os.remove(file_path)
         except Exception as e:
             globals.send_notification(f'Cannot delete file: {file_path}')
+            print(e)
         return True
 
     def open_file(self, window: Window) -> None:

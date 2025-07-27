@@ -796,7 +796,8 @@ class SheetDocument(GObject.Object):
                                         replace_with, search_pattern, match_case)
 
         # Update data
-        if self.data.update_cell_data_from_metadata(mcolumn, mrow, column_span, row_span, range.metadata.dfi, replace_with, search_pattern, match_case):
+        if self.data.update_cell_data_from_metadata(mcolumn, mrow, column_span, row_span, range.metadata.dfi, replace_with, search_pattern, match_case,
+                                                    self.display.column_visible_series, self.display.row_visible_series):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -1172,8 +1173,9 @@ class SheetDocument(GObject.Object):
         if mdfi < 0 or len(self.data.dfs) <= mdfi:
             return False
 
-        # This approach will also sort hidden rows which is different from other applications,
-        # I haven't made up my mind yet if we should follow other applications behavior.
+        # FIXME: This approach will also sort hidden rows which is different from other applications,
+        # I haven't made up my mind yet if we should follow other applications behavior, because I think
+        # it'll be too expensive.
         self.data.dfs[mdfi] = self.data.dfs[mdfi].with_row_index('$ridx')
         if len(self.display.row_visibility_flags):
             self.data.dfs[mdfi] = self.data.dfs[mdfi].with_columns(self.display.row_visibility_flags[1:].alias('$vrow'))
