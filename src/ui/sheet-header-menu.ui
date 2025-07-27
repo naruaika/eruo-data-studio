@@ -207,7 +207,7 @@
                 <property name="visible">false</property>
                 <signal name="clicked" handler="on_filter_continue_button_clicked" swapped="no"/>
                 <style>
-                  <class name="status-text-button"/>
+                  <class name="status-button"/>
                 </style>
               </object>
             </child>

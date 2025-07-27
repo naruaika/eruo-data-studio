@@ -113,7 +113,7 @@
                         <child>
                           <object class="GtkBox">
                             <property name="orientation">horizontal</property>
-                            <property name="margin-top">6</property>
+                            <property name="margin-top">3</property>
                             <property name="margin-bottom">3</property>
                             <property name="margin-start">3</property>
                             <property name="margin-end">3</property>
@@ -124,7 +124,7 @@
                                 <signal name="clicked" handler="on_add_sort_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="flat"/>
-                                  <class name="status-text-button"/>
+                                  <class name="row-button"/>
                                 </style>
                               </object>
                             </child>
@@ -140,7 +140,7 @@
                                 <signal name="clicked" handler="on_apply_sort_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="flat"/>
-                                  <class name="status-text-button"/>
+                                  <class name="row-button"/>
                                 </style>
                               </object>
                             </child>
@@ -169,16 +169,95 @@
                     <property name="activatable">false</property>
                     <property name="selectable">false</property>
                     <child>
-                      <object class="GtkLabel" id="filter_list_status">
-                        <property name="margin-top">6</property>
-                        <property name="margin-bottom">6</property>
+                      <object class="GtkBox" id="filter_list_status">
+                        <property name="orientation">horizontal</property>
+                        <property name="margin-top">0</property>
+                        <property name="margin-bottom">3</property>
                         <property name="margin-start">12</property>
-                        <property name="margin-end">12</property>
-                        <property name="label">No filters added</property>
-                        <property name="halign">start</property>
+                        <property name="margin-end">6</property>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="halign">start</property>
+                            <property name="hexpand">true</property>
+                            <property name="label">No filters added</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton">
+                            <property name="margin-end">1</property>
+                            <property name="icon-name">list-add-symbolic</property>
+                            <property name="tooltip-text">Add filter</property>
+                            <signal name="clicked" handler="on_add_filter_button_clicked" swapped="no"/>
+                            <style>
+                              <class name="flat"/>
+                            </style>
+                          </object>
+                        </child>
                         <style>
                           <class name="status-text"/>
                         </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox" id="filter_list_view_box">
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="GtkListView" id="filter_list_view">
+                            <property name="single-click-activate">true</property>
+                            <property name="model">
+                              <object class="GtkSingleSelection">
+                                <property name="model">
+                                  <object class="GListStore" id="filter_list_store"/>
+                                </property>
+                              </object>
+                            </property>
+                            <style>
+                              <class name="sidebar-list-view-box"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">horizontal</property>
+                            <property name="margin-top">0</property>
+                            <property name="margin-bottom">3</property>
+                            <property name="margin-start">3</property>
+                            <property name="margin-end">3</property>
+                            <child>
+                              <object class="GtkButton">
+                                <property name="valign">start</property>
+                                <property name="icon-name">list-add-symbolic</property>
+                                <property name="tooltip-text">Add filter</property>
+                                <signal name="clicked" handler="on_add_filter_button_clicked" swapped="no"/>
+                                <style>
+                                  <class name="flat"/>
+                                  <class name="row-button"/>
+                                </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="hexpand">true</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkButton">
+                                <property name="icon-name">checkmark-symbolic</property>
+                                <property name="tooltip-text">Apply filter</property>
+                                <signal name="clicked" handler="on_apply_filter_button_clicked" swapped="no"/>
+                                <style>
+                                  <class name="flat"/>
+                                  <class name="row-button"/>
+                                </style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="margin-end">34</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <style>

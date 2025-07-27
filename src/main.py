@@ -25,7 +25,7 @@ import sys
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 
-from gi.repository import Adw, Gio, GLib, GObject, Gtk
+from gi.repository import Adw, Gio, GObject, Gtk
 
 from . import globals
 from .file_manager import FileManager
@@ -231,7 +231,8 @@ class Application(Adw.Application):
         # Prevent from colliding with the undo action of editable widgets.
         # Not every editable widget supports the undo action, but for
         # safety, we exclude them all.
-        if isinstance(window.get_focus(), Gtk.Editable):
+        focused_widget = window.get_focus()
+        if isinstance(focused_widget, Gtk.Editable) or isinstance(focused_widget, Gtk.TextView):
             return
 
         globals.history.undo()
@@ -240,7 +241,8 @@ class Application(Adw.Application):
         window = self.get_active_window()
 
         # Prevent from colliding with the redo action of editable widgets
-        if isinstance(window.get_focus(), Gtk.Editable):
+        focused_widget = window.get_focus()
+        if isinstance(focused_widget, Gtk.Editable) or isinstance(focused_widget, Gtk.TextView):
             return
 
         globals.history.redo()

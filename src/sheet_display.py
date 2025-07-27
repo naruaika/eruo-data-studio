@@ -209,17 +209,19 @@ class SheetDisplay(GObject.Object):
         return self.get_cell_height_from_row(row)
 
     def get_cell_width_from_column(self, column: int) -> int:
-        if column == 0:
+        vcolumn = self.get_vcolumn_from_column(column)
+        if vcolumn == 0:
             return self.row_header_width
-        if column <= len(self.column_widths):
-            return self.column_widths[column - 1]
+        if vcolumn <= len(self.column_widths):
+            return self.column_widths[vcolumn - 1]
         return self.DEFAULT_CELL_WIDTH
 
     def get_cell_height_from_row(self, row: int) -> int:
-        if row == 0:
+        vrow = self.get_vrow_from_row(row)
+        if vrow == 0:
             return self.column_header_height
-        if row <= len(self.row_heights):
-            return self.row_heights[row - 1]
+        if vrow <= len(self.row_heights):
+            return self.row_heights[vrow - 1]
         return self.DEFAULT_CELL_HEIGHT
 
     def get_column_name_from_column(self, column: int = 0) -> str:

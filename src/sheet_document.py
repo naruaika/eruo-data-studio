@@ -34,6 +34,7 @@ class SheetDocument(GObject.Object):
         'selection-changed': (GObject.SIGNAL_RUN_FIRST, None, ()),
         'columns-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
         'sorts-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
+        'filters-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
         'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
     }
 
@@ -81,8 +82,18 @@ class SheetDocument(GObject.Object):
         self.pending_sorts = {}
         self.current_sorts = {}
 
-        self.pending_filters = {}
-        self.current_filters = {}
+        # These variables are used to store the pending and current filters.
+        # It should consist of one or more dictionary with the following format:
+        # - `qhash` is used for checking if there's a duplicate filter
+        # - `qtype` can be used to check where the filter comes from
+        # - `expression` is used by the SheetData for efficient filtering
+        # - `query-builder` can be used for pretty much anything else
+        self.pending_filters = []
+        self.current_filters = []
+
+    #
+    # Setup
+    #
 
     def setup_main_canvas(self) -> None:
         self.view.main_canvas.set_draw_func(self.renderer.render)
@@ -110,6 +121,10 @@ class SheetDocument(GObject.Object):
 
         # Initialize the undo stack
         self.history.setup()
+
+    #
+    # Event handlers
+    #
 
     def on_sheet_view_scrolled(self, source: GObject.Object) -> None:
         self.display.scroll_y_position = self.view.vertical_scrollbar.get_adjustment().get_value()
@@ -250,7 +265,10 @@ class SheetDocument(GObject.Object):
             (col_1, row_1), (col_2, row_2) = target_cell_position
 
         self.update_selection_from_position(col_1, row_1, col_2, row_2, True, True, True)
+
         self.view.main_canvas.queue_draw()
+
+        # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
 
     def on_update_selection_by_motion(self, source: GObject.Object, x: int, y: int) -> None:
         if self.focused_widget is not None:
@@ -311,7 +329,10 @@ class SheetDocument(GObject.Object):
             scroll_axis = 'vertical'
 
         self.update_selection_from_position(start_column, start_row, end_column, end_row, True, True, True, scroll_axis)
+
         self.view.main_canvas.queue_draw()
+
+        # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
 
     def on_update_pointer_moved(self, source: GObject.Object, x: int, y: int) -> None:
         if self.is_selecting_cells:
@@ -332,6 +353,10 @@ class SheetDocument(GObject.Object):
     def on_update_pointer_released(self, source: GObject.Object, x: int, y: int) -> None:
         self.is_selecting_cells = False
 
+    #
+    # Selection
+    #
+
     def select_element_from_point(self, x: float, y: float, state: Gdk.ModifierType = None) -> None:
         # Trigger the on_click event of the hovered widget if the pointer is under one,
         # otherwise select the hovered cell.
@@ -351,19 +376,27 @@ class SheetDocument(GObject.Object):
             start_row = active.row
 
         self.update_selection_from_position(start_column, start_row, end_column, end_row, True, False, False)
+
         self.view.main_canvas.queue_draw()
 
         if self.focused_widget is not None:
             self.focused_widget.do_on_click(x, y)
 
+        # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
+
     def update_selection_from_name(self, name: str) -> None:
         vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
+
         col_1 = self.display.get_column_from_vcolumn(vcol_1)
         col_2 = self.display.get_column_from_vcolumn(vcol_2)
         row_1 = self.display.get_row_from_vrow(vrow_1)
         row_2 = self.display.get_row_from_vrow(vrow_2)
+
         self.update_selection_from_position(col_1, row_1, col_2, row_2, False, False, True)
+
         self.view.main_canvas.queue_draw()
+
+        # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
 
     def update_selection_from_position(self, col_1: int, row_1: int, col_2: int, row_2: int,
                                        keep_order: bool = False, follow_cursor: bool = True,
@@ -490,6 +523,10 @@ class SheetDocument(GObject.Object):
         # Reset the current search range
         if not globals.is_changing_state and self.selection.current_search_range is not None:
             self.selection.current_search_range = self.selection.current_active_range
+
+    #
+    # Manipulations
+    #
 
     def insert_from_current_rows(self, dataframe: polars.DataFrame, vflags: polars.Series = None, rheights: polars.Series = None) -> bool:
         range = self.selection.current_active_range
@@ -713,10 +750,9 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    # TODO: currently update, duplicate and delete functions don't support multiple dataframes.
-    #       Should we add the support? I haven't decided yet.
-
     def update_current_cells(self, replace_with: any, search_pattern: str = None, match_case: bool = False) -> bool:
+        # TODO: currently update, duplicate and delete functions don't support multiple dataframes.
+        #       Should we add the support? I haven't decided yet.
         range = self.selection.current_active_range
 
         mcolumn = range.metadata.column
@@ -986,7 +1022,10 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            self.emit('columns-changed', range.metadata.dfi)
+            if not globals.is_refreshing_uis:
+                # FIXME: should we remove incompatible filters?
+                self.emit('columns-changed', range.metadata.dfi)
+                self.emit('filters-changed', range.metadata.dfi)
 
             return True
 
@@ -994,7 +1033,38 @@ class SheetDocument(GObject.Object):
 
     def filter_current_rows(self, multiple: bool = False) -> None:
         active = self.selection.current_active_cell
+
         metadata = active.metadata
+        mcolumn = active.metadata.column
+        mdfi = active.metadata.dfi
+
+        if mdfi < 0 or len(self.data.dfs) <= mdfi:
+            return False
+
+        # Build pending filters for single value filter
+        if not multiple:
+            column_name = self.data.dfs[mdfi].columns[mcolumn]
+            column_index = self.data.dfs[mdfi].columns.index(column_name)
+            column_dtype = self.data.dfs[mdfi].schema[column_name]
+
+            cell_value = self.data.read_cell_data_from_metadata(mcolumn, metadata.row, 1, 1, mdfi)
+
+            self.pending_filters = [{
+                'qhash': hash((column_name, 'single')),
+                'qtype': 'primitive',
+                'operator': 'and',
+                'query-builder': {
+                    'operator': 'and',
+                    'conditions': [{
+                        'findex': column_index,
+                        'fdtype': column_dtype,
+                        'field': column_name,
+                        'operator': '=',
+                        'value': cell_value,
+                    }],
+                },
+                'expression': polars.col(column_name).eq(cell_value),
+            }]
 
         # Save snapshot
         if not globals.is_changing_state:
@@ -1005,35 +1075,43 @@ class SheetDocument(GObject.Object):
                                                 copy.deepcopy(self.current_filters),
                                                 copy.deepcopy(self.pending_filters)))
 
+        # Prepare for updating the current filters
+        pindex = 0
+        while pindex < len(self.pending_filters):
+            pfilter = self.pending_filters[pindex]
+
+            if pfilter['qhash'] is None:
+                pindex += 1
+                continue # skip duplicable filters
+
+            # Check for duplicates
+            for cfilter in self.current_filters:
+                if cfilter['qhash'] == pfilter['qhash']:
+                    self.current_filters.remove(cfilter)
+                    break
+
+            # Remove empty not-in filters, usually comes from selecting
+            # all unique values for the target column
+            if pfilter['qtype'] == 'primitive':
+                condition = pfilter['query-builder']['conditions'][0]
+                if condition['operator'] == 'not in' and len(condition['value']) == 0:
+                    self.pending_filters.remove(pfilter)
+                    pindex += 1
+                    continue
+
+            pindex += 1
+
         # Update current filters
-        if not multiple:
-            column_name = self.data.dfs[metadata.dfi].columns[metadata.column]
-            cell_value = self.data.read_cell_data_from_metadata(metadata.column, metadata.row, 1, 1, metadata.dfi)
-            if column_name not in self.current_filters:
-                self.current_filters[column_name] = {'show': [str(cell_value)],
-                                                     'hide': ['$all']}
-            else:
-                self.current_filters[column_name]['show'].append(cell_value)
-        else:
-            for column_name in self.pending_filters:
-                if column_name not in self.current_filters:
-                    self.current_filters[column_name] = self.pending_filters[column_name]
-                else:
-                    self.current_filters[column_name]['show'] = list(set(self.current_filters[column_name]['show']) \
-                                                                     .difference(self.pending_filters[column_name]['hide']) \
-                                                                     .union(self.pending_filters[column_name]['show']))
-                    self.current_filters[column_name]['hide'] = list(set(self.current_filters[column_name]['hide']) \
-                                                                     .difference(self.pending_filters[column_name]['show']) \
-                                                                     .union(self.pending_filters[column_name]['hide']))
-        self.pending_filters = {}
+        self.current_filters += self.pending_filters
+        self.pending_filters = []
 
         # Update row visibility flags
-        self.display.row_visibility_flags = self.data.filter_rows_from_metadata(self.current_filters, metadata.dfi)
+        self.display.row_visibility_flags = self.data.filter_rows_from_metadata(self.current_filters, mdfi)
         self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
         if len(self.display.row_visible_series):
-            self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+            self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
         else:
-            self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
+            self.data.bbs[mdfi].row_span = self.data.dfs[mdfi].height + 1
 
         # Update row heights
         if len(self.display.row_heights):
@@ -1046,6 +1124,17 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
+        # Automatically adjust when the cursor is outside the current dataframe bounding box
+        active = self.selection.current_active_cell
+        if active.metadata.dfi < 0:
+            vrow = self.display.row_visible_series[-1]
+            vcolumn = self.display.get_vcolumn_from_column(active.column)
+            cell_name = self.display.get_cell_name_from_position(vcolumn, vrow)
+            self.update_selection_from_name(cell_name)
+
+        if not globals.is_refreshing_uis:
+            self.emit('filters-changed', mdfi)
+
     def reset_all_filters(self) -> None:
         # Save snapshot
         if not globals.is_changing_state:
@@ -1055,10 +1144,11 @@ class SheetDocument(GObject.Object):
                                                      copy.deepcopy(self.current_filters)))
 
         # Update current filters
-        self.current_filters = {}
-        self.pending_filters = {}
+        self.current_filters = []
+        self.pending_filters = []
 
         # Update row visibility flags
+        # TODO: support multiple dataframes?
         self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
         self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
         self.data.bbs[0].row_span = self.data.dfs[0].height + 1
@@ -1070,6 +1160,9 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_selections_by_crud(0, 0, True)
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
+
+        if not globals.is_refreshing_uis:
+            self.emit('filters-changed', 0)
 
     def sort_current_rows(self, descending: bool = False, multiple: bool = False) -> None:
         active = self.selection.current_active_cell
@@ -1167,6 +1260,11 @@ class SheetDocument(GObject.Object):
             self.auto_adjust_selections_by_crud(0, 0, True)
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
+
+            if not globals.is_refreshing_uis:
+                # FIXME: should we remove incompatible filters?
+                self.emit('columns-changed', range.metadata.dfi)
+                self.emit('filters-changed', range.metadata.dfi)
 
             return True
 
@@ -1416,6 +1514,10 @@ class SheetDocument(GObject.Object):
         if not globals.is_refreshing_uis:
             self.emit('columns-changed', 0)
 
+    #
+    # Helpers
+    #
+
     def check_selection_changed(self) -> bool:
         current_cell_clss = self.selection.current_active_range.__class__
         current_cell_attr = self.selection.current_active_range.__dict__.copy()
@@ -1458,6 +1560,10 @@ class SheetDocument(GObject.Object):
 
         # Request to update the input bar with the selected cell data
         self.emit('selection-changed')
+
+    #
+    # Adjustments
+    #
 
     def repopulate_auto_filter_widgets(self) -> None:
         if len(self.data.dfs) == 0:

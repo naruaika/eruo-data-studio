@@ -4,6 +4,10 @@
     background-color: rgb(52, 52, 54);
 }
 
+.sidebar-expander-row textview {
+    background-color: rgb(68, 68, 71);
+}
+
 .main-canvas {
     background-color: rgb(25, 25, 25);
 }

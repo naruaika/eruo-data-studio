@@ -416,7 +416,7 @@ class FilterRowState(State):
 
         # Update current filters
         document.current_filters = copy.deepcopy(self.cfilters)
-        document.pending_filters = {}
+        document.pending_filters = []
 
         # Update row visibility flags
         if self.vflags_path is not None:
@@ -438,6 +438,8 @@ class FilterRowState(State):
         else:
             document.display.row_heights = polars.Series(dtype=polars.UInt32)
             document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
+
+        document.emit('filters-changed', self.range.metadata.dfi)
 
         self.restore_selection()
 

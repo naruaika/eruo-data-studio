@@ -18,14 +18,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from gi.repository import GLib, GObject, Gtk, Pango
+import copy
 import gc
 import polars
 import threading
 
 from .window import Window
 
-class FilterListItem(GObject.Object):
-    __gtype_name__ = 'FilterListItem'
+class BasicFilterListItem(GObject.Object):
+    __gtype_name__ = 'BasicFilterListItem'
 
     cvalue = GObject.Property(type=str, default='[Blank]')
     active = GObject.Property(type=bool, default=False)
@@ -69,13 +70,30 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         # TODO: support multiple dataframes?
         column_name = sheet_document.data.dfs[0].columns[self.column]
 
+        self.cvalues_to_show: list[str] = ['$all']
+        self.cvalues_to_hide: list[str] = []
+
         # Get the current active filters if any, otherwise initialize the default filters
-        if column_name in sheet_document.current_filters:
-            self.cvalues_to_show = sheet_document.current_filters[column_name]['show']
-            self.cvalues_to_hide = sheet_document.current_filters[column_name]['hide']
-        else:
-            self.cvalues_to_show: list[str] = ['$all']
-            self.cvalues_to_hide: list[str] = []
+        for cfilter in sheet_document.current_filters:
+            if cfilter['qtype'] != 'primitive':
+                continue
+
+            condition = cfilter['query-builder']['conditions'][0]
+
+            if condition['field'] == column_name:
+                if condition['operator'] == 'in':
+                    self.cvalues_to_show = copy.deepcopy(condition['value'])
+                    self.cvalues_to_hide = ['$all']
+
+                if condition['operator'] == 'not in':
+                    self.cvalues_to_show = ['$all']
+                    self.cvalues_to_hide = copy.deepcopy(condition['value'])
+
+                if condition['operator'] == '=':
+                    self.cvalues_to_show = [condition['value']]
+                    self.cvalues_to_hide = ['$all']
+
+                break
 
         self.all_unique_values_hash = polars.Series([])
         self.current_unique_values_hash = polars.Series([])
@@ -117,7 +135,7 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         list_item.check_button = None
         list_item.label = None
 
-    def on_filter_list_item_check_button_toggled(self, button: Gtk.Button, item_data: FilterListItem) -> None:
+    def on_filter_list_item_check_button_toggled(self, button: Gtk.Button, item_data: BasicFilterListItem) -> None:
         if self.is_manually_toggling:
             return
         self.is_manually_toggling = True
@@ -219,24 +237,69 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         if self.filter_list_store.get_item(1).mvalue == '$results':
             if '$all' in self.cvalues_to_show and len(self.cvalues_to_hide) == 0:
                 self.filter_list_store.get_item(1).active = True
+
             elif '$all' in self.cvalues_to_hide and len(self.cvalues_to_show) == 0:
                 self.filter_list_store.get_item(1).active = False
+
             elif cvalues_to_show_hash.equals(self.current_unique_values_hash):
                 self.filter_list_store.get_item(1).active = True
+
             elif cvalues_to_hide_hash.equals(self.current_unique_values_hash):
                 self.filter_list_store.get_item(1).active = False
 
         self.is_manually_toggling = False
 
+        # TODO: support multiple dataframes?
         sheet_document = self.window.get_current_active_document()
         column_name = sheet_document.data.dfs[0].columns[self.column]
+        column_index = sheet_document.data.dfs[0].columns.index(column_name)
+        column_dtype = sheet_document.data.dfs[0].schema[column_name]
+
+        # Build the query blocks
+        operator = 'not in'
+        value = copy.deepcopy(self.cvalues_to_hide)
+
+        if '$all' in self.cvalues_to_hide:
+            operator = 'in'
+            value = copy.deepcopy(self.cvalues_to_show)
+
+        if '$blanks' in value:
+            value.remove('$blanks')
+            value.append(None)
+
+        if len(value) == 1:
+            operator = '='
+            value = value[0]
+
+        query_builder = {
+            'operator': 'and',
+            'conditions': [{
+                'findex': column_index,
+                'fdtype': column_dtype,
+                'field': column_name,
+                'operator': operator,
+                'value': value,
+            }],
+        }
+
+        if not isinstance(value, list):
+            value = [value]
+
+        value = copy.deepcopy(value)
+        value = polars.Series(value).cast(column_dtype, strict=False)
+
+        expression = polars.col(column_name).is_in(value)
+        if operator == 'not in':
+            expression = expression.not_()
 
         # Update the document's active filters
-        # TODO: support multiple dataframes?
-        sheet_document.pending_filters[column_name] = {
-            'show': self.cvalues_to_show,
-            'hide': self.cvalues_to_hide,
-        }
+        sheet_document.pending_filters = [{
+            'qhash': hash((column_name, 'array')),
+            'qtype': 'primitive',
+            'operator': 'and',
+            'query-builder': query_builder,
+            'expression': expression,
+        }]
 
     @Gtk.Template.Callback()
     def on_filter_search_entry_activated(self, entry: Gtk.Entry) -> None:
@@ -286,12 +349,12 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             self.filter_status.set_text(f'{self.filter_status.get_text()}. The result set only contains a subset of the unique values.')
             sample_only = True # force sampling
 
-        def update_filter_list() -> None:
+        def show_filter_list() -> None:
             # Add the "Select All" option
             active = '$all' in self.cvalues_to_show or len(self.cvalues_to_show) > 0
             consistent = ('$all' in self.cvalues_to_show and len(self.cvalues_to_hide) == 0) or \
                          ('$all' in self.cvalues_to_hide and len(self.cvalues_to_show) == 0)
-            GLib.idle_add(self.filter_list_store.append, FilterListItem('Select All', active, not consistent, '$all'))
+            GLib.idle_add(self.filter_list_store.append, BasicFilterListItem('Select All', active, not consistent, '$all'))
 
             unique_values = sheet_document.data.read_cell_data_unique_from_metadata(self.column, 0, sample_only, search_query, use_regexp)
 
@@ -313,23 +376,23 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
                     active = ('$blanks' in self.cvalues_to_show and '$all' in self.cvalues_to_hide) or \
                              ('$blanks' not in self.cvalues_to_hide and '$all' in self.cvalues_to_show)
                     all_results_actived &= active
-                    GLib.idle_add(self.filter_list_store.insert, 1, FilterListItem('(Blanks)', active, mvalue='$blanks'))
+                    GLib.idle_add(self.filter_list_store.insert, 1, BasicFilterListItem('(Blanks)', active, mvalue='$blanks'))
                     continue
 
                 cvalue = str(cvalue)
                 active = (cvalue in self.cvalues_to_show and '$all' in self.cvalues_to_hide) or \
                          (cvalue not in self.cvalues_to_hide and '$all' in self.cvalues_to_show)
                 all_results_actived &= active
-                GLib.idle_add(self.filter_list_store.append, FilterListItem(cvalue, active))
+                GLib.idle_add(self.filter_list_store.append, BasicFilterListItem(cvalue, active))
                 item_counter += 1
 
             # Add the "Select All Results" option if necessary
             if search_query is not None:
-                GLib.idle_add(self.filter_list_store.insert, 1, FilterListItem('Select All Results', all_results_actived, mvalue='$results'))
+                GLib.idle_add(self.filter_list_store.insert, 1, BasicFilterListItem('Select All Results', all_results_actived, mvalue='$results'))
 
             del unique_values
             gc.collect()
 
         self.filter_list_store.remove_all()
         if n_unique > 0:
-            threading.Thread(target=update_filter_list, daemon=True).start()
+            threading.Thread(target=show_filter_list, daemon=True).start()

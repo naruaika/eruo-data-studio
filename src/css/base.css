@@ -116,9 +116,6 @@
 .sidebar-list-view > row:selected {
     background-color: var(--card-bg-color);
 }
-.sidebar-list-view check {
-    background-color: transparent;
-}
 
 .sidebar-list-view-box {
     padding: 2px;
@@ -127,23 +124,32 @@
 .sidebar-list-view-box > row:selected {
     background-color: transparent;
 }
+.sidebar-list-view-box popover row {
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.sidebar-list-view check {
+    background-color: transparent;
+}
 .sidebar-list-view-box dropdown .toggle {
     font-weight: normal;
     padding: 2px 4px 2px 8px;
 }
-.sidebar-list-view-box .image-button {
+.sidebar-list-view-box button,
+.sidebar-expander-row .row-button,
+.sidebar-expander-row .status-text button {
     padding: 1px;
     -gtk-icon-size: 14px;
 }
-.sidebar-list-view-box .image-button,
-.sidebar-expander-row .status-text-button,
-.sidebar-expander-row .status-text .image-button {
-    padding: 1px;
-    -gtk-icon-size: 14px;
+.sidebar-expander-row entry {
+    min-height: 28px;
+    padding: 0 8px;
 }
-.sidebar-list-view-box popover row {
-    padding: 4px 8px;
-    border-radius: 12px;
+.sidebar-expander-row textview {
+    padding: 5px 8px;
+    font-feature-settings: "tnum" 1;
+    border-radius: 10px;
 }
 
 .sidebar-list-item-badge {
@@ -172,7 +178,7 @@
 .status-text {
     font-size: 12px;
 }
-.status-text-button {
+.status-button {
     margin-top: -4px;
 }
 

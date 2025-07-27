@@ -20,7 +20,6 @@
 
 from gi.repository import GObject
 from datetime import datetime
-import copy
 import gc
 import numpy
 import polars
@@ -288,11 +287,11 @@ class SheetData(GObject.Object):
             # Convert the input value to the correct type
             if row >= 0: # skip the header row
                 if column_dtype in (polars.Date, polars.Datetime, polars.Time):
+                    if column_dtype == polars.Datetime:
+                        new_value = datetime.strptime(replace_with, '%Y-%m-%d %H:%M:%S')
                     if column_dtype == polars.Date:
                         new_value = datetime.strptime(replace_with, '%Y-%m-%d').date()
-                    elif column_dtype == polars.Datetime:
-                        new_value = datetime.strptime(replace_with, '%Y-%m-%d %H:%M:%S')
-                    else: # polars.Time
+                    if column_dtype == polars.Time:
                         new_value = datetime.strptime(replace_with, '%H:%M:%S').time()
                 else:
                     try:
@@ -341,6 +340,10 @@ class SheetData(GObject.Object):
                 new_value = f'column_{cnumber}'
             else:
                 new_value = str(replace_with)
+
+            # Remove leading '$' to prevent collision
+            # from the internal column name
+            new_value = re.sub(r'^\$', '', new_value)
 
             # Update the column name
             self.dfs[dfi] = self.dfs[dfi].rename({column_name: new_value})
@@ -505,49 +508,26 @@ class SheetData(GObject.Object):
 
         return True
 
-    def filter_rows_from_metadata(self, filters: dict, dfi: int) -> polars.Series:
+    def filter_rows_from_metadata(self, filters: list, dfi: int) -> polars.Series:
         if dfi < 0 or len(self.dfs) <= dfi:
             return polars.Series(dtype=polars.Boolean)
 
-        filter_expression = polars.lit(True)
+        expression = polars.lit(True)
 
-        for column_name in filters:
-            cvalue_to_show = copy.deepcopy(filters[column_name]['show'])
-            cvalue_to_hide = copy.deepcopy(filters[column_name]['hide'])
-
-            column_dtype = self.dfs[dfi].schema[column_name]
-
-            if '$all' in cvalue_to_show and len(cvalue_to_hide) == 0:
+        for index, afilter in enumerate(filters):
+            if index == 0:
+                expression = afilter['expression']
                 continue
 
-            if '$all' in cvalue_to_show:
-                if exclude_nulls := '$blanks' in cvalue_to_hide:
-                    cvalue_to_hide.remove('$blanks')
-                try:
-                    cvalue_to_hide = polars.Series(cvalue_to_hide).cast(column_dtype, strict=False)
-                except Exception:
-                    continue # FIXME: shouldn't happen, but if it does, what should we do instead?
-                fexpr = polars.col(column_name).is_in(cvalue_to_hide).not_()
-                if exclude_nulls:
-                    fexpr &= polars.col(column_name).is_not_null()
-                filter_expression &= fexpr
-
-            if '$all' in cvalue_to_hide and len(cvalue_to_show) > 0:
-                if include_nulls := '$blanks' in cvalue_to_show:
-                    cvalue_to_show.remove('$blanks')
-                try:
-                    cvalue_to_show = polars.Series(cvalue_to_show).cast(column_dtype, strict=False)
-                except Exception:
-                    continue # FIXME: shouldn't happen, but if it does, what should we do instead?
-                fexpr = polars.col(column_name).is_in(cvalue_to_show)
-                if include_nulls:
-                    fexpr |= polars.col(column_name).is_null()
-                filter_expression &= fexpr
+            if afilter['operator'] == 'and':
+                expression &= afilter['expression']
+            else:
+                expression |= afilter['expression']
 
         # We don't do the actual filtering on the original dataframe here, instead we
         # just want to get the boolean series to flag which rows should be visible.
         return polars.concat([polars.Series([True]), # for header row
-                              self.dfs[dfi].with_columns(filter_expression.alias('$vrow'))['$vrow']])
+                              self.dfs[dfi].with_columns(expression.alias('$vrow'))['$vrow']])
 
     def sort_rows_from_metadata(self, sorts: dict, dfi: int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:

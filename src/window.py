@@ -385,6 +385,9 @@ class Window(Adw.ApplicationWindow):
     def on_sorts_changed(self, source: GObject.Object, dfi: int) -> None:
         self.sidebar_home_view.repopulate_sort_list(dfi)
 
+    def on_filters_changed(self, source: GObject.Object, dfi: int) -> None:
+        self.sidebar_home_view.repopulate_filter_list(dfi)
+
     def on_inline_formula_opened(self, source: GObject.Object, sel_value: str) -> None:
         globals.is_editing_cells = True
         self.inline_formula.get_buffer().set_text(sel_value)
@@ -508,6 +511,7 @@ class Window(Adw.ApplicationWindow):
         sheet_view.document.connect('selection-changed', self.on_selection_changed)
         sheet_view.document.connect('columns-changed', self.on_columns_changed)
         sheet_view.document.connect('sorts-changed', self.on_sorts_changed)
+        sheet_view.document.connect('filters-changed', self.on_filters_changed)
         sheet_view.document.connect('open-context-menu', self.on_context_menu_opened)
         sheet_view.document.view.connect('open-inline-formula', self.on_inline_formula_opened)
         sheet_view.document.view.connect('open-context-menu', self.on_context_menu_opened)

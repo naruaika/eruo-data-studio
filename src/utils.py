@@ -78,6 +78,8 @@ from polars import DataType, Categorical, \
                    Date, Time, Datetime, \
                    Boolean, Utf8, Null
 
+
+
 def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
     symbol_map = {
         Categorical: {'short': 'cat',   'long': 'categorical'},
@@ -103,3 +105,31 @@ def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
         if dtype == dt or isinstance(dtype, dt):
             return symbol['short'] if short else symbol['long']
     return '?'
+
+
+
+def get_dtype_class(dtype: DataType) -> type:
+    class_map = {
+        Categorical: 'other',
+        Int8:        'numeric',
+        Int16:       'numeric',
+        Int32:       'numeric',
+        Int64:       'numeric',
+        UInt8:       'numeric',
+        UInt16:      'numeric',
+        UInt32:      'numeric',
+        UInt64:      'numeric',
+        Float32:     'numeric',
+        Float64:     'numeric',
+        Decimal:     'numeric',
+        Date:        'temporal',
+        Time:        'other',
+        Datetime:    'temporal',
+        Boolean:     'other',
+        Utf8:        'text',
+        Null:        'other',
+    }
+    for dt, cls in class_map.items():
+        if dtype == dt or isinstance(dtype, dt):
+            return cls
+    return None
