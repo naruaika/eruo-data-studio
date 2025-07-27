@@ -43,6 +43,8 @@ class Window(Adw.ApplicationWindow):
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
     formula_bar_dtype = Gtk.Template.Child()
+
+    inline_formula_box = Gtk.Template.Child()
     inline_formula = Gtk.Template.Child()
 
     toast_overlay = Gtk.Template.Child()
@@ -182,7 +184,7 @@ class Window(Adw.ApplicationWindow):
 
         if keyval == Gdk.KEY_Escape:
             globals.is_editing_cells = False
-            self.inline_formula.set_visible(False)
+            self.inline_formula_box.set_visible(False)
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
             sheet_view.main_canvas.queue_draw()
@@ -190,7 +192,7 @@ class Window(Adw.ApplicationWindow):
 
         if keyval == Gdk.KEY_Return:
             globals.is_editing_cells = False
-            self.inline_formula.set_visible(False)
+            self.inline_formula_box.set_visible(False)
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
 
@@ -203,16 +205,16 @@ class Window(Adw.ApplicationWindow):
 
     def on_inline_formula_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         globals.is_editing_cells = False
-        self.inline_formula.set_visible(False)
+        self.inline_formula_box.set_visible(False)
 
         sheet_view = self.get_current_active_view()
         sheet_view.main_canvas.queue_draw()
 
     def on_inline_formula_buffer_changed(self, buffer):
-        self.inline_formula.queue_resize()
+        self.inline_formula_box.queue_resize()
 
     def on_content_overlay_get_child_position(self, overlay: Gtk.Overlay, widget: Gtk.Widget, allocation: Gdk.Rectangle) -> bool:
-        if widget == self.inline_formula:
+        if widget == self.inline_formula_box:
             sheet_view = self.get_current_active_view()
             sheet_document = sheet_view.document
 
@@ -394,9 +396,9 @@ class Window(Adw.ApplicationWindow):
 
     def on_inline_formula_opened(self, source: GObject.Object, sel_value: str) -> None:
         globals.is_editing_cells = True
+        self.inline_formula_box.get_vadjustment().set_value(0)
+        self.inline_formula_box.set_visible(True)
         self.inline_formula.get_buffer().set_text(sel_value)
-        self.inline_formula.set_visible(True)
-        self.inline_formula.grab_focus()
         self.inline_formula.grab_focus()
 
     def on_context_menu_opened(self, source: GObject.Object, x: int, y: int, type: str) -> None:
