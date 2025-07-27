@@ -9,6 +9,11 @@
     <file preprocess="xml-stripblanks">ui/search-replace-all-view.ui</file>
     <file preprocess="xml-stripblanks">ui/search-replace-overlay.ui</file>
     <file preprocess="xml-stripblanks">ui/sidebar-home-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/toolbar-home-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/toolbar-insert-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/toolbar-formulas-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/toolbar-data-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/toolbar-view-view.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-header-menu.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/window.ui</file>

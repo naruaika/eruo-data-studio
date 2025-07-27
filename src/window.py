@@ -40,6 +40,8 @@ class Window(Adw.ApplicationWindow):
     toggle_search_all = Gtk.Template.Child()
     toggle_history = Gtk.Template.Child()
 
+    toolbar_tab_view = Gtk.Template.Child()
+
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
     formula_bar_dtype = Gtk.Template.Child()
@@ -60,6 +62,27 @@ class Window(Adw.ApplicationWindow):
 
         from .sheet_manager import SheetManager
         self.sheet_manager = SheetManager()
+
+        from .toolbar_home_view import ToolbarHomeView
+        self.toolbar_home_view = ToolbarHomeView(self)
+        self.toolbar_home_page = self.toolbar_tab_view.append(self.toolbar_home_view)
+        self.toolbar_tab_view.set_selected_page(self.toolbar_home_page)
+
+        from .toolbar_insert_view import ToolbarInsertView
+        self.toolbar_insert_view = ToolbarInsertView(self)
+        self.toolbar_insert_page = self.toolbar_tab_view.append(self.toolbar_insert_view)
+
+        from .toolbar_formulas_view import ToolbarFormulasView
+        self.toolbar_formulas_view = ToolbarFormulasView(self)
+        self.toolbar_formulas_page = self.toolbar_tab_view.append(self.toolbar_formulas_view)
+
+        from .toolbar_data_view import ToolbarDataView
+        self.toolbar_data_view = ToolbarDataView(self)
+        self.toolbar_data_page = self.toolbar_tab_view.append(self.toolbar_data_view)
+
+        from .toolbar_view_view import ToolbarViewView
+        self.toolbar_view_view = ToolbarViewView(self)
+        self.toolbar_view_page = self.toolbar_tab_view.append(self.toolbar_view_view)
 
         from .search_replace_overlay import SearchReplaceOverlay
         self.search_replace_overlay = SearchReplaceOverlay(self)
@@ -259,6 +282,14 @@ class Window(Adw.ApplicationWindow):
             return True
 
         return False
+
+    @Gtk.Template.Callback()
+    def on_toolbar_tab_button_toggled(self, toggle_button: Gtk.ToggleButton) -> None:
+        if toggle_button.get_active():
+            tv_name = toggle_button.get_label().lower()
+            selected_view = getattr(self, f'toolbar_{tv_name}_page', None)
+            if selected_view is not None:
+                self.toolbar_tab_view.set_selected_page(selected_view)
 
     @Gtk.Template.Callback()
     def on_name_box_activated(self, widget: Gtk.Widget) -> None:

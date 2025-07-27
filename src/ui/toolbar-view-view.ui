@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <template class="ToolbarViewView" parent="GtkBox">
+    <property name="orientation">horizontal</property>
+    <child>
+      <object class="GtkScrolledWindow">
+        <property name="vscrollbar-policy">never</property>
+        <property name="hscrollbar-policy">external</property>
+        <property name="hexpand">true</property>
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">horizontal</property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>
