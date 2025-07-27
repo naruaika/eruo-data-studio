@@ -95,7 +95,7 @@ FILTER_BASIC_SCHEMA = {
                                      ['$value']],
     'equals'                      : [['$field', '$operator'],
                                      ['$value']],
-    'doesn\'t equal'              : [['$field', '$operator'],
+    'does not equal'              : [['$field', '$operator'],
                                      ['$value']],
     'is null'                     : [['$field', '$operator']],
     'is not null'                 : [['$field', '$operator']],
@@ -103,15 +103,15 @@ FILTER_BASIC_SCHEMA = {
     # TEXT
     'begins with'                 : [['$field', '$operator'],
                                      ['$value']],
-    'doesn\'t begin with'         : [['$field', '$operator'],
+    'does not begin with'         : [['$field', '$operator'],
                                      ['$value']],
     'ends with'                   : [['$field', '$operator'],
                                      ['$value']],
-    'doesn\'t end with'           : [['$field', '$operator'],
+    'does not end with'           : [['$field', '$operator'],
                                      ['$value']],
     'contains'                    : [['$field', '$operator'],
                                      ['$value']],
-    'doesn\'t contain'            : [['$field', '$operator'],
+    'does not contain'            : [['$field', '$operator'],
                                      ['$value']],
 
     # NUMERIC
@@ -187,17 +187,17 @@ FILTER_BASIC_SCHEMA = {
 FILTER_BASIC_OPTION = {
     'generic' : [
         'equals',
-        'doesn\'t equal',
+        'does not equal',
         'is null',
         'is not null',
     ],
     'text': [
         'begins with',
-        'doesn\'t begin with',
+        'does not begin with',
         'ends with',
-        'doesn\'t end with',
+        'does not end with',
         'contains',
-        'doesn\'t contain',
+        'does not contain',
     ],
     'numeric': [
         'is greater than',
@@ -641,6 +641,13 @@ class SidebarHomeView(Adw.Bin):
         self.sort_list_status.get_parent().set_visible(False)
 
     @Gtk.Template.Callback()
+    def on_delete_all_sort_button_clicked(self, button: Gtk.Button) -> None:
+        self.sort_list_store.remove_all()
+
+        self.sort_list_view_box.get_parent().set_visible(False)
+        self.sort_list_status.get_parent().set_visible(True)
+
+    @Gtk.Template.Callback()
     def on_apply_sort_button_clicked(self, button: Gtk.Button) -> None:
         document = self.window.get_current_active_document()
 
@@ -778,7 +785,7 @@ class SidebarHomeView(Adw.Bin):
                         elif row_item == '$custom':
                             text_view = self.create_general_text_view(item_data.query)
                             text_view.get_buffer().bind_property('text', item_data, 'query', GObject.BindingFlags.DEFAULT)
-                            list_item.container.append(text_view)
+                            box.append(text_view)
 
                         # Operator selector
                         elif row_item == '$operator':
@@ -815,6 +822,7 @@ class SidebarHomeView(Adw.Bin):
         if self.filter_list_store.get_n_items() == 0:
             self.filter_list_view_box.get_parent().set_visible(False)
             self.filter_list_status.get_parent().set_visible(True)
+
             self.apply_pending_filter() # force apply filter
 
     @Gtk.Template.Callback()
@@ -832,6 +840,15 @@ class SidebarHomeView(Adw.Bin):
 
         self.filter_list_view_box.get_parent().set_visible(True)
         self.filter_list_status.get_parent().set_visible(False)
+
+    @Gtk.Template.Callback()
+    def on_delete_all_filter_button_clicked(self, button: Gtk.Button) -> None:
+        self.filter_list_store.remove_all()
+
+        self.filter_list_view_box.get_parent().set_visible(False)
+        self.filter_list_status.get_parent().set_visible(True)
+
+        self.apply_pending_filter() # force apply filter
 
     @Gtk.Template.Callback()
     def on_apply_filter_button_clicked(self, button: Gtk.Button) -> None:
@@ -971,6 +988,9 @@ class SidebarHomeView(Adw.Bin):
         # TODO: support multiple dataframes?
         document = self.window.get_current_active_document()
         dtypes = document.data.dfs[0].dtypes
+
+        if len(document.current_filters) == 0 and self.filter_list_store.get_n_items() == 0:
+            return # skip to prevent from saving new history item
 
         document.current_filters = []
         document.pending_filters = []
@@ -1250,7 +1270,7 @@ class SidebarHomeView(Adw.Bin):
     def create_general_text_view(self, text: str = '') -> Gtk.TextView:
         text_view = Gtk.TextView()
         text_view.set_hexpand(True)
-        text_view.set_size_request(-1, 28)
+        text_view.set_size_request(-1, 65)
 
         buffer = Gtk.TextBuffer()
         buffer.set_text(text)
