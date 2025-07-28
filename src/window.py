@@ -385,6 +385,9 @@ class Window(Adw.ApplicationWindow):
             return
         sheet_view = tab_page.get_child()
 
+        # Force the sidebar to update its content based on the current active selection
+        sheet_view.document.notify_selected_table_changed(force=True)
+
         # Update the global references to the current active document
         globals.history = sheet_view.document.history
 

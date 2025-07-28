@@ -70,14 +70,14 @@
                         <property name="margin-start">12</property>
                         <property name="margin-end">6</property>
                         <child>
-                          <object class="GtkLabel">
+                          <object class="GtkLabel" id="sort_list_status_label">
                             <property name="halign">start</property>
                             <property name="hexpand">true</property>
                             <property name="label">No sorts added</property>
                           </object>
                         </child>
                         <child>
-                          <object class="GtkButton">
+                          <object class="GtkButton" id="sort_list_status_add_button">
                             <property name="margin-end">1</property>
                             <property name="icon-name">list-add-symbolic</property>
                             <property name="tooltip-text">Add sort</property>
@@ -191,14 +191,14 @@
                         <property name="margin-start">12</property>
                         <property name="margin-end">6</property>
                         <child>
-                          <object class="GtkLabel">
+                          <object class="GtkLabel" id="filter_list_status_label">
                             <property name="halign">start</property>
                             <property name="hexpand">true</property>
                             <property name="label">No filters added</property>
                           </object>
                         </child>
                         <child>
-                          <object class="GtkButton">
+                          <object class="GtkButton" id="filter_list_status_add_button">
                             <property name="margin-end">1</property>
                             <property name="icon-name">list-add-symbolic</property>
                             <property name="tooltip-text">Add filter</property>

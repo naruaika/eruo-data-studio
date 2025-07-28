@@ -409,11 +409,15 @@ class SidebarHomeView(Adw.Bin):
     sort_list_view_box = Gtk.Template.Child()
     sort_list_status = Gtk.Template.Child()
     sort_list_view = Gtk.Template.Child()
+    sort_list_status_label = Gtk.Template.Child()
+    sort_list_status_add_button = Gtk.Template.Child()
     sort_list_store = Gtk.Template.Child()
 
     filter_list_view_box = Gtk.Template.Child()
     filter_list_status = Gtk.Template.Child()
     filter_list_view = Gtk.Template.Child()
+    filter_list_status_label = Gtk.Template.Child()
+    filter_list_status_add_button = Gtk.Template.Child()
     filter_list_store = Gtk.Template.Child()
 
     def __init__(self, window: Window, **kwargs) -> None:
@@ -518,10 +522,10 @@ class SidebarHomeView(Adw.Bin):
         sheet_document = self.window.get_current_active_document()
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
-            dfi = 0 # TODO: add support for hiding field section?
-
-        self.field_list_view.get_parent().set_visible(True)
-        self.field_list_status.get_parent().set_visible(False)
+            self.field_list_view.get_parent().set_visible(False)
+            self.field_list_status.get_parent().set_visible(True)
+            self.field_list_status.set_text('No table selected')
+            return
 
         schema = sheet_document.data.dfs[dfi].schema
         bboxes = sheet_document.data.bbs[dfi]
@@ -533,6 +537,13 @@ class SidebarHomeView(Adw.Bin):
             self.field_list_store.append(FieldListItem(cindex + 1, cname, dtype, active))
 
         self.repopulate_sort_list(dfi)
+
+        is_empty = self.field_list_store.get_n_items() == 0
+        self.field_list_view.get_parent().set_visible(not is_empty)
+        self.field_list_status.get_parent().set_visible(is_empty)
+
+        if self.field_list_store.get_n_items() == 0:
+            self.field_list_status.set_text('No fields found')
 
     #
     # Sort section
@@ -631,6 +642,7 @@ class SidebarHomeView(Adw.Bin):
         if self.sort_list_store.get_n_items() == 0:
             self.sort_list_view_box.get_parent().set_visible(False)
             self.sort_list_status.get_parent().set_visible(True)
+            self.sort_list_status_label.set_text('No sorts found')
 
     @Gtk.Template.Callback()
     def on_add_sort_button_clicked(self, button: Gtk.Button) -> None:
@@ -646,6 +658,7 @@ class SidebarHomeView(Adw.Bin):
 
         self.sort_list_view_box.get_parent().set_visible(False)
         self.sort_list_status.get_parent().set_visible(True)
+        self.sort_list_status_label.set_text('No sorts found')
 
     @Gtk.Template.Callback()
     def on_apply_sort_button_clicked(self, button: Gtk.Button) -> None:
@@ -667,10 +680,10 @@ class SidebarHomeView(Adw.Bin):
         sheet_document = self.window.get_current_active_document()
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
-            dfi = 0 # TODO: add support for hiding sort section?
-
-        self.sort_list_view_box.get_parent().set_visible(True)
-        self.sort_list_status.get_parent().set_visible(False)
+            self.sort_list_view.get_parent().set_visible(False)
+            self.sort_list_status.get_parent().set_visible(True)
+            self.sort_list_status_label.set_text('No table selected')
+            return
 
         column_names = sheet_document.data.dfs[dfi].columns
 
@@ -683,6 +696,9 @@ class SidebarHomeView(Adw.Bin):
         is_empty = self.sort_list_store.get_n_items() == 0
         self.sort_list_view_box.get_parent().set_visible(not is_empty)
         self.sort_list_status.get_parent().set_visible(is_empty)
+
+        if self.sort_list_store.get_n_items() == 0:
+            self.sort_list_status_label.set_text('No sorts found')
 
     #
     # Filter section
@@ -822,6 +838,7 @@ class SidebarHomeView(Adw.Bin):
         if self.filter_list_store.get_n_items() == 0:
             self.filter_list_view_box.get_parent().set_visible(False)
             self.filter_list_status.get_parent().set_visible(True)
+            self.filter_list_status_label.set_text('No filters found')
 
             self.apply_pending_filter() # force apply filter
 
@@ -847,6 +864,7 @@ class SidebarHomeView(Adw.Bin):
 
         self.filter_list_view_box.get_parent().set_visible(False)
         self.filter_list_status.get_parent().set_visible(True)
+        self.filter_list_status_label.set_text('No filters found')
 
         self.apply_pending_filter() # force apply filter
 
@@ -860,10 +878,10 @@ class SidebarHomeView(Adw.Bin):
         sheet_document = self.window.get_current_active_document()
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
-            dfi = 0 # TODO: add support for hiding filter section?
-
-        self.filter_list_view_box.get_parent().set_visible(True)
-        self.filter_list_status.get_parent().set_visible(False)
+            self.filter_list_view.get_parent().set_visible(False)
+            self.filter_list_status.get_parent().set_visible(True)
+            self.filter_list_status_label.set_text('No table selected')
+            return
 
         for afilter in sheet_document.current_filters:
             builder = afilter['query-builder']
@@ -894,6 +912,9 @@ class SidebarHomeView(Adw.Bin):
         is_empty = self.filter_list_store.get_n_items() == 0
         self.filter_list_view_box.get_parent().set_visible(not is_empty)
         self.filter_list_status.get_parent().set_visible(is_empty)
+
+        if self.filter_list_store.get_n_items() == 0:
+            self.filter_list_status_label.set_text('No filters found')
 
     def refresh_filter_list_item(self, position: int, pstate: dict) -> None:
         item = self.filter_list_store.get_item(position)

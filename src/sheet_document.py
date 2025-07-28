@@ -65,6 +65,25 @@ class SheetDocument(GObject.Object):
         self.selection = SheetSelection(self)
         self.view = SheetView(self)
 
+        self.hovered_widget: SheetWidget = None
+        self.focused_widget: SheetWidget = None
+
+        self.is_selecting_cells: bool = False
+
+        self.current_dfi: int = -1
+
+        self.pending_sorts: dict = {}
+        self.current_sorts: dict = {}
+
+        # These variables are used to store the pending and current filters.
+        # It should consist of one or more dictionary with the following format:
+        # - `qhash` is used for checking if there's a duplicate filter
+        # - `qtype` can be used to check where the filter comes from
+        # - `expression` is used by the SheetData for efficient filtering
+        # - `query-builder` can be used for pretty much anything else
+        self.pending_filters: list = []
+        self.current_filters: list = []
+
         self.setup_main_canvas()
         self.setup_scrollbars()
 
@@ -74,23 +93,6 @@ class SheetDocument(GObject.Object):
         self.setup_document_history()
         self.populate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
-
-        self.hovered_widget: SheetWidget = None
-        self.focused_widget: SheetWidget = None
-
-        self.is_selecting_cells: bool = False
-
-        self.pending_sorts = {}
-        self.current_sorts = {}
-
-        # These variables are used to store the pending and current filters.
-        # It should consist of one or more dictionary with the following format:
-        # - `qhash` is used for checking if there's a duplicate filter
-        # - `qtype` can be used to check where the filter comes from
-        # - `expression` is used by the SheetData for efficient filtering
-        # - `query-builder` can be used for pretty much anything else
-        self.pending_filters = []
-        self.current_filters = []
 
     #
     # Setup
@@ -269,7 +271,8 @@ class SheetDocument(GObject.Object):
 
         self.view.main_canvas.queue_draw()
 
-        # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
+        self.notify_selected_table_changed()
+
 
     def on_update_selection_by_motion(self, source: GObject.Object, x: int, y: int) -> None:
         if self.focused_widget is not None:
@@ -334,7 +337,7 @@ class SheetDocument(GObject.Object):
 
         self.view.main_canvas.queue_draw()
 
-        # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
+        self.notify_selected_table_changed()
 
     def on_update_pointer_moved(self, source: GObject.Object, x: int, y: int) -> None:
         if self.is_selecting_cells:
@@ -401,7 +404,7 @@ class SheetDocument(GObject.Object):
 
         self.view.main_canvas.queue_draw()
 
-        # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
+        self.notify_selected_table_changed()
 
     def update_selection_from_name(self, name: str) -> None:
         vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
@@ -415,7 +418,7 @@ class SheetDocument(GObject.Object):
 
         self.view.main_canvas.queue_draw()
 
-        # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
+        self.notify_selected_table_changed()
 
     def update_selection_from_position(self, col_1: int, row_1: int, col_2: int, row_2: int,
                                        keep_order: bool = False, follow_cursor: bool = True,
@@ -1610,6 +1613,13 @@ class SheetDocument(GObject.Object):
 
         # Request to update the input bar with the selected cell data
         self.emit('selection-changed')
+
+    def notify_selected_table_changed(self, force: bool = False) -> None:
+        if self.current_dfi != self.selection.current_active_range.metadata.dfi or force:
+            self.current_dfi = self.selection.current_active_range.metadata.dfi
+            self.emit('columns-changed', self.current_dfi)
+            self.emit('sorts-changed', self.current_dfi)
+            self.emit('filters-changed', self.current_dfi)
 
     #
     # Adjustments
