@@ -21,7 +21,6 @@
 from gi.repository import Adw, Gdk, GLib, Gtk
 import polars
 
-from . import globals
 from .window import Window
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/search-replace-overlay.ui')
@@ -236,7 +235,8 @@ class SearchReplaceOverlay(Adw.Bin):
         self.search_entry.get_first_child().set_focus_on_click(True)
         self.search_entry.get_first_child().grab_focus()
 
-        globals.is_searching_cells = True
+        document = self.window.get_current_active_document()
+        document.is_searching_cells = True
 
         self.search_entry.grab_focus()
 
@@ -295,7 +295,7 @@ class SearchReplaceOverlay(Adw.Bin):
         # Reset the current search range
         sheet_view.document.selection.current_search_range = None
 
-        globals.is_searching_cells = False
+        sheet_view.document.is_searching_cells = False
 
         # Focus on the main canvas
         sheet_view.main_canvas.set_focusable(True)

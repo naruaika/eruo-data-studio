@@ -749,7 +749,7 @@ class SheetRenderer(GObject.Object):
         range_x, range_y, range_width, range_height = auto_adjust_selection_range(range.x, range.y, range.width, range.height)
 
         search_range = selection.current_search_range
-        if globals.is_searching_cells and search_range is not None:
+        if display.document.is_searching_cells and search_range is not None:
             search_range_x, search_range_y, search_range_width, search_range_height = auto_adjust_selection_range(search_range.x, search_range.y,
                                                                                                                   search_range.width, search_range.height)
 
@@ -777,7 +777,7 @@ class SheetRenderer(GObject.Object):
             context.stroke()
 
             # Render the search range
-            if globals.is_searching_cells and search_range is not None:
+            if display.document.is_searching_cells and search_range is not None:
                 context.save()
                 context.set_line_width(1)
                 context.set_dash([4, 4], 0)

@@ -34,11 +34,6 @@ history: HistoryManager = None
 is_changing_state: bool = False
 
 
-# Useful to break the event loop when refreshing UIs
-# TODO: move to sheet_document as it's only used there
-is_refreshing_uis: bool = False
-
-
 # The idea is to make the current active window to behave in a
 # certain way, e.g. when editing cells and the user wants to do
 # a vlookup to another window, the current window should show
@@ -46,13 +41,6 @@ is_refreshing_uis: bool = False
 # case, we may also need another global variable to track any
 # changes in the input bar.
 is_editing_cells: bool = False
-
-
-# This is specifically to tell the renderer that there's
-# a search going on, or a search box is open to be precise.
-# FIXME: move to sheet_display as it can be accessed from
-#        self.window.get_current_active_document().display
-is_searching_cells: bool = False
 
 
 # This is supposed to be set by any current window

@@ -595,20 +595,21 @@ class Window(Adw.ApplicationWindow):
             self.formula_bar_dtype.set_visible(False)
 
     def do_toggle_sidebar(self) -> None:
+        sheet_document = self.get_current_active_document()
+
         # Close the sidebar when it's already open
         if self.toggle_sidebar.get_active():
             self.toggle_sidebar.set_active(False)
             self.split_view.set_collapsed(True)
-            sheet_document = self.get_current_active_document()
             sheet_document.selection.current_search_range = None
-            globals.is_searching_cells = False
+            sheet_document.is_searching_cells = False
             return
 
         # Open the sidebar
         self.toggle_sidebar.set_active(True)
         self.split_view.set_collapsed(False)
         if self.sidebar_tab_view.get_selected_page() == self.search_replace_all_page:
-            globals.is_searching_cells = True
+            sheet_document.is_searching_cells = True
 
     def show_toast_message(self, message: str) -> None:
         self.toast_overlay.add_toast(Adw.Toast.new(message))

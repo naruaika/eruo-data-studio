@@ -504,10 +504,10 @@ class SidebarHomeView(Adw.Bin):
         def on_check_button_toggled(button: Gtk.Button, item_data: FieldListItem) -> None:
             item_data.active = button.get_active()
 
-            globals.is_refreshing_uis = True
             sheet_document = self.window.get_current_active_document()
+            sheet_document.is_refreshing_uis = True
             sheet_document.toggle_column_visibility(item_data.cindex, button.get_active())
-            globals.is_refreshing_uis = False
+            sheet_document.is_refreshing_uis = False
 
         list_item.check_button.connect('toggled', on_check_button_toggled, item_data)
 
@@ -670,9 +670,9 @@ class SidebarHomeView(Adw.Bin):
             document.pending_sorts[sort_item.cname] = {'cindex': sort_item.cindex,
                                                        'descending': descending}
 
-        globals.is_refreshing_uis = True
+        document.is_refreshing_uis = True
         document.sort_current_rows(multiple=True)
-        globals.is_refreshing_uis = False
+        document.is_refreshing_uis = False
 
     def repopulate_sort_list(self, dfi: int = 0) -> None:
         self.sort_list_store.remove_all()
@@ -1056,9 +1056,9 @@ class SidebarHomeView(Adw.Bin):
 
             document.pending_filters.append(metadata)
 
-        globals.is_refreshing_uis = True
+        document.is_refreshing_uis = True
         document.filter_current_rows(multiple=True)
-        globals.is_refreshing_uis = False
+        document.is_refreshing_uis = False
 
 
 

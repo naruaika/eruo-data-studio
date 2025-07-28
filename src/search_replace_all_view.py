@@ -190,7 +190,8 @@ class SearchReplaceAllView(Gtk.Box):
         tab_page = self.window.search_replace_all_page
         self.window.sidebar_tab_view.set_selected_page(tab_page)
 
-        globals.is_searching_cells = True
+        document = self.window.get_current_active_document()
+        document.is_searching_cells = True
 
         self.search_entry.grab_focus()
 
@@ -268,4 +269,5 @@ class SearchReplaceAllView(Gtk.Box):
     def close_search_view(self) -> None:
         self.window.toggle_search_all.set_active(False)
 
-        globals.is_searching_cells = False
+        document = self.window.get_current_active_document()
+        document.is_searching_cells = False

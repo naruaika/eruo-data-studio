@@ -68,6 +68,8 @@ class SheetDocument(GObject.Object):
         self.hovered_widget: SheetWidget = None
         self.focused_widget: SheetWidget = None
 
+        self.is_refreshing_uis: bool = False
+        self.is_searching_cells: bool = False
         self.is_selecting_cells: bool = False
 
         self.current_dfi: int = -1
@@ -1045,7 +1047,7 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            if not globals.is_refreshing_uis:
+            if not self.is_refreshing_uis:
                 # FIXME: should we remove incompatible filters?
                 self.emit('columns-changed', range.metadata.dfi)
                 self.emit('filters-changed', range.metadata.dfi)
@@ -1155,7 +1157,7 @@ class SheetDocument(GObject.Object):
             cell_name = self.display.get_cell_name_from_position(vcolumn, vrow)
             self.update_selection_from_name(cell_name)
 
-        if not globals.is_refreshing_uis:
+        if not self.is_refreshing_uis:
             self.emit('filters-changed', mdfi)
 
     def reset_all_filters(self) -> None:
@@ -1184,7 +1186,7 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
-        if not globals.is_refreshing_uis:
+        if not self.is_refreshing_uis:
             self.emit('filters-changed', 0)
 
     def sort_current_rows(self, descending: bool = False, multiple: bool = False) -> None:
@@ -1253,7 +1255,7 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
-        if not globals.is_refreshing_uis:
+        if not self.is_refreshing_uis:
             self.emit('sorts-changed', mdfi)
 
         return success
@@ -1285,7 +1287,7 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            if not globals.is_refreshing_uis:
+            if not self.is_refreshing_uis:
                 # FIXME: should we remove incompatible filters?
                 self.emit('columns-changed', range.metadata.dfi)
                 self.emit('filters-changed', range.metadata.dfi)
@@ -1535,7 +1537,7 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
-        if not globals.is_refreshing_uis:
+        if not self.is_refreshing_uis:
             self.emit('columns-changed', 0)
 
     def update_column_width(self, column: int, width: int) -> None:
