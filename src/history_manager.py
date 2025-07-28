@@ -49,12 +49,12 @@ class State(GObject.Object):
 
         self.timestamp = time.time()
 
-        # TODO: should we also store the scrollbar uppers?
         document = globals.history.document
         self.scroll_x = document.display.scroll_x_position
         self.scroll_y = document.display.scroll_y_position
+        self.should_restore_scroll_position = False
 
-    def save_selection(self) -> None:
+    def save_selection(self, should_restore: bool = False) -> None:
         document = globals.history.document
 
         self.range = document.selection.current_active_range
@@ -62,6 +62,8 @@ class State(GObject.Object):
         self.cursor = document.selection.current_cursor_cell
 
         self.search_range = document.selection.current_search_range
+
+        self.should_restore_scroll_position = should_restore
 
     def restore_selection(self, notify: bool = True) -> None:
         document = globals.history.document
@@ -100,7 +102,7 @@ class SelectionState(State):
                  keep_order: bool, follow_cursor: bool, auto_scroll: bool) -> None:
         super().__init__()
 
-        self.save_selection()
+        self.save_selection(True)
 
         self.col_1 = col_1
         self.row_1 = row_1
@@ -219,7 +221,7 @@ class UpdateDataState(State):
     def __init__(self, header: any, content: any, replace_with: any, search_pattern: str, match_case: bool) -> None:
         super().__init__()
 
-        self.save_selection()
+        self.save_selection(True)
 
         self.header = header
 
@@ -632,6 +634,8 @@ class ReplaceAllState(State):
                  match_cell: bool, within_selection: bool, use_regexp: bool) -> None:
         super().__init__()
 
+        self.save_selection(True)
+
         self.file_path = self.write_snapshot(content)
 
         self.column_names = column_names
@@ -645,8 +649,6 @@ class ReplaceAllState(State):
         self.match_cell = match_cell
         self.within_selection = within_selection
         self.use_regexp = use_regexp
-
-        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
@@ -776,12 +778,11 @@ class HistoryManager(GObject.Object):
             state.undo()
             self.redo_stack.append(state)
 
-        # FIXME: this is problematic, because it's too easy to jump to unexpected places
-        #        from the user perspective
-        scroll_y_position = globals.history.undo_stack[-1].scroll_y
-        scroll_x_position = globals.history.undo_stack[-1].scroll_x
+        scroll_y_position = self.undo_stack[-1].scroll_y
+        scroll_x_position = self.undo_stack[-1].scroll_x
 
-        self.restore_scroll_position(scroll_y_position, scroll_x_position)
+        if self.undo_stack[-1].should_restore_scroll_position:
+            self.restore_scroll_position(scroll_y_position, scroll_x_position)
 
         self.redraw_main_canvas()
 
@@ -797,15 +798,14 @@ class HistoryManager(GObject.Object):
         state.redo()
         self.undo_stack.append(state)
 
-        self.restore_scroll_position(state.scroll_y, state.scroll_x)
+        if state.should_restore_scroll_position:
+            self.restore_scroll_position(state.scroll_y, state.scroll_x)
 
         self.redraw_main_canvas()
 
         globals.is_changing_state = False
 
     def restore_scroll_position(self, scroll_y: float, scroll_x: float) -> None:
-        # TODO: if the target element is already visible, I don't think we need to scroll
-
         canvas_height = self.document.view.main_canvas.get_height()
         canvas_width = self.document.view.main_canvas.get_width()
 
@@ -814,6 +814,13 @@ class HistoryManager(GObject.Object):
 
         self.document.view.vertical_scrollbar.get_adjustment().set_value(scroll_y)
         self.document.view.horizontal_scrollbar.get_adjustment().set_value(scroll_x)
+
+        # Make sure that the cursor is visible in case the user has toggled some
+        # UI elements causing the cursor to be hidden, for example the sidebar.
+        self.document.auto_adjust_scrollbars_by_selection()
+        self.document.auto_adjust_locators_size_by_scroll()
+        self.document.auto_adjust_selections_by_scroll()
+        self.document.repopulate_auto_filter_widgets()
 
     def redraw_main_canvas(self) -> None:
         self.document.renderer.render_caches = {}

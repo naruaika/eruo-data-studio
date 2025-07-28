@@ -1197,7 +1197,7 @@ class SheetDocument(GObject.Object):
         if mdfi < 0 or len(self.data.dfs) <= mdfi:
             return False
 
-        # FIXME: This approach will also sort hidden rows which is different from other applications,
+        # FIXME: this approach will also sort hidden rows which is different from other applications,
         # I haven't made up my mind yet if we should follow other applications behavior, because I think
         # it'll be too expensive.
         self.data.dfs[mdfi] = self.data.dfs[mdfi].with_row_index('$ridx')
@@ -1272,7 +1272,8 @@ class SheetDocument(GObject.Object):
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import ConvertColumnDataTypeState
-            # FIXME: this doesn't handle different data types well even though usually they are the same
+            # FIXME: this doesn't handle different data types well when multiple columns are selected,
+            #        even though usually they are the same. Should we disable multiple selection?
             ndtype = self.data.read_column_dtype_from_metadata(range.metadata.column, range.metadata.dfi)
             state = ConvertColumnDataTypeState(ndtype, dtype)
 
