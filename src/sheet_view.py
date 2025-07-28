@@ -138,9 +138,8 @@ class SheetView(Gtk.Box):
         self.main_canvas.set_focusable(False)
 
     def on_main_canvas_lmb_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        # Request to open inline formula on double click
         if n_press >= 2:
-            self.document.auto_adjust_scrollbars_by_selection()
-
             cell_data = self.document.selection.cell_data
             if cell_data is None:
                 cell_data = ''

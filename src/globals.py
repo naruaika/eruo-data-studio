@@ -35,6 +35,7 @@ is_changing_state: bool = False
 
 
 # Useful to break the event loop when refreshing UIs
+# TODO: move to sheet_document as it's only used there
 is_refreshing_uis: bool = False
 
 
@@ -49,8 +50,8 @@ is_editing_cells: bool = False
 
 # This is specifically to tell the renderer that there's
 # a search going on, or a search box is open to be precise.
-# FIXME: we should do a better way, since this approach is
-# prone to bugs when the user switches between windows.
+# FIXME: move to sheet_display as it can be accessed from
+#        self.window.get_current_active_document().display
 is_searching_cells: bool = False
 
 

@@ -72,6 +72,7 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_scrollbars_by_scroll()
 
         self.setup_document_history()
+        self.populate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 
         self.hovered_widget: SheetWidget = None
@@ -328,7 +329,8 @@ class SheetDocument(GObject.Object):
         if isinstance(active_range, SheetLeftLocatorCell):
             scroll_axis = 'vertical'
 
-        self.update_selection_from_position(start_column, start_row, end_column, end_row, True, True, True, scroll_axis)
+        self.update_selection_from_position(start_column, start_row, end_column, end_row,
+                                            True, True, True, scroll_axis, False, True)
 
         self.view.main_canvas.queue_draw()
 
@@ -337,11 +339,23 @@ class SheetDocument(GObject.Object):
     def on_update_pointer_moved(self, source: GObject.Object, x: int, y: int) -> None:
         if self.is_selecting_cells:
             return
+
+        if self.focused_widget is not None:
+            if self.focused_widget.do_on_dragged(x, y):
+                return
+
         hovered_widget = None
 
+        # Find and track the hovered widget
         for widget in self.widgets:
             if widget.contains(x, y):
                 hovered_widget = widget
+                widget.do_on_enter(x, y)
+                continue
+
+            if self.hovered_widget == widget:
+                widget.do_on_leave(x, y)
+                continue
 
         if hovered_widget is not None:
             self.view.main_canvas.set_cursor(hovered_widget.cursor)
@@ -353,6 +367,10 @@ class SheetDocument(GObject.Object):
     def on_update_pointer_released(self, source: GObject.Object, x: int, y: int) -> None:
         self.is_selecting_cells = False
 
+        if self.focused_widget is not None:
+            self.focused_widget.do_on_released(x, y)
+            self.focused_widget = None
+
     #
     # Selection
     #
@@ -361,6 +379,10 @@ class SheetDocument(GObject.Object):
         # Trigger the on_click event of the hovered widget if the pointer is under one,
         # otherwise select the hovered cell.
         self.focused_widget = self.hovered_widget
+
+        if self.focused_widget is not None:
+            if self.focused_widget.do_on_pressed(x, y):
+                return
 
         column = self.display.get_column_from_point(x)
         row = self.display.get_row_from_point(y)
@@ -378,9 +400,6 @@ class SheetDocument(GObject.Object):
         self.update_selection_from_position(start_column, start_row, end_column, end_row, True, False, False)
 
         self.view.main_canvas.queue_draw()
-
-        if self.focused_widget is not None:
-            self.focused_widget.do_on_click(x, y)
 
         # TODO: should emit columns/sorts/filters-changed signals when only the dfi was changed
 
@@ -401,7 +420,7 @@ class SheetDocument(GObject.Object):
     def update_selection_from_position(self, col_1: int, row_1: int, col_2: int, row_2: int,
                                        keep_order: bool = False, follow_cursor: bool = True,
                                        auto_scroll: bool = True, scroll_axis: str = 'both',
-                                       with_offset: bool = False) -> None:
+                                       with_offset: bool = False, smooth_scroll: bool = False) -> None:
         # Save snapshot
         if not globals.is_changing_state:
             from .history_manager import SelectionState
@@ -510,7 +529,7 @@ class SheetDocument(GObject.Object):
         self.selection.current_cursor_cell = SheetContentCell(x, y, col_2, row_2, width, height, 1, 1, cell_metadata)
 
         if auto_scroll:
-            self.auto_adjust_scrollbars_by_selection(follow_cursor, scroll_axis, with_offset)
+            self.auto_adjust_scrollbars_by_selection(follow_cursor, scroll_axis, with_offset, smooth_scroll)
             self.auto_adjust_locators_size_by_scroll()
             self.auto_adjust_selections_by_scroll()
             self.repopulate_auto_filter_widgets()
@@ -1508,13 +1527,42 @@ class SheetDocument(GObject.Object):
                 column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
             self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
-        self.auto_adjust_selections_by_crud(0, 0, True)
+        self.auto_adjust_selections_by_crud(0, 0, False)
         self.repopulate_auto_filter_widgets()
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
         if not globals.is_refreshing_uis:
             self.emit('columns-changed', 0)
+
+    def update_column_width(self, column: int, width: int) -> None:
+        # Initialize column widths if needed
+        if len(self.display.column_widths) == 0:
+            self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * (column - 1))
+
+        # Expand column widths if needed
+        if len(self.display.column_widths) < column:
+            offset = column - len(self.display.column_widths)
+            self.display.column_widths = polars.concat([self.display.column_widths,
+                                                       polars.Series([self.display.DEFAULT_CELL_WIDTH] * offset)])
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UpdateColumnWidthState
+            old_width = self.display.column_widths[column - 1]
+            globals.history.save(UpdateColumnWidthState(column, old_width, width))
+
+        # Update column widths
+        self.display.column_widths[column - 1] = width
+        column_widths_visible_only = self.display.column_widths
+        if len(self.display.column_visibility_flags):
+            column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
+        self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_auto_filter_widgets()
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
     #
     # Helpers
@@ -1567,6 +1615,33 @@ class SheetDocument(GObject.Object):
     # Adjustments
     #
 
+    def populate_column_resizer_widgets(self) -> None:
+        if len(self.data.dfs) == 0:
+            return
+
+        from .sheet_widget import SheetColumnResizer
+
+        def on_hovered() -> None:
+            self.view.main_canvas.queue_draw()
+
+        def on_released(target_column: int, column_width: int) -> None:
+            vcolumn = self.display.get_vcolumn_from_column(target_column)
+
+            if column_width == 0:
+                self.toggle_column_visibility(vcolumn, False)
+            else:
+                self.update_column_width(vcolumn, column_width)
+
+        x = 0
+        y = 3
+        width = 8 # in pixels
+        height = self.display.column_header_height - 6
+
+        # We need only one column resizer that'll adapt to the position of the pointer on the canvas
+        # around any nearby column horizontal edges
+        column_resizer = SheetColumnResizer(x, y, width, height, self.display, on_hovered, on_released)
+        self.widgets.append(column_resizer)
+
     def repopulate_auto_filter_widgets(self) -> None:
         if len(self.data.dfs) == 0:
             return
@@ -1582,7 +1657,7 @@ class SheetDocument(GObject.Object):
         cell_height = self.display.get_cell_height_from_row(1)
         y = cell_y + (cell_height - icon_size) / 2 + self.display.scroll_y_position
 
-        def open_header_context_menu(x: int, y: int) -> None:
+        def on_clicked(x: int, y: int) -> None:
             GLib.idle_add(self.emit, 'open-context-menu', x, y, 'header')
 
         # TODO: support multiple dataframes?
@@ -1593,8 +1668,8 @@ class SheetDocument(GObject.Object):
             cell_x = self.display.get_cell_x_from_column(column + 1)
             cell_width = self.display.get_cell_width_from_column(column + 1)
             x = cell_x + self.display.scroll_x_position + cell_width - icon_size - 3
-            sheet_auto_filter = SheetAutoFilter(x, y,  icon_size, icon_size, self.display, open_header_context_menu)
-            self.widgets.append(sheet_auto_filter)
+            auto_filter = SheetAutoFilter(x, y,  icon_size, icon_size, self.display, on_clicked)
+            self.widgets.insert(0, auto_filter)
 
     def auto_adjust_column_widths(self) -> None:
         if len(self.data.dfs) == 0:
@@ -1700,13 +1775,20 @@ class SheetDocument(GObject.Object):
 
         globals.is_changing_state = False
 
-    def auto_adjust_scrollbars_by_selection(self, follow_cursor: bool = True, scroll_axis: str = 'both', with_offset: bool = False) -> None:
+    def auto_adjust_scrollbars_by_selection(self, follow_cursor: bool = True, scroll_axis: str = 'both',
+                                            with_offset: bool = False, smooth_scroll: bool = False) -> None:
         globals.is_changing_state = True
 
         column = self.selection.current_cursor_cell.column
         row = self.selection.current_cursor_cell.row
         viewport_height = self.view.main_canvas.get_height() - self.display.column_header_height
         viewport_width = self.view.main_canvas.get_width() - self.display.row_header_width
+
+        # TODO: implement smooth scrolling so that the cursor doesn't jump infinitely
+        # when the cursor near the edge of the viewport
+        if smooth_scroll:
+            pass
+
         self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis, with_offset)
 
         if not follow_cursor:

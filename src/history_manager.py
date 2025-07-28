@@ -100,6 +100,8 @@ class SelectionState(State):
                  keep_order: bool, follow_cursor: bool, auto_scroll: bool) -> None:
         super().__init__()
 
+        self.save_selection()
+
         self.col_1 = col_1
         self.row_1 = row_1
         self.col_2 = col_2
@@ -108,8 +110,6 @@ class SelectionState(State):
         self.keep_order = keep_order
         self.follow_cursor = follow_cursor
         self.auto_scroll = auto_scroll
-
-        self.save_selection()
 
     def undo(self) -> None:
         self.restore_selection()
@@ -130,10 +130,10 @@ class InsertBlankRowState(State):
     def __init__(self, row_span: int, above: bool) -> None:
         super().__init__()
 
+        self.save_selection()
+
         self.row_span = row_span
         self.above = above
-
-        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
@@ -166,10 +166,10 @@ class InsertBlankColumnState(State):
     def __init__(self, column_span: int, left: bool) -> None:
         super().__init__()
 
+        self.save_selection()
+
         self.column_span = column_span
         self.left = left
-
-        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
@@ -219,6 +219,8 @@ class UpdateDataState(State):
     def __init__(self, header: any, content: any, replace_with: any, search_pattern: str, match_case: bool) -> None:
         super().__init__()
 
+        self.save_selection()
+
         self.header = header
 
         self.replace_with = replace_with
@@ -244,6 +246,8 @@ class UpdateDataState(State):
         else:
             document.update_current_cells([self.header, self.content])
 
+        self.restore_selection()
+
     def redo(self) -> None:
         document = globals.history.document
         document.update_current_cells(self.replace_with, self.search_pattern, self.match_case)
@@ -259,10 +263,10 @@ class DuplicateRowState(State):
     def __init__(self, row_span: int, above: bool) -> None:
         super().__init__()
 
+        self.save_selection()
+
         self.row_span = row_span
         self.above = above
-
-        self.save_selection()
 
     def undo(self) -> None:
         document = globals.history.document
@@ -589,12 +593,16 @@ class ConvertColumnDataTypeState(State):
     def __init__(self, before: polars.DataType, after: polars.DataType) -> None:
         super().__init__()
 
+        self.save_selection()
+
         self.before = before
         self.after = after
 
     def undo(self) -> None:
         document = globals.history.document
         document.convert_current_columns_dtype(self.before)
+
+        self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
@@ -664,6 +672,8 @@ class ToggleColumnVisibilityState(State):
     def __init__(self, column: int, show: bool) -> None:
         super().__init__()
 
+        self.save_selection()
+
         self.column = column
         self.show = show
 
@@ -671,9 +681,40 @@ class ToggleColumnVisibilityState(State):
         document = globals.history.document
         document.toggle_column_visibility(self.column, not self.show)
 
+        self.restore_selection()
+
     def redo(self) -> None:
         document = globals.history.document
         document.toggle_column_visibility(self.column, self.show)
+
+
+
+class UpdateColumnWidthState(State):
+    __gtype_name__ = 'UpdateColumnWidthState'
+
+    column: int
+    before: int
+    after: int
+
+    def __init__(self, column: int, before: int, after: int) -> None:
+        super().__init__()
+
+        self.save_selection()
+
+        self.column = column
+        self.before = before
+        self.after = after
+
+    def undo(self) -> None:
+        document = globals.history.document
+        document.update_column_width(self.column, self.before)
+
+        self.restore_selection()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.update_column_width(self.column, self.after)
+
 
 
 class HistoryManager(GObject.Object):
@@ -735,6 +776,8 @@ class HistoryManager(GObject.Object):
             state.undo()
             self.redo_stack.append(state)
 
+        # FIXME: this is problematic, because it's too easy to jump to unexpected places
+        #        from the user perspective
         scroll_y_position = globals.history.undo_stack[-1].scroll_y
         scroll_x_position = globals.history.undo_stack[-1].scroll_x
 

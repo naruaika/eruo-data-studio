@@ -53,9 +53,9 @@ class SheetRenderer(GObject.Object):
         self.setup_cairo_context(context)
         self.draw_headers_backgrounds(context, width, height, display)
         self.draw_selection_backgrounds(context, width, height, display, selection)
-        self.draw_cells_borders(context, width, height, display)
         self.draw_headers_contents(canvas, context, width, height, display, data)
         self.draw_cells_contents(canvas, context, width, height, display, data)
+        self.draw_cells_borders(context, width, height, display)
         self.draw_selection_borders(context, width, height, display, selection)
         self.draw_virtual_widgets(context, width, height, display, widgets)
 
@@ -194,7 +194,7 @@ class SheetRenderer(GObject.Object):
         accent_rgba[3] = 1.0
         context.set_source_rgba(*accent_rgba)
 
-        # Bold highlight all the column headers if the user has selected the entire sheet
+        # Bold highlight all the headers if the user has selected the entire sheet
         if range.column == 0 and range.row == 0:
             context.reset_clip()
             context.rectangle(display.row_header_width, range_y, width, display.column_header_height)
@@ -204,7 +204,7 @@ class SheetRenderer(GObject.Object):
         # Bold highlight the selected column(s) header
         if range.column > 0 and range.row == 0:
             context.reset_clip()
-            context.rectangle(display.row_header_width -1, -1, width, height)
+            context.rectangle(display.row_header_width - 1, -1, width, height)
             context.clip()
             context.rectangle(range_x, range_y, range_width, display.column_header_height)
             context.fill()
@@ -237,141 +237,6 @@ class SheetRenderer(GObject.Object):
         context.clip()
         context.rectangle(cell.x, cell.y, cell.width, cell.height)
         context.fill()
-
-        context.restore()
-
-    def draw_cells_borders(self, context: cairo.Context, width: int, height: int, display: SheetDisplay) -> None:
-        context.save()
-
-        # We need to make sure that the cell borders are contrast enough to the canvas background
-        if self.prefers_dark:
-            context.set_source_rgb(0.25, 0.25, 0.25)
-        else:
-            context.set_source_rgb(0.75, 0.75, 0.75)
-
-        x_start = display.row_header_width
-        y_start = display.column_header_height
-        cell_width = display.DEFAULT_CELL_WIDTH
-        cell_height = display.DEFAULT_CELL_HEIGHT
-
-        # Draw separator line between headers and contents
-        context.move_to(0, y_start)
-        context.line_to(width, y_start)
-        context.move_to(x_start, 0)
-        context.line_to(x_start, height)
-        context.stroke()
-
-        # I bet this is better than a thick line!
-        context.set_hairline(True)
-
-        # Draw horizontal lines
-        y = y_start
-
-        nrow_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
-        prow_index = nrow_index
-
-        context.reset_clip()
-        context.rectangle(0, display.column_header_height, width, height)
-        context.clip()
-
-        # TODO: add support for custom row heights
-        while y < height:
-            context.move_to(x_start, y)
-            context.line_to(width, y)
-
-            # Skipping rows that are hidden will result in double lines
-            double_lines = False
-            if nrow_index < len(display.row_visible_series):
-                vrow_index = display.row_visible_series[nrow_index]
-                if vrow_index != prow_index:
-                    double_lines = True
-                    prow_index = vrow_index
-
-            # Handle edge cases where the last row(s) are hidden
-            elif nrow_index == len(display.row_visible_series) \
-                    and len(display.row_visible_series) \
-                    and display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) \
-                    and not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
-                double_lines = True
-                nrow_index += (len(display.row_visibility_flags) - 1) - (display.row_visible_series[-1] - 1)
-
-            if double_lines:
-                context.move_to(0, y - 2)
-                context.line_to(x_start, y - 2)
-                context.move_to(0, y + 2)
-                context.line_to(x_start, y + 2)
-            else:
-                context.move_to(0, y)
-                context.line_to(x_start, y)
-
-            y += cell_height
-            nrow_index += 1
-            prow_index += 1
-
-        context.stroke()
-
-        # Draw vertical lines
-        ncol_index = display.get_starting_column()
-        pcol_index = ncol_index
-
-        context.reset_clip()
-        context.rectangle(display.row_header_width, 0, width, height)
-        context.clip()
-
-        x = x_start
-        x_offset = 0
-        while x < width:
-            # Skipping columns that are hidden will result in double lines
-            double_lines = False
-            if ncol_index < len(display.column_visible_series):
-                vcol_index = display.column_visible_series[ncol_index]
-                if vcol_index != pcol_index:
-                    double_lines = True
-                    pcol_index = vcol_index
-
-            # Handle edge cases where the last column(s) are hidden
-            elif ncol_index == len(display.column_visible_series) \
-                    and len(display.column_visible_series) \
-                    and display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) \
-                    and not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
-                double_lines = True
-                ncol_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1)
-
-            vcol_index = display.get_vcolumn_from_column(ncol_index + 1)
-
-            # Get the width of the next appearing column
-            cell_width = display.DEFAULT_CELL_WIDTH
-            if vcol_index - 1 < len(display.column_widths):
-                cell_width = display.column_widths[vcol_index - 1]
-
-            # Offset the first appearing column to account for the scroll position if necessary
-            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
-                x_offset = display.scroll_x_position
-                if 0 < ncol_index <= len(display.cumulative_column_widths):
-                    x_offset -= display.cumulative_column_widths[ncol_index - 1]
-                elif len(display.cumulative_column_widths) < ncol_index:
-                    x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
-                x -= x_offset
-
-            # Draw line(s) in the locator area
-            if double_lines:
-                context.move_to(x - 2, 0)
-                context.line_to(x - 2, y_start)
-                context.move_to(x + 2, 0)
-                context.line_to(x + 2, y_start)
-            else:
-                context.move_to(x, 0)
-                context.line_to(x, y_start)
-
-            # Draw line in the content area
-            context.move_to(x, y_start)
-            context.line_to(x, height)
-
-            x += cell_width
-            ncol_index += 1
-            pcol_index += 1
-
-        context.stroke()
 
         context.restore()
 
@@ -707,6 +572,141 @@ class SheetRenderer(GObject.Object):
         context.set_source_surface(rcache['surface'], 0, 0)
         context.paint()
 
+    def draw_cells_borders(self, context: cairo.Context, width: int, height: int, display: SheetDisplay) -> None:
+        context.save()
+
+        # We need to make sure that the cell borders are contrast enough to the canvas background
+        if self.prefers_dark:
+            context.set_source_rgb(0.25, 0.25, 0.25)
+        else:
+            context.set_source_rgb(0.75, 0.75, 0.75)
+
+        x_start = display.row_header_width
+        y_start = display.column_header_height
+        cell_width = display.DEFAULT_CELL_WIDTH
+        cell_height = display.DEFAULT_CELL_HEIGHT
+
+        # Draw separator line between headers and contents
+        context.move_to(0, y_start)
+        context.line_to(width, y_start)
+        context.move_to(x_start, 0)
+        context.line_to(x_start, height)
+        context.stroke()
+
+        # I bet this is better than a thick line!
+        context.set_hairline(True)
+
+        # Draw horizontal lines
+        y = y_start
+
+        nrow_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
+        prow_index = nrow_index
+
+        context.reset_clip()
+        context.rectangle(0, display.column_header_height, width, height)
+        context.clip()
+
+        # TODO: add support for custom row heights
+        while y < height:
+            context.move_to(x_start, y)
+            context.line_to(width, y)
+
+            # Skipping rows that are hidden will result in double lines
+            double_lines = False
+            if nrow_index < len(display.row_visible_series):
+                vrow_index = display.row_visible_series[nrow_index]
+                if vrow_index != prow_index:
+                    double_lines = True
+                    prow_index = vrow_index
+
+            # Handle edge cases where the last row(s) are hidden
+            elif nrow_index == len(display.row_visible_series) \
+                    and len(display.row_visible_series) \
+                    and display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) \
+                    and not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
+                double_lines = True
+                nrow_index += (len(display.row_visibility_flags) - 1) - (display.row_visible_series[-1] - 1)
+
+            if double_lines:
+                context.move_to(0, y - 2)
+                context.line_to(x_start, y - 2)
+                context.move_to(0, y + 2)
+                context.line_to(x_start, y + 2)
+            else:
+                context.move_to(0, y)
+                context.line_to(x_start, y)
+
+            y += cell_height
+            nrow_index += 1
+            prow_index += 1
+
+        context.stroke()
+
+        # Draw vertical lines
+        ncol_index = display.get_starting_column()
+        pcol_index = ncol_index
+
+        context.reset_clip()
+        context.rectangle(display.row_header_width, 0, width, height)
+        context.clip()
+
+        x = x_start
+        x_offset = 0
+        while x < width:
+            # Skipping columns that are hidden will result in double lines
+            double_lines = False
+            if ncol_index < len(display.column_visible_series):
+                vcol_index = display.column_visible_series[ncol_index]
+                if vcol_index != pcol_index:
+                    double_lines = True
+                    pcol_index = vcol_index
+
+            # Handle edge cases where the last column(s) are hidden
+            elif ncol_index == len(display.column_visible_series) \
+                    and len(display.column_visible_series) \
+                    and display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) \
+                    and not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
+                double_lines = True
+                ncol_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1)
+
+            vcol_index = display.get_vcolumn_from_column(ncol_index + 1)
+
+            # Get the width of the next appearing column
+            cell_width = display.DEFAULT_CELL_WIDTH
+            if vcol_index - 1 < len(display.column_widths):
+                cell_width = display.column_widths[vcol_index - 1]
+
+            # Offset the first appearing column to account for the scroll position if necessary
+            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
+                x_offset = display.scroll_x_position
+                if 0 < ncol_index <= len(display.cumulative_column_widths):
+                    x_offset -= display.cumulative_column_widths[ncol_index - 1]
+                elif len(display.cumulative_column_widths) < ncol_index:
+                    x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
+                x -= x_offset
+
+            # Draw line(s) in the locator area
+            if double_lines:
+                context.move_to(x - 2, 0)
+                context.line_to(x - 2, y_start)
+                context.move_to(x + 2, 0)
+                context.line_to(x + 2, y_start)
+            else:
+                context.move_to(x, 0)
+                context.line_to(x, y_start)
+
+            # Draw line in the content area
+            context.move_to(x, y_start)
+            context.line_to(x, height)
+
+            x += cell_width
+            ncol_index += 1
+            pcol_index += 1
+
+        context.stroke()
+
+        context.restore()
+
     def draw_selection_borders(self, context: cairo.Context, width: int, height: int, display: SheetDisplay, selection: SheetSelection) -> None:
         context.save()
 
@@ -823,7 +823,7 @@ class SheetRenderer(GObject.Object):
                 continue
 
             context.save()
-            widget.do_render(context, width, height, self.prefers_dark)
+            widget.do_render(context, width, height, self.prefers_dark, self.color_accent)
             context.restore()
 
         context.restore()
