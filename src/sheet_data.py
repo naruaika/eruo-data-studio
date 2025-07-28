@@ -326,11 +326,12 @@ class SheetData(GObject.Object):
             elif stop - start > 0:
                 # The default behaviour is to replace cells within the selection range
                 if search_pattern is None:
+                    when_expression = polars.col('$ridx').is_between(start, stop - 1)
+                    if len(row_vseries):
+                        when_expression &= polars.col('$ridx').is_in(row_vseries[1:] - 1)
                     self.dfs[dfi] = self.dfs[dfi].with_row_index('$ridx') \
-                                                 .with_columns(polars.when(polars.col('$ridx').is_between(start, stop - 1) & \
-                                                                           polars.col('$ridx').is_in(row_vseries[1:] - 1))
-                                                                     .then(polars.lit(new_value)).otherwise(polars.col(column_name))
-                                                                     .alias(column_name)) \
+                                                 .with_columns(polars.when(when_expression).then(polars.lit(new_value))
+                                                                     .otherwise(polars.col(column_name)).alias(column_name)) \
                                                  .drop('$ridx')
 
                 # Pattern is used only for search and replace. The target should always be a single cell
