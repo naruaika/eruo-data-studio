@@ -22,6 +22,7 @@ from gi.repository import Gdk, GObject, Gtk
 
 from . import globals
 from .sheet_document import SheetDocument
+from .sheet_selection import SheetCornerLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/sheet-view.ui')
 class SheetView(Gtk.Box):
@@ -213,7 +214,34 @@ class SheetView(Gtk.Box):
     def on_main_canvas_resized(self, drawing_area: Gtk.DrawingArea, width: int, height: int) -> None:
         if self.main_canvas_width == width and self.main_canvas_height == height:
             return
+
+        active = self.document.selection.current_active_range
+
+        if isinstance(active, SheetCornerLocatorCell):
+            active.width = width
+            active.height = height
+        if isinstance(active, SheetTopLocatorCell):
+            active.height = height
+        if isinstance(active, SheetLeftLocatorCell):
+            active.width = width
+
+        self.document.auto_adjust_scrollbars_by_scroll()
+
+        # Invalidate some parts of the render cache
+        if 'content' in self.document.renderer.render_caches and \
+                (self.main_canvas_width < width or self.main_canvas_height < height):
+            if (x_offset := width - self.main_canvas_width) != 0:
+                self.document.renderer.render_caches['content']['x_pos'] -= x_offset
+                self.document.renderer.render_caches['content']['x_trans'] = x_offset
+
+            if (y_offset := height - self.main_canvas_height) != 0:
+                self.document.renderer.render_caches['content']['y_pos'] -= y_offset
+                self.document.renderer.render_caches['content']['y_trans'] = y_offset
+
+            # We currently don't support resizing in diagonal axis,
+            # so we force clear the entire cache instead
+            if x_offset != 0 and y_offset != 0:
+                self.document.renderer.render_caches = {}
+
         self.main_canvas_width = width
         self.main_canvas_height = height
-        self.document.auto_adjust_scrollbars_by_scroll()
-        self.document.renderer.render_caches = {}

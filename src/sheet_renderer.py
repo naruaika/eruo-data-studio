@@ -516,6 +516,8 @@ class SheetRenderer(GObject.Object):
                 'surface': cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height),
                 'x_pos': display.scroll_x_position,
                 'y_pos': display.scroll_y_position,
+                'x_trans': 0,
+                'y_trans': 0,
             }
             use_cache = False
 
@@ -559,10 +561,15 @@ class SheetRenderer(GObject.Object):
                     cheight = display.get_cell_height_from_point(y_start - y_offset)
                     ncontext.rectangle(x_start, ny_end + cheight, x_end, y_end)
 
+                ncontext.translate(rcache['x_trans'], rcache['y_trans'])
                 ncontext.clip()
                 ncontext.set_source_surface(rcache['surface'], -x_offset, -y_offset)
                 ncontext.paint()
                 ncontext.reset_clip()
+                ncontext.translate(-rcache['x_trans'], -rcache['y_trans'])
+
+                rcache['x_trans'] = 0
+                rcache['y_trans'] = 0
 
             ccontext = ncontext
             rcache['surface'] = nsurface
