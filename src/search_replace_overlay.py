@@ -123,11 +123,11 @@ class SearchReplaceOverlay(Adw.Bin):
             vheight = sheet_document.view.main_canvas.get_height() - sheet_document.display.column_header_height
             vwidth = sheet_document.view.main_canvas.get_width() - sheet_document.display.row_header_width
 
-            cell_name = sheet_view.document.selection.cell_name
+            cell_name = sheet_document.selection.cell_name
             vcol_index, vrow_index = sheet_document.display.get_cell_position_from_name(cell_name)
 
-            col_index = sheet_view.document.display.get_column_from_vcolumn(vcol_index)
-            row_index = sheet_view.document.display.get_row_from_vrow(vrow_index)
+            col_index = sheet_document.display.get_column_from_vcolumn(vcol_index)
+            row_index = sheet_document.display.get_row_from_vrow(vrow_index)
 
             # Try to scroll to the search item first in case the user has scrolled.
             # In addition, we force to continue previous search if the user chose to search within the selection
