@@ -1351,9 +1351,6 @@ class SheetDocument(GObject.Object):
         return False
 
     def find_in_current_table(self, text_value: str, match_case: bool, match_cell: bool, within_selection: bool, use_regexp: bool) -> int:
-        if text_value in ['', None]:
-            return polars.DataFrame(), 0
-
         # Prepare the search expression
         filter_expression = polars.all().str.contains_any([text_value], ascii_case_insensitive=not match_case)
         if match_cell:
@@ -1364,6 +1361,8 @@ class SheetDocument(GObject.Object):
             filter_expression = polars.col(polars.String).str.contains(f'(?i){text_value}')
             if match_case:
                 filter_expression = polars.col(polars.String).str.contains(text_value)
+        if text_value in ['', None]:
+            filter_expression = polars.all().is_null()
 
         # Collect hidden column names
         hidden_column_names = []
@@ -1426,8 +1425,7 @@ class SheetDocument(GObject.Object):
                                          .with_row_index('$ridx') \
                                          .filter(selected_rows_expression & visible_rows_expression) \
                                          .filter(polars.col('$rand') == True) \
-                                         .drop('$rand') \
-                                         .fill_null(False)
+                                         .drop('$rand')
 
         # Drop column(s) without data
         columns_to_drop = []
@@ -1449,9 +1447,6 @@ class SheetDocument(GObject.Object):
         return search_results, search_results_length
 
     def replace_all_in_current_table(self, search_pattern: str, replace_with: str, match_case: bool, match_cell: bool, within_selection: bool, use_regexp: bool) -> None:
-        if search_pattern in ['', None]:
-            return polars.DataFrame(), 0
-
         # Collect hidden column names
         hidden_column_names = []
         for col_index, is_visible in enumerate(self.display.column_visibility_flags):
@@ -1519,6 +1514,13 @@ class SheetDocument(GObject.Object):
             nsearch_pattern = f'(?i){search_pattern}'
 
         for column_name in target_column_names:
+            if search_pattern in ['', None]:
+                filter_expression = polars.col(column_name).is_null()
+                with_columns[column_name] = polars.when(filter_expression & selected_rows_expression & visible_rows_expression) \
+                                                  .then(polars.col(column_name).fill_null(replace_with)) \
+                                                  .otherwise(polars.col(column_name))
+                continue
+
             # Prepare the search expression
             filter_expression = polars.col(column_name).str.contains_any([search_pattern], ascii_case_insensitive=not match_case)
             if match_cell:

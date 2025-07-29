@@ -111,10 +111,6 @@ class SearchReplaceOverlay(Adw.Bin):
 
         self.search_status.set_visible(True)
 
-        if text_value == '':
-            self.search_status.set_text('No results found')
-            return # prevent empty search
-
         new_search_states = self.get_current_search_states()
 
         # Continue previous search
@@ -469,10 +465,6 @@ class SearchReplaceOverlay(Adw.Bin):
     def replace_all_search_occurences(self) -> None:
         search_pattern = self.search_entry.get_text()
         replace_with = self.replace_entry.get_text()
-
-        if search_pattern == '':
-            self.search_status.set_visible(False)
-            return
 
         match_case = self.search_match_case.get_active()
         match_cell = self.search_match_cell.get_active()
