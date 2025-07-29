@@ -156,11 +156,21 @@ class SheetDocument(GObject.Object):
             case Gdk.KEY_Tab | Gdk.KEY_ISO_Left_Tab:
                 # Select a cell at the left to the selection
                 if state == Gdk.ModifierType.SHIFT_MASK:
-                    target_cell_position = (max(1, active_cell_position[0] - 1), active_cell_position[1])
+                    target_cell_position = (active_cell_position[0] - 1, active_cell_position[1])
+
+                    # If the cursor is currently within a table and it's reaching the first column,
+                    # re-target to the last column of the previous row instead.
+                    if df_selected and target_cell_position[0] == 0:
+                        target_cell_position = (df_bbox.column + df_bbox.column_span - 1, target_cell_position[1] - 1)
 
                 # Select a cell at the right to the selection
                 else:
                     target_cell_position = (active_cell_position[0] + 1, active_cell_position[1])
+
+                    # If the cursor is currently within a table and it's reaching the last column,
+                    # re-target to the first column of the next row instead.
+                    if df_selected and df_bbox.column + df_bbox.column_span - 1 < target_cell_position[0]:
+                        target_cell_position = (1, target_cell_position[1] + 1)
 
             case Gdk.KEY_Return:
                 # Select a cell at the bottom to the selection
