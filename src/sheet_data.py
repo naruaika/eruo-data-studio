@@ -408,7 +408,11 @@ class SheetData(GObject.Object):
                                                   .extend(self.dfs[dfi][stop:row_count, column])
                                                   .alias(column_name)
                 )
-            elif content is not None:
+            # TODO: we need explicit flag for when the user only want to update the header. Currently,
+            #       we always receive with this structure data: [header, content]. It is ambiguous now
+            #       since when the user only wants to update the header, the content is None. But it is
+            #       also None when the user wants to clear the content.
+            elif not (row == -1 and row_span == 1):
                 self.dfs[dfi] = self.dfs[dfi].with_columns(
                     self.dfs[dfi][0:start, column].extend(polars.Series([content]).cast(column_dtype))
                                                   .extend(self.dfs[dfi][stop:row_count, column])

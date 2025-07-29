@@ -792,6 +792,41 @@ class SheetDocument(GObject.Object):
         # TODO: currently update, duplicate and delete functions don't support multiple dataframes.
         #       Should we add the support? I haven't decided yet.
         range = self.selection.current_active_range
+        bbox = self.data.bbs[range.metadata.dfi]
+
+        # Automatically adding a new row when the user updates any cell right below the last row
+        if bbox.column <= range.column <= bbox.column + bbox.column_span - 1 and bbox.row + bbox.row_span == range.row:
+            cstate = globals.is_changing_state
+
+            globals.is_changing_state = True
+            self.update_selection_from_name(self.display.get_above_cell_name(self.selection.cell_name))
+
+            # Be cautious as this strategy will leave the inserted blank row when the user performs undo,
+            # it's not harmful though at least for the time being.
+            globals.is_changing_state = True
+            self.insert_blank_from_current_rows()
+
+            globals.is_changing_state = True
+            self.update_selection_from_name(self.display.get_below_cell_name(self.selection.cell_name))
+
+            globals.is_changing_state = cstate
+            range = self.selection.current_active_range
+
+        # Automatically adding a new column when the user updates any cell right after the last column
+        elif bbox.row <= range.row <= bbox.row + bbox.row_span - 1 and bbox.column + bbox.column_span == range.column:
+            cstate = globals.is_changing_state
+
+            globals.is_changing_state = True
+            self.update_selection_from_name(self.display.get_left_cell_name(self.selection.cell_name))
+
+            globals.is_changing_state = True
+            self.insert_blank_from_current_columns()
+
+            globals.is_changing_state = True
+            self.update_selection_from_name(self.display.get_right_cell_name(self.selection.cell_name))
+
+            globals.is_changing_state = cstate
+            range = self.selection.current_active_range
 
         mcolumn = range.metadata.column
         mrow = range.metadata.row
@@ -815,10 +850,10 @@ class SheetDocument(GObject.Object):
             mrow = mrow - row_span + 1
 
         if column_span < 0:
-            column_span = self.data.bbs[range.metadata.dfi].column_span
+            column_span = bbox.column_span
 
         if row_span < 0:
-            row_span = self.data.bbs[range.metadata.dfi].row_span - 1
+            row_span = bbox.row_span - 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:

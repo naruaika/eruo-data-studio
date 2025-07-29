@@ -131,20 +131,143 @@ class SheetDisplay(GObject.Object):
         return len(self.row_visibility_flags) - len(self.row_visible_series)
 
     def get_right_cell_name(self, name: str) -> str:
-        i = len(name) - 1
-        while i >= 0 and name[i] == 'Z':
-            i -= 1
-        if i == -1:
-            return 'A' * (len(name) + 1)
-        return name[:i] + chr(ord(name[i]) + 1) + 'A' * (len(name) - i - 1)
+        """
+        Calculates the cell name to the right of the given cell name. This function handles
+        column-like names (e.g., A -> B, Z -> AA) while preserving the row number. Assumes
+        cell names follow the pattern: [Column Letters][Row Numbers] (e.g., A1, AA10).
 
-    def get_bottom_cell_name(self, name: str) -> str:
-        i = len(name) - 1
-        while i >= 0 and name[i] == '9':
-            i -= 1
+        Disclaimer: this function was written by genAI under my own supervision.
+        I've tested over all the potential cases, but there's no guarantee.
+        """
+        # Use regex to split the cell name into its alphabetical and numeric parts
+        match = re.match(r"([A-Z]+)(\d+)", name, re.IGNORECASE)
+        if not match:
+            # If the name does not match the expected format, return an error
+            return "INVALID_CELL_NAME_FORMAT"
+
+        column_part_str = match.group(1).upper() # Ensure column part is uppercase
+        row_part = match.group(2)
+
+        chars = list(column_part_str)
+        i = len(chars) - 1
+
+        # Iterate from the rightmost character of the column part, handling 'Z' rollovers
+        while i >= 0 and chars[i] == 'Z':
+            chars[i] = 'A' # Wrap 'Z' to 'A'
+            i -= 1 # Move to the left to increment the next character
+
         if i == -1:
-            return 'A' * (len(name) + 1)
-        return name[:i] + str(int(name[i]) + 1) + 'A' * (len(name) - i - 1)
+            # If all characters were 'Z' (e.g., "Z", "ZZ"),
+            # add a new 'A' at the beginning (e.g., "Z" -> "AA", "ZZ" -> "AAA")
+            new_column_part = 'A' * (len(chars) + 1)
+        else:
+            # Increment the character at index 'i'
+            chars[i] = chr(ord(chars[i]) + 1)
+            new_column_part = "".join(chars)
+
+        return f"{new_column_part}{row_part}"
+
+    def get_above_cell_name(self, name: str) -> str:
+        """
+        Calculates the cell name "above" the given cell name, by decrementing only the numeric
+        row part of the cell name. For example: "A2" -> "A1", "B100" -> "B99". Assumes cell names
+        follow the pattern: [Column Letters][Row Numbers] (e.g., A1, AA10).
+
+        Returns "INVALID_BELOW_CELL" if the row number would become 0 or less (e.g., from "A1").
+
+        Disclaimer: this function was written by genAI under my own supervision.
+        I've tested over all the potential cases, but there's no guarantee.
+        """
+        # Use regex to split the cell name into its alphabetical and numeric parts
+        match = re.match(r"([A-Z]+)(\d+)", name, re.IGNORECASE)
+        if not match:
+            return "INVALID_CELL_NAME_FORMAT"
+
+        column_part = match.group(1).upper() # Ensure column part is uppercase
+        row_part_str = match.group(2)
+
+        try:
+            row_number = int(row_part_str)
+            if row_number <= 1: # Spreadsheet rows typically start from 1
+                return "INVALID_ABOVE_CELL"
+
+            new_row_number = row_number - 1
+            return f"{column_part}{new_row_number}"
+        except ValueError:
+            return "INVALID_ROW_NUMBER"
+
+    def get_left_cell_name(self, name: str) -> str:
+        """
+        Calculates the cell name to the left of the given cell name. This function handles
+        column-like names (e.g., B -> A, AA -> Z) while preserving the row number.
+        Assumes cell names follow the pattern: [Column Letters][Row Numbers] (e.g., A1, AA10).
+
+        Returns "INVALID_LEFT_CELL" if there is no valid cell to the left (e.g., from "A1").
+
+        Disclaimer: this function was written by genAI under my own supervision.
+        I've tested over all the potential cases, but there's no guarantee.
+        """
+        if not name:
+            return "INVALID_LEFT_CELL"
+
+        # Separate column and row parts
+        match = re.match(r"([A-Z]+)(\d+)", name, re.IGNORECASE)
+        if not match:
+            return "INVALID_CELL_NAME_FORMAT"
+
+        column_part_str = match.group(1).upper()
+        row_part = match.group(2)
+
+        chars = list(column_part_str)
+        n = len(chars)
+        i = n - 1
+
+        # Iterate from the rightmost character of the column part, handling 'A' rollovers (borrowing)
+        while i >= 0:
+            if chars[i] == 'A':
+                chars[i] = 'Z' # Wrap around to 'Z'
+                i -= 1 # Move to the left to "borrow"
+            else:
+                chars[i] = chr(ord(chars[i]) - 1) # Decrement the character
+                break
+        else:
+            # If the loop completes, it means all characters were 'A's (e.g., "A", "AA", "AAA")
+            if n == 1: # If it was just "A" (e.g., "A1"), there's no cell to its left (column-wise)
+                return "INVALID_LEFT_CELL"
+            else: # If it was "AA", "AAA", etc., it becomes "Z", "ZZ" (length decreases for column)
+                new_column_part = 'Z' * (n - 1) # Reconstruct with new column (shorter)
+                return f"{new_column_part}{row_part}"
+
+        # Join the characters back to form the new column part
+        new_column_part = "".join(chars)
+
+        return f"{new_column_part}{row_part}"
+
+    def get_below_cell_name(self, name: str) -> str:
+        """
+        Calculates the cell name "below" the given cell name, by incrementing only the
+        numeric row part of the cell name. For example: "A1" -> "A2", "B99" -> "B100".
+        Assumes cell names follow the pattern: [Column Letters][Row Numbers] (e.g., A1, AA10).
+
+        Disclaimer: this function was written by genAI under my own supervision.
+        I've tested over all the potential cases, but there's no guarantee.
+        """
+        # Use regex to split the cell name into its alphabetical and numeric parts
+        match = re.match(r"([A-Z]+)(\d+)", name, re.IGNORECASE)
+        if not match:
+            # If the name does not match the expected format, return an error or original name
+            return "INVALID_CELL_NAME_FORMAT"
+
+        column_part = match.group(1).upper() # Ensure column part is uppercase
+        row_part_str = match.group(2)
+
+        try:
+            row_number = int(row_part_str)
+            new_row_number = row_number + 1
+            return f"{column_part}{new_row_number}"
+        except ValueError:
+            # Should not happen if regex matches \d+, but good for robustness
+            return "INVALID_BELOW_NUMBER"
 
     def get_column_from_point(self, x: int = 0, side = 'left') -> int:
         if x <= self.row_header_width:
