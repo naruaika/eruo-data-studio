@@ -1361,8 +1361,11 @@ class SheetDocument(GObject.Object):
             filter_expression = polars.col(polars.String).str.contains(f'(?i){text_value}')
             if match_case:
                 filter_expression = polars.col(polars.String).str.contains(text_value)
+
         if text_value in ['', None]:
             filter_expression = polars.all().is_null()
+        else:
+            filter_expression &= polars.all().is_not_null()
 
         # Collect hidden column names
         hidden_column_names = []
