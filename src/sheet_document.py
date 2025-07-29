@@ -580,6 +580,8 @@ class SheetDocument(GObject.Object):
                                                                        self.display.row_visibility_flags[mrow:]])
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
                 self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+            else:
+                self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
 
             # Update row heights
             if len(self.display.row_heights):
@@ -642,6 +644,8 @@ class SheetDocument(GObject.Object):
                                                                    self.display.row_visibility_flags[mrow:]])
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
                 self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+            else:
+                self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
 
             # Update row heights
             if len(self.display.row_heights):
@@ -870,6 +874,8 @@ class SheetDocument(GObject.Object):
                                                                    self.display.row_visibility_flags[mrow:]])
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
                 self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+            else:
+                self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
 
             # Update row heights
             if len(self.display.row_heights):
@@ -980,6 +986,8 @@ class SheetDocument(GObject.Object):
                                                                    self.display.row_visibility_flags[mrow + row_span:]])
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
                 self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+            else:
+                self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
 
             # Update row heights
             if len(self.display.row_heights):
