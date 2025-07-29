@@ -147,18 +147,18 @@ class SheetAutoFilter(SheetWidget):
         context.set_hairline(True)
 
         # Draw the left diagonal line
-        start_x = x + 3
-        start_y = y + 4
+        start_x = x + 4
+        start_y = y + 5
         end_x = x + self.width / 2
-        end_y = y + self.height - 4
+        end_y = y + self.height - 5
         context.move_to(start_x, start_y)
         context.line_to(end_x, end_y)
 
         # Draw the right diagonal line
         start_x = x + self.width / 2
-        start_y = y + self.height - 4
-        end_x = x + self.width - 3
-        end_y = y + 4
+        start_y = y + self.height - 5
+        end_x = x + self.width - 4
+        end_y = y + 5
         context.move_to(start_x, start_y)
         context.line_to(end_x, end_y)
 
