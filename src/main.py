@@ -400,6 +400,7 @@ class Application(Adw.Application):
         # But later on, we can add support for file manager integration
         # as well as a command line interface. Maybe even adding support
         # for opening the last session automatically.
+        # TODO: user should be able to setup the file reader parameters
         if file_path:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(file_path)

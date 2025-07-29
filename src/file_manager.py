@@ -46,9 +46,39 @@ class FileManager(GObject.Object):
             'parquet': polars.read_parquet,
             'csv': polars.read_csv,
         }
-        if file_format in read_methods:
+
+        if file_format not in read_methods:
+            raise ValueError(f"Unsupported file format: {file_format}")
+
+        try:
             return read_methods[file_format](file_path)
-        raise ValueError(f"Unsupported file format: {file_format}")
+        except Exception as e:
+            print(e)
+
+        if file_format != 'csv':
+            globals.send_notification(f'Cannot read file: {file_path}')
+            return None
+
+        # Retry by ignoring any errors
+        try:
+            return read_methods[file_format](file_path, ignore_errors=True, infer_schema=False)
+        except Exception as e:
+            print(e)
+
+        # We use non-standard parameters to force loading the entire file contents without losing any data
+        # by forcing opinionated behaviour. Let's the user decide what to do.
+        try:
+            def send_notification():
+                callback = getattr(globals, 'send_notification', None)
+                callback(f'Cannot parse file: {file_path}')
+            GLib.timeout_add(1000, send_notification)
+            return read_methods[file_format](file_path, ignore_errors=True, infer_schema=False,
+                                             quote_char=None, separator='\x1f', truncate_ragged_lines=True)
+        except Exception as e:
+            print(e)
+
+        globals.send_notification(f'Cannot read file: {file_path}')
+        return None
 
     def write_file(self, file_path: str, sheet_data: SheetData, dfi: int = 0, **kwargs) -> bool:
         try:
