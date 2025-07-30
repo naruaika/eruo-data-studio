@@ -1,6 +1,6 @@
 # Eruo Data Studio
 
-A powerful yet friendly ETL (Extract, Transform, Load) tool powered by [Polars](https://pola.rs/) backend, targeting the large data science community using Python.
+A powerful yet friendly ETL (Extract, Transform, Load) tool powered by [Polars](https://pola.rs/), one of the fastest data processing library. It's free and open source!
 
 ![Eruo Data Studio](docs/screenshot.png)
 
@@ -18,7 +18,11 @@ Currently in early development. Stay tuned for updates.
 
 ## Backgrounds
 
-[TODO]
+The amount of customer survey and feedback data that was collected every day at my former employment was too much for our team to handle. More than one million rows are involved, which is significantly more than Microsoft Excel can manage efficiently.
+
+Sure, there are contemporary technologies for handling medium datasets, but it's impractical to teach Python coding to everyone. For rapid data exploration, even I find myself wishing for a more straightforward approach. For this reason, I think a graphical user interface program can have a significant impact.
+
+Despite having several features in common with spreadsheets, this project is not intended to replace them. Rather, it focuses on advanced business analytics and is intended to be a strong substitute for business intelligence platforms like as Tableau and Power BI. The objective is to provide a platform that makes it easier to analyze medium datasets so that more people may access complex insights.
 
 ## Limitations
 
@@ -42,7 +46,7 @@ We've been doing some research on similar applications as follows:
 - [Alteryx Designer](https://www.alteryx.com/products/alteryx-designer)
 - [SmoothCSV](https://smoothcsv.com/)
 
-## Planning
+## Roadmap
 
 [TODO]
 
