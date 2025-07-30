@@ -83,8 +83,6 @@ Here are some useful references for the project development:
 - Libadwaita: https://gnome.pages.gitlab.gnome.org/libadwaita/doc/1.4/index.html
 - Polars: https://docs.pola.rs/api/python/stable/reference/index.html
 
-Please bear with us, most of the docstrings are AI-generated, though sometimes under my supervision. Your help will be greatly appreciated.
-
 ## Licenses
 
 This project is distributed under the [GNU General Public License Version 3](https://www.gnu.org/licenses/gpl-3.0.en.html). We use GTK and [Libadwaita](https://gitlab.gnome.org/GNOME/libadwaita) to build the user interface, which are licensed under the [GNU Lesser General Public License Version 2.1](https://www.gnu.org/licenses/lgpl-2.1.en.html). The backend for data manipulation uses [Polars](https://pola.rs/), which is distributed under the [MIT License](https://opensource.org/license/mit). For other dependencies, see the `requirements.txt` file. We use icons from [Carbon Design System](https://carbondesignsystem.com/elements/icons/library/), which is distributed under the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).

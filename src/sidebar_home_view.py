@@ -22,7 +22,6 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango
 from datetime import datetime, timedelta
 import polars
 
-from . import globals
 from . import utils
 from .window import Window
 

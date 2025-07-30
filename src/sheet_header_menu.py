@@ -121,17 +121,33 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         list_item.check_button = check_button
         list_item.label = label
 
+        list_item.bind_active = None
+        list_item.bind_inconsistent = None
+        list_item.bind_toggled = None
+
     def bind_factory_check_button(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
         item_data = list_item.get_item()
 
-        item_data.bind_property('active', list_item.check_button, 'active', GObject.BindingFlags.SYNC_CREATE)
-        item_data.bind_property('inconsistent', list_item.check_button, 'inconsistent', GObject.BindingFlags.SYNC_CREATE)
+        if list_item.bind_active is not None:
+            list_item.bind_active.unbind()
 
-        list_item.check_button.connect('toggled', self.on_filter_list_item_check_button_toggled, item_data)
+        if list_item.bind_inconsistent is not None:
+            list_item.bind_inconsistent.unbind()
 
-        list_item.label.set_label(item_data.cvalue)
+        if list_item.bind_toggled is not None:
+            list_item.check_button.disconnect(list_item.bind_toggled)
+
+        list_item.bind_active = item_data.bind_property('active', list_item.check_button, 'active', GObject.BindingFlags.SYNC_CREATE)
+        list_item.bind_inconsistent = item_data.bind_property('inconsistent', list_item.check_button, 'inconsistent', GObject.BindingFlags.SYNC_CREATE)
+        list_item.bind_toggled = list_item.check_button.connect('toggled', self.on_filter_list_item_check_button_toggled, item_data)
+
+        list_item.label.set_label(item_data.cvalue[:40])
 
     def teardown_factory_check_button(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        list_item.bind_active = None
+        list_item.bind_inconsistent = None
+        list_item.bind_toggled = None
+
         list_item.check_button = None
         list_item.label = None
 
@@ -247,8 +263,6 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             elif cvalues_to_hide_hash.equals(self.current_unique_values_hash):
                 self.filter_list_store.get_item(1).active = False
 
-        self.is_manually_toggling = False
-
         # TODO: support multiple dataframes?
         sheet_document = self.window.get_current_active_document()
         column_name = sheet_document.data.dfs[0].columns[self.column]
@@ -300,6 +314,8 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             'query-builder': query_builder,
             'expression': expression,
         }]
+
+        self.is_manually_toggling = False
 
     @Gtk.Template.Callback()
     def on_filter_search_entry_activated(self, entry: Gtk.Entry) -> None:
