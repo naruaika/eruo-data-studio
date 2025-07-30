@@ -93,6 +93,10 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
                     self.cvalues_to_show = [condition['value']]
                     self.cvalues_to_hide = ['$all']
 
+                if condition['operator'] == '!=':
+                    self.cvalues_to_show = ['$all']
+                    self.cvalues_to_hide = [condition['value']]
+
                 break
 
         self.all_unique_values_hash = polars.Series([])
@@ -282,7 +286,10 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             value.append(None)
 
         if len(value) == 1:
-            operator = '='
+            if operator == 'in':
+                operator = '='
+            else:
+                operator = '!='
             value = value[0]
 
         query_builder = {
@@ -303,7 +310,7 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         value = polars.Series(value).cast(column_dtype, strict=False)
 
         expression = polars.col(column_name).is_in(value)
-        if operator == 'not in':
+        if operator in ['not in', '!=']:
             expression = expression.not_()
 
         # Update the document's active filters
