@@ -332,17 +332,17 @@ def get_filter_basic_expression(item_data: FilterListItem, cvalues: list) -> pol
     match operator:
         # GENERIC
         case 'equals'                      : return polars.col(field).eq(cvalues[0]) if fdtype != 'text' else polars.col(field).str.to_lowercase().eq(cvalues[0].lower())
-        case 'doesn\'t equal'              : return polars.col(field).ne(cvalues[0]) if fdtype != 'text' else polars.col(field).str.to_lowercase().ne(cvalues[0].lower())
+        case 'does not equal'              : return polars.col(field).ne(cvalues[0]) if fdtype != 'text' else polars.col(field).str.to_lowercase().ne(cvalues[0].lower())
         case 'is null'                     : return polars.col(field).is_null()
         case 'is not null'                 : return polars.col(field).is_not_null()
 
         # TEXT
         case 'begins with'                 : return polars.col(field).str.to_lowercase().str.starts_with(cvalues[0].lower())
-        case 'doesn\'t begin with'         : return polars.col(field).str.to_lowercase().str.starts_with(cvalues[0].lower()).not_()
+        case 'does not begin with'         : return polars.col(field).str.to_lowercase().str.starts_with(cvalues[0].lower()).not_()
         case 'ends with'                   : return polars.col(field).str.to_lowercase().str.ends_with(cvalues[0].lower())
-        case 'doesn\'t end with'           : return polars.col(field).str.to_lowercase().str.ends_with(cvalues[0].lower()).not_()
+        case 'does not end with'           : return polars.col(field).str.to_lowercase().str.ends_with(cvalues[0].lower()).not_()
         case 'contains'                    : return polars.col(field).str.contains_any([cvalues[0]], ascii_case_insensitive=True)
-        case 'doesn\'t contain'            : return polars.col(field).str.contains_any([cvalues[0]], ascii_case_insensitive=True).not_()
+        case 'does not contain'            : return polars.col(field).str.contains_any([cvalues[0]], ascii_case_insensitive=True).not_()
 
         # NUMERIC
         case 'is greater than'             : return polars.col(field).gt(cvalues[0])
