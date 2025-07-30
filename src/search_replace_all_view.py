@@ -70,13 +70,15 @@ class SearchReplaceAllView(Gtk.Box):
 
         self.search_list_view.connect('activate', self.on_search_list_view_item_activated)
 
-    def on_search_list_view_item_activated(self, list_view: Gtk.ListView, position: int) -> None:
+    def on_search_list_view_item_activated(self,
+                                           list_view: Gtk.ListView,
+                                           position: int) -> None:
         sheet_document = self.window.get_current_active_document()
 
+        cname = self.search_list_store.get_item(position).cname
+        sheet_document.update_selection_from_name(cname)
+
         search_range = sheet_document.selection.current_search_range
-
-        sheet_document.update_selection_from_name(self.search_list_store.get_item(position).cname)
-
         sheet_document.selection.current_search_range = search_range
 
     @Gtk.Template.Callback()
@@ -96,7 +98,8 @@ class SearchReplaceAllView(Gtk.Box):
 
         # Initialize the current search range
         elif sheet_document.selection.current_search_range is None:
-            sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+            arange = sheet_document.selection.current_active_range
+            sheet_document.selection.current_search_range = arange
 
         self.search_status.set_visible(True)
 
@@ -105,8 +108,11 @@ class SearchReplaceAllView(Gtk.Box):
             return # prevent empty search
 
         # Get the search results
-        search_results, self.search_results_length = sheet_document.find_in_current_table(text_value, match_case, match_cell,
-                                                                                          within_selection, use_regexp)
+        search_results, self.search_results_length = sheet_document.find_in_current_cells(text_value,
+                                                                                          match_case,
+                                                                                          match_cell,
+                                                                                          within_selection,
+                                                                                          use_regexp)
 
         if self.search_results_length == 0:
             self.search_list_store.remove_all()
@@ -120,29 +126,32 @@ class SearchReplaceAllView(Gtk.Box):
             globals.is_changing_state = True
 
             item_counter = 0
-            more_items_to_discover = False
+            has_more_items = False
 
             MAX_SEARCH_RESULT_ITEMS = 10_000
 
             # Update the search results
             for row in range(search_results.height):
                 if item_counter == MAX_SEARCH_RESULT_ITEMS:
-                    more_items_to_discover = True
+                    has_more_items = True
                     break
 
                 for column_name in search_results.columns:
                     if item_counter == MAX_SEARCH_RESULT_ITEMS:
-                        more_items_to_discover = True
+                        has_more_items = True
                         break
                     if column_name == '$ridx':
                         continue
                     if search_results[column_name][row] is False:
                         continue
 
-                    col_index = sheet_document.data.dfs[0].columns.index(column_name)
-                    row_index = search_results['$ridx'][row]
-                    cname = sheet_document.display.get_cell_name_from_position(col_index + 1, row_index + 2)
+                    # TODO: support multiple dataframes?
+                    col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1
+                    row_index = search_results['$ridx'][row] + 2
+
+                    cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
                     cvalue = str(sheet_document.data.dfs[0][column_name][row_index])[:40]
+
                     list_item = SearchResultListItem(cname, cvalue)
 
                     if item_counter == 0:
@@ -156,10 +165,9 @@ class SearchReplaceAllView(Gtk.Box):
 
                     GLib.idle_add(self.search_list_store.append, list_item)
 
-            if more_items_to_discover:
-                # TODO: should we really show all the results?
-                # If so, we can process it in a different thread,
-                # and append it to the store using GLib.idle_add().
+            if has_more_items:
+                # TODO: should we really show all the results? If so, we can process it in a different thread,
+                #       and append it to the store using GLib.idle_add(), maybe?
                 GLib.idle_add(self.search_status.set_text, f'{self.search_status.get_text()}. '
                                                            f'The result set only contains a subset of all matches.')
 
@@ -174,10 +182,8 @@ class SearchReplaceAllView(Gtk.Box):
 
     @Gtk.Template.Callback()
     def on_search_options_toggled(self, button: Gtk.Button) -> None:
-        if button.get_active():
-            self.search_options.set_visible(True)
-        else:
-            self.search_options.set_visible(False)
+        is_active = button.get_active()
+        self.search_options.set_visible(is_active)
 
     def open_search_view(self) -> None:
         self.window.split_view.set_collapsed(False)
@@ -190,16 +196,17 @@ class SearchReplaceAllView(Gtk.Box):
         tab_page = self.window.search_replace_all_page
         self.window.sidebar_tab_view.set_selected_page(tab_page)
 
-        document = self.window.get_current_active_document()
-        document.is_searching_cells = True
+        sheet_document = self.window.get_current_active_document()
+        sheet_document.is_searching_cells = True
 
         self.search_entry.grab_focus()
 
     def toggle_replace_section(self) -> None:
-        tab_page = self.window.search_replace_all_page
+        sidebar_is_collapsed = self.window.split_view.get_collapsed()
+        selected_page = self.window.sidebar_tab_view.get_selected_page()
+        target_page = self.window.search_replace_all_page
 
-        view_is_visible = self.window.split_view.get_collapsed() == False \
-                          and self.window.sidebar_tab_view.get_selected_page() == tab_page
+        view_is_visible = not sidebar_is_collapsed and selected_page == target_page
         view_is_in_focus = self.get_focus_child()
         search_entry_in_focus = self.search_entry.get_focus_child()
         replace_section_visible = self.replace_section.get_visible()
@@ -209,19 +216,25 @@ class SearchReplaceAllView(Gtk.Box):
             self.open_search_view()
 
         # In case the user wants to jump between the search and replace entry
-        if view_is_visible and replace_section_visible and view_is_in_focus and search_entry_in_focus:
+        if view_is_visible \
+                and replace_section_visible \
+                and view_is_in_focus \
+                and search_entry_in_focus:
             self.toggle_replace.set_icon_name('go-down-symbolic')
             self.replace_section.set_visible(True)
 
             # Selects all text on the replace entry
-            self.replace_entry.select_region(0, len(self.replace_entry.get_text()))
+            text_length = len(self.replace_entry.get_text())
+            self.replace_entry.select_region(0, text_length)
             self.replace_entry.get_first_child().set_focus_on_click(True)
             self.replace_entry.get_first_child().grab_focus()
 
             self.replace_entry.grab_focus()
 
         # Hide the replace section and grab focus on the search entry
-        elif view_is_visible and replace_section_visible and view_is_in_focus:
+        elif view_is_visible \
+                and replace_section_visible \
+                and view_is_in_focus:
             self.toggle_replace.set_icon_name('go-next-symbolic')
             self.replace_section.set_visible(False)
 
@@ -233,7 +246,8 @@ class SearchReplaceAllView(Gtk.Box):
             self.replace_section.set_visible(True)
 
             # Selects all text on the replace entry
-            self.replace_entry.select_region(0, len(self.replace_entry.get_text()))
+            text_length = len(self.replace_entry.get_text())
+            self.replace_entry.select_region(0, text_length)
             self.replace_entry.get_first_child().set_focus_on_click(True)
             self.replace_entry.get_first_child().grab_focus()
 
@@ -256,14 +270,20 @@ class SearchReplaceAllView(Gtk.Box):
 
         # Initialize the current search range
         elif sheet_document.selection.current_search_range is None:
-            sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+            arange = sheet_document.selection.current_active_range
+            sheet_document.selection.current_search_range = arange
 
-        sheet_document.replace_all_in_current_table(search_pattern, replace_with, match_case, match_cell, within_selection, use_regexp)
+        sheet_document.replace_all_in_current_cells(search_pattern,
+                                                    replace_with,
+                                                    match_case,
+                                                    match_cell,
+                                                    within_selection,
+                                                    use_regexp)
 
         self.search_status.set_visible(False)
 
     def close_search_view(self) -> None:
         self.window.toggle_search_all.set_active(False)
 
-        document = self.window.get_current_active_document()
-        document.is_searching_cells = False
+        sheet_document = self.window.get_current_active_document()
+        sheet_document.is_searching_cells = False

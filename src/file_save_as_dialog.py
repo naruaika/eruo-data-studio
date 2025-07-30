@@ -37,17 +37,22 @@ class FileSaveAsDialog(Adw.Dialog):
     warning_banner = Gtk.Template.Child()
     save_button = Gtk.Template.Child()
 
-    def __init__(self, window: Window, callback: callable, **kwargs) -> None:
+    def __init__(self,
+                 window: Window,
+                 callback: callable,
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
+        self.window = window
         self.callback = callback
 
         file_name = 'Book1'
         folder_path = str(Path.home())
+
         if window.file is not None:
             file_path = window.file.get_path()
-            folder_path = os.path.dirname(file_path)
             file_name = os.path.basename(file_path).split('.')[0]
+            folder_path = os.path.dirname(file_path)
 
         view = FileSaveAsCsvView(file_name, folder_path)
         self.view_stack.add_titled(view, 'csv', 'CSV')
@@ -61,12 +66,17 @@ class FileSaveAsDialog(Adw.Dialog):
         self.visible_view = self.view_stack.get_visible_child()
         self.view_stack.connect('notify::visible-child', self.on_visible_child_changed)
 
-    def on_visible_child_changed(self, stack: Adw.ViewStack, pspec: GObject.ParamSpec) -> None:
+    def on_visible_child_changed(self,
+                                 stack: Adw.ViewStack,
+                                 pspec: GObject.ParamSpec) -> None:
         view = self.view_stack.get_visible_child()
 
+        save_as_value = self.visible_view.save_as.get_text()
+        save_to_value = self.visible_view.save_to.get_subtitle()
+
         # Copy the text and subtitle from the previous view
-        view.save_as.set_text(self.visible_view.save_as.get_text())
-        view.save_to.set_subtitle(self.visible_view.save_to.get_subtitle())
+        view.save_as.set_text(save_as_value)
+        view.save_to.set_subtitle(save_to_value)
 
         self.visible_view = view
 
@@ -85,6 +95,7 @@ class FileSaveAsDialog(Adw.Dialog):
 
         file_name = view.save_as.get_text()
         folder_path = view.save_to.get_subtitle()
+
         file_path = f'{folder_path}/{file_name}{file_format}'
         file_path = file_path.replace('~', str(Path.home()))
 
@@ -167,27 +178,36 @@ class FileSaveAsDialog(Adw.Dialog):
             return False
 
         file_basename = os.path.basename(file_path)
+
         alert_dialog = Adw.AlertDialog()
+
         alert_dialog.set_heading(_('Replace File?'))
-        alert_dialog.set_body(_('A file named "{}" already exists. Do you want to replace it?').format(file_basename))
+        alert_dialog.set_body(_('A file named "{}" already exists. '
+                                'Do you want to replace it?').format(file_basename))
+
         alert_dialog.add_response('cancel', _('_Cancel'))
         alert_dialog.add_response('replace', _('_Replace'))
+
         alert_dialog.set_response_appearance('replace', Adw.ResponseAppearance.DESTRUCTIVE)
         alert_dialog.set_default_response('replace')
         alert_dialog.set_close_response('cancel')
 
-        alert_dialog.choose(self.get_root(), None, self.on_alert_dialog_dismissed, file_path)
+        alert_dialog.choose(self.get_root(), None, self.on_alert_dialog_dismissed)
 
         return True
 
-    def on_alert_dialog_dismissed(self, dialog: Adw.AlertDialog, result: Gio.Task, file_path: str) -> None:
+    def on_alert_dialog_dismissed(self,
+                                  dialog: Adw.AlertDialog,
+                                  result: Gio.Task) -> None:
         if result.had_error():
             return
 
         if dialog.choose_finish(result) != 'replace':
             return
 
-        match view := self.view_stack.get_visible_child():
+        view = self.view_stack.get_visible_child()
+
+        match view:
             case FileSaveAsCsvView():
                 self.save_as_csv(view)
             case FileSaveAsJsonView():
@@ -195,6 +215,8 @@ class FileSaveAsDialog(Adw.Dialog):
             case FileSaveAsParquetView():
                 self.save_as_parquet(view)
 
-    def write_file(self, file_path: str, **kwargs) -> None:
-        self.callback(file_path, **kwargs)
+    def write_file(self,
+                   file_path: str,
+                   **kwargs) -> None:
+        self.callback(self.window, file_path, **kwargs)
         self.close()

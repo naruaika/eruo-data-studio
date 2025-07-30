@@ -27,7 +27,12 @@ from .sheet_display import SheetDisplay
 class SheetWidget(GObject.Object):
     __gtype_name__ = 'SheetWidget'
 
-    def __init__(self, x: int, y: int, width: int, height: int, display: SheetDisplay) -> None:
+    def __init__(self,
+                 x:       int,
+                 y:       int,
+                 width:   int,
+                 height:  int,
+                 display: SheetDisplay) -> None:
         super().__init__()
 
         self.x = x
@@ -83,7 +88,12 @@ class SheetWidget(GObject.Object):
     def do_on_dragged(self, x: int, y: int) -> bool:
         return False # should interrupt mouse event
 
-    def do_render(self, context: cairo.Context, width: int, height: int, prefers_dark: bool, color_accent: tuple[float, float, float, float]) -> None:
+    def do_render(self,
+                  context:      cairo.Context,
+                  width:        int,
+                  height:       int,
+                  prefers_dark: bool,
+                  color_accent: tuple[float, float, float, float]) -> None:
         if self.position == 'relative':
             context.translate(-self.display.scroll_x_position, -self.display.scroll_y_position)
 
@@ -92,7 +102,13 @@ class SheetWidget(GObject.Object):
 class SheetAutoFilter(SheetWidget):
     __gtype_name__ = 'SheetAutoFilter'
 
-    def __init__(self, x: int, y: int, width: int, height: int, display: SheetDisplay, on_clicked: callable) -> None:
+    def __init__(self,
+                 x:          int,
+                 y:          int,
+                 width:      int,
+                 height:     int,
+                 display:    SheetDisplay,
+                 on_clicked: callable) -> None:
         super().__init__(x, y, width, height, display)
 
         self.on_clicked = on_clicked
@@ -122,7 +138,12 @@ class SheetAutoFilter(SheetWidget):
         self.on_clicked(x, y)
         return False
 
-    def do_render(self, context: cairo.Context, width: int, height: int, prefers_dark: bool, color_accent: tuple[float, float, float, float]) -> None:
+    def do_render(self,
+                  context:      cairo.Context,
+                  width:        int,
+                  height:       int,
+                  prefers_dark: bool,
+                  color_accent: tuple[float, float, float, float]) -> None:
         context.rectangle(self.display.row_header_width, 0, width, height)
         context.clip()
 
@@ -169,7 +190,14 @@ class SheetAutoFilter(SheetWidget):
 class SheetColumnResizer(SheetWidget):
     __gtype_name__ = 'SheetColumnResizer'
 
-    def __init__(self, x: int, y: int, width: int, height: int, display: SheetDisplay, on_hovered: callable, on_released: callable) -> None:
+    def __init__(self,
+                 x:           int,
+                 y:           int,
+                 width:       int,
+                 height:      int,
+                 display:     SheetDisplay,
+                 on_hovered:  callable,
+                 on_released: callable) -> None:
         super().__init__(x, y, width, height, display)
 
         self.on_hovered = on_hovered
@@ -202,7 +230,8 @@ class SheetColumnResizer(SheetWidget):
         left_hovered = left_1 <= x <= left_2
         right_hovered = right_1 <= x <= right_2
 
-        if x <= self.display.row_header_width or (left_hovered and cell_x <= self.display.row_header_width):
+        if x <= self.display.row_header_width \
+                or (left_hovered and cell_x <= self.display.row_header_width):
             return False
 
         # Move the widget to around the left/right edge of the current cell
@@ -225,7 +254,8 @@ class SheetColumnResizer(SheetWidget):
         self.target_cell_width = self.display.get_cell_width_from_column(self.target_column)
         self.handler_x = self.target_cell_x + self.target_cell_width
 
-        return (left_hovered or right_hovered) and 0 <= y <= self.display.column_header_height
+        return (left_hovered or right_hovered) and \
+               0 <= y <= self.display.column_header_height
 
     def do_on_enter(self, x: int, y: int) -> None:
         if self.is_clicked:
@@ -269,7 +299,12 @@ class SheetColumnResizer(SheetWidget):
 
         return True
 
-    def do_render(self, context: cairo.Context, width: int, height: int, prefers_dark: bool, color_accent: tuple[float, float, float, float]) -> None:
+    def do_render(self,
+                  context:      cairo.Context,
+                  width:        int,
+                  height:       int,
+                  prefers_dark: bool,
+                  color_accent: tuple[float, float, float, float]) -> None:
         if not self.is_hovered and not self.is_clicked:
             return # skip if not hovered
 
@@ -291,7 +326,10 @@ class SheetColumnResizer(SheetWidget):
             self.draw_selection_borders(context, width, color_accent)
 
             context.save()
-            context.rectangle(self.handler_x - 1, 0, width - self.handler_x + 1, self.display.column_header_height + 1)
+            context.rectangle(self.handler_x - 1,
+                              0,
+                              width - self.handler_x + 1,
+                              self.display.column_header_height + 1)
             context.clip()
             context.set_source_surface(new_surface, 0, 0)
             context.paint()
@@ -309,7 +347,9 @@ class SheetColumnResizer(SheetWidget):
         if self.x_offset < 0:
             self.draw_diagonal_lines_pattern(context, width, prefers_dark)
 
-    def draw_resize_handler(self, context: cairo.Context, prefers_dark: bool) -> None:
+    def draw_resize_handler(self,
+                            context: cairo.Context,
+                            prefers_dark: bool) -> None:
         context.save()
 
         x = self.handler_x
@@ -322,7 +362,10 @@ class SheetColumnResizer(SheetWidget):
         context.set_source_rgb(*background_color)
 
         # Draw the handle fill
-        context.rectangle(x - self.width / 2, y, self.width, self.height)
+        context.rectangle(x - self.width / 2,
+                          y,
+                          self.width,
+                          self.height)
         context.fill()
 
         stroke_color = (1.0, 1.0, 1.0)
@@ -339,7 +382,10 @@ class SheetColumnResizer(SheetWidget):
 
         context.restore()
 
-    def draw_vertical_line(self, context: cairo.Context, height: int, color_accent: tuple[float, float, float, float]) -> None:
+    def draw_vertical_line(self,
+                           context:      cairo.Context,
+                           height:       int,
+                           color_accent: tuple[float, float, float, float]) -> None:
         context.save()
 
         x = self.handler_x
@@ -354,13 +400,16 @@ class SheetColumnResizer(SheetWidget):
 
         context.restore()
 
-    def draw_headers_backgrounds(self, context: cairo.Context, width: int, prefers_dark: bool) -> None:
+    def draw_headers_backgrounds(self,
+                                 context:      cairo.Context,
+                                 width:        int,
+                                 prefers_dark: bool) -> None:
         context.save()
 
         # I don't want this class to access the data directly,
         # but well I have no alternative solution right now.
         selection = self.display.document.selection
-        range = selection.current_active_range
+        arange = selection.current_active_range
 
         # Flag this as a TODO for now following the sheet_renderer,
         # as this code is copied from there.
@@ -372,21 +421,29 @@ class SheetColumnResizer(SheetWidget):
         x = max(self.target_cell_x, self.display.row_header_width)
 
         # Take hidden column(s) into account
-        start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(range.column + range.column_span - 1)
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + arange.column_span - 1)
         rcolumn_span = end_vcolumn - start_vcolumn + 1
 
         # Adjust the rectangle position for the specific condition
         # based on pixel perfect calculation
-        if range.column + rcolumn_span - 1 < self.target_column or range.x <= self.display.row_header_width:
+        if arange.column + rcolumn_span - 1 < self.target_column \
+                or arange.x <= self.display.row_header_width:
             x += 1
 
-        context.rectangle(x, 0, width - x, self.display.column_header_height - 1)
+        context.rectangle(x,
+                          0,
+                          width - x,
+                          self.display.column_header_height - 1)
         context.fill()
 
         context.restore()
 
-    def draw_selection_backgrounds(self, context: cairo.Context, width: int, height: int, color_accent: tuple[float, float, float, float]) -> None:
+    def draw_selection_backgrounds(self,
+                                   context:      cairo.Context,
+                                   width:        int,
+                                   height:       int,
+                                   color_accent: tuple[float, float, float, float]) -> None:
         context.save()
 
         # I don't want this class to access the data directly,
@@ -397,16 +454,16 @@ class SheetColumnResizer(SheetWidget):
         # of the viewport, meaning they'll be negative if the user scrolled down. The calculations below
         # is only for optimization purposes or to handle the case where the selection size is too big so
         # that it can only be partially drawn.
-        range = selection.current_active_range
+        arange = selection.current_active_range
 
-        range_x = range.x
-        range_y = range.y
+        range_x = arange.x
+        range_y = arange.y
 
-        range_width = range.width
+        range_width = arange.width
 
-        range_row = range.row
-        range_column = range.column
-        rcolumn_span = range.column_span
+        range_row = arange.row
+        range_column = arange.column
+        rcolumn_span = arange.column_span
 
         # Hide the left of the selection if it is exceeded by the scroll viewport
         if range_x < 0:
@@ -429,11 +486,13 @@ class SheetColumnResizer(SheetWidget):
         rcolumn_span = end_vcolumn - start_vcolumn + 1
 
         # Only draw the selection if the target column is within the selection
-        if (range_column + rcolumn_span <= self.target_column or self.target_column < range_column) and 0 < rcolumn_span:
+        if (range_column + rcolumn_span <= self.target_column \
+                or self.target_column < range_column) and 0 < rcolumn_span:
             return
 
         # Adjust the range if necessary to prevent from drawing over translucent cells
-        if range_column <= self.target_column <= range_column + rcolumn_span - 1 or rcolumn_span == -1:
+        column_in_range = range_column <= self.target_column <= range_column + rcolumn_span - 1
+        if column_in_range or rcolumn_span == -1:
             range_x = max(range_x, self.target_cell_x)
             range_width = max(range_width, self.new_cell_width)
 
@@ -478,13 +537,16 @@ class SheetColumnResizer(SheetWidget):
 
         context.restore()
 
-    def draw_cells_borders(self, context: cairo.Context, width: int, prefers_dark: bool) -> None:
+    def draw_cells_borders(self,
+                           context:      cairo.Context,
+                           width:        int,
+                           prefers_dark: bool) -> None:
         context.save()
 
         # I don't want this class to access the data directly,
         # but well I have no alternative solution right now.
         selection = self.display.document.selection
-        range = selection.current_active_range
+        arange = selection.current_active_range
 
         # We need to make sure that the cell borders are contrast enough to the canvas background
         if prefers_dark:
@@ -497,7 +559,7 @@ class SheetColumnResizer(SheetWidget):
 
         # Draw separator line between headers and contents for the specific condition
         # based on pixel perfect calculation
-        if range.column > 0 and range.row > 0:
+        if arange.column > 0 and arange.row > 0:
             context.move_to(x_start, 0)
             context.line_to(x_start, y_start - 1)
 
@@ -510,7 +572,10 @@ class SheetColumnResizer(SheetWidget):
 
         context.restore()
 
-    def draw_headers_contents(self, context: cairo.Context, width: int, prefers_dark: bool) -> None:
+    def draw_headers_contents(self,
+                              context:      cairo.Context,
+                              width:        int,
+                              prefers_dark: bool) -> None:
         context.save()
 
         # I don't want this class to access the data directly,
@@ -524,7 +589,8 @@ class SheetColumnResizer(SheetWidget):
         layout.set_font_description(header_font_desc)
 
         # Use system default font family for drawing text
-        body_font_desc = Gtk.Widget.create_pango_context(self.display.document.view.main_canvas).get_font_description()
+        canvas = self.display.document.view.main_canvas
+        body_font_desc = Gtk.Widget.create_pango_context(canvas).get_font_description()
         font_family = body_font_desc.get_family() if body_font_desc else 'Sans'
         body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Bold {self.display.FONT_SIZE}px')
 
@@ -538,7 +604,10 @@ class SheetColumnResizer(SheetWidget):
         # Determine the starting column label
         col_index = self.target_column
 
-        context.rectangle(self.display.row_header_width, 0, width, self.display.column_header_height)
+        context.rectangle(self.display.row_header_width,
+                          0,
+                          width,
+                          self.display.column_header_height)
         context.clip()
 
         # Draw column headers texts (centered)
@@ -549,26 +618,35 @@ class SheetColumnResizer(SheetWidget):
         x = self.target_cell_x
         x_offset = 0
 
+        column_vseries = self.display.column_visible_series
+        column_vflags = self.display.column_visibility_flags
+
         # Handle edge cases where the last column(s) are hidden
-        if col_index - 1 == len(self.display.column_visible_series) \
-                and len(self.display.column_visible_series) \
-                and self.display.column_visible_series[-1] + 1 < len(self.display.column_visibility_flags) \
-                and not self.display.column_visibility_flags[self.display.column_visible_series[-1] + 1]:
-            col_index += (len(self.display.column_visibility_flags) - 1) - (self.display.column_visible_series[-1] - 1) - 1
+        if col_index - 1 == len(column_vseries) \
+                and len(column_vseries) \
+                and column_vseries[-1] + 1 < len(column_vflags) \
+                and not column_vflags[column_vseries[-1] + 1]:
+            col_index += (len(column_vflags) - 1) - (column_vseries[-1] - 1) - 1
 
         vcol_index = self.display.get_vcolumn_from_column(col_index)
 
+        cumulative_cwidths = self.display.cumulative_column_widths
+
         # Offset the first appearing column to account for the scroll position if necessary
-        if x == x_start and 0 < self.display.scroll_x_position and len(self.display.cumulative_column_widths):
+        if x == x_start \
+                and 0 < self.display.scroll_x_position \
+                and len(cumulative_cwidths):
             x_offset = self.display.scroll_x_position
-            if 0 < col_index - 1 <= len(self.display.cumulative_column_widths):
-                x_offset -= self.display.cumulative_column_widths[col_index - 2]
-            elif len(self.display.cumulative_column_widths) < col_index - 1:
-                x_offset = (x_offset - self.display.cumulative_column_widths[-1]) % self.display.DEFAULT_CELL_WIDTH
+            if 0 < col_index - 1 <= len(cumulative_cwidths):
+                x_offset -= cumulative_cwidths[col_index - 2]
+            elif len(cumulative_cwidths) < col_index - 1:
+                x_offset = (x_offset - cumulative_cwidths[-1]) % self.display.DEFAULT_CELL_WIDTH
             x -= x_offset
 
         # Draw dataframe header
-        if len(data.bbs) and 0 < self.display.scroll_y_position and col_index <= data.bbs[0].column_span:
+        if len(data.bbs) \
+                and 0 < self.display.scroll_y_position \
+                and col_index <= data.bbs[0].column_span:
             cname = data.dfs[0].columns[vcol_index - 1]
             dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
             layout.set_font_description(body_font_desc)
@@ -583,7 +661,10 @@ class SheetColumnResizer(SheetWidget):
             text_width = layout.get_size()[0] / Pango.SCALE
             x_text = x + (self.new_cell_width - text_width) / 2
 
-        context.rectangle(x, 0, self.new_cell_width - 1, self.display.column_header_height)
+        context.rectangle(x,
+                          0,
+                          self.new_cell_width - 1,
+                          self.display.column_header_height)
         context.clip()
 
         context.move_to(x_text, 2)
@@ -591,7 +672,10 @@ class SheetColumnResizer(SheetWidget):
 
         context.restore()
 
-    def draw_selection_borders(self, context: cairo.Context, width: int, color_accent: tuple[float, float, float, float]) -> None:
+    def draw_selection_borders(self,
+                               context:      cairo.Context,
+                               width:        int,
+                               color_accent: tuple[float, float, float, float]) -> None:
         context.save()
 
         # I don't want this class to access the data directly,
@@ -602,14 +686,14 @@ class SheetColumnResizer(SheetWidget):
         # of the viewport, meaning they'll be negative if the user scrolled down. The calculations below
         # is only for optimization purposes or to handle the case where the selection size is too big so
         # that it can only be partially drawn.
-        range = selection.current_active_range
+        arange = selection.current_active_range
 
-        range_x = range.x
-        range_width = range.width
+        range_x = arange.x
+        range_width = arange.width
 
-        range_row = range.row
-        range_column = range.column
-        rcolumn_span = range.column_span
+        range_row = arange.row
+        range_column = arange.column
+        rcolumn_span = arange.column_span
 
         # Hide the left of the selection if it is exceeded by the scroll viewport
         if range_x < 0:
@@ -632,7 +716,9 @@ class SheetColumnResizer(SheetWidget):
         rcolumn_span = end_vcolumn - start_vcolumn + 1
 
         # Only draw the selection if the target column is within the selection
-        if (range_column + rcolumn_span <= self.target_column or self.target_column < range_column) and 0 < rcolumn_span:
+        if (range_column + rcolumn_span <= self.target_column or
+            self.target_column < range_column) \
+                and 0 < rcolumn_span:
             return
 
         # Adjust the range if necessary to prevent from drawing over translucent cells
@@ -644,7 +730,10 @@ class SheetColumnResizer(SheetWidget):
         context.set_source_rgba(*color_accent)
         context.set_line_width(2)
 
-        context.rectangle(self.display.row_header_width, 0, width, self.display.column_header_height + 1)
+        context.rectangle(self.display.row_header_width,
+                          0,
+                          width,
+                          self.display.column_header_height + 1)
         context.clip()
 
         # Indicates that the user has a selection by drawing a line next to the row and column header(s)
@@ -655,7 +744,10 @@ class SheetColumnResizer(SheetWidget):
 
         context.restore()
 
-    def draw_diagonal_lines_pattern(self, context: cairo.Context, width: int, prefers_dark: bool) -> None:
+    def draw_diagonal_lines_pattern(self,
+                                    context:      cairo.Context,
+                                    width:        int,
+                                    prefers_dark: bool) -> None:
         context.save()
 
         if prefers_dark:

@@ -38,7 +38,10 @@ class FileSaveAsCsvView(Adw.PreferencesPage):
     date_format = Gtk.Template.Child()
     time_format = Gtk.Template.Child()
 
-    def __init__(self, file_name: str, folder_path: str, **kwargs) -> None:
+    def __init__(self,
+                 file_name: str,
+                 folder_path: str,
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         if file_name is not None:
@@ -54,9 +57,13 @@ class FileSaveAsCsvView(Adw.PreferencesPage):
         dialog.set_initial_folder(Gio.File.new_for_path(str(Path.home())))
         dialog.set_modal(True)
 
-        dialog.select_folder(self.get_root(), None, self.on_save_to_dialog_dismissed)
+        dialog.select_folder(self.get_root(),
+                             None,
+                             self.on_save_to_dialog_dismissed)
 
-    def on_save_to_dialog_dismissed(self, dialog: Gtk.FileDialog, result: Gio.Task) -> None:
+    def on_save_to_dialog_dismissed(self,
+                                    dialog: Gtk.FileDialog,
+                                    result: Gio.Task) -> None:
         if result.had_error():
             return
         folder = dialog.select_folder_finish(result)

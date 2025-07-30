@@ -29,6 +29,7 @@ class SheetView(Gtk.Box):
     __gtype_name__ = 'SheetView'
 
     __gsignals__ = {
+        'cancel-operation': (GObject.SIGNAL_RUN_FIRST, None, ()),
         'select-by-keypress': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
         'select-by-motion': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
         'pointer-moved': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
@@ -96,7 +97,10 @@ class SheetView(Gtk.Box):
         motion_event_controller.connect('leave', self.on_scrollbar_left)
         self.horizontal_scrollbar.add_controller(motion_event_controller)
 
-    def on_main_canvas_scrolled(self, event: Gtk.EventControllerScroll, dx: float, dy: float) -> bool:
+    def on_main_canvas_scrolled(self,
+                                event: Gtk.EventControllerScroll,
+                                dx:    float,
+                                dy:    float) -> bool:
         # Change direction of scroll based on shift key
         if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dy < 0 or 0 < dy):
             dx, dy = dy, 0
@@ -123,7 +127,10 @@ class SheetView(Gtk.Box):
 
         return True
 
-    def on_main_canvas_drag_update(self, event: Gtk.GestureDrag, offset_x: float, offset_y: float) -> None:
+    def on_main_canvas_drag_update(self,
+                                   event:    Gtk.GestureDrag,
+                                   offset_x: float,
+                                   offset_y: float) -> None:
         if globals.is_editing_cells:
             return # prevent dragging while inline editing
 
@@ -131,13 +138,20 @@ class SheetView(Gtk.Box):
         end_coord = (start_coord[0] + offset_x, start_coord[1] + offset_y)
         self.emit('select-by-motion', *end_coord)
 
-    def on_main_canvas_motion(self, event: Gtk.EventControllerMotion, x: float, y: float) -> None:
+    def on_main_canvas_motion(self,
+                              event: Gtk.EventControllerMotion,
+                              x:     float,
+                              y:     float) -> None:
         self.emit('pointer-moved', x, y)
 
     def on_main_canvas_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         self.main_canvas.set_focusable(False)
 
-    def on_main_canvas_lmb_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+    def on_main_canvas_lmb_pressed(self,
+                                   event:   Gtk.GestureClick,
+                                   n_press: int,
+                                   x:       float,
+                                   y:       float) -> None:
         # Request to open inline formula on double click
         if n_press >= 2:
             cell_data = self.document.selection.cell_data
@@ -150,18 +164,32 @@ class SheetView(Gtk.Box):
             return
 
         self.document.select_element_from_point(x, y, event.get_current_event_state())
+
         self.main_canvas.set_focusable(True)
         self.main_canvas.grab_focus()
+
         if self.document.check_selection_changed():
             self.main_canvas.queue_draw()
 
-    def on_main_canvas_lmb_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+    def on_main_canvas_lmb_released(self,
+                                    event:   Gtk.GestureClick,
+                                    n_press: int,
+                                    x:       float,
+                                    y:       float) -> None:
         self.emit('pointer-released', x, y)
 
-    def on_main_canvas_rmb_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+    def on_main_canvas_rmb_pressed(self,
+                                   event:   Gtk.GestureClick,
+                                   n_press: int,
+                                   x:       float,
+                                   y:       float) -> None:
         pass
 
-    def on_main_canvas_rmb_released(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+    def on_main_canvas_rmb_released(self,
+                                    event:   Gtk.GestureClick,
+                                    n_press: int,
+                                    x:       float,
+                                    y:       float) -> None:
         if not self.document.check_selection_contains_point(x, y):
             self.document.select_element_from_point(x, y)
             self.main_canvas.queue_draw()
@@ -175,7 +203,15 @@ class SheetView(Gtk.Box):
         self.emit('pointer-released', x, y)
         self.emit('open-context-menu', x, y, 'cell')
 
-    def on_main_canvas_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+    def on_main_canvas_key_pressed(self,
+                                   event:   Gtk.EventControllerKey,
+                                   keyval:  int,
+                                   keycode: int,
+                                   state:   Gdk.ModifierType) -> None:
+        if keyval == Gdk.KEY_Escape:
+            self.emit('cancel-operation')
+            return
+
         if keyval in [
             Gdk.KEY_Tab,
             Gdk.KEY_ISO_Left_Tab,
@@ -204,14 +240,21 @@ class SheetView(Gtk.Box):
             self.emit('open-inline-formula', '')
             return
 
-    def on_scrollbar_entered(self, event: Gtk.EventControllerMotion, x: float, y: float) -> None:
+    def on_scrollbar_entered(self,
+                             event: Gtk.EventControllerMotion,
+                             x:     float,
+                             y:     float) -> None:
         event.get_widget().add_css_class('hovering')
 
     def on_scrollbar_left(self, event: Gtk.EventControllerMotion) -> None:
         event.get_widget().remove_css_class('hovering')
 
-    def on_main_canvas_resized(self, drawing_area: Gtk.DrawingArea, width: int, height: int) -> None:
-        if self.main_canvas_width == width and self.main_canvas_height == height:
+    def on_main_canvas_resized(self,
+                               drawing_area: Gtk.DrawingArea,
+                               width:        int,
+                               height:       int) -> None:
+        if self.main_canvas_width == width \
+                and self.main_canvas_height == height:
             return
 
         active = self.document.selection.current_active_range

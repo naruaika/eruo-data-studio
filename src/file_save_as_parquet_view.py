@@ -33,7 +33,10 @@ class FileSaveAsParquetView(Adw.PreferencesPage):
     compression = Gtk.Template.Child()
     compression_level = Gtk.Template.Child()
 
-    def __init__(self, file_name: str, folder_path: str, **kwargs) -> None:
+    def __init__(self,
+                 file_name:   str,
+                 folder_path: str,
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         if file_name is not None:
@@ -46,19 +49,28 @@ class FileSaveAsParquetView(Adw.PreferencesPage):
     def on_save_to_activated(self, button: Gtk.Button) -> None:
         dialog = Gtk.FileDialog()
         dialog.set_title('Save To')
-        dialog.set_initial_folder(Gio.File.new_for_path(str(Path.home())))
         dialog.set_modal(True)
 
-        dialog.select_folder(self.get_root(), None, self.on_save_to_dialog_dismissed)
+        home_path = Gio.File.new_for_path(str(Path.home()))
+        dialog.set_initial_folder(home_path)
 
-    def on_save_to_dialog_dismissed(self, dialog: Gtk.FileDialog, result: Gio.Task) -> None:
+        dialog.select_folder(self.get_root(),
+                             None,
+                             self.on_save_to_dialog_dismissed)
+
+    def on_save_to_dialog_dismissed(self,
+                                    dialog: Gtk.FileDialog,
+                                    result: Gio.Task) -> None:
         if result.had_error():
             return
+
         folder = dialog.select_folder_finish(result)
         self.save_to.set_subtitle(folder.get_path())
 
     @Gtk.Template.Callback()
-    def on_compression_selected(self, combo_box: Adw.ComboRow, pspec: GObject.ParamSpec) -> None:
+    def on_compression_selected(self,
+                                combo_box: Adw.ComboRow,
+                                pspec:     GObject.ParamSpec) -> None:
         compression_map = {
             'zstd': (1, 22),
             'brotli': (0, 11),
@@ -71,7 +83,8 @@ class FileSaveAsParquetView(Adw.PreferencesPage):
         self.compression_level.set_range(start, end)
 
         level = self.compression_level.get_value()
-        self.compression_level.set_value(max(min(level, end), start))
+        level = max(min(level, end), start)
+        self.compression_level.set_value(level)
 
     @Gtk.Template.Callback()
     def on_reset_default_clicked(self, button: Gtk.Button) -> None:

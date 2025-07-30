@@ -28,7 +28,10 @@ class FileSaveAsJsonView(Adw.PreferencesPage):
     save_as = Gtk.Template.Child()
     save_to = Gtk.Template.Child()
 
-    def __init__(self, file_name: str, folder_path: str, **kwargs) -> None:
+    def __init__(self,
+                 file_name:   str,
+                 folder_path: str,
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         if file_name is not None:
@@ -41,13 +44,20 @@ class FileSaveAsJsonView(Adw.PreferencesPage):
     def on_save_to_activated(self, button: Gtk.Button) -> None:
         dialog = Gtk.FileDialog()
         dialog.set_title('Save To')
-        dialog.set_initial_folder(Gio.File.new_for_path(str(Path.home())))
         dialog.set_modal(True)
 
-        dialog.select_folder(self.get_root(), None, self.on_save_to_dialog_dismissed)
+        home_folder = Gio.File.new_for_path(str(Path.home()))
+        dialog.set_initial_folder(home_folder)
 
-    def on_save_to_dialog_dismissed(self, dialog: Gtk.FileDialog, result: Gio.Task) -> None:
+        dialog.select_folder(self.get_root(),
+                             None,
+                             self.on_save_to_dialog_dismissed)
+
+    def on_save_to_dialog_dismissed(self,
+                                    dialog: Gtk.FileDialog,
+                                    result: Gio.Task) -> None:
         if result.had_error():
             return
+
         folder = dialog.select_folder_finish(result)
         self.save_to.set_subtitle(folder.get_path())

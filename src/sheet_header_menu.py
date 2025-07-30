@@ -33,7 +33,11 @@ class BasicFilterListItem(GObject.Object):
     inconsistent = GObject.Property(type=bool, default=False)
     mvalue = GObject.Property(type=str, default='')
 
-    def __init__(self, cvalue: str, active: bool, inconsistent: bool = False, mvalue: str = '') -> None:
+    def __init__(self,
+                 cvalue:       str,
+                 active:       bool,
+                 inconsistent: bool = False,
+                 mvalue:       str = '') -> None:
         super().__init__()
 
         self.cvalue = cvalue
@@ -59,7 +63,10 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
 
     MAX_NO_UNIQUE_ITEMS = 10_000
 
-    def __init__(self, window: Window, column: int, **kwargs) -> None:
+    def __init__(self,
+                 window:      Window,
+                 column:      int,
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.window = window
@@ -112,7 +119,9 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
 
         self.populate_filter_list()
 
-    def setup_factory_check_button(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def setup_factory_check_button(self,
+                                   list_item_factory: Gtk.SignalListItemFactory,
+                                   list_item:         Gtk.ListItem) -> None:
         check_button = Gtk.CheckButton()
         list_item.set_child(check_button)
 
@@ -129,7 +138,9 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         list_item.bind_inconsistent = None
         list_item.bind_toggled = None
 
-    def bind_factory_check_button(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def bind_factory_check_button(self,
+                                  list_item_factory: Gtk.SignalListItemFactory,
+                                  list_item:         Gtk.ListItem) -> None:
         item_data = list_item.get_item()
 
         if list_item.bind_active is not None:
@@ -141,13 +152,20 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         if list_item.bind_toggled is not None:
             list_item.check_button.disconnect(list_item.bind_toggled)
 
-        list_item.bind_active = item_data.bind_property('active', list_item.check_button, 'active', GObject.BindingFlags.SYNC_CREATE)
-        list_item.bind_inconsistent = item_data.bind_property('inconsistent', list_item.check_button, 'inconsistent', GObject.BindingFlags.SYNC_CREATE)
-        list_item.bind_toggled = list_item.check_button.connect('toggled', self.on_filter_list_item_check_button_toggled, item_data)
+        list_item.bind_active = item_data.bind_property('active', list_item.check_button,
+                                                        'active', GObject.BindingFlags.SYNC_CREATE)
+
+        list_item.bind_inconsistent = item_data.bind_property('inconsistent', list_item.check_button,
+                                                              'inconsistent', GObject.BindingFlags.SYNC_CREATE)
+
+        list_item.bind_toggled = list_item.check_button.connect('toggled', self.on_filter_list_item_check_button_toggled,
+                                                                item_data)
 
         list_item.label.set_label(item_data.cvalue[:40])
 
-    def teardown_factory_check_button(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def teardown_factory_check_button(self,
+                                      list_item_factory: Gtk.SignalListItemFactory,
+                                      list_item: Gtk.ListItem) -> None:
         list_item.bind_active = None
         list_item.bind_inconsistent = None
         list_item.bind_toggled = None
@@ -155,7 +173,9 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         list_item.check_button = None
         list_item.label = None
 
-    def on_filter_list_item_check_button_toggled(self, button: Gtk.Button, item_data: BasicFilterListItem) -> None:
+    def on_filter_list_item_check_button_toggled(self,
+                                                 button:    Gtk.Button,
+                                                 item_data: BasicFilterListItem) -> None:
         if self.is_manually_toggling:
             return
         self.is_manually_toggling = True
@@ -345,17 +365,25 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         n_unique_approx = sheet_document.data.read_cell_data_n_unique_approx_from_metadata(self.column, 0)
 
         if self.MAX_NO_UNIQUE_ITEMS < n_unique_approx:
-            self.filter_status.set_text('Found approximately {:,} unique values. Continue anyway?'.format(n_unique_approx))
+            self.filter_status.set_text('Found approximately {:,} unique values. '
+                                        'Continue anyway?'.format(n_unique_approx))
+
             if col_dtype == polars.String:
-                self.filter_status.set_text(f'{self.filter_status.get_text()} Or use the search box to narrow down the result set.')
+                self.filter_status.set_text(f'{self.filter_status.get_text()} '
+                                            f'Or use the search box to narrow down the result set.')
             else:
-                self.filter_status.set_text(f'{self.filter_status.get_text()} Or use the custom filter to narrow down the result set.')
+                self.filter_status.set_text(f'{self.filter_status.get_text()} '
+                                            f'Or use the custom filter to narrow down the result set.')
+
             self.filter_continue.set_visible(True)
+
             return
 
         self.find_unique_values()
 
-    def find_unique_values(self, sample_only: bool = False, search_query: str = None) -> None:
+    def find_unique_values(self,
+                           sample_only: bool = False,
+                           search_query: str = None) -> None:
         if search_query == '':
             search_query = None
 
@@ -363,13 +391,17 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
 
         sheet_document = self.window.get_current_active_document()
 
-        n_unique = sheet_document.data.read_cell_data_n_unique_from_metadata(self.column, 0, search_query, use_regexp)
+        n_unique = sheet_document.data.read_cell_data_n_unique_from_metadata(self.column,
+                                                                             0,
+                                                                             search_query,
+                                                                             use_regexp)
         self.filter_status.set_text('Found {:,} unique values'.format(n_unique))
 
         self.filter_continue.set_visible(False)
 
         if self.MAX_NO_UNIQUE_ITEMS < n_unique:
-            self.filter_status.set_text(f'{self.filter_status.get_text()}. The result set only contains a subset of the unique values.')
+            self.filter_status.set_text(f'{self.filter_status.get_text()}. '
+                                        'The result set only contains a subset of the unique values.')
             sample_only = True # force sampling
 
         def show_filter_list() -> None:
@@ -377,9 +409,14 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             active = '$all' in self.cvalues_to_show or len(self.cvalues_to_show) > 0
             consistent = ('$all' in self.cvalues_to_show and len(self.cvalues_to_hide) == 0) or \
                          ('$all' in self.cvalues_to_hide and len(self.cvalues_to_show) == 0)
-            GLib.idle_add(self.filter_list_store.append, BasicFilterListItem('Select All', active, not consistent, '$all'))
+            list_item = BasicFilterListItem('Select All', active, not consistent, '$all')
+            GLib.idle_add(self.filter_list_store.append, list_item)
 
-            unique_values = sheet_document.data.read_cell_data_unique_from_metadata(self.column, 0, sample_only, search_query, use_regexp)
+            unique_values = sheet_document.data.read_cell_data_unique_from_metadata(self.column,
+                                                                                    0,
+                                                                                    sample_only,
+                                                                                    search_query,
+                                                                                    use_regexp)
 
             # Store the unique values hash for tracking changes
             if search_query is None or self.all_unique_values_hash.shape[0] == 0:
@@ -399,23 +436,27 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
                     active = ('$blanks' in self.cvalues_to_show and '$all' in self.cvalues_to_hide) or \
                              ('$blanks' not in self.cvalues_to_hide and '$all' in self.cvalues_to_show)
                     all_results_actived &= active
-                    GLib.idle_add(self.filter_list_store.insert, 1, BasicFilterListItem('(Blanks)', active, mvalue='$blanks'))
+                    list_item = BasicFilterListItem('(Blanks)', active, mvalue='$blanks')
+                    GLib.idle_add(self.filter_list_store.insert, 1, list_item)
                     continue
 
                 cvalue = str(cvalue)
                 active = (cvalue in self.cvalues_to_show and '$all' in self.cvalues_to_hide) or \
                          (cvalue not in self.cvalues_to_hide and '$all' in self.cvalues_to_show)
                 all_results_actived &= active
-                GLib.idle_add(self.filter_list_store.append, BasicFilterListItem(cvalue, active))
+                list_item = BasicFilterListItem(cvalue, active)
+                GLib.idle_add(self.filter_list_store.append, list_item)
                 item_counter += 1
 
             # Add the "Select All Results" option if necessary
             if search_query is not None:
-                GLib.idle_add(self.filter_list_store.insert, 1, BasicFilterListItem('Select All Results', all_results_actived, mvalue='$results'))
+                list_item = BasicFilterListItem('Select All Results', all_results_actived, mvalue='$results')
+                GLib.idle_add(self.filter_list_store.insert, 1, list_item)
 
             del unique_values
             gc.collect()
 
+        # TODO: show a loading indicator
         self.filter_list_store.remove_all()
         if n_unique > 0:
             threading.Thread(target=show_filter_list, daemon=True).start()

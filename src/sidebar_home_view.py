@@ -33,7 +33,11 @@ class FieldListItem(GObject.Object):
     dtype = GObject.Property(type=str, default='text')
     active = GObject.Property(type=bool, default=True)
 
-    def __init__(self, cindex: int, cname: str, dtype: str, active: bool) -> None:
+    def __init__(self,
+                 cindex: int,
+                 cname:  str,
+                 dtype:  str,
+                 active: bool) -> None:
         super().__init__()
 
         self.cindex = cindex
@@ -50,7 +54,10 @@ class SortListItem(GObject.Object):
     cname = GObject.Property(type=str, default='column_1')
     order = GObject.Property(type=str, default='Ascending')
 
-    def __init__(self, cindex: int, cname: str, order: str) -> None:
+    def __init__(self,
+                 cindex: int,
+                 cname:  str,
+                 order:  str) -> None:
         super().__init__()
 
         self.cindex = cindex
@@ -71,7 +78,14 @@ class FilterListItem(GObject.Object):
     operator = GObject.Property(type=str, default='equals')
     value: dict = {}
 
-    def __init__(self, qtype: str, query: str, findex: int, fdtype: str, field: str, operator: str, value: dict) -> None:
+    def __init__(self,
+                 qtype: str,
+                 query: str,
+                 findex: int,
+                 fdtype: str,
+                 field: str,
+                 operator: str,
+                 value: dict) -> None:
         super().__init__()
 
         self.qtype = qtype
@@ -87,7 +101,7 @@ class FilterListItem(GObject.Object):
 FILTER_BASIC_SCHEMA = {
     # GENERIC
     '='                           : [['$field', '$operator'], # row 1
-                                     ['$value']],          # row 2, etc.
+                                     ['$value']],             # row 2, etc.
     '!='                          : [['$field', '$operator'],
                                      ['$value']],
     '<>'                          : [['$field', '$operator'],
@@ -248,7 +262,8 @@ FILTER_BASIC_OPTION = {
 
 
 
-def get_filter_basic_expression(item_data: FilterListItem, cvalues: list) -> polars.Expr:
+def get_filter_basic_expression(item_data: FilterListItem,
+                                cvalues:   list) -> polars.Expr:
     query = item_data.query
     field = item_data.field
     fdtype = item_data.fdtype
@@ -331,8 +346,10 @@ def get_filter_basic_expression(item_data: FilterListItem, cvalues: list) -> pol
 
     match operator:
         # GENERIC
-        case 'equals'                      : return polars.col(field).eq(cvalues[0]) if fdtype != 'text' else polars.col(field).str.to_lowercase().eq(cvalues[0].lower())
-        case 'does not equal'              : return polars.col(field).ne(cvalues[0]) if fdtype != 'text' else polars.col(field).str.to_lowercase().ne(cvalues[0].lower())
+        case 'equals'                      : return polars.col(field).eq(cvalues[0]) if fdtype != 'text' \
+                                                    else polars.col(field).str.to_lowercase().eq(cvalues[0].lower())
+        case 'does not equal'              : return polars.col(field).ne(cvalues[0]) if fdtype != 'text' \
+                                                    else polars.col(field).str.to_lowercase().ne(cvalues[0].lower())
         case 'is null'                     : return polars.col(field).is_null()
         case 'is not null'                 : return polars.col(field).is_not_null()
 
@@ -419,7 +436,9 @@ class SidebarHomeView(Adw.Bin):
     filter_list_status_add_button = Gtk.Template.Child()
     filter_list_store = Gtk.Template.Child()
 
-    def __init__(self, window: Window, **kwargs) -> None:
+    def __init__(self,
+                 window: Window,
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.window = window
@@ -472,7 +491,9 @@ class SidebarHomeView(Adw.Bin):
     # Field section
     #
 
-    def setup_factory_field(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def setup_factory_field(self,
+                            list_item_factory: Gtk.SignalListItemFactory,
+                            list_item:         Gtk.ListItem) -> None:
         check_button = Gtk.CheckButton()
         list_item.set_child(check_button)
 
@@ -494,23 +515,28 @@ class SidebarHomeView(Adw.Bin):
         list_item.label_name = label_name
         list_item.label_type = label_type
 
-    def bind_factory_field(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def bind_factory_field(self,
+                           list_item_factory: Gtk.SignalListItemFactory,
+                           list_item:         Gtk.ListItem) -> None:
         item_data = list_item.get_item()
         list_item.check_button.set_active(item_data.active)
         list_item.label_name.set_label(item_data.cname)
         list_item.label_type.set_label(item_data.dtype)
 
-        def on_check_button_toggled(button: Gtk.Button, item_data: FieldListItem) -> None:
+        def on_check_button_toggled(button:    Gtk.Button,
+                                    item_data: FieldListItem) -> None:
             item_data.active = button.get_active()
 
             sheet_document = self.window.get_current_active_document()
             sheet_document.is_refreshing_uis = True
-            sheet_document.toggle_column_visibility(item_data.cindex, button.get_active())
+            sheet_document.toggle_column_visibility(item_data.cindex, item_data.active)
             sheet_document.is_refreshing_uis = False
 
         list_item.check_button.connect('toggled', on_check_button_toggled, item_data)
 
-    def teardown_factory_field(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def teardown_factory_field(self,
+                               list_item_factory: Gtk.SignalListItemFactory,
+                               list_item:         Gtk.ListItem) -> None:
         list_item.check_button = None
         list_item.label_name = None
         list_item.label_type = None
@@ -533,7 +559,8 @@ class SidebarHomeView(Adw.Bin):
         for cindex, cname in enumerate(schema):
             dtype = utils.get_dtype_symbol(schema[cname])
             active = vflags[bboxes.column + cindex - 1] if len(vflags) else True
-            self.field_list_store.append(FieldListItem(cindex + 1, cname, dtype, active))
+            list_item = FieldListItem(cindex + 1, cname, dtype, active)
+            self.field_list_store.append(list_item)
 
         self.repopulate_sort_list(dfi)
 
@@ -548,7 +575,9 @@ class SidebarHomeView(Adw.Bin):
     # Sort section
     #
 
-    def setup_header_factory_sort(self, list_item_factory: Gtk.SignalListItemFactory, list_header: Gtk.ListHeader) -> None:
+    def setup_header_factory_sort(self,
+                                  list_item_factory: Gtk.SignalListItemFactory,
+                                  list_header:       Gtk.ListHeader) -> None:
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         box.set_spacing(6)
         list_header.set_child(box)
@@ -580,7 +609,9 @@ class SidebarHomeView(Adw.Bin):
         spacer.set_margin_end(28)
         box.append(spacer)
 
-    def setup_factory_sort(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def setup_factory_sort(self,
+                           list_item_factory: Gtk.SignalListItemFactory,
+                           list_item:         Gtk.ListItem) -> None:
         list_item.set_focusable(False)
         list_item.set_activatable(False)
 
@@ -607,13 +638,19 @@ class SidebarHomeView(Adw.Bin):
         list_item.order_dropdown = order_dropdown
         list_item.delete_button = delete_button
 
-    def bind_factory_sort(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def bind_factory_sort(self,
+                          list_item_factory: Gtk.SignalListItemFactory,
+                          list_item:         Gtk.ListItem) -> None:
 
-        def on_field_selected(dropdown: Gtk.DropDown, pspec: GObject.ParamSpec, item_data: SortListItem) -> None:
+        def on_field_selected(dropdown: Gtk.DropDown,
+                              pspec: GObject.ParamSpec,
+                              item_data: SortListItem) -> None:
             item_data.cindex = dropdown.get_selected_item().cindex
             item_data.cname = dropdown.get_selected_item().cname
 
-        def on_order_selected(dropdown: Gtk.DropDown, pspec: GObject.ParamSpec, item_data: SortListItem) -> None:
+        def on_order_selected(dropdown: Gtk.DropDown,
+                              pspec: GObject.ParamSpec,
+                              item_data: SortListItem) -> None:
             item_data.order = dropdown.get_selected_item().get_string()
 
         item_data = list_item.get_item()
@@ -626,16 +663,21 @@ class SidebarHomeView(Adw.Bin):
         list_item.order_dropdown.connect('notify::selected-item', on_order_selected, item_data)
 
         def on_delete_sort_button_clicked(button: Gtk.Button) -> None:
-            self.on_delete_sort_button_clicked(button, list_item.get_position())
+            position = list_item.get_position()
+            self.on_delete_sort_button_clicked(button, position)
 
         list_item.delete_button.connect('clicked', on_delete_sort_button_clicked)
 
-    def teardown_factory_sort(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def teardown_factory_sort(self,
+                              list_item_factory: Gtk.SignalListItemFactory,
+                              list_item:         Gtk.ListItem) -> None:
         list_item.field_dropdown = None
         list_item.order_dropdown = None
         list_item.delete_button = None
 
-    def on_delete_sort_button_clicked(self, button: Gtk.Button, position: int) -> None:
+    def on_delete_sort_button_clicked(self,
+                                      button: Gtk.Button,
+                                      position: int) -> None:
         self.sort_list_store.remove(position)
 
         if self.sort_list_store.get_n_items() == 0:
@@ -646,7 +688,13 @@ class SidebarHomeView(Adw.Bin):
     @Gtk.Template.Callback()
     def on_add_sort_button_clicked(self, button: Gtk.Button) -> None:
         selected_item = self.field_list_store.get_item(0)
-        self.sort_list_store.append(SortListItem(selected_item.cindex - 1, selected_item.cname, 'Ascending'))
+
+        cindex = selected_item.cindex - 1
+        cname = selected_item.cname
+        order = 'Ascending'
+
+        list_item = SortListItem(cindex, cname, order)
+        self.sort_list_store.append(list_item)
 
         self.sort_list_view_box.get_parent().set_visible(True)
         self.sort_list_status.get_parent().set_visible(False)
@@ -703,7 +751,9 @@ class SidebarHomeView(Adw.Bin):
     # Filter section
     #
 
-    def setup_header_factory_filter(self, list_item_factory: Gtk.SignalListItemFactory, list_header: Gtk.ListHeader) -> None:
+    def setup_header_factory_filter(self,
+                                    list_item_factory: Gtk.SignalListItemFactory,
+                                    list_header:       Gtk.ListHeader) -> None:
         label = Gtk.Label()
         label.set_margin_start(6)
         label.set_margin_end(34)
@@ -713,7 +763,9 @@ class SidebarHomeView(Adw.Bin):
         label.set_label('Condition')
         list_header.set_child(label)
 
-    def setup_factory_filter(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def setup_factory_filter(self,
+                             list_item_factory: Gtk.SignalListItemFactory,
+                             list_item:         Gtk.ListItem) -> None:
         list_item.set_focusable(False)
         list_item.set_activatable(False)
 
@@ -734,20 +786,30 @@ class SidebarHomeView(Adw.Bin):
         list_item.container = container
         list_item.delete_button = delete_button
 
-    def bind_factory_filter(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    def bind_factory_filter(self,
+                            list_item_factory: Gtk.SignalListItemFactory,
+                            list_item:         Gtk.ListItem) -> None:
 
-        def on_filter_field_selected(dropdown: Gtk.DropDown, pspec: GObject.ParamSpec, item_data: FilterListItem) -> None:
+        def on_filter_field_selected(dropdown:  Gtk.DropDown,
+                                     pspec:     GObject.ParamSpec,
+                                     item_data: FilterListItem) -> None:
             pstate = { 'findex': item_data.findex, }
             _, position = self.filter_list_store.find(item_data)
+
             item_data.findex = dropdown.get_selected_item().cindex - 1
             item_data.fdtype = dropdown.get_selected_item().dtype
             item_data.field = dropdown.get_selected_item().cname
+
             self.refresh_filter_list_item(position, pstate)
 
-        def on_filter_value_changed(entry: Gtk.Entry, item_data: FilterListItem, value_index: int) -> None:
+        def on_filter_value_changed(entry:       Gtk.Entry,
+                                    item_data:   FilterListItem,
+                                    value_index: int) -> None:
             item_data.value[value_index] = entry.get_text()
 
-        def on_filter_operator_selected(dropdown: Gtk.DropDown, pspec: GObject.ParamSpec, item_data: FilterListItem) -> None:
+        def on_filter_operator_selected(dropdown:  Gtk.DropDown,
+                                        pspec:     GObject.ParamSpec,
+                                        item_data: FilterListItem) -> None:
             pstate = { 'operator': item_data.operator, }
             _, position = self.filter_list_store.find(item_data)
             item_data.operator = dropdown.get_selected_item().get_string()
@@ -799,7 +861,8 @@ class SidebarHomeView(Adw.Bin):
                         # Custom input
                         elif row_item == '$custom':
                             text_view = self.create_general_text_view(item_data.query)
-                            text_view.get_buffer().bind_property('text', item_data, 'query', GObject.BindingFlags.DEFAULT)
+                            text_view.get_buffer().bind_property('text', item_data,
+                                                                 'query', GObject.BindingFlags.DEFAULT)
                             box.append(text_view)
 
                         # Operator selector
@@ -824,14 +887,18 @@ class SidebarHomeView(Adw.Bin):
 
         list_item.delete_button.connect('clicked', on_delete_filter_button_clicked)
 
-    def teardown_factory_filter(self, list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
-        # I fear by commenting this out, there'll be memory leaks. But we can't access these variables anymore
-        # after splicing the filter_list_store when calling the refresh_filter_list_item() function.
+    def teardown_factory_filter(self,
+                                list_item_factory: Gtk.SignalListItemFactory,
+                                list_item:         Gtk.ListItem) -> None:
+        # I fear by commenting this out, there'll be memory leaks. But we got an error
+        # after splicing the filter_list_store when calling the refresh_filter_list_item().
         # list_item.condition_box = None
         # list_item.delete_button = None
         pass
 
-    def on_delete_filter_button_clicked(self, button: Gtk.Button, position: int) -> None:
+    def on_delete_filter_button_clicked(self,
+                                        button:   Gtk.Button,
+                                        position: int) -> None:
         self.filter_list_store.remove(position)
 
         if self.filter_list_store.get_n_items() == 0:
@@ -852,7 +919,8 @@ class SidebarHomeView(Adw.Bin):
         query = f'{field} {operator}'
         value = {}
 
-        self.filter_list_store.append(FilterListItem(qtype, query, findex, fdtype, field, operator, value))
+        list_item = FilterListItem(qtype, query, findex, fdtype, field, operator, value)
+        self.filter_list_store.append(list_item)
 
         self.filter_list_view_box.get_parent().set_visible(True)
         self.filter_list_status.get_parent().set_visible(False)
@@ -906,7 +974,8 @@ class SidebarHomeView(Adw.Bin):
             if query.endswith(')'):
                 query = query[:-1].strip()
 
-            self.filter_list_store.append(FilterListItem(qtype, query, findex, fdtype, field, operator, value))
+            list_item = FilterListItem(qtype, query, findex, fdtype, field, operator, value)
+            self.filter_list_store.append(list_item)
 
         is_empty = self.filter_list_store.get_n_items() == 0
         self.filter_list_view_box.get_parent().set_visible(not is_empty)
@@ -915,7 +984,9 @@ class SidebarHomeView(Adw.Bin):
         if self.filter_list_store.get_n_items() == 0:
             self.filter_list_status_label.set_text('No filters found')
 
-    def refresh_filter_list_item(self, position: int, pstate: dict) -> None:
+    def refresh_filter_list_item(self,
+                                 position: int,
+                                 pstate:   dict) -> None:
         item = self.filter_list_store.get_item(position)
 
         # TODO: support multiple dataframes?
@@ -961,17 +1032,18 @@ class SidebarHomeView(Adw.Bin):
 
                 # Reset the value if the new and old operator aren't naively compatible
                 old_schema = FILTER_BASIC_SCHEMA[svalue]
-                old_n_values = len([item for row in old_schema for item in row if item == '$value'])
                 new_schema = FILTER_BASIC_SCHEMA[item.operator]
+                old_n_values = len([item for row in old_schema for item in row if item == '$value'])
                 new_n_values = len([item for row in new_schema for item in row if item == '$value'])
                 if old_n_values != new_n_values:
                     value = {}
 
         new_item = FilterListItem(qtype, query, findex, fdtype, field, operator, value)
-
         self.filter_list_store.splice(position, 1, [new_item])
 
-    def parse_query(self, builder: dict, query: str = '') -> str:
+    def parse_query(self,
+                    builder: dict,
+                    query:   str = '') -> str:
         if 'conditions' in builder:
             query += f' {builder['operator']} '
             for condition in builder['conditions']:
@@ -1065,7 +1137,8 @@ class SidebarHomeView(Adw.Bin):
         field_dropdown = Gtk.DropDown.new()
         field_dropdown.set_hexpand(True)
 
-        def setup_factory_field_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        def setup_factory_field_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                         list_item:         Gtk.ListItem) -> None:
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             box.set_hexpand(True)
             list_item.set_child(box)
@@ -1081,7 +1154,8 @@ class SidebarHomeView(Adw.Bin):
             list_item.label = label
             list_item.image = image
 
-        def bind_factory_field_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        def bind_factory_field_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                        list_item:         Gtk.ListItem) -> None:
             item_data = list_item.get_item()
             list_item.label.set_label(item_data.cname)
 
@@ -1093,9 +1167,10 @@ class SidebarHomeView(Adw.Bin):
             field_dropdown.connect('notify::selected-item', on_list_item_selected)
             on_list_item_selected()
 
-        def teardown_factory_field_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
-            # I fear by commenting this out, there'll be memory leaks. But we can't access these variables anymore
-            # after splicing the filter_list_store when calling the refresh_filter_list_item() function.
+        def teardown_factory_field_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                            list_item:         Gtk.ListItem) -> None:
+            # I fear by commenting this out, there'll be memory leaks. But we got an error
+            # after splicing the filter_list_store when calling the refresh_filter_list_item().
             # list_item.label = None
             # list_item.image = None
             pass
@@ -1139,7 +1214,8 @@ class SidebarHomeView(Adw.Bin):
         order_dropdown = Gtk.DropDown.new()
         order_dropdown.set_hexpand(True)
 
-        def setup_factory_order_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        def setup_factory_order_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                         list_item:         Gtk.ListItem) -> None:
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             box.set_hexpand(True)
             list_item.set_child(box)
@@ -1155,7 +1231,8 @@ class SidebarHomeView(Adw.Bin):
             list_item.label = label
             list_item.image = image
 
-        def bind_factory_order_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        def bind_factory_order_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                        list_item:         Gtk.ListItem) -> None:
             item_data = list_item.get_item()
             list_item.label.set_label(item_data.get_string())
 
@@ -1167,7 +1244,8 @@ class SidebarHomeView(Adw.Bin):
             order_dropdown.connect('notify::selected-item', on_list_item_selected)
             on_list_item_selected()
 
-        def teardown_factory_order_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        def teardown_factory_order_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                            list_item:         Gtk.ListItem) -> None:
             list_item.label = None
             list_item.image = None
 
@@ -1210,7 +1288,8 @@ class SidebarHomeView(Adw.Bin):
         basic_filter_dropdown = Gtk.DropDown.new()
         basic_filter_dropdown.set_hexpand(True)
 
-        def setup_factory_basic_filter_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        def setup_factory_basic_filter_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                                list_item:         Gtk.ListItem) -> None:
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             box.set_hexpand(True)
             list_item.set_child(box)
@@ -1226,7 +1305,8 @@ class SidebarHomeView(Adw.Bin):
             list_item.label = label
             list_item.image = image
 
-        def bind_factory_basic_filter_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        def bind_factory_basic_filter_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                               list_item:         Gtk.ListItem) -> None:
             item_data = list_item.get_item()
             list_item.label.set_label(item_data.get_string())
 
@@ -1238,9 +1318,10 @@ class SidebarHomeView(Adw.Bin):
             basic_filter_dropdown.connect('notify::selected-item', on_list_item_selected)
             on_list_item_selected()
 
-        def teardown_factory_basic_filter_dropdown(list_item_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
-            # I fear by commenting this out, there'll be memory leaks. But we can't access these variables anymore
-            # after splicing the filter_list_store when calling the refresh_filter_list_item() function.
+        def teardown_factory_basic_filter_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                                   list_item:         Gtk.ListItem) -> None:
+            # I fear by commenting this out, there'll be memory leaks. But we got an error
+            # after splicing the filter_list_store when calling the refresh_filter_list_item().
             # list_item.label = None
             # list_item.image = None
             pass

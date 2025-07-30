@@ -37,7 +37,12 @@ class SheetManager(GObject.Object):
     def get_sheet_names(self) -> list[str]:
         return [sheet.title for sheet in self.sheets.values()]
 
-    def create_sheet(self, dataframe: polars.DataFrame, title: str = None) -> SheetView:
+    def create_sheet(self,
+                     # The initial dataframe to display in the newly created sheet,
+                     # the remaining dataframe should be loaded progressively.
+                     dataframe: polars.DataFrame,
+                     title:     str = None) -> SheetView:
+        # Automatically generate the sheet title when not provided
         if title is None:
             sheet_number = 1
             for sheet_name in self.get_sheet_names():
