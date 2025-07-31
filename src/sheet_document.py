@@ -26,7 +26,6 @@ import re
 
 from . import globals
 from . import utils
-from .clipboard_manager import ClipboardManager
 
 class SheetDocument(GObject.Object):
     __gtype_name__ = 'SheetDocument'

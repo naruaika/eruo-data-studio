@@ -137,74 +137,90 @@ class InsertBlankRowState(State):
 
     row_span: int
     above: bool
+    auto_range: bool
 
     def __init__(self,
-                 row_span: int,
-                 above:    bool) -> None:
+                 above:      bool,
+                 row_span:   int,
+                 auto_range: bool) -> None:
         super().__init__()
 
         self.save_selection()
 
-        self.row_span = row_span
         self.above = above
+        self.row_span = row_span
+        self.auto_range = auto_range
 
     def undo(self) -> None:
         document = globals.history.document
 
-        prow_span, self.range.row_span = self.range.row_span, self.row_span
-
-        if not self.above:
-            document.selection.current_active_range.metadata.row += self.range.row_span
+        if self.auto_range:
+            prow_span, self.range.row_span = self.range.row_span, self.row_span
+            if not self.above:
+                document.selection.current_active_range.metadata.row += self.range.row_span
+            else:
+                document.selection.current_active_range = self.range
         else:
-            document.selection.current_active_range = self.range
+            document.selection.current_active_range.metadata.row = self.range.row
+            document.selection.current_active_range.row_span = self.row_span
 
         document.delete_current_rows()
 
-        self.range.row_span = prow_span
+        if self.auto_range:
+            self.range.row_span = prow_span
 
         self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
-        document.insert_blank_from_current_rows(self.above)
+        document.insert_blank_from_current_rows(self.above,
+                                                self.row_span if not self.auto_range else -1)
 
 
 
 class InsertBlankColumnState(State):
     __gtype_name__ = 'InsertBlankColumnState'
 
-    column_span: int
     left: bool
+    column_span: int
+    auto_range: bool
 
     def __init__(self,
+                 left:        bool,
                  column_span: int,
-                 left:        bool) -> None:
+                 auto_range:  bool) -> None:
         super().__init__()
 
         self.save_selection()
 
-        self.column_span = column_span
         self.left = left
+        self.column_span = column_span
+        self.auto_range = auto_range
 
     def undo(self) -> None:
         document = globals.history.document
 
-        pcolumn_span, self.range.column_span = self.range.column_span, self.column_span
-
-        if not self.left:
-            document.selection.current_active_range.metadata.column += self.range.column_span
+        if self.auto_range:
+            pcolumn_span, self.range.column_span = self.range.column_span, self.column_span
+            if not self.left:
+                document.selection.current_active_range.metadata.column += self.range.column_span
+            else:
+                document.selection.current_active_range = self.range
         else:
-            document.selection.current_active_range = self.range
+            document.selection.current_active_range.metadata.column = self.range.column
+            document.selection.current_active_range.column_span = self.column_span
 
         document.delete_current_columns()
 
-        self.range.column_span = pcolumn_span
+        if self.auto_range:
+            self.range.column_span = pcolumn_span
 
         self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
-        document.insert_blank_from_current_columns(self.left)
+        document.insert_blank_from_current_columns(self.left,
+                                                   self.column_span if not self.auto_range else -1)
 
 
 
