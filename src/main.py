@@ -25,9 +25,10 @@ import sys
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 
-from gi.repository import Adw, Gio, GObject, Gtk
+from gi.repository import Adw, Gdk, Gio, GObject, Gtk
 
 from . import globals
+from .clipboard_manager import ClipboardManager
 from .file_manager import FileManager
 from .sheet_document import SheetDocument
 from .window import Window
@@ -43,6 +44,8 @@ class Application(Adw.Application):
         self.file_manager = FileManager()
         self.file_manager.connect('file-opened', self.on_file_opened)
         self.file_manager.connect('file-saved', self.on_file_saved)
+
+        self.clipboard = ClipboardManager()
 
         self.create_action('quit', self.on_quit_action, ['<primary>q'])
         self.create_action('about', self.on_about_action)
@@ -61,9 +64,6 @@ class Application(Adw.Application):
         self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
         self.create_action('undo', self.on_undo_action, ['<primary>z'])
         self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
-        # self.create_action('cut', self.on_cut_action, ['<primary>x'])
-        # self.create_action('copy', self.on_copy_action, ['<primary>c'])
-        # self.create_action('paste', self.on_paste_action, ['<primary>v'])
         self.create_action('insert-row-above', self.on_insert_row_above_action)
         self.create_action('insert-row-below', self.on_insert_row_below_action)
         self.create_action('insert-column-left', self.on_insert_column_left_action)
@@ -72,8 +72,8 @@ class Application(Adw.Application):
         self.create_action('duplicate-to-below', self.on_duplicate_to_below_action)
         self.create_action('duplicate-to-left', self.on_duplicate_to_left_action)
         self.create_action('duplicate-to-right', self.on_duplicate_to_right_action)
-        self.create_action('delete-row', self.on_delete_row_x_action)
-        self.create_action('delete-column', self.on_delete_column_x_action)
+        self.create_action('delete-row', self.on_delete_row_action)
+        self.create_action('delete-column', self.on_delete_column_action)
         self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
         self.create_action('filter-cell-value', self.on_filter_cell_value_action)
         # self.create_action('filter-cell-color', self.on_filter_cell_color_action)
@@ -227,34 +227,27 @@ class Application(Adw.Application):
 
     def on_undo_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
+        focused_widget = window.get_focus()
 
         # Prevent from colliding with the undo action of editable widgets.
-        # Not every editable widget supports the undo action, but for
-        # safety, we exclude them all.
-        focused_widget = window.get_focus()
-        if isinstance(focused_widget, Gtk.Editable) or isinstance(focused_widget, Gtk.TextView):
+        if isinstance(focused_widget, Gtk.Text) \
+                or isinstance(focused_widget, Gtk.TextView):
+            focused_widget.activate_action('text.undo', None)
             return
 
         globals.history.undo()
 
     def on_redo_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
+        focused_widget = window.get_focus()
 
         # Prevent from colliding with the redo action of editable widgets
-        focused_widget = window.get_focus()
-        if isinstance(focused_widget, Gtk.Editable) or isinstance(focused_widget, Gtk.TextView):
+        if isinstance(focused_widget, Gtk.Text) \
+                or isinstance(focused_widget, Gtk.TextView):
+            focused_widget.activate_action('text.redo', None)
             return
 
         globals.history.redo()
-
-    def on_cut_action(self, action: Gio.SimpleAction, *args) -> None:
-        pass
-
-    def on_copy_action(self, action: Gio.SimpleAction, *args) -> None:
-        pass
-
-    def on_paste_action(self, action: Gio.SimpleAction, *args) -> None:
-        pass
 
     def on_insert_row_above_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()
@@ -288,11 +281,11 @@ class Application(Adw.Application):
         document = self.get_current_active_document()
         document.duplicate_from_current_columns(left=False)
 
-    def on_delete_row_x_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_delete_row_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()
         document.delete_current_rows()
 
-    def on_delete_column_x_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_delete_column_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()
         document.delete_current_columns()
 
@@ -385,7 +378,10 @@ class Application(Adw.Application):
         window = self.get_active_window()
         return window.get_current_active_document()
 
-    def create_action(self, name: str, callback: callable, shortcuts: list = None) -> None:
+    def create_action(self,
+                      name:      str,
+                      callback:  callable,
+                      shortcuts: list = None) -> None:
         action = Gio.SimpleAction.new(name, None)
         action.connect('activate', callback)
         self.add_action(action)
@@ -400,7 +396,6 @@ class Application(Adw.Application):
         # But later on, we can add support for file manager integration
         # as well as a command line interface. Maybe even adding support
         # for opening the last session automatically.
-        # TODO: user should be able to setup the file reader parameters
         if file_path:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(file_path)

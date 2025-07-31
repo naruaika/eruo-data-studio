@@ -102,11 +102,11 @@ class SheetRenderer(GObject.Object):
         # of the viewport, meaning they'll be negative if the user scrolled down. The calculations below
         # is only for optimization purposes or to handle the case where the selection size is too big so
         # that it can only be partially drawn.
-        range = selection.current_active_range
-        range_x = range.x
-        range_y = range.y
-        range_width = range.width
-        range_height = range.height
+        arange = selection.current_active_range
+        range_x = arange.x
+        range_y = arange.y
+        range_width = arange.width
+        range_height = arange.height
 
         # Hide the top of the selection if it is exceeded by the scroll viewport
         if range_y < 0:
@@ -140,15 +140,15 @@ class SheetRenderer(GObject.Object):
 
         # Clipping for when the user selects the entire row(s). You may notice that
         # I didn't adjust the width and height as it's not worth the complexity.
-        if range.column == 0:
+        if arange.column == 0:
             context.rectangle(-1, display.column_header_height - 1, width, height)
             context.clip()
         # Clipping for when the user selects the entire column(s)
-        if range.row == 0:
+        if arange.row == 0:
             context.rectangle(display.row_header_width - 1, -1, width, height)
             context.clip()
         # Clipping for general use cases
-        if range.column > 0 and range.row > 0:
+        if arange.column > 0 and arange.row > 0:
             context.rectangle(display.row_header_width - 1, display.column_header_height - 1, width, height)
             context.clip()
 
@@ -164,19 +164,19 @@ class SheetRenderer(GObject.Object):
             context.fill()
 
         # Indicates that the user has selected the entire column(s) by highlighting all the row headers
-        if range.column > 0 and range.row == 0:
+        if arange.column > 0 and arange.row == 0:
             context.reset_clip()
             context.rectangle(0, display.column_header_height, display.row_header_width, height)
             context.fill()
 
         # Indicates that the user has selected the entire row(s) by highlighting all the column headers
-        if range.column == 0 and range.row > 0:
+        if arange.column == 0 and arange.row > 0:
             context.reset_clip()
             context.rectangle(display.row_header_width, 0, width, display.column_header_height)
             context.fill()
 
         # Indicates that the user has a selection by highlighting the row and column header(s)
-        if range.column > 0 and range.row > 0:
+        if arange.column > 0 and arange.row > 0:
             context.reset_clip()
             context.rectangle(display.row_header_width - 1, 0, width, height)
             context.clip()
@@ -195,14 +195,14 @@ class SheetRenderer(GObject.Object):
         context.set_source_rgba(*accent_rgba)
 
         # Bold highlight all the headers if the user has selected the entire sheet
-        if range.column == 0 and range.row == 0:
+        if arange.column == 0 and arange.row == 0:
             context.reset_clip()
             context.rectangle(display.row_header_width, range_y, width, display.column_header_height)
             context.rectangle(range_x, display.column_header_height, display.row_header_width, range_height)
             context.fill()
 
         # Bold highlight the selected column(s) header
-        if range.column > 0 and range.row == 0:
+        if arange.column > 0 and arange.row == 0:
             context.reset_clip()
             context.rectangle(display.row_header_width - 1, -1, width, height)
             context.clip()
@@ -210,7 +210,7 @@ class SheetRenderer(GObject.Object):
             context.fill()
 
         # Bold highlight the selected row(s) header
-        if range.column == 0 and range.row > 0:
+        if arange.column == 0 and arange.row > 0:
             context.reset_clip()
             context.rectangle(-1, display.column_header_height - 1, width, height)
             context.clip()
@@ -745,25 +745,30 @@ class SheetRenderer(GObject.Object):
 
             return range_x, range_y, range_width, range_height
 
-        range = selection.current_active_range
-        range_x, range_y, range_width, range_height = auto_adjust_selection_range(range.x, range.y, range.width, range.height)
+        arange = selection.current_active_range
+        range_x, range_y, range_width, range_height = auto_adjust_selection_range(arange.x, arange.y, arange.width, arange.height)
 
         search_range = selection.current_search_range
         if display.document.is_searching_cells and search_range is not None:
             search_range_x, search_range_y, search_range_width, search_range_height = auto_adjust_selection_range(search_range.x, search_range.y,
                                                                                                                   search_range.width, search_range.height)
 
+        cutcopy_range = selection.current_cutcopy_range
+        if (display.document.is_cutting_cells or display.document.is_copying_cells) and cutcopy_range is not None:
+            cutcopy_range_x, cutcopy_range_y, cutcopy_range_width, cutcopy_range_height = auto_adjust_selection_range(cutcopy_range.x, cutcopy_range.y,
+                                                                                                                      cutcopy_range.width, cutcopy_range.height)
+
         # Clipping for when the user selects the entire row(s). You may notice that
         # I didn't adjust the width and height as it's not worth the complexity.
-        if range.column == 0:
+        if arange.column == 0:
             context.rectangle(-1, display.column_header_height - 1, width, height)
             context.clip()
         # Clipping for when the user selects the entire column(s)
-        if range.row == 0:
+        if arange.row == 0:
             context.rectangle(display.row_header_width - 1, -1, width, height)
             context.clip()
         # Clipping for general use cases
-        if range.column > 0 and range.row > 0:
+        if arange.column > 0 and arange.row > 0:
             context.rectangle(display.row_header_width - 1, display.column_header_height - 1, width, height)
             context.clip()
 
@@ -785,22 +790,36 @@ class SheetRenderer(GObject.Object):
                 context.stroke()
                 context.restore()
 
+            # Render the cut/copy range
+            if (display.document.is_cutting_cells or display.document.is_copying_cells) and cutcopy_range is not None:
+                context.save()
+                context.rectangle(cutcopy_range_x, cutcopy_range_y, cutcopy_range_width, cutcopy_range_height)
+                context.stroke()
+                if self.prefers_dark:
+                    context.set_source_rgb(0.13, 0.13, 0.15)
+                else:
+                    context.set_source_rgb(0.98, 0.98, 0.98)
+                context.set_dash([4, 4], 0)
+                context.rectangle(cutcopy_range_x, cutcopy_range_y, cutcopy_range_width, cutcopy_range_height)
+                context.stroke()
+                context.restore()
+
         # Indicates that the user has selected the entire column(s) by drawing a vertical line
         # next to the row headers
-        if range.column > 0 and range.row == 0:
+        if arange.column > 0 and arange.row == 0:
             context.move_to(display.row_header_width, display.column_header_height - 1)
             context.line_to(display.row_header_width, height)
             context.stroke()
 
         # Indicates that the user has selected the entire row(s) by drawing a horizontal line
         # next to the column headers
-        if range.column == 0 and range.row > 0:
+        if arange.column == 0 and arange.row > 0:
             context.move_to(display.row_header_width - 1, display.column_header_height)
             context.line_to(width, display.column_header_height)
             context.stroke()
 
         # Indicates that the user has a selection by drawing a line next to the row and column header(s)
-        if range.column > 0 and range.row > 0:
+        if arange.column > 0 and arange.row > 0:
             context.move_to(range_x, display.column_header_height)
             context.line_to(range_x + range_width, display.column_header_height)
             context.move_to(display.row_header_width, range_y)

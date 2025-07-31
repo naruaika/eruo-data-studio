@@ -72,13 +72,14 @@ class SearchReplaceAllView(Gtk.Box):
 
     def on_search_list_view_item_activated(self,
                                            list_view: Gtk.ListView,
-                                           position: int) -> None:
+                                           position:  int) -> None:
         sheet_document = self.window.get_current_active_document()
+
+        search_range = sheet_document.selection.current_search_range
 
         cname = self.search_list_store.get_item(position).cname
         sheet_document.update_selection_from_name(cname)
 
-        search_range = sheet_document.selection.current_search_range
         sheet_document.selection.current_search_range = search_range
 
     @Gtk.Template.Callback()
@@ -146,11 +147,11 @@ class SearchReplaceAllView(Gtk.Box):
                         continue
 
                     # TODO: support multiple dataframes?
-                    col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1
-                    row_index = search_results['$ridx'][row] + 2
+                    col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the $ridx column
+                    row_index = search_results['$ridx'][row] + 2 # +2 for the locator and the header
 
                     cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
-                    cvalue = str(sheet_document.data.dfs[0][column_name][row_index])[:40]
+                    cvalue = str(sheet_document.data.dfs[0][column_name][row_index - 2])[:40]
 
                     list_item = SearchResultListItem(cname, cvalue)
 

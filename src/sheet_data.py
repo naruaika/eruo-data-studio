@@ -38,7 +38,11 @@ class SheetCellBoundingBox(GObject.Object):
     column_span: int
     row_span: int
 
-    def __init__(self, column: int, row: int, column_span: int, row_span: int) -> None:
+    def __init__(self,
+                 column:      int,
+                 row:         int,
+                 column_span: int,
+                 row_span:    int) -> None:
         super().__init__()
 
         self.column = column
@@ -46,6 +50,109 @@ class SheetCellBoundingBox(GObject.Object):
 
         self.column_span = column_span
         self.row_span = row_span
+
+    def check_collision(self, target: 'SheetCellBoundingBox') -> tuple[bool, int, int, str]:
+        """
+        Checks if the current bounding box collides with a target bounding box, calculates the intersecting
+        column and row differences, and determines the relative direction of the target box.
+        """
+        # Calculate the exclusive end coordinates for both boxes.
+        target_end_column = target.column + target.column_span
+        target_end_row = target.row + target.row_span
+
+        self_end_column = self.column + self.column_span
+        self_end_row = self.row + self.row_span
+
+        # Calculate the start and end of the intersection region
+        intersect_start_column = max(target.column, self.column)
+        intersect_end_column = min(target_end_column, self_end_column)
+
+        intersect_start_row = max(target.row, self.row)
+        intersect_end_row = min(target_end_row, self_end_row)
+
+        # Calculate the width and height of the actual intersection
+        overlapping_column_diff = max(0, intersect_end_column - intersect_start_column)
+        overlapping_row_diff = max(0, intersect_end_row - intersect_start_row)
+
+        # Determine if a collision occurred
+        has_collision = (overlapping_column_diff > 0) and (overlapping_row_diff > 0)
+
+        # Calculate non-overlapping parts of the target box
+        if has_collision:
+            # If there's a collision, the non-overlapping part is the target's total span
+            # minus the span of the overlap.
+            non_overlapping_target_column_span = target.column_span - overlapping_column_diff
+            non_overlapping_target_row_span = target.row_span - overlapping_row_diff
+        else:
+            # If there's no collision, the entire target box is non-overlapping.
+            non_overlapping_target_column_span = target.column_span
+            non_overlapping_target_row_span = target.row_span
+
+        # Initialize distances and direction
+        horizontal_gap = 0
+        vertical_gap = 0
+        direction_parts = []
+
+        if has_collision:
+            direction_parts.append("overlap")
+            # Check if target extends beyond self's boundaries
+            if target.column < self.column:
+                direction_parts.append("left")
+            if target_end_column > self_end_column:
+                direction_parts.append("right")
+            if target.row < self.row:
+                direction_parts.append("above")
+            if target_end_row > self_end_row:
+                direction_parts.append("below")
+            direction = "-".join(direction_parts)
+            # Gaps remain 0 if there's an overlap
+
+        else:
+            # Calculate horizontal separation (gap)
+            if self_end_column <= target.column: # Current box is to the left of target
+                horizontal_gap = target.column - self_end_column
+            elif target_end_column <= self.column: # Target box is to the left of current
+                horizontal_gap = self.column - target_end_column
+            # If neither, they must overlap horizontally, so horizontal_gap remains 0
+
+            # Calculate vertical separation (gap)
+            if self_end_row <= target.row: # Current box is above target
+                vertical_gap = target.row - self_end_row
+            elif target_end_row <= self.row: # Target box is above current
+                vertical_gap = self.row - target_end_row
+            # If neither, they must overlap vertically, so vertical_gap remains 0
+
+            # Determine direction based on relative positions and gaps
+            is_right = (self_end_column <= target.column)
+            is_left = (target_end_column <= self.column)
+            is_below = (self_end_row <= target.row)
+            is_above = (target_end_row <= self.row)
+
+            if is_left:
+                direction_parts.append("left")
+            if is_right:
+                direction_parts.append("right")
+            if is_above:
+                direction_parts.append("above")
+            if is_below:
+                direction_parts.append("below")
+
+            if direction_parts:
+                direction = "-".join(direction_parts)
+            else:
+                direction = "no-relation-complex-separation"
+            # If none of the above, it means no collision, and no clear single-axis or diagonal separation
+            # (e.g., they might be touching exactly at an edge or corner, or complex alignment)
+            # The default "no-relation-complex-separation" handles this.
+
+        return {
+            'has_collision':     has_collision,
+            'nonov_column_span': non_overlapping_target_column_span,
+            'nonov_row_span':    non_overlapping_target_row_span,
+            'direction':         direction,
+            'horizontal_gap':    horizontal_gap,
+            'vertical_gap':      vertical_gap
+        }
 
 
 
@@ -57,7 +164,10 @@ class SheetCellMetadata(GObject.Object):
 
     dfi: int
 
-    def __init__(self, column: int, row: int, dfi: int) -> None:
+    def __init__(self,
+                 column: int,
+                 row:    int,
+                 dfi:    int) -> None:
         super().__init__()
 
         self.column = column
@@ -73,63 +183,100 @@ class SheetData(GObject.Object):
     bbs: list[SheetCellBoundingBox] = [] # visual bounding boxes
     dfs: list[polars.DataFrame | numpy.ndarray] = []
 
-    def __init__(self, document: SheetDocument, dataframe: polars.DataFrame) -> None:
+    def __init__(self,
+                 document:  SheetDocument,
+                 dataframe: polars.DataFrame,
+                 column:    int = 1,
+                 row:       int = 1) -> None:
         super().__init__()
 
         self.document = document
 
         if dataframe is not None:
-            self.dfs = [dataframe]
-            # TODO: should we support dataframe starting from row > 1 and/or column > 1?
-            self.bbs = [SheetCellBoundingBox(1, 1, dataframe.width, dataframe.height + 1)]
+            width = dataframe.width
+            height = dataframe.height + 1 # +1 for the header
 
-    def get_cell_metadata_from_position(self, column: int, row: int) -> SheetCellMetadata:
+            self.bbs = [SheetCellBoundingBox(column, row, width, height)]
+            self.dfs = [dataframe]
+
+    def get_cell_metadata_from_position(self,
+                                        column: int,
+                                        row:    int) -> SheetCellMetadata:
         # Handle the locator cells
         column = max(1, column)
         row = max(1, row)
 
         for bbi, bbs in enumerate(self.bbs):
-            if bbs.column <= column < (bbs.column + self.dfs[bbi].width) and bbs.row <= row < (bbs.row + self.dfs[bbi].height + 1):
+            column_in_range = bbs.column <= column < (bbs.column + self.dfs[bbi].width)
+            row_in_range = bbs.row <= row < (bbs.row + self.dfs[bbi].height + 1)
+
+            if column_in_range and row_in_range:
                 column = column - bbs.column
                 row = row - bbs.row
                 return SheetCellMetadata(column, row, bbi)
 
         return SheetCellMetadata(-1, -1, -1)
 
-    def read_column_dtype_from_metadata(self, column: int, dfi: int) -> any:
+    def read_column_dtype_from_metadata(self,
+                                        column: int,
+                                        dfi:    int) -> polars.DataType:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
         return self.dfs[dfi].dtypes[column]
 
-    def read_cell_data_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int) -> any:
+    def read_single_cell_data_from_metadata(self,
+                                            column: int,
+                                            row:    int,
+                                            dfi:    int) -> any:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+
+        row -= 1 # coordinate to index
+
+        # Get the header
+        if row < 0:
+            return self.dfs[dfi].columns[column]
+
+        # Get the content
+        return self.dfs[dfi][row, column]
+
+    def read_cell_data_block_from_metadata(self,
+                                           column:         int,
+                                           row:            int,
+                                           column_span:    int,
+                                           row_span:       int,
+                                           dfi:            int,
+                                           include_header: bool = False,
+                                           with_hidden:    bool = True) -> polars.DataFrame:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
 
         row -= 1
 
-        # Get the header(s)
-        if row < 0:
-            df = self.dfs[dfi].columns[column: column + column_span]
-            if column_span > 1:
-                return df
-            else:
-                return df[0]
+        if include_header:
+            row += 1
+            row_span -= 1
 
-        # Get the content(s)
-        if row_span == 1 and column_span == 1:
-            return self.dfs[dfi][row, column]
-        else:
-            return self.dfs[dfi][row:row + row_span, column:column + column_span]
+        return self.dfs[dfi][row:row + row_span, column:column + column_span]
 
-    def read_cell_data_chunks_from_metadata(self, column_names: list[str], row: int, row_span: int, dfi: int) -> any:
+    def read_cell_data_chunks_from_metadata(self,
+                                            column_names: list[str],
+                                            row:          int,
+                                            row_span:     int,
+                                            dfi:          int) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
 
+        # Get the entire content
         if row_span < 0:
             return self.dfs[dfi].select(column_names)
+
+        # Get the content in range
         return self.dfs[dfi].select(column_names)[row:row + row_span]
 
-    def read_cell_data_n_unique_approx_from_metadata(self, column: int, dfi: int) -> any:
+    def read_cell_data_n_unique_approx_from_metadata(self,
+                                                     column: int,
+                                                     dfi:    int) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
 
@@ -140,7 +287,11 @@ class SheetData(GObject.Object):
         except Exception:
             return self.dfs[dfi].select(polars.col(column_name).n_unique()).item()
 
-    def read_cell_data_n_unique_from_metadata(self, column: int, dfi: int, search_query: str = None, use_regexp: bool = False) -> any:
+    def read_cell_data_n_unique_from_metadata(self,
+                                              column:       int,
+                                              dfi:          int,
+                                              search_query: str = None,
+                                              use_regexp:   bool = False) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
 
@@ -152,9 +303,16 @@ class SheetData(GObject.Object):
             if use_regexp:
                 filter_expression = polars.col(column_name).str.contains(f'(?i){search_query}')
 
-        return self.dfs[dfi].filter(filter_expression).select(polars.col(column_name).n_unique()).item()
+        return self.dfs[dfi].filter(filter_expression) \
+                            .select(polars.col(column_name).n_unique()) \
+                            .item()
 
-    def read_cell_data_unique_from_metadata(self, column: int, dfi: int, sample_only: bool = False, search_query: str = None, use_regexp: bool = False) -> any:
+    def read_cell_data_unique_from_metadata(self,
+                                            column:       int,
+                                            dfi:          int,
+                                            sample_only:  bool = False,
+                                            search_query: str = None,
+                                            use_regexp:   bool = False) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
 
@@ -168,46 +326,37 @@ class SheetData(GObject.Object):
 
         if sample_only:
             return self.dfs[dfi].filter(filter_expression).get_column(column_name) \
-                                .sample(1_000_000, seed=99, with_replacement=True).unique().sort()
+                                .sample(1_000_000, seed=99, with_replacement=True) \
+                                .unique().sort()
 
         return self.dfs[dfi].filter(filter_expression).get_column(column_name).unique().sort()
 
-    def read_cell_bbox_from_metadata(self, dfi: int) -> any:
+    def read_cell_bbox_from_metadata(self, dfi: int) -> SheetCellBoundingBox:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
         return self.bbs[dfi]
 
-    def insert_rows_from_metadata(self, row: int, row_span: int, dfi: int) -> bool:
+    def insert_rows_from_metadata(self,
+                                  row:      int,
+                                  row_span: int,
+                                  dfi:      int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        empty_rows = polars.DataFrame({
-            column_name: polars.Series(values=[None] * row_span, dtype=column_dtype)
-                         for column_name, column_dtype in self.dfs[dfi].schema.items()
-        })
+        empty_rows = polars.DataFrame({column_name: polars.Series(values=[None] * row_span, dtype=column_dtype)
+                                                    for column_name, column_dtype in self.dfs[dfi].schema.items()})
 
-        self.dfs[dfi] = polars.concat([
-            self.dfs[dfi].slice(0, row),
-            empty_rows,
-            self.dfs[dfi].slice(row),
-        ])
+        self.dfs[dfi] = polars.concat([self.dfs[dfi].slice(0, row),
+                                       empty_rows,
+                                       self.dfs[dfi].slice(row)])
 
         return True
 
-    def insert_columns_from_dataframe(self, dataframe: polars.DataFrame, column: int, dfi: int) -> bool:
-        if dfi < 0 or len(self.dfs) <= dfi:
-            return False
-
-        for counter, column in enumerate(range(column, column + dataframe.width)):
-            self.dfs[dfi] = self.dfs[dfi].insert_column(column, dataframe[:, counter])
-            self.bbs[dfi].column_span += 1
-
-        del dataframe
-        gc.collect()
-
-        return True
-
-    def insert_columns_from_metadata(self, column: int, column_span: int, dfi: int, left: bool = False) -> bool:
+    def insert_columns_from_metadata(self,
+                                     column:      int,
+                                     column_span: int,
+                                     dfi:         int,
+                                     left:        bool = False) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -233,44 +382,46 @@ class SheetData(GObject.Object):
 
         return True
 
-    def insert_rows_from_dataframe(self, dataframe: polars.DataFrame, row: int, dfi: int) -> bool:
+    def insert_rows_from_dataframe(self,
+                                   dataframe: polars.DataFrame,
+                                   row:       int,
+                                   dfi:       int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        self.dfs[dfi] = polars.concat([
-            self.dfs[dfi].slice(0, row - 1),
-            dataframe,
-            self.dfs[dfi].slice(row - 1),
-        ])
+        self.dfs[dfi] = polars.concat([self.dfs[dfi].slice(0, row - 1),
+                                       dataframe,
+                                       self.dfs[dfi].slice(row - 1)])
         self.bbs[dfi].row_span += dataframe.height
 
         return True
 
-    def update_cell_data_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int,
-                                       replace_with: any, search_pattern: str, match_case: bool,
-                                       column_vseries: polars.Series, row_vseries: polars.Series) -> bool:
+    def insert_columns_from_dataframe(self,
+                                      dataframe: polars.DataFrame,
+                                      column:    int,
+                                      dfi:       int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        # Currently, no other use cases than undo/redo for this one
-        if isinstance(replace_with, list):
-            return self.update_cell_data_with_array_from_metadata(column, row, column_span, row_span, dfi,
-                                                                  replace_with)
+        for counter, column in enumerate(range(column, column + dataframe.width)):
+            self.dfs[dfi] = self.dfs[dfi].insert_column(column, dataframe[:, counter])
+            self.bbs[dfi].column_span += 1
 
-        # This is the default use case
-        try:
-            return self.update_cell_data_with_single_from_metadata(column, row, column_span, row_span, dfi,
-                                                                   replace_with, search_pattern, match_case,
-                                                                   column_vseries, row_vseries)
-        except Exception as e:
-            globals.send_notification(f'Cannot update the selected cells')
-            print(e)
+        del dataframe
+        gc.collect()
 
-        return False
+        return True
 
-    def update_cell_data_with_single_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int,
-                                                   replace_with: any, search_pattern: str, match_case: bool,
-                                                   column_vseries: polars.Series, row_vseries: polars.Series) -> bool:
+    def update_cell_data_block_with_single_from_metadata(self,
+                                                         column:         int,
+                                                         row:            int,
+                                                         column_span:    int,
+                                                         row_span:       int,
+                                                         dfi:            int,
+                                                         include_header: bool,
+                                                         new_value:      any,
+                                                         column_vseries: polars.Series,
+                                                         row_vseries:    polars.Series) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -298,86 +449,76 @@ class SheetData(GObject.Object):
             column_dtype = self.dfs[dfi].dtypes[column]
 
             # Cast empty string
-            if replace_with == '' and search_pattern is None:
+            if new_value == '':
                 replace_with = None
 
             # Convert the input value to the correct type
-            if row >= 0: # skip the header row
-                if column_dtype in (polars.Date, polars.Datetime, polars.Time):
-                    if column_dtype == polars.Datetime:
-                        new_value = datetime.strptime(replace_with, '%Y-%m-%d %H:%M:%S')
-                    if column_dtype == polars.Date:
-                        new_value = datetime.strptime(replace_with, '%Y-%m-%d').date()
-                    if column_dtype == polars.Time:
-                        new_value = datetime.strptime(replace_with, '%H:%M:%S').time()
-                else:
-                    try:
-                        new_value = polars.Series([replace_with]).cast(column_dtype)[0]
-                    except Exception:
-                        new_value = str(replace_with)
-            else:
-                new_value = replace_with
+            try:
+                match column_dtype:
+                    case polars.Datetime:
+                        replace_with = datetime.strptime(new_value, '%Y-%m-%d %H:%M:%S')
+                    case polars.Date:
+                        replace_with = datetime.strptime(new_value, '%Y-%m-%d').date()
+                    case polars.Time:
+                        replace_with = datetime.strptime(new_value, '%H:%M:%S').time()
+                    case _:
+                        replace_with = polars.Series([new_value]).cast(column_dtype)[0]
+            except Exception:
+                replace_with = str(new_value)
 
             # Update the entire column
             if row_span < 0:
-                self.dfs[dfi] = self.dfs[dfi].with_columns(polars.repeat(new_value, row_count, eager=True, dtype=column_dtype)
+                self.dfs[dfi] = self.dfs[dfi].with_columns(polars.repeat(replace_with, row_count, eager=True, dtype=column_dtype)
                                                                  .alias(column_name))
             # Update the dataframe in range, excluding the header row
             elif stop - start > 0:
-                # The default behaviour is to replace cells within the selection range
-                if search_pattern is None:
-                    when_expression = polars.col('$ridx').is_between(start, stop - 1)
-                    if len(row_vseries):
-                        when_expression &= polars.col('$ridx').is_in(row_vseries[1:] - 1)
-                    self.dfs[dfi] = self.dfs[dfi].with_row_index('$ridx') \
-                                                 .with_columns(polars.when(when_expression).then(polars.lit(new_value))
-                                                                     .otherwise(polars.col(column_name)).alias(column_name)) \
-                                                 .drop('$ridx')
+                when_expression = polars.col('$ridx').is_between(start, stop - 1)
+                if len(row_vseries):
+                    when_expression &= polars.col('$ridx').is_in(row_vseries[1:] - 1)
+                self.dfs[dfi] = self.dfs[dfi].with_row_index('$ridx') \
+                                             .with_columns(polars.when(when_expression).then(polars.lit(replace_with))
+                                                                 .otherwise(polars.col(column_name))
+                                                                 .alias(column_name)) \
+                                             .drop('$ridx')
 
-                # Pattern is used only for search and replace. The target should always be a single cell
-                # and its value should always a string. Cast empty string if necessary. For the replace
-                # all operation, we don't call this function.
-                else:
-                    if self.dfs[dfi][start, column] == search_pattern and replace_with == '':
-                        self.dfs[dfi][start, column] = None
-                    else:
-                        if match_case:
-                            self.dfs[dfi][start, column] = self.dfs[dfi][start, column].replace(search_pattern, replace_with)
-                        else:
-                            self.dfs[dfi][start, column] = re.sub(re.escape(search_pattern), replace_with, self.dfs[dfi][start, column], flags=re.IGNORECASE)
-
-            if row >= 0:
+            if not include_header:
                 continue # skip header cell
 
-            # Generate a new column name if needed
-            if new_value is None:
-                if re.match(r'column_(\d+)', column_name):
-                    continue # skip renaming already named column
+            # Remove leading '$' to prevent collision from internal column names
+            replace_with = new_value.strip('$')
+
+            def generate_next_column_name(column_name: str) -> str:
                 cnumber = 1
                 for cname in self.dfs[dfi].columns:
-                    if match := re.match(r'column_(\d+)', cname):
+                    if match := re.match(column_name + r'_(\d+)', cname):
                         cnumber = max(cnumber, int(match.group(1)) + 1)
-                new_value = f'column_{cnumber}'
-            else:
-                new_value = str(replace_with)
+                return f'{column_name}_{cnumber}'
 
-            # Remove leading '$' to prevent collision
-            # from the internal column name
-            new_value = new_value.strip('$')
+            # Generate a new column name if needed
+            if replace_with in ['', None]:
+                replace_with = generate_next_column_name('column')
+            else:
+                replace_with = str(replace_with)
+                if replace_with in self.dfs[dfi].columns:
+                    replace_with = generate_next_column_name(replace_with)
 
             # Update the column name
-            self.dfs[dfi] = self.dfs[dfi].rename({column_name: new_value})
+            self.dfs[dfi] = self.dfs[dfi].rename({column_name: replace_with})
 
         return True
 
-    def update_cell_data_with_array_from_metadata(self, column: int, row: int, column_span: int, row_span: int, dfi: int, content: list) -> bool:
+    def update_cell_data_block_from_metadata(self,
+                                             column:         int,
+                                             row:            int,
+                                             column_span:    int,
+                                             row_span:       int,
+                                             dfi:            int,
+                                             include_header: bool,
+                                             content:        polars.DataFrame) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
         row -= 1
-
-        header = content[0]
-        content = content[1]
 
         row_count = self.dfs[dfi].height
 
@@ -401,39 +542,30 @@ class SheetData(GObject.Object):
             column_name = self.dfs[dfi].columns[column]
             column_dtype = self.dfs[dfi].dtypes[column]
 
-            # Update the dataframe in range, excluding the header row
-            if isinstance(content, polars.DataFrame):
-                self.dfs[dfi] = self.dfs[dfi].with_columns(
-                    self.dfs[dfi][0:start, column].extend(content[:, content_index].cast(column_dtype))
-                                                  .extend(self.dfs[dfi][stop:row_count, column])
-                                                  .alias(column_name)
-                )
-            # TODO: we need explicit flag for when the user only want to update the header. Currently,
-            #       we always receive with this structure data: [header, content]. It is ambiguous now
-            #       since when the user only wants to update the header, the content is None. But it is
-            #       also None when the user wants to clear the content.
-            elif not (row == -1 and row_span == 1):
-                self.dfs[dfi] = self.dfs[dfi].with_columns(
-                    self.dfs[dfi][0:start, column].extend(polars.Series([content]).cast(column_dtype))
-                                                  .extend(self.dfs[dfi][stop:row_count, column])
-                                                  .alias(column_name)
-                )
+            # Update the dataframe in range
+            self.dfs[dfi] = self.dfs[dfi].with_columns(
+                self.dfs[dfi][:start, column].extend(content[:, content_index].cast(column_dtype))
+                                             .extend(self.dfs[dfi][stop:, column])
+                                             .alias(column_name)
+            )
 
-            if header is None:
+            if not include_header:
                 continue # skip header cell
 
             # Update the column name
-            if isinstance(header, list):
-                self.dfs[dfi] = self.dfs[dfi].rename({column_name: header[content_index]})
-            else:
-                self.dfs[dfi] = self.dfs[dfi].rename({column_name: header})
+            self.dfs[dfi] = self.dfs[dfi].rename({column_name: content.columns[content_index]})
 
         del content
         gc.collect()
 
         return True
 
-    def update_cell_data_with_chunk_from_metadata(self, column_names: list[str], row: int, row_span: int, dfi: int, content: polars.DataFrame) -> bool:
+    def update_cell_data_blocks_from_metadata(self,
+                                              column_names: list[str],
+                                              row: int,
+                                              row_span: int,
+                                              dfi: int,
+                                              content: polars.DataFrame) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -442,31 +574,34 @@ class SheetData(GObject.Object):
             if row_span < 0: # update the entire column
                 self.dfs[dfi] = self.dfs[dfi].with_columns(content[column_name].alias(column_name))
             else: # update within the range
-                self.dfs[dfi] = self.dfs[dfi].with_columns(
-                    self.dfs[dfi][0:row, column].extend(content[column_name])
-                                                .extend(self.dfs[dfi][row + row_span:, column])
-                                                .alias(column_name)
-                )
+                self.dfs[dfi] = self.dfs[dfi].with_columns(self.dfs[dfi][0:row, column].extend(content[column_name])
+                                                                                       .extend(self.dfs[dfi][row + row_span:, column])
+                                                                                       .alias(column_name))
 
         del content
         gc.collect()
 
         return True
 
-    def duplicate_rows_from_metadata(self, row: int, row_span: int, dfi: int) -> bool:
+    def duplicate_rows_from_metadata(self,
+                                     row:      int,
+                                     row_span: int,
+                                     dfi:      int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        self.dfs[dfi] = polars.concat([
-            self.dfs[dfi].slice(0, row + row_span - 1),
-            self.dfs[dfi].slice(row - 1, row_span),
-            self.dfs[dfi].slice(row + row_span - 1),
-        ])
+        self.dfs[dfi] = polars.concat([self.dfs[dfi].slice(0, row + row_span - 1),
+                                       self.dfs[dfi].slice(row - 1, row_span),
+                                       self.dfs[dfi].slice(row + row_span - 1)])
         self.bbs[dfi].row_span += row_span
 
         return True
 
-    def duplicate_columns_from_metadata(self, column: int, column_span: int, dfi: int, left: bool = False) -> bool:
+    def duplicate_columns_from_metadata(self,
+                                        column:      int,
+                                        column_span: int,
+                                        dfi:         int,
+                                        left:        bool = False) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -500,7 +635,10 @@ class SheetData(GObject.Object):
 
         return True
 
-    def delete_rows_from_metadata(self, row: int, row_span: int, dfi: int) -> bool:
+    def delete_rows_from_metadata(self,
+                                  row:      int,
+                                  row_span: int,
+                                  dfi:      int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -520,7 +658,10 @@ class SheetData(GObject.Object):
 
         return True
 
-    def delete_columns_from_metadata(self, column: int, column_span: int, dfi: int) -> bool:
+    def delete_columns_from_metadata(self,
+                                     column:      int,
+                                     column_span: int,
+                                     dfi:         int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -532,7 +673,9 @@ class SheetData(GObject.Object):
 
         return True
 
-    def filter_rows_from_metadata(self, filters: list, dfi: int) -> polars.Series:
+    def filter_rows_from_metadata(self,
+                                  filters: list,
+                                  dfi:     int) -> polars.Series:
         if dfi < 0 or len(self.dfs) <= dfi:
             return polars.Series(dtype=polars.Boolean)
 
@@ -548,12 +691,14 @@ class SheetData(GObject.Object):
             else:
                 expression |= afilter['expression']
 
-        # We don't do the actual filtering on the original dataframe here, instead we
-        # just want to get the boolean series to flag which rows should be visible.
+        # We don't do the actual filtering on the original dataframe here, instead
+        # we just want to get the boolean series to flag which rows should be visible.
         return polars.concat([polars.Series([True]), # for header row
                               self.dfs[dfi].with_columns(expression.alias('$vrow'))['$vrow']])
 
-    def sort_rows_from_metadata(self, sorts: dict, dfi: int) -> bool:
+    def sort_rows_from_metadata(self,
+                                sorts: dict,
+                                dfi:   int) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -564,11 +709,17 @@ class SheetData(GObject.Object):
             sort_cnames.append(column_name)
             sort_descendings.append(sorts[column_name]['descending'])
 
-        self.dfs[dfi] = self.dfs[dfi].sort(sort_cnames, descending=sort_descendings, nulls_last=True)
+        self.dfs[dfi] = self.dfs[dfi].sort(sort_cnames,
+                                           descending=sort_descendings,
+                                           nulls_last=True)
 
         return True
 
-    def convert_columns_dtype_from_metadata(self, column: int, column_span: int, dfi: int, dtype: polars.DataType) -> bool:
+    def convert_columns_dtype_from_metadata(self,
+                                            column:      int,
+                                            column_span: int,
+                                            dfi:         int,
+                                            dtype:       polars.DataType) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
@@ -581,11 +732,14 @@ class SheetData(GObject.Object):
 
             elif dtype in (polars.Datetime, polars.Date, polars.Time):
                 original_dtype = self.dfs[dfi].schema[column_name]
-                first_non_null = self.dfs[dfi].filter(polars.col(column_name).is_not_null()).head(1)[column_name].item()
+                first_non_null = self.dfs[dfi].filter(polars.col(column_name).is_not_null()) \
+                                              .head(1)[column_name].item()
 
                 if isinstance(original_dtype, polars.String) and first_non_null:
                     dformat = utils.get_date_format_string(first_non_null)
-                    expressions.append(polars.col(column_name).str.strip_chars().str.strptime(dtype, dformat).alias(column_name))
+                    expressions.append(polars.col(column_name).str.strip_chars()
+                                                              .str.strptime(dtype, dformat)
+                                                              .alias(column_name))
                 else:
                     expressions.append(polars.col(column_name).cast(dtype).alias(column_name))
 
@@ -595,10 +749,36 @@ class SheetData(GObject.Object):
         try:
             self.dfs[dfi] = self.dfs[dfi].with_columns(expressions)
             return True
-
         except Exception as e:
-            dtype = utils.get_dtype_symbol(dtype, False)
-            globals.send_notification(f'One or more columns couldn\'t be converted to: {dtype}')
             print(e)
 
+        dtype = utils.get_dtype_symbol(dtype, False)
+        globals.send_notification(f'One or more columns couldn\'t be converted to: {dtype}')
+
         return False
+
+    def replace_cell_data_by_pattern_from_metadata(self,
+                                                   column:         int,
+                                                   row:            int,
+                                                   dfi:            int,
+                                                   replace_with:   str,
+                                                   search_pattern: str,
+                                                   match_case:     bool) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        row -= 1
+
+        if self.dfs[dfi][row, column] == search_pattern and replace_with == '':
+            self.dfs[dfi][row, column] = None
+            return True
+
+        if match_case:
+            self.dfs[dfi][row, column] = self.dfs[dfi][row, column].replace(search_pattern, replace_with)
+        else:
+            self.dfs[dfi][row, column] = re.sub(re.escape(search_pattern),
+                                                replace_with,
+                                                self.dfs[dfi][row, column],
+                                                flags=re.IGNORECASE)
+
+        return True

@@ -26,6 +26,7 @@ import re
 
 from . import globals
 from . import utils
+from .clipboard_manager import ClipboardManager
 
 class SheetDocument(GObject.Object):
     __gtype_name__ = 'SheetDocument'
@@ -39,9 +40,12 @@ class SheetDocument(GObject.Object):
     }
 
     docid = GObject.Property(type=int, default=0)
-    title = GObject.Property(type=str, default='Sheet')
+    title = GObject.Property(type=str, default='Sheet 1')
 
-    def __init__(self, docid: int, title: str, dataframe: polars.DataFrame = None) -> None:
+    def __init__(self,
+                 docid: int,
+                 title: str,
+                 dataframe: polars.DataFrame = None) -> None:
         super().__init__()
 
         self.docid = docid
@@ -71,20 +75,24 @@ class SheetDocument(GObject.Object):
         self.is_refreshing_uis: bool = False
         self.is_searching_cells: bool = False
         self.is_selecting_cells: bool = False
+        self.is_cutting_cells: bool = False
+        self.is_copying_cells: bool = False
 
-        self.current_dfi: int = -1
+        self.current_dfi: int = 0 if dataframe is not None else -1
 
         self.pending_sorts: dict = {}
         self.current_sorts: dict = {}
 
-        # These variables are used to store the pending and current filters.
-        # It should consist of one or more dictionary with the following format:
+        # Should be consist of one or more dictionary with keys:
         # - `qhash` is used for checking if there's a duplicate filter
         # - `qtype` can be used to check where the filter comes from
         # - `expression` is used by the SheetData for efficient filtering
         # - `query-builder` can be used for pretty much anything else
         self.pending_filters: list = []
         self.current_filters: list = []
+
+        from .clipboard_manager import ClipboardManager
+        self.clipboard: ClipboardManager = None
 
         self.setup_main_canvas()
         self.setup_scrollbars()
@@ -102,17 +110,21 @@ class SheetDocument(GObject.Object):
 
     def setup_main_canvas(self) -> None:
         self.view.main_canvas.set_draw_func(self.renderer.render)
+        self.view.connect('cancel-operation', self.on_operation_cancelled)
         self.view.connect('select-by-keypress', self.on_update_selection_by_keypress)
         self.view.connect('select-by-motion', self.on_update_selection_by_motion)
         self.view.connect('pointer-moved', self.on_update_pointer_moved)
         self.view.connect('pointer-released', self.on_update_pointer_released)
 
     def setup_scrollbars(self) -> None:
-        vertical_adjustment = Gtk.Adjustment.new(0, 0, 0, self.display.scroll_increment, self.display.page_increment, 0)
+        scroll_increment = self.display.scroll_increment
+        page_increment = self.display.page_increment
+
+        vertical_adjustment = Gtk.Adjustment.new(0, 0, 0, scroll_increment, page_increment, 0)
         vertical_adjustment.connect('value-changed', self.on_sheet_view_scrolled)
         self.view.vertical_scrollbar.set_adjustment(vertical_adjustment)
 
-        horizontal_adjustment = Gtk.Adjustment.new(0, 0, 0, self.display.scroll_increment, self.display.page_increment, 0)
+        horizontal_adjustment = Gtk.Adjustment.new(0, 0, 0, scroll_increment, page_increment, 0)
         horizontal_adjustment.connect('value-changed', self.on_sheet_view_scrolled)
         self.view.horizontal_scrollbar.set_adjustment(horizontal_adjustment)
 
@@ -132,8 +144,14 @@ class SheetDocument(GObject.Object):
     #
 
     def on_sheet_view_scrolled(self, source: GObject.Object) -> None:
-        self.display.scroll_y_position = self.view.vertical_scrollbar.get_adjustment().get_value()
-        self.display.scroll_x_position = self.view.horizontal_scrollbar.get_adjustment().get_value()
+        vscrollbar = self.view.vertical_scrollbar
+        hscrollbar = self.view.horizontal_scrollbar
+
+        vadjustment = vscrollbar.get_adjustment()
+        hadjustment = hscrollbar.get_adjustment()
+
+        self.display.scroll_y_position = vadjustment.get_value()
+        self.display.scroll_x_position = hadjustment.get_value()
         self.display.discretize_scroll_position()
 
         self.auto_adjust_scrollbars_by_scroll()
@@ -143,12 +161,22 @@ class SheetDocument(GObject.Object):
 
         self.view.main_canvas.queue_draw()
 
-    def on_update_selection_by_keypress(self, source: GObject.Object, keyval: int, state: Gdk.ModifierType) -> None:
-        active_cell_position = (self.selection.current_active_cell.column, self.selection.current_active_cell.row)
-        cursor_cell_position = (self.selection.current_cursor_cell.column, self.selection.current_cursor_cell.row)
+    def on_operation_cancelled(self, source: GObject.Object) -> None:
+        self.cancel_cutcopy_operation()
+        self.view.main_canvas.queue_draw()
+
+    def on_update_selection_by_keypress(self,
+                                        source: GObject.Object,
+                                        keyval: int,
+                                        state:  Gdk.ModifierType) -> None:
+        active_cell = self.selection.current_active_cell
+        cursor_cell = self.selection.current_cursor_cell
+
+        active_cell_position = (active_cell.column, active_cell.row)
+        cursor_cell_position = (cursor_cell.column, cursor_cell.row)
         target_cell_position = active_cell_position
 
-        df_metadata = self.selection.current_active_cell.metadata
+        df_metadata = active_cell.metadata
         df_bbox = self.data.read_cell_bbox_from_metadata(df_metadata.dfi)
         df_selected = df_bbox is not None
 
@@ -156,122 +184,174 @@ class SheetDocument(GObject.Object):
             case Gdk.KEY_Tab | Gdk.KEY_ISO_Left_Tab:
                 # Select a cell at the left to the selection
                 if state == Gdk.ModifierType.SHIFT_MASK:
-                    target_cell_position = (active_cell_position[0] - 1, active_cell_position[1])
+                    target_cell_position = (active_cell_position[0] - 1,
+                                            active_cell_position[1])
 
                     # If the cursor is currently within a table and it's reaching the first column,
                     # re-target to the last column of the previous row instead.
                     if df_selected and target_cell_position[0] == 0:
-                        target_cell_position = (df_bbox.column + df_bbox.column_span - 1, target_cell_position[1] - 1)
+                        target_cell_position = (df_bbox.column + df_bbox.column_span - 1,
+                                                target_cell_position[1] - 1)
 
                 # Select a cell at the right to the selection
                 else:
-                    target_cell_position = (active_cell_position[0] + 1, active_cell_position[1])
+                    target_cell_position = (active_cell_position[0] + 1,
+                                            active_cell_position[1])
 
                     # If the cursor is currently within a table and it's reaching the last column,
                     # re-target to the first column of the next row instead.
                     if df_selected and df_bbox.column + df_bbox.column_span - 1 < target_cell_position[0]:
-                        target_cell_position = (1, target_cell_position[1] + 1)
+                        target_cell_position = (1, # first column
+                                                target_cell_position[1] + 1)
 
             case Gdk.KEY_Return:
                 # Select a cell at the bottom to the selection
                 if state == Gdk.ModifierType.SHIFT_MASK:
-                    target_cell_position = (active_cell_position[0], max(1, active_cell_position[1] - 1))
+                    target_cell_position = (active_cell_position[0],
+                                            max(1, active_cell_position[1] - 1))
 
                 # Select a cell at the top to the selection
                 else:
-                    target_cell_position = (active_cell_position[0], active_cell_position[1] + 1)
+                    target_cell_position = (active_cell_position[0],
+                                            active_cell_position[1] + 1)
 
             case Gdk.KEY_Left:
                 # Select the leftmost cell in the same row
                 if state == Gdk.ModifierType.CONTROL_MASK:
                     if df_selected:
-                        target_cell_position = (max(1, df_bbox.column), active_cell_position[1])
+                        target_cell_position = (max(1, df_bbox.column),
+                                                active_cell_position[1])
                     else:
-                        target_cell_position = (1, active_cell_position[1])
+                        target_cell_position = (1, # first column
+                                                active_cell_position[1])
 
                 # Include a cell at the left to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
-                    target_cell_position = (active_cell_position, (max(1, cursor_cell_position[0] - 1), cursor_cell_position[1]))
+                    new_cursor_cell_position = (max(1, cursor_cell_position[0] - 1),
+                                                cursor_cell_position[1])
+                    target_cell_position = (active_cell_position,
+                                            new_cursor_cell_position)
 
                 # Include all cells to the left to the selection
                 elif state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
                     if df_selected:
-                        target_cell_position = (active_cell_position, (max(1, df_bbox.column), cursor_cell_position[1]))
+                        new_cursor_cell_position = (max(1, df_bbox.column),
+                                                    cursor_cell_position[1])
+                        target_cell_position = (active_cell_position,
+                                                new_cursor_cell_position)
                     else:
-                        target_cell_position = (active_cell_position, (1, cursor_cell_position[1]))
+                        target_cell_position = (active_cell_position,
+                                                (1, cursor_cell_position[1]))
 
                 # Select a cell at the left to the selection
                 else:
-                    target_cell_position = (max(1, active_cell_position[0] - 1), active_cell_position[1])
+                    target_cell_position = (max(1, active_cell_position[0] - 1),
+                                            active_cell_position[1])
 
             case Gdk.KEY_Right:
                 # Select the rightmost cell in the same row
                 if state == Gdk.ModifierType.CONTROL_MASK:
                     if df_selected:
-                        target_cell_position = (max(1, df_bbox.column + df_bbox.column_span - 1), active_cell_position[1])
+                        target_cell_position = (max(1, df_bbox.column + df_bbox.column_span - 1),
+                                                active_cell_position[1])
                     else:
-                        target_cell_position = (active_cell_position[0] + 1, active_cell_position[1])
+                        target_cell_position = (active_cell_position[0] + 1,
+                                                active_cell_position[1])
 
                 # Include a cell at the right to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
-                    target_cell_position = (active_cell_position, (cursor_cell_position[0] + 1, cursor_cell_position[1]))
+                    new_cursor_cell_position = (cursor_cell_position[0] + 1,
+                                                cursor_cell_position[1])
+                    target_cell_position = (active_cell_position,
+                                            new_cursor_cell_position)
 
                 # Include all cells to the right to the selection
                 elif state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
                     if df_selected:
-                        target_cell_position = (active_cell_position, (max(1, df_bbox.column + df_bbox.column_span - 1), cursor_cell_position[1]))
+                        new_cursor_cell_position = (max(1, df_bbox.column + df_bbox.column_span - 1),
+                                                    cursor_cell_position[1])
+                        target_cell_position = (active_cell_position,
+                                                new_cursor_cell_position)
                     else:
-                        target_cell_position = (active_cell_position, (cursor_cell_position[0] + 1, cursor_cell_position[1]))
+                        new_cursor_cell_position = (cursor_cell_position[0] + 1,
+                                                    cursor_cell_position[1])
+                        target_cell_position = (active_cell_position,
+                                                new_cursor_cell_position)
 
                 # Select a cell at the right to the selection
                 else:
-                    target_cell_position = (active_cell_position[0] + 1, active_cell_position[1])
+                    target_cell_position = (active_cell_position[0] + 1,
+                                            active_cell_position[1])
 
             case Gdk.KEY_Up:
                 # Select the topmost cell in the same column
                 if state == Gdk.ModifierType.CONTROL_MASK:
                     if df_selected:
-                        target_cell_position = (active_cell_position[0], max(1, df_bbox.row))
+                        target_cell_position = (active_cell_position[0],
+                                                max(1, df_bbox.row))
                     else:
-                        target_cell_position = (active_cell_position[0], 1)
+                        target_cell_position = (active_cell_position[0],
+                                                1) # first row
 
                 # Include a cell at the top to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
-                    target_cell_position = (active_cell_position, (cursor_cell_position[0], max(1, cursor_cell_position[1] - 1)))
+                    new_cursor_cell_position = (cursor_cell_position[0],
+                                                max(1, cursor_cell_position[1] - 1))
+                    target_cell_position = (active_cell_position,
+                                            new_cursor_cell_position)
 
                 # Include all cells above to the selection
                 elif state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
                     if df_selected:
-                        target_cell_position = (active_cell_position, (cursor_cell_position[0], max(1, df_bbox.row)))
+                        new_cursor_cell_position = (cursor_cell_position[0],
+                                                    max(1, df_bbox.row))
+                        target_cell_position = (active_cell_position,
+                                                new_cursor_cell_position)
                     else:
-                        target_cell_position = (active_cell_position, (cursor_cell_position[0], 1))
+                        new_cursor_cell_position = (cursor_cell_position[0],
+                                                    1) # first row
+                        target_cell_position = (active_cell_position,
+                                                new_cursor_cell_position)
 
                 # Select a cell at the top to the selection
                 else:
-                    target_cell_position = (active_cell_position[0], max(1, active_cell_position[1] - 1))
+                    target_cell_position = (active_cell_position[0],
+                                            max(1, active_cell_position[1] - 1))
 
             case Gdk.KEY_Down:
                 # Select the bottommost cell in the same column
                 if state == Gdk.ModifierType.CONTROL_MASK:
                     if df_selected:
-                        target_cell_position = (active_cell_position[0], max(1, df_bbox.row + df_bbox.row_span - 1))
+                        target_cell_position = (active_cell_position[0],
+                                                max(1, df_bbox.row + df_bbox.row_span - 1))
                     else:
-                        target_cell_position = (active_cell_position[0], active_cell_position[1] + 1)
+                        target_cell_position = (active_cell_position[0],
+                                                active_cell_position[1] + 1)
 
                 # Include a cell at the bottom to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
-                    target_cell_position = (active_cell_position, (cursor_cell_position[0], cursor_cell_position[1] + 1))
+                    new_cursor_cell_position = (cursor_cell_position[0],
+                                                cursor_cell_position[1] + 1)
+                    target_cell_position = (active_cell_position,
+                                            new_cursor_cell_position)
 
                 # Include all cells below to the selection
                 elif state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
                     if df_selected:
-                        target_cell_position = (active_cell_position, (cursor_cell_position[0], max(1, df_bbox.row + df_bbox.row_span - 1)))
+                        new_cursor_cell_position = (cursor_cell_position[0],
+                                                    max(1, df_bbox.row + df_bbox.row_span - 1))
+                        target_cell_position = (active_cell_position,
+                                                new_cursor_cell_position)
                     else:
-                        target_cell_position = (active_cell_position, (cursor_cell_position[0], cursor_cell_position[1] + 1))
+                        new_cursor_cell_position = (cursor_cell_position[0],
+                                                    cursor_cell_position[1] + 1)
+                        target_cell_position = (active_cell_position,
+                                                new_cursor_cell_position)
 
                 # Select a cell at the bottom to the selection
                 else:
-                    target_cell_position = (active_cell_position[0], active_cell_position[1] + 1)
+                    target_cell_position = (active_cell_position[0],
+                                            active_cell_position[1] + 1)
 
         if all(isinstance(i, int) for i in target_cell_position):
             col_1, row_1 = target_cell_position
@@ -279,19 +359,28 @@ class SheetDocument(GObject.Object):
         else:
             (col_1, row_1), (col_2, row_2) = target_cell_position
 
-        self.update_selection_from_position(col_1, row_1, col_2, row_2, True, True, True)
+        self.update_selection_from_position(col_1, row_1,
+                                            col_2, row_2,
+                                            keep_order=True,
+                                            follow_cursor=True,
+                                            auto_scroll=True)
 
         self.view.main_canvas.queue_draw()
 
         self.notify_selected_table_changed()
 
-
-    def on_update_selection_by_motion(self, source: GObject.Object, x: int, y: int) -> None:
+    def on_update_selection_by_motion(self,
+                                      source: GObject.Object,
+                                      x:      int,
+                                      y:      int) -> None:
         if self.focused_widget is not None:
             return
+
         self.is_selecting_cells = True
 
-        from .sheet_selection import SheetLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell
+        from .sheet_selection import SheetLocatorCell, \
+                                     SheetTopLocatorCell, \
+                                     SheetLeftLocatorCell
 
         active_range = self.selection.current_active_range
         range_column = active_range.column
@@ -319,11 +408,13 @@ class SheetDocument(GObject.Object):
                 end_row = 0
                 if end_column <= 0:
                     end_column = max(1, cursor_column - 1)
+
             if isinstance(active_range, SheetLeftLocatorCell):
                 start_column = 0
                 end_column = 0
                 if end_row <= 0:
                     end_row = max(1, cursor_row - 1)
+
         else:
             if end_column <= 0:
                 end_column = max(1, cursor_column - 1)
@@ -331,11 +422,16 @@ class SheetDocument(GObject.Object):
                 end_row = max(1, cursor_row - 1)
 
         # Skip if the cursor is not considered moving
-        if end_column == cursor_column and end_row == cursor_row:
+        if end_column == cursor_column \
+                and end_row == cursor_row:
             return
-        if end_column == cursor_column and end_row == 0 and cursor_row == 1:
+        if end_column == cursor_column \
+                and end_row == 0 \
+                and cursor_row == 1:
             return
-        if end_column == 0 and cursor_column == 1 and end_row == cursor_row:
+        if end_column == 0 \
+                and cursor_column == 1 \
+                and end_row == cursor_row:
             return
 
         scroll_axis = 'both'
@@ -344,14 +440,25 @@ class SheetDocument(GObject.Object):
         if isinstance(active_range, SheetLeftLocatorCell):
             scroll_axis = 'vertical'
 
-        self.update_selection_from_position(start_column, start_row, end_column, end_row,
-                                            True, True, True, scroll_axis, False, True)
+        self.update_selection_from_position(start_column,
+                                            start_row,
+                                            end_column,
+                                            end_row,
+                                            keep_order=True,
+                                            follow_cursor=True,
+                                            auto_scroll=True,
+                                            scroll_axis=scroll_axis,
+                                            with_offset=False,
+                                            smooth_scroll=True)
 
         self.view.main_canvas.queue_draw()
 
         self.notify_selected_table_changed()
 
-    def on_update_pointer_moved(self, source: GObject.Object, x: int, y: int) -> None:
+    def on_update_pointer_moved(self,
+                                source: GObject.Object,
+                                x:      int,
+                                y:      int) -> None:
         if self.is_selecting_cells:
             return
 
@@ -372,14 +479,17 @@ class SheetDocument(GObject.Object):
                 widget.do_on_leave(x, y)
                 continue
 
+        self.view.main_canvas.set_cursor(self.view.default_cursor)
+
         if hovered_widget is not None:
             self.view.main_canvas.set_cursor(hovered_widget.cursor)
-        else:
-            self.view.main_canvas.set_cursor(self.view.default_cursor)
 
         self.hovered_widget = hovered_widget
 
-    def on_update_pointer_released(self, source: GObject.Object, x: int, y: int) -> None:
+    def on_update_pointer_released(self,
+                                   source: GObject.Object,
+                                   x:      int,
+                                   y:      int) -> None:
         self.is_selecting_cells = False
 
         if self.focused_widget is not None:
@@ -390,7 +500,10 @@ class SheetDocument(GObject.Object):
     # Selection
     #
 
-    def select_element_from_point(self, x: float, y: float, state: Gdk.ModifierType = None) -> None:
+    def select_element_from_point(self,
+                                  x:     float,
+                                  y:     float,
+                                  state: Gdk.ModifierType = None) -> None:
         # Trigger the on_click event of the hovered widget if the pointer is under one,
         # otherwise select the hovered cell.
         self.focused_widget = self.hovered_widget
@@ -412,7 +525,13 @@ class SheetDocument(GObject.Object):
             start_column = active.column
             start_row = active.row
 
-        self.update_selection_from_position(start_column, start_row, end_column, end_row, True, False, False)
+        self.update_selection_from_position(start_column,
+                                            start_row,
+                                            end_column,
+                                            end_row,
+                                            keep_order=True,
+                                            follow_cursor=False,
+                                            auto_scroll=False)
 
         self.view.main_canvas.queue_draw()
 
@@ -426,20 +545,37 @@ class SheetDocument(GObject.Object):
         row_1 = self.display.get_row_from_vrow(vrow_1)
         row_2 = self.display.get_row_from_vrow(vrow_2)
 
-        self.update_selection_from_position(col_1, row_1, col_2, row_2, False, False, True)
+        self.update_selection_from_position(col_1,
+                                            row_1,
+                                            col_2,
+                                            row_2,
+                                            keep_order=False,
+                                            follow_cursor=False,
+                                            auto_scroll=True)
 
         self.view.main_canvas.queue_draw()
 
         self.notify_selected_table_changed()
 
-    def update_selection_from_position(self, col_1: int, row_1: int, col_2: int, row_2: int,
-                                       keep_order: bool = False, follow_cursor: bool = True,
-                                       auto_scroll: bool = True, scroll_axis: str = 'both',
-                                       with_offset: bool = False, smooth_scroll: bool = False) -> None:
+    def update_selection_from_position(self,
+                                       col_1:         int,
+                                       row_1:         int,
+                                       col_2:         int,
+                                       row_2:         int,
+                                       keep_order:    bool = False,
+                                       follow_cursor: bool = True,
+                                       auto_scroll:   bool = True,
+                                       scroll_axis:   str = 'both',
+                                       with_offset:   bool = False,
+                                       smooth_scroll: bool = False) -> None:
         # Save snapshot
         if not globals.is_changing_state:
             from .history_manager import SelectionState
-            state = SelectionState(col_1, row_1, col_2, row_2, keep_order, follow_cursor, auto_scroll)
+            state = SelectionState(col_1, row_1,
+                                   col_2, row_2,
+                                   keep_order,
+                                   follow_cursor,
+                                   auto_scroll)
             globals.history.save(state)
 
         # Handle a special case when the user inputs e.g. "A:1" or "1:A"
@@ -497,23 +633,48 @@ class SheetDocument(GObject.Object):
         # Cache the previous active range, usually to prevent from unnecessary re-renders
         self.selection.previous_active_range = self.selection.current_active_range
 
-        from .sheet_selection import SheetLocatorCell, SheetCornerLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell, SheetContentCell
+        from .sheet_selection import SheetLocatorCell, \
+                                     SheetCornerLocatorCell, \
+                                     SheetTopLocatorCell, \
+                                     SheetLeftLocatorCell, \
+                                     SheetContentCell
 
         # Handle clicking on the top left locator area
         if start_column == 0 and start_row == 0:
-            self.selection.current_active_range = SheetCornerLocatorCell(x, y, 0, 0, canvas_width, canvas_height, -1, -1, cell_metadata, rtl, btt)
+            self.selection.current_active_range = SheetCornerLocatorCell(x, y,
+                                                                         0, 0,
+                                                                         canvas_width,
+                                                                         canvas_height,
+                                                                         -1, -1,
+                                                                         cell_metadata,
+                                                                         rtl, btt)
 
         # Handle selecting the top locator area
         elif start_column > 0 and start_row == 0:
-            self.selection.current_active_range = SheetTopLocatorCell(x, y, start_column, 0, width, canvas_height, column_span, -1, cell_metadata, rtl, btt)
+            self.selection.current_active_range = SheetTopLocatorCell(x, y,
+                                                                      start_column, 0,
+                                                                      width, canvas_height,
+                                                                      column_span, -1,
+                                                                      cell_metadata,
+                                                                      rtl, btt)
 
         # Handle selecting the left locator area
         elif start_column == 0 and start_row > 0:
-            self.selection.current_active_range = SheetLeftLocatorCell(x, y, 0, start_row, canvas_width, height, -1, row_span, cell_metadata, rtl, btt)
+            self.selection.current_active_range = SheetLeftLocatorCell(x, y,
+                                                                       0, start_row,
+                                                                       canvas_width, height,
+                                                                       -1, row_span,
+                                                                       cell_metadata,
+                                                                       rtl, btt)
 
         # Handle selecting a cell content area
         else:
-            self.selection.current_active_range = SheetContentCell(x, y, start_column, start_row, width, height, column_span, row_span, cell_metadata, rtl, btt)
+            self.selection.current_active_range = SheetContentCell(x, y,
+                                                                   start_column, start_row,
+                                                                   width, height,
+                                                                   column_span, row_span,
+                                                                   cell_metadata,
+                                                                   rtl, btt)
 
         if isinstance(self.selection.current_active_range, SheetLocatorCell):
             col_1 = max(1, col_1)
@@ -535,16 +696,27 @@ class SheetDocument(GObject.Object):
         y = self.display.get_cell_y_from_row(row_1)
         width = self.display.get_cell_width_from_column(col_1)
         height = self.display.get_cell_height_from_row(row_1)
-        self.selection.current_active_cell = SheetContentCell(x, y, col_1, row_1, width, height, 1, 1, cell_metadata)
+        self.selection.current_active_cell = SheetContentCell(x, y,
+                                                              col_1, row_1,
+                                                              width, height,
+                                                              1, 1,
+                                                              cell_metadata)
 
         x = self.display.get_cell_x_from_column(col_2)
         y = self.display.get_cell_y_from_row(row_2)
         width = self.display.get_cell_width_from_column(col_2)
         height = self.display.get_cell_height_from_row(row_2)
-        self.selection.current_cursor_cell = SheetContentCell(x, y, col_2, row_2, width, height, 1, 1, cell_metadata)
+        self.selection.current_cursor_cell = SheetContentCell(x, y,
+                                                              col_2, row_2,
+                                                              width, height,
+                                                              1, 1,
+                                                              cell_metadata)
 
         if auto_scroll:
-            self.auto_adjust_scrollbars_by_selection(follow_cursor, scroll_axis, with_offset, smooth_scroll)
+            self.auto_adjust_scrollbars_by_selection(follow_cursor,
+                                                     scroll_axis,
+                                                     with_offset,
+                                                     smooth_scroll)
             self.auto_adjust_locators_size_by_scroll()
             self.auto_adjust_selections_by_scroll()
             self.repopulate_auto_filter_widgets()
@@ -555,29 +727,48 @@ class SheetDocument(GObject.Object):
             self.notify_selection_changed(start_column, start_row, cell_metadata)
 
         # Reset the current search range
-        if not globals.is_changing_state and self.selection.current_search_range is not None:
-            self.selection.current_search_range = self.selection.current_active_range
+        # FIXME: don't reset the range when resizing columns
+        if self.selection.current_search_range is not None:
+            arange = self.selection.current_active_range
+            self.selection.current_search_range = arange
+
+        # Update the current cut/copy range
+        if self.selection.current_cutcopy_range is not None:
+            ccrange = self.selection.current_cutcopy_range
+
+            x = self.display.get_cell_x_from_column(ccrange.column)
+            y = self.display.get_cell_y_from_row(ccrange.row)
+            end_x = self.display.get_cell_x_from_column(ccrange.column + ccrange.column_span)
+            end_y = self.display.get_cell_y_from_row(ccrange.row + ccrange.row_span)
+
+            ccrange.x = x
+            ccrange.y = y
+            ccrange.width = end_x - x
+            ccrange.height = end_y - y
 
     #
     # Manipulations
     #
 
-    def insert_from_current_rows(self, dataframe: polars.DataFrame, vflags: polars.Series = None, rheights: polars.Series = None) -> bool:
-        range = self.selection.current_active_range
+    def insert_from_current_rows(self,
+                                 dataframe: polars.DataFrame,
+                                 vflags:    polars.Series = None,
+                                 rheights:  polars.Series = None) -> bool:
+        arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mrow = range.metadata.row
-        row_span = range.row_span
+        mrow = arange.metadata.row
+        row_span = arange.row_span
 
         # Take hidden row(s) into account
-        start_vrow = self.display.get_vrow_from_row(range.row)
-        end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+        start_vrow = self.display.get_vrow_from_row(arange.row)
+        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
 
-        if range.btt:
+        if arange.btt:
             mrow = mrow - row_span + 1
 
-        if self.data.insert_rows_from_dataframe(dataframe, mrow, range.metadata.dfi):
+        if self.data.insert_rows_from_dataframe(dataframe, mrow, arange.metadata.dfi):
             # Update row visibility flags
             if len(self.display.row_visibility_flags):
                 if vflags is not None:
@@ -616,31 +807,41 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def insert_blank_from_current_rows(self, above: bool = False) -> bool:
-        range = self.selection.current_active_range
+    def insert_blank_from_current_rows(self, above: bool = False, row_span: int = -1) -> bool:
+        arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mrow = range.metadata.row
-        row_span = range.row_span
+        mrow = arange.metadata.row
 
-        # Take hidden row(s) into account
-        start_vrow = self.display.get_vrow_from_row(range.row)
-        end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
-        row_span = end_vrow - start_vrow + 1
+        auto_range = False
 
-        if not above:
-            mrow = mrow + row_span
-        if range.btt:
-            mrow = mrow - row_span
+        # Manually set column_span
+        if row_span > -1:
+            mrow += 1
+
+        # Determine column_span
         else:
-            mrow = mrow - 1
+            auto_range = True
+
+            # Take hidden row(s) into account
+            start_vrow = self.display.get_vrow_from_row(arange.row)
+            end_vrow = self.display.get_vrow_from_row(arange.row + arange.row_span - 1)
+            row_span = end_vrow - start_vrow + 1
+
+            if not above:
+                mrow = mrow + row_span
+
+            if arange.btt:
+                mrow = mrow - row_span
+            else:
+                mrow = mrow - 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import InsertBlankRowState
-            state = InsertBlankRowState(row_span, above)
+            state = InsertBlankRowState(above, row_span, auto_range)
 
-        if self.data.insert_rows_from_metadata(mrow, row_span, range.metadata.dfi):
+        if self.data.insert_rows_from_metadata(mrow, row_span, arange.metadata.dfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -675,22 +876,25 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def insert_from_current_columns(self, dataframe: polars.DataFrame, vflags: polars.Series = None, cwidths: polars.Series = None) -> bool:
-        range = self.selection.current_active_range
+    def insert_from_current_columns(self,
+                                    dataframe: polars.DataFrame,
+                                    vflags:    polars.Series = None,
+                                    cwidths:   polars.Series = None) -> bool:
+        arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mcolumn = range.metadata.column
-        column_span = range.column_span
+        mcolumn = arange.metadata.column
+        column_span = arange.column_span
 
         # Take hidden column(s) into account
-        start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
 
-        if range.rtl:
+        if arange.rtl:
             mcolumn = mcolumn - column_span + 1
 
-        if self.data.insert_columns_from_dataframe(dataframe, mcolumn, range.metadata.dfi):
+        if self.data.insert_columns_from_dataframe(dataframe, mcolumn, arange.metadata.dfi):
             # Update column visibility flags
             if len(self.display.column_visibility_flags):
                 if vflags is not None:
@@ -724,37 +928,47 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            self.emit('columns-changed', range.metadata.dfi)
+            self.emit('columns-changed', arange.metadata.dfi)
 
             return True
 
         return False
 
-    def insert_blank_from_current_columns(self, left: bool = False) -> bool:
-        range = self.selection.current_active_range
+    def insert_blank_from_current_columns(self, left: bool = False, column_span: int = -1) -> bool:
+        arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mcolumn = range.metadata.column
-        column_span = range.column_span
+        mcolumn = arange.metadata.column
 
-        # Take hidden row(s) into account
-        start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
-        column_span = end_vcolumn - start_vcolumn + 1
+        auto_range = False
 
-        if not left:
-            mcolumn = mcolumn + column_span
+        # Manually set column_span
+        if column_span > -1:
+            mcolumn += 1
+
+        # Determine column_span
         else:
-            mcolumn = mcolumn - column_span + 1
-        if range.rtl:
-            mcolumn = mcolumn - column_span + 1
+            auto_range = True
+
+            # Take hidden column(s) into account
+            start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+            end_vcolumn = self.display.get_vcolumn_from_column(arange.column + arange.column_span - 1)
+            column_span = end_vcolumn - start_vcolumn + 1
+
+            if not left:
+                mcolumn = mcolumn + column_span
+            else:
+                mcolumn = mcolumn - column_span + 1
+
+            if arange.rtl:
+                mcolumn = mcolumn - column_span + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import InsertBlankColumnState
-            state = InsertBlankColumnState(column_span, left)
+            state = InsertBlankColumnState(left, column_span, auto_range)
 
-        if self.data.insert_columns_from_metadata(mcolumn, column_span, range.metadata.dfi, left):
+        if self.data.insert_columns_from_metadata(mcolumn, column_span, arange.metadata.dfi, left):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -782,71 +996,105 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            self.emit('columns-changed', range.metadata.dfi)
+            self.emit('columns-changed', arange.metadata.dfi)
 
             return True
 
         return False
 
-    def update_current_cells(self, replace_with: any, search_pattern: str = None, match_case: bool = False) -> bool:
-        # TODO: currently update, duplicate and delete functions don't support multiple dataframes.
-        #       Should we add the support? I haven't decided yet.
-        range = self.selection.current_active_range
-        bbox = self.data.bbs[range.metadata.dfi]
+    def update_current_cells(self, new_value: any) -> bool:
+        arange = self.selection.current_active_range
+        active = self.selection.current_active_cell
+        cursor = self.selection.current_cursor_cell
 
-        # Automatically adding a new row when the user updates any cell right below the last row
-        if bbox.column <= range.column <= bbox.column + bbox.column_span - 1 and bbox.row + bbox.row_span == range.row:
-            cstate = globals.is_changing_state
+        mdfi = arange.metadata.dfi
 
-            globals.is_changing_state = True
-            self.update_selection_from_name(self.display.get_above_cell_name(self.selection.cell_name))
+        should_expand = False
+        collision_info = {}
 
-            # Be cautious as this strategy will leave the inserted blank row when the user performs undo,
-            # it's not harmful though at least for the time being.
-            globals.is_changing_state = True
-            self.insert_blank_from_current_rows()
+        # Check bounding box collision
+        from .sheet_data import SheetCellBoundingBox
+        arange_bbox = SheetCellBoundingBox(arange.column,
+                                           arange.row,
+                                           arange.column_span,
+                                           arange.row_span)
+        for bbox in self.data.bbs:
+            collision_info = bbox.check_collision(arange_bbox)
 
-            globals.is_changing_state = True
-            self.update_selection_from_name(self.display.get_below_cell_name(self.selection.cell_name))
+            has_collision = collision_info['has_collision']
+            in_bounds = collision_info['nonov_column_span'] + collision_info['nonov_row_span'] == 0
+            is_sticky = collision_info['horizontal_gap'] + collision_info['vertical_gap'] == 0
 
-            globals.is_changing_state = cstate
-            range = self.selection.current_active_range
+            if (has_collision and not in_bounds) or is_sticky:
+                mdfi = self.data.bbs.index(bbox)
+                should_expand = True
+                break
 
-        # Automatically adding a new column when the user updates any cell right after the last column
-        elif bbox.row <= range.row <= bbox.row + bbox.row_span - 1 and bbox.column + bbox.column_span == range.column:
-            cstate = globals.is_changing_state
+        bbox = self.data.bbs[mdfi]
 
-            globals.is_changing_state = True
-            self.update_selection_from_name(self.display.get_left_cell_name(self.selection.cell_name))
+        # Exclude the case where the cell is being inserted below right,
+        # it should not expand the target dataframe
+        if should_expand and collision_info['direction'] == 'right-below':
+            return False
 
-            globals.is_changing_state = True
-            self.insert_blank_from_current_columns()
+        def move_selection(corner: str = 'bottom-right') -> None:
+            column = bbox.column + bbox.column_span - 1
+            row = bbox.row + bbox.row_span - 1
 
-            globals.is_changing_state = True
-            self.update_selection_from_name(self.display.get_right_cell_name(self.selection.cell_name))
+            if corner == 'bottom-left':
+                column = bbox.column
 
-            globals.is_changing_state = cstate
-            range = self.selection.current_active_range
+            self.update_selection_from_position(column, row,
+                                                column, row,
+                                                follow_cursor=False,
+                                                auto_scroll=False)
 
-        mcolumn = range.metadata.column
-        mrow = range.metadata.row
-        column_span = range.column_span
-        row_span = range.row_span
+        # Automatically expand the dataframe if needed
+        if should_expand and 'below' in collision_info['direction']:
+            move_selection('bottom-right')
+            row_span = collision_info['nonov_row_span']
+            self.insert_blank_from_current_rows(False, row_span)
+
+        if should_expand and 'right' in collision_info['direction']:
+            move_selection('bottom-right')
+            column_span = collision_info['nonov_column_span']
+            self.insert_blank_from_current_columns(False, column_span)
+
+        if should_expand and 'left' in collision_info['direction']:
+            move_selection('bottom-left')
+            column_span = collision_info['nonov_column_span']
+            self.insert_blank_from_current_columns(True, column_span)
+
+        if should_expand:
+            # Restore the selection range
+            self.update_selection_from_position(active.column,
+                                                active.row,
+                                                cursor.column,
+                                                cursor.row,
+                                                keep_order=True,
+                                                follow_cursor=True,
+                                                auto_scroll=True)
+            arange = self.selection.current_active_range
+
+        mcolumn = arange.metadata.column
+        mrow = arange.metadata.row
+        column_span = arange.column_span
+        row_span = arange.row_span
 
         # Take hidden column(s) into account
-        start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
 
         # Take hidden row(s) into account
-        start_vrow = self.display.get_vrow_from_row(range.row)
-        end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+        start_vrow = self.display.get_vrow_from_row(arange.row)
+        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
 
-        if range.rtl:
-            mcolumn = mcolumn - range.column_span + 1
+        if arange.rtl:
+            mcolumn = mcolumn - arange.column_span + 1
 
-        if range.btt:
+        if arange.btt:
             mrow = mrow - row_span + 1
 
         if column_span < 0:
@@ -855,22 +1103,29 @@ class SheetDocument(GObject.Object):
         if row_span < 0:
             row_span = bbox.row_span - 1
 
+        include_header = arange.metadata.row == 0
+
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import UpdateDataState
-
-            if range.metadata.row == 0: # includes header row
-                state = UpdateDataState(self.data.read_cell_data_from_metadata(mcolumn, mrow, column_span, 1, range.metadata.dfi),
-                                        self.data.read_cell_data_from_metadata(mcolumn, mrow + 1, column_span, row_span - 1, range.metadata.dfi),
-                                        replace_with, search_pattern, match_case)
-            else: # excludes header row
-                state = UpdateDataState(None,
-                                        self.data.read_cell_data_from_metadata(mcolumn, mrow, column_span, row_span, range.metadata.dfi),
-                                        replace_with, search_pattern, match_case)
+            content = self.data.read_cell_data_block_from_metadata(mcolumn,
+                                                                   mrow,
+                                                                   column_span,
+                                                                   row_span,
+                                                                   mdfi,
+                                                                   include_header)
+            state = UpdateDataState(content, new_value, include_header)
 
         # Update data
-        if self.data.update_cell_data_from_metadata(mcolumn, mrow, column_span, row_span, range.metadata.dfi, replace_with, search_pattern, match_case,
-                                                    self.display.column_visible_series, self.display.row_visible_series):
+        if self.data.update_cell_data_block_with_single_from_metadata(mcolumn,
+                                                                      mrow,
+                                                                      column_span,
+                                                                      row_span,
+                                                                      mdfi,
+                                                                      include_header,
+                                                                      new_value,
+                                                                      self.display.column_visible_series,
+                                                                      self.display.row_visible_series):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -886,18 +1141,18 @@ class SheetDocument(GObject.Object):
         return False
 
     def duplicate_from_current_rows(self, above: bool = False) -> bool:
-        range = self.selection.current_active_range
+        arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mrow = range.metadata.row
-        row_span = range.row_span
+        mrow = arange.metadata.row
+        row_span = arange.row_span
 
         # Take hidden row(s) into account
-        start_vrow = self.display.get_vrow_from_row(range.row)
-        end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+        start_vrow = self.display.get_vrow_from_row(arange.row)
+        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
 
-        if range.btt:
+        if arange.btt:
             mrow = mrow - row_span + 1
 
         # Prepare for snapshot
@@ -905,7 +1160,7 @@ class SheetDocument(GObject.Object):
             from .history_manager import DuplicateRowState
             state = DuplicateRowState(row_span, above)
 
-        if self.data.duplicate_rows_from_metadata(mrow, row_span, range.metadata.dfi):
+        if self.data.duplicate_rows_from_metadata(mrow, row_span, arange.metadata.dfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -941,18 +1196,18 @@ class SheetDocument(GObject.Object):
         return False
 
     def duplicate_from_current_columns(self, left: bool = False) -> bool:
-        range = self.selection.current_active_range
+        arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mcolumn = range.metadata.column
-        column_span = range.column_span
+        mcolumn = arange.metadata.column
+        column_span = arange.column_span
 
         # Take hidden column(s) into account
-        start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
 
-        if range.rtl:
+        if arange.rtl:
             mcolumn = mcolumn - column_span + 1
 
         # Prepare for snapshot
@@ -960,7 +1215,7 @@ class SheetDocument(GObject.Object):
             from .history_manager import DuplicateColumnState
             state = DuplicateColumnState(column_span, left)
 
-        if self.data.duplicate_columns_from_metadata(mcolumn, column_span, range.metadata.dfi, left):
+        if self.data.duplicate_columns_from_metadata(mcolumn, column_span, arange.metadata.dfi, left):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -991,36 +1246,37 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            self.emit('columns-changed', range.metadata.dfi)
+            self.emit('columns-changed', arange.metadata.dfi)
 
             return True
 
         return False
 
     def delete_current_rows(self) -> bool:
-        range = self.selection.current_active_range
+        arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mrow = range.metadata.row
-        row_span = range.row_span
+        mdfi = arange.metadata.dfi
+        mrow = arange.metadata.row
+        row_span = arange.row_span
 
         # Take hidden row(s) into account
-        start_vrow = self.display.get_vrow_from_row(range.row)
-        end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+        start_vrow = self.display.get_vrow_from_row(arange.row)
+        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
 
-        if range.btt:
+        if arange.btt:
             mrow = mrow - row_span + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import DeleteRowState
-            column_count = self.data.bbs[range.metadata.dfi].column_span
-            state = DeleteRowState(self.data.read_cell_data_from_metadata(0, mrow, column_count, row_span, range.metadata.dfi),
+            column_count = self.data.bbs[mdfi].column_span
+            state = DeleteRowState(self.data.read_cell_data_block_from_metadata(0, mrow, column_count, row_span, mdfi),
                                    self.display.row_visibility_flags[mrow:mrow + row_span] if len(self.display.row_visibility_flags) else None,
                                    self.display.row_heights[mrow:mrow + row_span] if len(self.display.row_heights) else None)
 
-        if self.data.delete_rows_from_metadata(mrow, row_span, range.metadata.dfi):
+        if self.data.delete_rows_from_metadata(mrow, row_span, mdfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -1052,29 +1308,30 @@ class SheetDocument(GObject.Object):
         return False
 
     def delete_current_columns(self) -> bool:
-        range = self.selection.current_active_range
+        arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mcolumn = range.metadata.column
-        column_span = range.column_span
+        mdfi = arange.metadata.dfi
+        mcolumn = arange.metadata.column
+        column_span = arange.column_span
 
         # Take hidden column(s) into account
-        start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
 
-        if range.rtl:
+        if arange.rtl:
             mcolumn = mcolumn - column_span + 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import DeleteColumnState
-            row_count = self.data.bbs[range.metadata.dfi].row_span - 1
-            state = DeleteColumnState(self.data.read_cell_data_from_metadata(mcolumn, 1, column_span, row_count, range.metadata.dfi),
+            row_count = self.data.bbs[mdfi].row_span - 1
+            state = DeleteColumnState(self.data.read_cell_data_block_from_metadata(mcolumn, 1, column_span, row_count, mdfi),
                                       self.display.column_visibility_flags[mcolumn:mcolumn + column_span] if len(self.display.column_visibility_flags) else None,
                                       self.display.column_widths[mcolumn:mcolumn + column_span] if len(self.display.column_widths) else None)
 
-        if self.data.delete_columns_from_metadata(mcolumn, column_span, range.metadata.dfi):
+        if self.data.delete_columns_from_metadata(mcolumn, column_span, mdfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -1102,8 +1359,8 @@ class SheetDocument(GObject.Object):
 
             if not self.is_refreshing_uis:
                 # FIXME: should we remove incompatible filters?
-                self.emit('columns-changed', range.metadata.dfi)
-                self.emit('filters-changed', range.metadata.dfi)
+                self.emit('columns-changed', mdfi)
+                self.emit('filters-changed', mdfi)
 
             return True
 
@@ -1125,7 +1382,7 @@ class SheetDocument(GObject.Object):
             column_index = self.data.dfs[mdfi].columns.index(column_name)
             column_dtype = self.data.dfs[mdfi].schema[column_name]
 
-            cell_value = self.data.read_cell_data_from_metadata(mcolumn, metadata.row, 1, 1, mdfi)
+            cell_value = self.data.read_single_cell_data_from_metadata(mcolumn, metadata.row, mdfi)
 
             self.pending_filters = [{
                 'qhash': hash((column_name, 'single')),
@@ -1242,7 +1499,9 @@ class SheetDocument(GObject.Object):
         if not self.is_refreshing_uis:
             self.emit('filters-changed', 0)
 
-    def sort_current_rows(self, descending: bool = False, multiple: bool = False) -> None:
+    def sort_current_rows(self,
+                          descending: bool = False,
+                          multiple:   bool = False) -> None:
         active = self.selection.current_active_cell
         mdfi = active.metadata.dfi
         mcolumn = active.metadata.column
@@ -1314,12 +1573,13 @@ class SheetDocument(GObject.Object):
         return success
 
     def convert_current_columns_dtype(self, dtype: polars.DataType) -> bool:
-        range = self.selection.current_active_range
-        column_span = range.column_span
+        arange = self.selection.current_active_range
+        column_span = arange.column_span
+        metadata = arange.metadata
 
         # Take hidden column(s) into account
-        start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
 
         # Prepare for snapshot
@@ -1327,12 +1587,12 @@ class SheetDocument(GObject.Object):
             from .history_manager import ConvertColumnDataTypeState
             # FIXME: this doesn't handle different data types well when multiple columns are selected,
             #        even though usually they are the same. Should we disable multiple selection?
-            ndtype = self.data.read_column_dtype_from_metadata(range.metadata.column, range.metadata.dfi)
+            ndtype = self.data.read_column_dtype_from_metadata(metadata.column, metadata.dfi)
             state = ConvertColumnDataTypeState(ndtype, dtype)
 
         # FIXME: datetime to string conversion doesn't recover the original content.
         # Maybe for numerical and temporal data, we should store the entire content? Or just the string format?
-        if self.data.convert_columns_dtype_from_metadata(range.metadata.column, column_span, range.metadata.dfi, dtype):
+        if self.data.convert_columns_dtype_from_metadata(metadata.column, column_span, metadata.dfi, dtype):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -1343,14 +1603,19 @@ class SheetDocument(GObject.Object):
 
             if not self.is_refreshing_uis:
                 # FIXME: should we remove incompatible filters?
-                self.emit('columns-changed', range.metadata.dfi)
-                self.emit('filters-changed', range.metadata.dfi)
+                self.emit('columns-changed', metadata.dfi)
+                self.emit('filters-changed', metadata.dfi)
 
             return True
 
         return False
 
-    def find_in_current_table(self, text_value: str, match_case: bool, match_cell: bool, within_selection: bool, use_regexp: bool) -> int:
+    def find_in_current_cells(self,
+                              text_value:       str,
+                              match_case:       bool,
+                              match_cell:       bool,
+                              within_selection: bool,
+                              use_regexp:       bool) -> int:
         # Prepare the search expression
         filter_expression = polars.all().str.contains_any([text_value], ascii_case_insensitive=not match_case)
         if match_cell:
@@ -1373,20 +1638,21 @@ class SheetDocument(GObject.Object):
             if not is_visible:
                 hidden_column_names.append(self.data.dfs[0].columns[col_index])
 
+        # TODO: support non-string columns?
         select_expression = polars.col(polars.String).exclude(hidden_column_names)
 
         # Collect column names within the selection
         if within_selection:
-            range = self.selection.current_search_range
-            column_span = range.column_span
+            arange = self.selection.current_search_range
+            column_span = arange.column_span
 
             # Take hidden column(s) into account
             if len(self.display.column_visibility_flags):
-                start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-                end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+                start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+                end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
                 column_span = end_vcolumn - start_vcolumn + 1
 
-            selected_column_names = self.data.dfs[0].columns[range.metadata.column:range.metadata.column + column_span]
+            selected_column_names = self.data.dfs[0].columns[arange.metadata.column:arange.metadata.column + column_span]
 
             # Remove non-string column names
             selected_column_names = [name for name in selected_column_names if self.data.dfs[0][name].dtype == polars.String]
@@ -1398,10 +1664,10 @@ class SheetDocument(GObject.Object):
 
         # Define row range within the selection
         if within_selection:
-            range = self.selection.current_search_range
+            arange = self.selection.current_search_range
 
-            start_row = range.metadata.row - 1
-            row_span = range.row_span
+            start_row = arange.metadata.row - 1
+            row_span = arange.row_span
 
             # Handle edge cases where the user selected the entire column(s),
             # so there's no point to filter by row.
@@ -1409,8 +1675,8 @@ class SheetDocument(GObject.Object):
 
             # Take hidden row(s) into account
             if has_selected_rows and len(self.display.row_visibility_flags):
-                start_vrow = self.display.get_vrow_from_row(range.row)
-                end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+                start_vrow = self.display.get_vrow_from_row(arange.row)
+                end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
                 row_span = end_vrow - start_vrow + 1
 
         selected_rows_expression = (polars.col('$ridx') >= start_row) & (polars.col('$ridx') < start_row + row_span) \
@@ -1449,7 +1715,49 @@ class SheetDocument(GObject.Object):
 
         return search_results, search_results_length
 
-    def replace_all_in_current_table(self, search_pattern: str, replace_with: str, match_case: bool, match_cell: bool, within_selection: bool, use_regexp: bool) -> None:
+    def replace_in_current_cells(self,
+                                 replace_with:   str,
+                                 search_pattern: str,
+                                 match_case:     bool) -> bool:
+        arange = self.selection.current_active_range
+        mcolumn = arange.metadata.column
+        mrow = arange.metadata.row
+        mdfi = arange.metadata.dfi
+
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            from .history_manager import ReplaceDataState
+            content = self.data.read_single_cell_data_from_metadata(mcolumn, mrow, mdfi)
+            state = ReplaceDataState(content, replace_with, search_pattern, match_case)
+
+        # Update data
+        if self.data.replace_cell_data_by_pattern_from_metadata(mcolumn,
+                                                                mrow,
+                                                                mdfi,
+                                                                replace_with,
+                                                                search_pattern,
+                                                                match_case):
+            # Save snapshot
+            if not globals.is_changing_state:
+                globals.history.save(state)
+
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
+
+            active_cell = self.selection.current_active_cell
+            self.notify_selection_changed(active_cell.column, active_cell.row, active_cell.metadata)
+
+            return True
+
+        return False
+
+    def replace_all_in_current_cells(self,
+                                     search_pattern: str,
+                                     replace_with: str,
+                                     match_case: bool,
+                                     match_cell: bool,
+                                     within_selection: bool,
+                                     use_regexp: bool) -> None:
         # Collect hidden column names
         hidden_column_names = []
         for col_index, is_visible in enumerate(self.display.column_visibility_flags):
@@ -1460,16 +1768,16 @@ class SheetDocument(GObject.Object):
 
         # Collect column names within the selection
         if within_selection:
-            range = self.selection.current_search_range
-            column_span = range.column_span
+            arange = self.selection.current_search_range
+            column_span = arange.column_span
 
             # Take hidden column(s) into account
             if len(self.display.column_visibility_flags):
-                start_vcolumn = self.display.get_vcolumn_from_column(range.column)
-                end_vcolumn = self.display.get_vcolumn_from_column(range.column + column_span - 1)
+                start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+                end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
                 column_span = end_vcolumn - start_vcolumn + 1
 
-            selected_column_names = self.data.dfs[0].columns[range.metadata.column:range.metadata.column + column_span]
+            selected_column_names = self.data.dfs[0].columns[arange.metadata.column:arange.metadata.column + column_span]
 
             # Remove non-string column names
             selected_column_names = [name for name in selected_column_names if self.data.dfs[0][name].dtype == polars.String]
@@ -1483,10 +1791,10 @@ class SheetDocument(GObject.Object):
 
         # Define row range within the selection
         if within_selection:
-            range = self.selection.current_search_range
+            arange = self.selection.current_search_range
 
-            start_row = range.metadata.row - 1
-            row_span = range.row_span
+            start_row = arange.metadata.row - 1
+            row_span = arange.row_span
 
             # Handle edge cases where the user selected the entire column(s),
             # so there's no point to filter by row.
@@ -1494,8 +1802,8 @@ class SheetDocument(GObject.Object):
 
             # Take hidden row(s) into account
             if has_selected_rows and len(self.display.row_visibility_flags):
-                start_vrow = self.display.get_vrow_from_row(range.row)
-                end_vrow = self.display.get_vrow_from_row(range.row + row_span - 1)
+                start_vrow = self.display.get_vrow_from_row(arange.row)
+                end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
                 row_span = end_vrow - start_vrow + 1
 
         target_column_names = self.data.dfs[0].select(select_expression).columns
@@ -1543,8 +1851,16 @@ class SheetDocument(GObject.Object):
         if not globals.is_changing_state:
             from .history_manager import ReplaceAllState
             globals.history.save(ReplaceAllState(self.data.read_cell_data_chunks_from_metadata(target_column_names, start_row, row_span, 0),
-                                                 target_column_names, start_row, row_span, 0,
-                                                 search_pattern, replace_with, match_case, match_cell, within_selection, use_regexp))
+                                                 target_column_names,
+                                                 start_row,
+                                                 row_span,
+                                                 0,
+                                                 search_pattern,
+                                                 replace_with,
+                                                 match_case,
+                                                 match_cell,
+                                                 within_selection,
+                                                 use_regexp))
 
         # Bulk replace cells
         # TODO: support multiple dataframes?
@@ -1559,7 +1875,9 @@ class SheetDocument(GObject.Object):
         active_cell = self.selection.current_active_cell
         self.notify_selection_changed(active_cell.column, active_cell.row, active_cell.metadata)
 
-    def toggle_column_visibility(self, column: int, show: bool) -> None:
+    def toggle_column_visibility(self,
+                                 column: int,
+                                 show:   bool) -> None:
         # Save snapshot
         if not globals.is_changing_state:
             from .history_manager import ToggleColumnVisibilityState
@@ -1599,7 +1917,9 @@ class SheetDocument(GObject.Object):
         if not self.is_refreshing_uis:
             self.emit('columns-changed', 0)
 
-    def update_column_width(self, column: int, width: int) -> None:
+    def update_column_width(self,
+                            column: int,
+                            width:  int) -> None:
         # Initialize column widths if needed
         if len(self.display.column_widths) == 0:
             self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * (column - 1))
@@ -1608,7 +1928,7 @@ class SheetDocument(GObject.Object):
         if len(self.display.column_widths) < column:
             offset = column - len(self.display.column_widths)
             self.display.column_widths = polars.concat([self.display.column_widths,
-                                                       polars.Series([self.display.DEFAULT_CELL_WIDTH] * offset)])
+                                                        polars.Series([self.display.DEFAULT_CELL_WIDTH] * offset)])
 
         # Save snapshot
         if not globals.is_changing_state:
@@ -1632,6 +1952,17 @@ class SheetDocument(GObject.Object):
     # Helpers
     #
 
+    # TODO: call this function if any cells within the range is edited
+    def cancel_cutcopy_operation(self) -> None:
+        if self.is_cutting_cells and self.clipboard is not None:
+            self.clipboard.clear()
+        self.clipboard = None
+
+        self.is_cutting_cells = False
+        self.is_copying_cells = False
+
+        self.selection.current_cutcopy_range = None
+
     def check_selection_changed(self) -> bool:
         current_cell_clss = self.selection.current_active_range.__class__
         current_cell_attr = self.selection.current_active_range.__dict__.copy()
@@ -1646,41 +1977,55 @@ class SheetDocument(GObject.Object):
                     current_cell_data == previous_cell_data)
 
     def check_selection_contains_point(self, x: int, y: int) -> bool:
-        range = self.selection.current_active_range
-        return range.x <= x <= range.x + range.width and \
-               range.y <= y <= range.y + range.height
+        arange = self.selection.current_active_range
+        return arange.x <= x <= arange.x + arange.width and \
+               arange.y <= y <= arange.y + arange.height
 
     def notify_selection_changed(self, column: int, row: int, metadata) -> None:
+        column_vseries = self.display.column_visible_series
+        column_vflags = self.display.column_visibility_flags
+
+        row_vseries = self.display.row_visible_series
+        row_vflags = self.display.row_visibility_flags
+
         # Handle edge cases where the last column(s) are hidden
-        if column - 1 == len(self.display.column_visible_series) \
-                and column < len(self.display.column_visibility_flags) \
-                and not self.display.column_visibility_flags[column]:
-            column += (len(self.display.column_visibility_flags) - 1) - (self.display.column_visible_series[-1] - 1) - 1
+        if column - 1 == len(column_vseries) \
+                and column < len(column_vflags) \
+                and not column_vflags[column]:
+            column += (len(column_vflags) - 1) - (column_vseries[-1] - 1) - 1
 
         # Handle edge cases where the last row(s) are hidden
-        if row - 1 == len(self.display.row_visible_series) \
+        if row - 1 == len(row_vseries) \
                 and row < len(self.display.row_visibility_flags) \
-                and not self.display.row_visibility_flags[row]:
-            row += (len(self.display.row_visibility_flags) - 1) - (self.display.row_visible_series[-1] - 1) - 1
+                and not row_vflags[row]:
+            row += (len(row_vflags) - 1) - (row_vseries[-1] - 1) - 1
 
-        # Cache the selected cell data usually for resetting the input bar
         vcolumn = self.display.get_vcolumn_from_column(column)
         vrow = self.display.get_vrow_from_row(row)
-        self.selection.cell_name = self.display.get_cell_name_from_position(vcolumn, vrow)
-        self.selection.cell_data = self.data.read_cell_data_from_metadata(metadata.column, metadata.row, 1, 1, metadata.dfi)
 
-        cell_dtype = self.data.read_column_dtype_from_metadata(metadata.column, metadata.dfi)
+        mcolumn = metadata.column
+        mrow = metadata.row
+        mdfi = metadata.dfi
+
+        # Cache the selected cell data usually for resetting the input bar
+        self.selection.cell_name = self.display.get_cell_name_from_position(vcolumn, vrow)
+        self.selection.cell_data = self.data.read_single_cell_data_from_metadata(mcolumn, mrow, mdfi)
+
+        cell_dtype = self.data.read_column_dtype_from_metadata(mcolumn, mdfi)
         self.selection.cell_dtype = utils.get_dtype_symbol(cell_dtype) if cell_dtype is not None else None
 
         # Request to update the input bar with the selected cell data
         self.emit('selection-changed')
 
     def notify_selected_table_changed(self, force: bool = False) -> None:
-        if self.current_dfi != self.selection.current_active_range.metadata.dfi or force:
-            self.current_dfi = self.selection.current_active_range.metadata.dfi
-            self.emit('columns-changed', self.current_dfi)
-            self.emit('sorts-changed', self.current_dfi)
-            self.emit('filters-changed', self.current_dfi)
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        if force or self.current_dfi != mdfi:
+            self.current_dfi = mdfi
+            self.emit('columns-changed', mdfi)
+            self.emit('sorts-changed', mdfi)
+            self.emit('filters-changed', mdfi)
 
     #
     # Adjustments
@@ -1818,6 +2163,10 @@ class SheetDocument(GObject.Object):
             self.selection.current_search_range.x = self.display.get_cell_x_from_column(self.selection.current_search_range.column)
             self.selection.current_search_range.y = self.display.get_cell_y_from_row(self.selection.current_search_range.row)
 
+        if self.selection.current_cutcopy_range is not None:
+            self.selection.current_cutcopy_range.x = self.display.get_cell_x_from_column(self.selection.current_cutcopy_range.column)
+            self.selection.current_cutcopy_range.y = self.display.get_cell_y_from_row(self.selection.current_cutcopy_range.row)
+
         globals.is_changing_state = False
 
     def auto_adjust_locators_size_by_scroll(self) -> None:
@@ -1846,8 +2195,11 @@ class SheetDocument(GObject.Object):
 
         globals.is_changing_state = False
 
-    def auto_adjust_scrollbars_by_selection(self, follow_cursor: bool = True, scroll_axis: str = 'both',
-                                            with_offset: bool = False, smooth_scroll: bool = False) -> None:
+    def auto_adjust_scrollbars_by_selection(self,
+                                            follow_cursor: bool = True,
+                                            scroll_axis:   str = 'both',
+                                            with_offset:   bool = False,
+                                            smooth_scroll: bool = False) -> None:
         globals.is_changing_state = True
 
         column = self.selection.current_cursor_cell.column
@@ -1883,7 +2235,10 @@ class SheetDocument(GObject.Object):
 
         globals.is_changing_state = False
 
-    def auto_adjust_selections_by_crud(self, column_offset: int, row_offset: int, shrink: bool) -> None:
+    def auto_adjust_selections_by_crud(self,
+                                       column_offset: int,
+                                       row_offset:    int,
+                                       shrink:        bool) -> None:
         globals.is_changing_state = True
 
         active = self.selection.current_active_cell
@@ -1899,6 +2254,10 @@ class SheetDocument(GObject.Object):
             col_2 = cursor.column + column_offset
             row_2 = cursor.row + row_offset
 
-        self.update_selection_from_position(col_1, row_1, col_2, row_2, True, True, False)
+        self.update_selection_from_position(col_1, row_1,
+                                            col_2, row_2,
+                                            keep_order=True,
+                                            follow_cursor=True,
+                                            auto_scroll=False)
 
         globals.is_changing_state = False

@@ -43,10 +43,8 @@ is_changing_state: bool = False
 is_editing_cells: bool = False
 
 
-# This is supposed to be set by any current window
-# to enable any module to send notifications, e.g.
-# error messages when something goes wrong. It'll
-# appear a bit technical to common users, but could
-# somehow be useful especially when asking in a
-# community forum.
+# This is supposed to be set by any current window to enable any module
+# to send notifications, e.g. error messages when something goes wrong.
+# It may will appear a bit technical to common users, but could somehow
+# be useful especially when asking in a community forum.
 send_notification: callable = lambda *_: None

@@ -133,11 +133,8 @@ class SheetDisplay(GObject.Object):
     def get_right_cell_name(self, name: str) -> str:
         """
         Calculates the cell name to the right of the given cell name. This function handles
-        column-like names (e.g., A -> B, Z -> AA) while preserving the row number. Assumes
-        cell names follow the pattern: [Column Letters][Row Numbers] (e.g., A1, AA10).
-
-        Disclaimer: this function was written by genAI under my own supervision.
-        I've tested over all the potential cases, but there's no guarantee.
+        column-like names (e.g. A -> B, Z -> AA) while preserving the row number. Assumes
+        cell names follow the pattern: [Column Letters][Row Numbers] (e.g. A1, AA10).
         """
         # Use regex to split the cell name into its alphabetical and numeric parts
         match = re.match(r"([A-Z]+)(\d+)", name, re.IGNORECASE)
@@ -157,8 +154,8 @@ class SheetDisplay(GObject.Object):
             i -= 1 # Move to the left to increment the next character
 
         if i == -1:
-            # If all characters were 'Z' (e.g., "Z", "ZZ"),
-            # add a new 'A' at the beginning (e.g., "Z" -> "AA", "ZZ" -> "AAA")
+            # If all characters were 'Z' (e.g. "Z", "ZZ"),
+            # add a new 'A' at the beginning (e.g. "Z" -> "AA", "ZZ" -> "AAA")
             new_column_part = 'A' * (len(chars) + 1)
         else:
             # Increment the character at index 'i'
@@ -171,12 +168,9 @@ class SheetDisplay(GObject.Object):
         """
         Calculates the cell name "above" the given cell name, by decrementing only the numeric
         row part of the cell name. For example: "A2" -> "A1", "B100" -> "B99". Assumes cell names
-        follow the pattern: [Column Letters][Row Numbers] (e.g., A1, AA10).
+        follow the pattern: [Column Letters][Row Numbers] (e.g. A1, AA10).
 
-        Returns "INVALID_BELOW_CELL" if the row number would become 0 or less (e.g., from "A1").
-
-        Disclaimer: this function was written by genAI under my own supervision.
-        I've tested over all the potential cases, but there's no guarantee.
+        Returns "INVALID_BELOW_CELL" if the row number would become 0 or less (e.g. from "A1").
         """
         # Use regex to split the cell name into its alphabetical and numeric parts
         match = re.match(r"([A-Z]+)(\d+)", name, re.IGNORECASE)
@@ -199,13 +193,10 @@ class SheetDisplay(GObject.Object):
     def get_left_cell_name(self, name: str) -> str:
         """
         Calculates the cell name to the left of the given cell name. This function handles
-        column-like names (e.g., B -> A, AA -> Z) while preserving the row number.
-        Assumes cell names follow the pattern: [Column Letters][Row Numbers] (e.g., A1, AA10).
+        column-like names (e.g. B -> A, AA -> Z) while preserving the row number.
+        Assumes cell names follow the pattern: [Column Letters][Row Numbers] (e.g. A1, AA10).
 
-        Returns "INVALID_LEFT_CELL" if there is no valid cell to the left (e.g., from "A1").
-
-        Disclaimer: this function was written by genAI under my own supervision.
-        I've tested over all the potential cases, but there's no guarantee.
+        Returns "INVALID_LEFT_CELL" if there is no valid cell to the left (e.g. from "A1").
         """
         if not name:
             return "INVALID_LEFT_CELL"
@@ -231,8 +222,8 @@ class SheetDisplay(GObject.Object):
                 chars[i] = chr(ord(chars[i]) - 1) # Decrement the character
                 break
         else:
-            # If the loop completes, it means all characters were 'A's (e.g., "A", "AA", "AAA")
-            if n == 1: # If it was just "A" (e.g., "A1"), there's no cell to its left (column-wise)
+            # If the loop completes, it means all characters were 'A's (e.g. "A", "AA", "AAA")
+            if n == 1: # If it was just "A" (e.g. "A1"), there's no cell to its left (column-wise)
                 return "INVALID_LEFT_CELL"
             else: # If it was "AA", "AAA", etc., it becomes "Z", "ZZ" (length decreases for column)
                 new_column_part = 'Z' * (n - 1) # Reconstruct with new column (shorter)
@@ -247,10 +238,7 @@ class SheetDisplay(GObject.Object):
         """
         Calculates the cell name "below" the given cell name, by incrementing only the
         numeric row part of the cell name. For example: "A1" -> "A2", "B99" -> "B100".
-        Assumes cell names follow the pattern: [Column Letters][Row Numbers] (e.g., A1, AA10).
-
-        Disclaimer: this function was written by genAI under my own supervision.
-        I've tested over all the potential cases, but there's no guarantee.
+        Assumes cell names follow the pattern: [Column Letters][Row Numbers] (e.g. A1, AA10).
         """
         # Use regex to split the cell name into its alphabetical and numeric parts
         match = re.match(r"([A-Z]+)(\d+)", name, re.IGNORECASE)
@@ -368,10 +356,7 @@ class SheetDisplay(GObject.Object):
 
     def get_cell_position_from_name(self, name: str) -> tuple[int, int]:
         """
-        Parses a cell name (e.g., 'A10', 'ABC123', '5', 'H') into a (column, row) tuple.
-
-        Disclaimer: this function was written by genAI under my own supervision.
-        I've tested over all the potential cases, but there's no guarantee.
+        Parses a cell name (e.g. 'A10', 'ABC123', '5', 'H') into a (column, row) tuple.
 
         Interpretation of inputs:
         - For 'A10', 'AA5', 'ABC123': column is 1-based (A=1, AA=27), row is 1-based.
@@ -395,7 +380,7 @@ class SheetDisplay(GObject.Object):
         has_digits = bool(re.search(r"\d", cell_part))
 
         if has_letters and has_digits:
-            # Case 1: Contains both letters and digits (e.g., 'A10', 'AA5', 'ABC123')
+            # Case 1: Contains both letters and digits (e.g. 'A10', 'AA5', 'ABC123')
             # This is a standard column-row reference.
             col_letters_match = re.search(r"([A-Za-z]+)", cell_part)
             row_str_match = re.search(r"(\d+)", cell_part)
@@ -413,13 +398,13 @@ class SheetDisplay(GObject.Object):
             row = int(row_str)
 
         elif has_digits:
-            # Case 2: Contains only digits (e.g., '5', '10')
+            # Case 2: Contains only digits (e.g. '5', '10')
             # As per requirement: this implies a specific row with column 0.
             col = 0 # Explicitly set column to 0
             row = int(cell_part) # Row is the number itself (1-based)
 
         elif has_letters:
-            # Case 3: Contains only letters (e.g., 'h', 'H', 'HIJ')
+            # Case 3: Contains only letters (e.g. 'h', 'H', 'HIJ')
             # As per requirement: this implies a specific column with row 0.
             # Convert column letters to 1-based index
             for c in cell_part.upper(): # cell_part is entirely letters here
@@ -438,11 +423,8 @@ class SheetDisplay(GObject.Object):
 
     def get_cell_range_from_name(self, name: str) -> tuple[int, int, int, int]:
         """
-        Parses a cell range (e.g., 'A10:a20', 'AA5:BB20', '5:10', 'h:H') or a single cell
-        (e.g., 'a10', '123', 'HIJ', 'ABC123') into a tuple of (start_col, start_row, end_col, end_row).
-
-        Disclaimer: this function was written by genAI under my own supervision.
-        I've tested over all the potential cases, but there's no guarantee.
+        Parses a cell range (e.g. 'A10:a20', 'AA5:BB20', '5:10', 'h:H') or a single cell
+        (e.g. 'a10', '123', 'HIJ', 'ABC123') into a tuple of (start_col, start_row, end_col, end_row).
 
         Returns (-1, -1, -1, -1) if the name cannot be parsed.
         """
@@ -469,7 +451,11 @@ class SheetDisplay(GObject.Object):
         else: # It's a single cell name
             return (*start_pos, *start_pos)
 
-    def check_cell_position_near_edges(self, column: int, row: int, viewport_height: int, viewport_width: int) -> list[str]:
+    def check_cell_position_near_edges(self,
+                                       column: int,
+                                       row: int,
+                                       viewport_height: int,
+                                       viewport_width: int) -> list[str]:
         cell_y = self.get_cell_y_from_row(row)
         cell_x = self.get_cell_x_from_column(column)
         cell_width = self.get_cell_width_from_column(column)
@@ -504,8 +490,14 @@ class SheetDisplay(GObject.Object):
 
         return near_edges
 
-    def scroll_to_position(self, column: int, row: int, viewport_height: int, viewport_width: int, scroll_axis: str = 'both',
-                           with_offset: bool = False, offset_size: int = 0) -> bool:
+    def scroll_to_position(self,
+                           column: int,
+                           row: int,
+                           viewport_height: int,
+                           viewport_width: int,
+                           scroll_axis: str = 'both',
+                           with_offset: bool = False,
+                           offset_size: int = 0) -> bool:
         cell_y = self.get_cell_y_from_row(row)
         cell_x = self.get_cell_x_from_column(column)
         cell_width = self.get_cell_width_from_column(column)

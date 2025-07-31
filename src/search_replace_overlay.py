@@ -68,12 +68,20 @@ class SearchReplaceOverlay(Adw.Bin):
         key_event_controller.connect('key-pressed', self.on_replace_entry_key_pressed)
         self.replace_entry.add_controller(key_event_controller)
 
-    def on_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+    def on_key_pressed(self,
+                       event:   Gtk.EventControllerKey,
+                       keyval:  int,
+                       keycode: int,
+                       state:   Gdk.ModifierType) -> None:
         if keyval == Gdk.KEY_Escape:
             self.close_search_box()
             return
 
-    def on_search_entry_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+    def on_search_entry_key_pressed(self,
+                                    event:   Gtk.EventControllerKey,
+                                    keyval:  int,
+                                    keycode: int,
+                                    state:   Gdk.ModifierType) -> None:
         # Pressing enter/return key while holding shift key will
         # search for the previous search occurrence.
         if keyval == Gdk.KEY_Return and state == Gdk.ModifierType.SHIFT_MASK:
@@ -84,10 +92,15 @@ class SearchReplaceOverlay(Adw.Bin):
             self.find_previous_search_occurrence()
             return
 
-    def on_replace_entry_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+    def on_replace_entry_key_pressed(self,
+                                     event:   Gtk.EventControllerKey,
+                                     keyval:  int,
+                                     keycode: int,
+                                     state:   Gdk.ModifierType) -> None:
         # Pressing enter/return key while holding shift key will
         # search for the previous search occurrence.
-        if keyval == Gdk.KEY_Return and state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK):
+        if keyval == Gdk.KEY_Return \
+                and state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK):
             self.on_replace_all_button_clicked(self.replace_all_button)
 
     @Gtk.Template.Callback()
@@ -107,7 +120,8 @@ class SearchReplaceOverlay(Adw.Bin):
 
         # Initialize the current search range
         elif sheet_document.selection.current_search_range is None:
-            sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+            arange = sheet_document.selection.current_active_range
+            sheet_document.selection.current_search_range = arange
 
         self.search_status.set_visible(True)
 
@@ -128,7 +142,7 @@ class SearchReplaceOverlay(Adw.Bin):
             # In addition, we force to continue previous search if the user chose to search within the selection
             # when the user re-opens the search box.
             if not within_selection and sheet_document.display.scroll_to_position(col_index, row_index, vheight, vwidth):
-                sheet_document.auto_adjust_scrollbars_by_selection(with_offset=True)
+                sheet_document.auto_adjust_scrollbars_by_selection()
                 sheet_document.renderer.render_caches = {}
                 sheet_document.view.main_canvas.queue_draw()
                 return
@@ -141,9 +155,11 @@ class SearchReplaceOverlay(Adw.Bin):
         self.search_states = new_search_states
 
         # Get the search results
-        self.search_results, self.search_results_length = sheet_document.find_in_current_table(text_value,
-                                                                                               match_case, match_cell,
-                                                                                               within_selection, use_regexp)
+        self.search_results, self.search_results_length = sheet_document.find_in_current_cells(text_value,
+                                                                                               match_case,
+                                                                                               match_cell,
+                                                                                               within_selection,
+                                                                                               use_regexp)
 
         if self.search_results_length == 0:
             self.search_status.set_text('No results found')
@@ -180,11 +196,11 @@ class SearchReplaceOverlay(Adw.Bin):
 
     @Gtk.Template.Callback()
     def on_replace_entry_activated(self, entry: Gtk.Entry) -> None:
-        self.replace_current_search_result_item()
+        self.replace_current_search_occurence()
 
     @Gtk.Template.Callback()
     def on_replace_button_clicked(self, button: Gtk.Button) -> None:
-        self.replace_current_search_result_item()
+        self.replace_current_search_occurence()
 
     @Gtk.Template.Callback()
     def on_replace_all_button_clicked(self, button: Gtk.Button) -> None:
@@ -192,11 +208,17 @@ class SearchReplaceOverlay(Adw.Bin):
 
     @Gtk.Template.Callback()
     def on_find_all_button_clicked(self, button: Gtk.Button) -> None:
-        self.window.search_replace_all_view.search_entry.set_text(self.search_entry.get_text())
-        self.window.search_replace_all_view.search_match_case.set_active(self.search_match_case.get_active())
-        self.window.search_replace_all_view.search_match_cell.set_active(self.search_match_cell.get_active())
-        self.window.search_replace_all_view.search_within_selection.set_active(self.search_within_selection.get_active())
-        self.window.search_replace_all_view.search_use_regexp.set_active(self.search_use_regexp.get_active())
+        search_text = self.search_entry.get_text()
+        match_case = self.search_match_case.get_active()
+        match_cell = self.search_match_cell.get_active()
+        within_selection = self.search_within_selection.get_active()
+        use_regexp = self.search_use_regexp.get_active()
+
+        self.window.search_replace_all_view.search_entry.set_text(search_text)
+        self.window.search_replace_all_view.search_match_case.set_active(match_case)
+        self.window.search_replace_all_view.search_match_cell.set_active(match_cell)
+        self.window.search_replace_all_view.search_within_selection.set_active(within_selection)
+        self.window.search_replace_all_view.search_use_regexp.set_active(use_regexp)
 
         self.close_search_box()
 
@@ -227,7 +249,8 @@ class SearchReplaceOverlay(Adw.Bin):
         GLib.timeout_add(200, self.search_box.remove_css_class, 'slide-up-dialog')
 
         # Selects all text on the search entry
-        self.search_entry.select_region(0, len(self.search_entry.get_text()))
+        search_text = self.search_entry.get_text()
+        self.search_entry.select_region(0, len(search_text))
         self.search_entry.get_first_child().set_focus_on_click(True)
         self.search_entry.get_first_child().grab_focus()
 
@@ -247,12 +270,16 @@ class SearchReplaceOverlay(Adw.Bin):
             self.open_search_box()
 
         # In case the user wants to jump between the search and replace entry
-        if overlay_visible and replace_section_visible and overlay_in_focus and search_entry_in_focus:
+        if overlay_visible \
+                and replace_section_visible \
+                and overlay_in_focus \
+                and search_entry_in_focus:
             self.replace_toggler.set_icon_name('go-down-symbolic')
             self.replace_section.set_visible(True)
 
             # Selects all text on the replace entry
-            self.replace_entry.select_region(0, len(self.replace_entry.get_text()))
+            replace_text = self.replace_entry.get_text()
+            self.replace_entry.select_region(0, len(replace_text))
             self.replace_entry.get_first_child().set_focus_on_click(True)
             self.replace_entry.get_first_child().grab_focus()
 
@@ -271,7 +298,8 @@ class SearchReplaceOverlay(Adw.Bin):
             self.replace_section.set_visible(True)
 
             # Selects all text on the replace entry
-            self.replace_entry.select_region(0, len(self.replace_entry.get_text()))
+            replace_text = self.replace_entry.get_text()
+            self.replace_entry.select_region(0, len(replace_text))
             self.replace_entry.get_first_child().set_focus_on_click(True)
             self.replace_entry.get_first_child().grab_focus()
 
@@ -325,7 +353,8 @@ class SearchReplaceOverlay(Adw.Bin):
 
         if within_selection:
             if sheet_document.selection.current_search_range is None:
-                sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+                arange = sheet_document.selection.current_active_range
+                sheet_document.selection.current_search_range = arange
 
             csr_dict = sheet_document.selection.current_search_range.__dict__.copy()
             search_states['selection'] = {
@@ -338,9 +367,11 @@ class SearchReplaceOverlay(Adw.Bin):
         return search_states
 
     def find_previous_search_occurrence(self) -> None:
+        row_index, column_name = self.search_cursor_coordinate
+
         # Check if the cursor is at the end of the search results
-        cursor_at_first_row = self.search_cursor_coordinate[0] == 0
-        cursor_at_first_column = self.search_cursor_coordinate[1] == self.search_results.columns[1]
+        cursor_at_first_row = row_index == 0
+        cursor_at_first_column = column_name == self.search_results.columns[1]
 
         # Reset the cursor when hitting the end of the search results
         if cursor_at_first_row and cursor_at_first_column:
@@ -353,17 +384,17 @@ class SearchReplaceOverlay(Adw.Bin):
         # Move the cursor to the previous row
         if cursor_at_first_column:
             last_column_name = self.search_results.columns[-1]
-            next_row_index = self.search_cursor_coordinate[0] - 1
+            next_row_index = row_index - 1
             self.search_cursor_coordinate = (next_row_index, last_column_name)
 
         # Move the cursor to previous column
         else:
-            current_column_index = self.search_results.columns.index(self.search_cursor_coordinate[1])
+            current_column_index = self.search_results.columns.index(column_name)
             previous_column_name = self.search_results.columns[current_column_index - 1]
-            self.search_cursor_coordinate = (self.search_cursor_coordinate[0], previous_column_name)
+            self.search_cursor_coordinate = (row_index, previous_column_name)
 
         # Check if the current cursor position is a search result
-        found_search_result_item = self.search_results[self.search_cursor_coordinate[1]][self.search_cursor_coordinate[0]]
+        found_search_result_item = self.search_results[column_name][row_index]
 
         # Continue to search if the current cursor position is not a search result
         if not found_search_result_item:
@@ -375,9 +406,11 @@ class SearchReplaceOverlay(Adw.Bin):
             self.show_current_search_result_item()
 
     def find_next_search_occurrence(self) -> None:
+        row_index, column_name = self.search_cursor_coordinate
+
         # Check if the cursor is at the end of the search results
-        cursor_at_last_row = self.search_cursor_coordinate[0] == self.search_results.height - 1
-        cursor_at_last_column = self.search_cursor_coordinate[1] == self.search_results.columns[-1]
+        cursor_at_last_row = row_index == self.search_results.height - 1
+        cursor_at_last_column = column_name == self.search_results.columns[-1]
 
         # Reset the cursor when hitting the end of the search results
         if cursor_at_last_column and cursor_at_last_row:
@@ -390,17 +423,17 @@ class SearchReplaceOverlay(Adw.Bin):
         # Move the cursor to the next row
         if cursor_at_last_column:
             first_column_name = self.search_results.columns[1]
-            next_row_index = self.search_cursor_coordinate[0] + 1
+            next_row_index = row_index + 1
             self.search_cursor_coordinate = (next_row_index, first_column_name)
 
         # Move the cursor to next column
         else:
-            current_column_index = self.search_results.columns.index(self.search_cursor_coordinate[1])
+            current_column_index = self.search_results.columns.index(column_name)
             next_column_name = self.search_results.columns[current_column_index + 1]
-            self.search_cursor_coordinate = (self.search_cursor_coordinate[0], next_column_name)
+            self.search_cursor_coordinate = (row_index, next_column_name)
 
         # Check if the current cursor position is a search result
-        found_search_result_item = self.search_results[self.search_cursor_coordinate[1]][self.search_cursor_coordinate[0]]
+        found_search_result_item = self.search_results[column_name][row_index]
 
         # Continue to search if the current cursor position is not a search result
         if not found_search_result_item:
@@ -414,20 +447,18 @@ class SearchReplaceOverlay(Adw.Bin):
     def show_current_search_result_item(self) -> None:
         sheet_document = self.window.get_current_active_document()
 
+        row_index, column_name = self.search_cursor_coordinate
+
         # TODO: support multiple dataframes?
-        vcol_index = sheet_document.data.dfs[0].columns.index(self.search_cursor_coordinate[1]) + 1 # +1 for the locator
-        vrow_index = self.search_results['$ridx'][self.search_cursor_coordinate[0]] + 2 # +2 for the locator and the header
+        vcol_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the locator
+        vrow_index = self.search_results['$ridx'][row_index] + 2 # +2 for the locator and the header
 
         col_index = sheet_document.display.get_column_from_vcolumn(vcol_index)
         row_index = sheet_document.display.get_row_from_vrow(vrow_index)
 
         search_range = sheet_document.selection.current_search_range
 
-        sheet_document.update_selection_from_position(col_index, row_index, col_index, row_index, with_offset=True)
-
-        sheet_document.selection.current_search_range = search_range
-
-        sheet_document.view.main_canvas.queue_draw()
+        sheet_document.update_selection_from_position(col_index, row_index, col_index, row_index)
 
         column = sheet_document.selection.current_active_cell.column
         row = sheet_document.selection.current_active_cell.row
@@ -439,24 +470,31 @@ class SearchReplaceOverlay(Adw.Bin):
             offset_size = self.get_height() + self.get_margin_bottom() + sheet_document.display.DEFAULT_CELL_HEIGHT
             sheet_document.display.scroll_y_position += offset_size
             sheet_document.display.discretize_scroll_position()
-            sheet_document.auto_adjust_scrollbars_by_selection()
+            sheet_document.update_selection_from_position(col_index, row_index, col_index, row_index)
 
-        self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of {format(self.search_results_length, ',d')} results')
+        sheet_document.selection.current_search_range = search_range
+
+        sheet_document.view.main_canvas.queue_draw()
+
+        self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of '
+                                    f'{format(self.search_results_length, ',d')} results')
         self.search_status.set_visible(True)
 
-    def replace_current_search_result_item(self) -> None:
+    def replace_current_search_occurence(self) -> None:
         if self.get_current_search_states() != self.search_states \
                 or self.search_results_length == 0:
             self.on_search_entry_activated(self.search_entry)
+            return
 
         if self.search_results_length == 0:
             return
 
-        sheet_document = self.window.get_current_active_document()
+        replace_with = self.replace_entry.get_text()
+        search_pattern = self.search_entry.get_text()
+        match_case = self.search_match_case.get_active()
 
-        sheet_document.update_current_cells(self.replace_entry.get_text(),
-                                            self.search_entry.get_text(),
-                                            self.search_match_case.get_active())
+        sheet_document = self.window.get_current_active_document()
+        sheet_document.replace_in_current_cells(replace_with, search_pattern, match_case)
 
         self.find_next_search_occurrence()
 
@@ -479,8 +517,14 @@ class SearchReplaceOverlay(Adw.Bin):
 
         # Initialize the current search range
         elif sheet_document.selection.current_search_range is None:
-            sheet_document.selection.current_search_range = sheet_document.selection.current_active_range
+            arange = sheet_document.selection.current_active_range
+            sheet_document.selection.current_search_range = arange
 
-        sheet_document.replace_all_in_current_table(search_pattern, replace_with, match_case, match_cell, within_selection, use_regexp)
+        sheet_document.replace_all_in_current_cells(search_pattern,
+                                                    replace_with,
+                                                    match_case,
+                                                    match_cell,
+                                                    within_selection,
+                                                    use_regexp)
 
         self.search_status.set_visible(False)

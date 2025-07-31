@@ -55,7 +55,10 @@ class Window(Adw.ApplicationWindow):
     tab_view = Gtk.Template.Child()
     tab_bar = Gtk.Template.Child()
 
-    def __init__(self, file: Gio.File, dataframe: polars.DataFrame, **kwargs) -> None:
+    def __init__(self,
+                 file:        Gio.File,
+                 dataframe:   polars.DataFrame,
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.file = file
@@ -103,7 +106,7 @@ class Window(Adw.ApplicationWindow):
         self.name_box.get_first_child().set_focus_on_click(False)
 
         # We add some margin to the formula bar to prevent its content from being hidden
-        # by the dtype indicator tag.
+        # by the dtype indicator widget.
         self.formula_bar.get_first_child().set_margin_end(45)
 
         click_event_controller = Gtk.GestureClick()
@@ -202,7 +205,11 @@ class Window(Adw.ApplicationWindow):
         # for the user. We can add a verification to avoid that though.
         globals.send_notification = self.show_toast_message
 
-    def on_inline_formula_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+    def on_inline_formula_key_pressed(self,
+                                      event:   Gtk.EventControllerKey,
+                                      keyval:  int,
+                                      keycode: int,
+                                      state:   Gdk.ModifierType) -> None:
         sheet_view = self.get_current_active_view()
 
         if keyval == Gdk.KEY_Escape:
@@ -236,7 +243,10 @@ class Window(Adw.ApplicationWindow):
     def on_inline_formula_buffer_changed(self, buffer):
         self.inline_formula_box.queue_resize()
 
-    def on_content_overlay_get_child_position(self, overlay: Gtk.Overlay, widget: Gtk.Widget, allocation: Gdk.Rectangle) -> bool:
+    def on_content_overlay_get_child_position(self,
+                                              overlay:    Gtk.Overlay,
+                                              widget:     Gtk.Widget,
+                                              allocation: Gdk.Rectangle) -> bool:
         if widget == self.inline_formula_box:
             sheet_view = self.get_current_active_view()
             sheet_document = sheet_view.document
@@ -277,7 +287,7 @@ class Window(Adw.ApplicationWindow):
             allocation.width = new_width
             allocation.height = new_height
 
-            widget.set_size_request(allocation.width, allocation.height)
+            widget.set_size_request(new_width, new_height)
 
             return True
 
@@ -342,7 +352,11 @@ class Window(Adw.ApplicationWindow):
         sheet_view = self.sheet_manager.create_sheet(None)
         self.add_new_tab(sheet_view)
 
-    def on_name_box_pressed(self, event: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+    def on_name_box_pressed(self,
+                            event:   Gtk.GestureClick,
+                            n_press: int,
+                            x:       float,
+                            y:       float) -> None:
         # Selects all text when the user clicks on the name box
         # when it's currently not in focus.
         self.name_box.select_region(0, len(self.name_box.get_text()))
@@ -352,7 +366,11 @@ class Window(Adw.ApplicationWindow):
     def on_name_box_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         self.name_box.get_first_child().set_focus_on_click(False)
 
-    def on_name_box_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
+    def on_name_box_key_pressed(self,
+                                event:   Gtk.EventControllerKey,
+                                keyval:  int,
+                                keycode: int,
+                                state:   Gdk.ModifierType) -> None:
         # Pressing tab key will reset the input bar instead of activating
         # the input bar to prevent undesired behavior. I've seen other
         # applications don't do this, but I prefer this for consistency.
@@ -369,9 +387,13 @@ class Window(Adw.ApplicationWindow):
             sheet_view.main_canvas.grab_focus()
             return
 
-    def on_formula_bar_key_pressed(self, event: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> None:
-        # Pressing escape key will reset the input bar and
-        # return the focus to the main canvas back.
+    def on_formula_bar_key_pressed(self,
+                                   event:   Gtk.EventControllerKey,
+                                   keyval:  int,
+                                   keycode: int,
+                                   state:   Gdk.ModifierType) -> None:
+        # Pressing escape key will reset the input bar
+        # and return the focus to the main canvas back.
         if keyval == Gdk.KEY_Escape:
             self.reset_inputbar()
             sheet_view = self.get_current_active_view()
@@ -379,13 +401,16 @@ class Window(Adw.ApplicationWindow):
             sheet_view.main_canvas.grab_focus()
             return
 
-    def on_selected_page_changed(self, tab_view: Adw.TabView, pspec: GObject.ParamSpec) -> None:
+    def on_selected_page_changed(self,
+                                 tab_view: Adw.TabView,
+                                 pspec:    GObject.ParamSpec) -> None:
         tab_page = tab_view.get_selected_page()
         if tab_page is None:
             return
         sheet_view = tab_page.get_child()
 
-        # Force the sidebar to update its content based on the current active selection
+        # Force the sidebar to update its content based on the current
+        # active selection
         sheet_view.document.notify_selected_table_changed(force=True)
 
         # Update the global references to the current active document
@@ -399,7 +424,9 @@ class Window(Adw.ApplicationWindow):
         # Reset the input bar to represent the current selection
         self.reset_inputbar()
 
-    def on_page_closed(self, tab_view: Adw.TabView, tab_page: Adw.TabPage) -> None:
+    def on_page_closed(self,
+                       tab_view: Adw.TabView,
+                       tab_page: Adw.TabPage) -> None:
         sheet_view = tab_page.get_child()
 
         # Clean up the history, mainly to free up disk space
@@ -419,23 +446,35 @@ class Window(Adw.ApplicationWindow):
     def on_selection_changed(self, source: GObject.Object) -> None:
         self.reset_inputbar()
 
-    def on_columns_changed(self, source: GObject.Object, dfi: int) -> None:
+    def on_columns_changed(self,
+                           source: GObject.Object,
+                           dfi:    int) -> None:
         self.sidebar_home_view.repopulate_field_list(dfi)
 
-    def on_sorts_changed(self, source: GObject.Object, dfi: int) -> None:
+    def on_sorts_changed(self,
+                         source: GObject.Object,
+                         dfi:    int) -> None:
         self.sidebar_home_view.repopulate_sort_list(dfi)
 
-    def on_filters_changed(self, source: GObject.Object, dfi: int) -> None:
+    def on_filters_changed(self,
+                           source: GObject.Object,
+                           dfi:    int) -> None:
         self.sidebar_home_view.repopulate_filter_list(dfi)
 
-    def on_inline_formula_opened(self, source: GObject.Object, sel_value: str) -> None:
+    def on_inline_formula_opened(self,
+                                 source:    GObject.Object,
+                                 sel_value: str) -> None:
         globals.is_editing_cells = True
         self.inline_formula_box.get_vadjustment().set_value(0)
         self.inline_formula_box.set_visible(True)
         self.inline_formula.get_buffer().set_text(sel_value)
         self.inline_formula.grab_focus()
 
-    def on_context_menu_opened(self, source: GObject.Object, x: int, y: int, type: str) -> None:
+    def on_context_menu_opened(self,
+                               source: GObject.Object,
+                               x:      int,
+                               y:      int,
+                               type:   str) -> None:
         if type == 'header':
             self.open_header_context_menu(x, y)
             return
@@ -444,7 +483,9 @@ class Window(Adw.ApplicationWindow):
             self.open_cell_context_menu(x, y)
             return
 
-    def open_header_context_menu(self, x: int, y: int) -> None:
+    def open_header_context_menu(self,
+                                 x: int,
+                                 y: int) -> None:
         sheet_document = self.get_current_active_document()
 
         active_cell = sheet_document.selection.current_active_cell
@@ -465,6 +506,7 @@ class Window(Adw.ApplicationWindow):
         self.context_menu.set_parent(self.content_overlay)
 
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
+            sheet_document.focused_widget = None
             sheet_document.view.main_canvas.set_sensitive(True)
             sheet_document.view.main_canvas.set_focusable(True)
             sheet_document.view.main_canvas.grab_focus()
@@ -482,7 +524,9 @@ class Window(Adw.ApplicationWindow):
         # Show context menu
         self.context_menu.popup()
 
-    def open_cell_context_menu(self, x: int, y: int) -> None:
+    def open_cell_context_menu(self,
+                               x: int,
+                               y: int) -> None:
         sheet_document = self.get_current_active_document()
 
         cursor_cell = sheet_document.selection.current_cursor_cell
@@ -516,10 +560,14 @@ class Window(Adw.ApplicationWindow):
         # Create context menu
         if self.context_menu is not None:
             self.context_menu.unparent()
-        self.context_menu = SheetCellMenu(start_column, start_row, end_column, end_row, column_span, row_span, ctype)
+        self.context_menu = SheetCellMenu(start_column,start_row,
+                                          end_column,  end_row,
+                                          column_span, row_span,
+                                          ctype)
         self.context_menu.set_parent(self.content_overlay)
 
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
+            sheet_document.focused_widget = None
             sheet_document.view.main_canvas.set_sensitive(True)
             sheet_document.view.main_canvas.set_focusable(True)
             sheet_document.view.main_canvas.grab_focus()
@@ -584,7 +632,10 @@ class Window(Adw.ApplicationWindow):
         cell_data = str(cell_data)
         self.update_inputbar(cell_name, cell_data, cell_dtype)
 
-    def update_inputbar(self, sel_name: str = '', sel_value: str = '', sel_dtype: str = None) -> None:
+    def update_inputbar(self,
+                        sel_name:  str = '',
+                        sel_value: str = '',
+                        sel_dtype: str = None) -> None:
         self.name_box.set_text(sel_name)
         self.formula_bar.set_text(sel_value)
 
@@ -608,7 +659,10 @@ class Window(Adw.ApplicationWindow):
         # Open the sidebar
         self.toggle_sidebar.set_active(True)
         self.split_view.set_collapsed(False)
-        if self.sidebar_tab_view.get_selected_page() == self.search_replace_all_page:
+
+        selected_page = self.sidebar_tab_view.get_selected_page()
+
+        if selected_page == self.search_replace_all_page:
             sheet_document.is_searching_cells = True
 
     def show_toast_message(self, message: str) -> None:

@@ -98,8 +98,14 @@ class SelectionState(State):
     follow_cursor: bool
     auto_scroll: bool
 
-    def __init__(self, col_1: int, row_1: int, col_2: int, row_2: int,
-                 keep_order: bool, follow_cursor: bool, auto_scroll: bool) -> None:
+    def __init__(self,
+                 col_1:         int,
+                 row_1:         int,
+                 col_2:         int,
+                 row_2:         int,
+                 keep_order:    bool,
+                 follow_cursor: bool,
+                 auto_scroll:   bool) -> None:
         super().__init__()
 
         self.save_selection(True)
@@ -118,8 +124,11 @@ class SelectionState(State):
 
     def redo(self) -> None:
         document = globals.history.document
-        document.update_selection_from_position(self.col_1, self.row_1, self.col_2, self.row_2,
-                                                self.keep_order, self.follow_cursor, self.auto_scroll)
+        document.update_selection_from_position(self.col_1, self.row_1,
+                                                self.col_2, self.row_2,
+                                                self.keep_order,
+                                                self.follow_cursor,
+                                                self.auto_scroll)
 
 
 
@@ -129,7 +138,9 @@ class InsertBlankRowState(State):
     row_span: int
     above: bool
 
-    def __init__(self, row_span: int, above: bool) -> None:
+    def __init__(self,
+                 row_span: int,
+                 above:    bool) -> None:
         super().__init__()
 
         self.save_selection()
@@ -165,7 +176,9 @@ class InsertBlankColumnState(State):
     column_span: int
     left: bool
 
-    def __init__(self, column_span: int, left: bool) -> None:
+    def __init__(self,
+                 column_span: int,
+                 left:        bool) -> None:
         super().__init__()
 
         self.save_selection()
@@ -198,61 +211,45 @@ class InsertBlankColumnState(State):
 class UpdateDataState(State):
     __gtype_name__ = 'UpdateDataState'
 
-    # When header is None, it means the header is not changed.
-    # The header can be a list or a single value.
-    header: any
-
-    # When content is None, it means the content is not changed.
-    # The header can only be a DataFrame and when it is, we'll
-    # store the content as a parquet file, assign None to content,
-    # and store the file path.
     content: any
     file_path: str
 
-    # It can be a single value or a polars.DataFrame
-    # TODO: for now only single value is supported.
-    replace_with: any
+    new_value: any
 
-    # It can be None when there is no search pattern in case
-    # the user wants to replace all the cell contents.
-    search_pattern: str
-    match_case: bool
+    include_header: bool
 
-    def __init__(self, header: any, content: any, replace_with: any, search_pattern: str, match_case: bool) -> None:
+    def __init__(self,
+                 content:        any,
+                 new_value:      any,
+                 include_header: bool) -> None:
         super().__init__()
 
         self.save_selection(True)
 
-        self.header = header
+        self.file_path = self.write_snapshot(content)
 
-        self.replace_with = replace_with
-        self.search_pattern = search_pattern
-        self.match_case = match_case
+        self.new_value = new_value
 
-        if isinstance(content, polars.DataFrame):
-            if content.height == 0:
-                self.content = None
-                self.file_path = None
-            else:
-                self.content = None
-                self.file_path = self.write_snapshot(content)
-        else:
-            self.content = content
-            self.file_path = None
+        self.include_header = include_header
 
     def undo(self) -> None:
         document = globals.history.document
 
-        if self.file_path is not None:
-            document.update_current_cells([self.header, polars.read_parquet(self.file_path)])
-        else:
-            document.update_current_cells([self.header, self.content])
+        arange = document.selection.current_active_range
+
+        document.data.update_cell_data_block_from_metadata(arange.metadata.column,
+                                                           arange.metadata.row,
+                                                           arange.column_span,
+                                                           arange.row_span,
+                                                           arange.metadata.dfi,
+                                                           self.include_header,
+                                                           polars.read_parquet(self.file_path))
 
         self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
-        document.update_current_cells(self.replace_with, self.search_pattern, self.match_case)
+        document.update_current_cells(self.new_value)
 
 
 
@@ -262,7 +259,9 @@ class DuplicateRowState(State):
     row_span: int
     above: bool
 
-    def __init__(self, row_span: int, above: bool) -> None:
+    def __init__(self,
+                 row_span: int,
+                 above:    bool) -> None:
         super().__init__()
 
         self.save_selection()
@@ -298,7 +297,9 @@ class DuplicateColumnState(State):
     column_span: int
     left: bool
 
-    def __init__(self, column_span: int, left: bool) -> None:
+    def __init__(self,
+                 column_span: int,
+                 left:        bool) -> None:
         super().__init__()
 
         self.column_span = column_span
@@ -335,7 +336,10 @@ class DeleteRowState(State):
     vflags_path: str
     rheights_path: str
 
-    def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series, rheights: polars.Series) -> None:
+    def __init__(self,
+                 dataframe: polars.DataFrame,
+                 vflags:    polars.Series,
+                 rheights:  polars.Series) -> None:
         super().__init__()
 
         self.save_selection()
@@ -368,7 +372,10 @@ class DeleteColumnState(State):
     vflags_path: str
     cwidths_path: str
 
-    def __init__(self, dataframe: polars.DataFrame, vflags: polars.Series, cwidths: polars.Series) -> None:
+    def __init__(self,
+                 dataframe: polars.DataFrame,
+                 vflags:    polars.Series,
+                 cwidths:   polars.Series) -> None:
         super().__init__()
 
         self.save_selection()
@@ -404,7 +411,12 @@ class FilterRowState(State):
     cfilters: dict
     pfilters: dict
 
-    def __init__(self, vflags: polars.Series, rheights: polars.Series, multiple: bool, cfilters: dict, pfilters: dict) -> None:
+    def __init__(self,
+                 vflags:   polars.Series,
+                 rheights: polars.Series,
+                 multiple: bool,
+                 cfilters: dict,
+                 pfilters: dict) -> None:
         super().__init__()
 
         self.save_selection()
@@ -469,7 +481,10 @@ class ResetFilterRowState(State):
 
     cfilters: dict
 
-    def __init__(self, vflags: polars.Series, rheights: polars.Series, cfilters: dict) -> None:
+    def __init__(self,
+                 vflags:   polars.Series,
+                 rheights: polars.Series,
+                 cfilters: dict) -> None:
         super().__init__()
 
         self.save_selection()
@@ -527,7 +542,14 @@ class SortRowState(State):
     rindex_path: str
     vflags_path: str
 
-    def __init__(self, rindex: polars.DataFrame, vflags: polars.Series, dfi: int, descending: bool, multiple: bool, csorts: dict, psorts: dict) -> None:
+    def __init__(self,
+                 rindex:     polars.DataFrame,
+                 vflags:     polars.Series,
+                 dfi:        int,
+                 descending: bool,
+                 multiple:   bool,
+                 csorts:     dict,
+                 psorts:     dict) -> None:
         super().__init__()
 
         self.save_selection()
@@ -592,7 +614,9 @@ class ConvertColumnDataTypeState(State):
     before: polars.DataType
     after: polars.DataType
 
-    def __init__(self, before: polars.DataType, after: polars.DataType) -> None:
+    def __init__(self,
+                 before: polars.DataType,
+                 after:  polars.DataType) -> None:
         super().__init__()
 
         self.save_selection()
@@ -609,6 +633,39 @@ class ConvertColumnDataTypeState(State):
     def redo(self) -> None:
         document = globals.history.document
         document.convert_current_columns_dtype(self.after)
+
+
+
+class ReplaceDataState(State):
+    __gtype_name__ = 'ReplaceDataState'
+
+    content: str
+    replace_with: str
+    search_pattern: str
+    match_case: bool
+
+    def __init__(self,
+                 content:        str,
+                 replace_with:   str,
+                 search_pattern: str,
+                 match_case:     bool) -> None:
+        super().__init__()
+
+        self.save_selection(True)
+
+        self.content = content
+        self.replace_with = replace_with
+        self.search_pattern = search_pattern
+        self.match_case = match_case
+
+    def undo(self) -> None:
+        document = globals.history.document
+        document.update_current_cells(self.content)
+        self.restore_selection()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.replace_in_current_cells(self.replace_with, self.search_pattern, self.match_case)
 
 
 
@@ -629,9 +686,18 @@ class ReplaceAllState(State):
     within_selection: bool
     use_regexp: bool
 
-    def __init__(self, content: any, column_names: list[str], row: int, row_span: int, dfi: int,
-                 search_pattern: str, replace_with: str, match_case: bool,
-                 match_cell: bool, within_selection: bool, use_regexp: bool) -> None:
+    def __init__(self,
+                 content:          any,
+                 column_names:     list[str],
+                 row:              int,
+                 row_span:         int,
+                 dfi:              int,
+                 search_pattern:   str,
+                 replace_with:     str,
+                 match_case:       bool,
+                 match_cell:       bool,
+                 within_selection: bool,
+                 use_regexp:       bool) -> None:
         super().__init__()
 
         self.save_selection(True)
@@ -652,16 +718,23 @@ class ReplaceAllState(State):
 
     def undo(self) -> None:
         document = globals.history.document
-        document.data.update_cell_data_with_chunk_from_metadata(self.column_names, self.row, self.row_span, self.dfi,
-                                                                polars.read_parquet(self.file_path))
+        document.data.update_cell_data_blocks_from_metadata(self.column_names,
+                                                            self.row,
+                                                            self.row_span,
+                                                            self.dfi,
+                                                            polars.read_parquet(self.file_path))
 
     def redo(self) -> None:
         document = globals.history.document
 
         self.restore_selection()
 
-        document.replace_all_in_current_table(self.search_pattern, self.replace_with, self.match_case,
-                                              self.match_cell, self.within_selection, self.use_regexp)
+        document.replace_all_in_current_cells(self.search_pattern,
+                                              self.replace_with,
+                                              self.match_case,
+                                              self.match_cell,
+                                              self.within_selection,
+                                              self.use_regexp)
 
 
 
@@ -671,7 +744,9 @@ class ToggleColumnVisibilityState(State):
     column: int
     show: bool
 
-    def __init__(self, column: int, show: bool) -> None:
+    def __init__(self,
+                 column: int,
+                 show:   bool) -> None:
         super().__init__()
 
         self.save_selection()
@@ -698,7 +773,10 @@ class UpdateColumnWidthState(State):
     before: int
     after: int
 
-    def __init__(self, column: int, before: int, after: int) -> None:
+    def __init__(self,
+                 column: int,
+                 before: int,
+                 after:  int) -> None:
         super().__init__()
 
         self.save_selection()
@@ -805,7 +883,10 @@ class HistoryManager(GObject.Object):
 
         globals.is_changing_state = False
 
-    def restore_scroll_position(self, scroll_y: float, scroll_x: float) -> None:
+    def restore_scroll_position(self,
+                                scroll_y: float,
+                                scroll_x: float) -> None:
+        # TODO: don't restore the scroll position if the target cell is already visible
         canvas_height = self.document.view.main_canvas.get_height()
         canvas_width = self.document.view.main_canvas.get_width()
 
