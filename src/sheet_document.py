@@ -2216,34 +2216,40 @@ class SheetDocument(GObject.Object):
 
         crange = clipboard.range
 
+        def post_cutting_cells_action() -> None:
+            arange = self.selection.current_active_range
+
+            self.update_selection_from_position(crange.column,
+                                                crange.row,
+                                                crange.column + crange.column_span - 1,
+                                                crange.row + crange.row_span - 1,
+                                                keep_order=True,
+                                                follow_cursor=False,
+                                                auto_scroll=False)
+            self.update_current_cells('')
+
+            self.update_selection_from_position(arange.column,
+                                                arange.row,
+                                                arange.column + arange.column_span - 1,
+                                                arange.row + arange.row_span - 1,
+                                                keep_order=True,
+                                                follow_cursor=False,
+                                                auto_scroll=False)
+
+            self.notify_selection_changed(arange.column, arange.row, arange.metadata)
+
         if crange is not None and (crange.column_span > 1 or crange.row_span > 1):
             self.update_current_cells_from_range(crange)
 
             if is_cutting_cells:
-                arange = self.selection.current_active_range
-
-                self.update_selection_from_position(crange.column,
-                                                    crange.row,
-                                                    crange.column + crange.column_span - 1,
-                                                    crange.row + crange.row_span - 1,
-                                                    keep_order=True,
-                                                    follow_cursor=False,
-                                                    auto_scroll=False)
-                self.update_current_cells('')
-
-                self.update_selection_from_position(arange.column,
-                                                    arange.row,
-                                                    arange.column + arange.column_span - 1,
-                                                    arange.row + arange.row_span - 1,
-                                                    keep_order=True,
-                                                    follow_cursor=False,
-                                                    auto_scroll=False)
-
-                self.notify_selection_changed(arange.column, arange.row, arange.metadata)
+                post_cutting_cells_action()
 
             return
 
         self.update_current_cells(content)
+
+        if is_cutting_cells:
+            post_cutting_cells_action()
 
     #
     # Helpers
