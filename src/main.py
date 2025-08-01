@@ -64,6 +64,9 @@ class Application(Adw.Application):
         self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
         self.create_action('undo', self.on_undo_action, ['<primary>z'])
         self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
+        self.create_action('cut', self.on_cut_action, ['<primary>x'])
+        self.create_action('copy', self.on_copy_action, ['<primary>c'])
+        self.create_action('paste', self.on_paste_action, ['<primary>v'])
         self.create_action('insert-row-above', self.on_insert_row_above_action)
         self.create_action('insert-row-below', self.on_insert_row_below_action)
         self.create_action('insert-column-left', self.on_insert_column_left_action)
@@ -248,6 +251,60 @@ class Application(Adw.Application):
             return
 
         globals.history.redo()
+
+    def on_cut_action(self, action: Gio.SimpleAction, *args) -> bool:
+        window = self.get_active_window()
+
+        # Prevent from colliding with the cut action of editable widgets
+        focused_widget = window.get_focus()
+        if isinstance(focused_widget, Gtk.Text) \
+                or isinstance(focused_widget, Gtk.TextView):
+            focused_widget.activate_action('clipboard.cut', None)
+            return True
+
+        # TODO
+
+        return True
+
+    def on_copy_action(self, action: Gio.SimpleAction, *args) -> bool:
+        window = self.get_active_window()
+
+        # Prevent from colliding with the copy action of editable widgets
+        focused_widget = window.get_focus()
+        if isinstance(focused_widget, Gtk.Text) \
+                or isinstance(focused_widget, Gtk.TextView):
+            focused_widget.activate_action('clipboard.copy', None)
+            return True
+
+        document = self.get_current_active_document()
+        if focused_widget == document.view.main_canvas:
+            document.copy_from_current_selection(self.clipboard)
+
+        return True
+
+    def on_paste_action(self, action: Gio.SimpleAction, *args) -> bool:
+        window = self.get_active_window()
+
+        # Prevent from colliding with the paste action of editable widgets
+        focused_widget = window.get_focus()
+        if isinstance(focused_widget, Gtk.Text) \
+                or isinstance(focused_widget, Gtk.TextView):
+            focused_widget.activate_action('clipboard.paste', None)
+            return True
+
+        def on_clipboard_text_received(clipboard: Gdk.Clipboard, result: Gio.Task) -> None:
+            if result.had_error():
+                document.paste_into_current_selection(self.clipboard, None)
+                return False
+
+            text = clipboard.read_text_finish(result)
+            document.paste_into_current_selection(self.clipboard, text)
+
+        document = self.get_current_active_document()
+        if focused_widget == document.view.main_canvas:
+            self.clipboard.read_text_async(on_clipboard_text_received)
+
+        return True
 
     def on_insert_row_above_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()
