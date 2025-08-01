@@ -39,22 +39,8 @@
             "sources": [
                 {
                     "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/b8/d9/5e2753784ea30d84b3e769a56f5e50ac5a89c129e87baa16ac0773eb4ef7/polars-1.31.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-                    "sha256": "ada7940ed92bea65d5500ae7ac1f599798149df8faa5a6db150327c9ddbee4f1"
-                }
-            ]
-        },
-        {
-            "name": "python3-numpy",
-            "buildsystem": "simple",
-            "build-commands": [
-                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"numpy\" --no-build-isolation"
-            ],
-            "sources": [
-                {
-                    "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/6e/45/c51cb248e679a6c6ab14b7a8e3ead3f4a3fe7425fc7a6f98b3f147bec532/numpy-2.3.1-cp312-cp312-manylinux_2_28_x86_64.whl",
-                    "sha256": "e7cbf5a5eafd8d230a3ce356d892512185230e4781a361229bd902ff403bc660"
+                    "url": "https://files.pythonhosted.org/packages/61/97/fe3797e8e1d4f9eadab32ffe218a841b8874585b6c9bd0f1a26469fb2992/polars-1.32.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+                    "sha256": "f4c15adb97d44766d30c759f5cebbdb64d361e8349ef10b5afc7413f71bf4b72"
                 }
             ]
         },

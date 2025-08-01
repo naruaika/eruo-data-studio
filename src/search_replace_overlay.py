@@ -494,7 +494,7 @@ class SearchReplaceOverlay(Adw.Bin):
         match_case = self.search_match_case.get_active()
 
         sheet_document = self.window.get_current_active_document()
-        sheet_document.replace_in_current_cells(replace_with, search_pattern, match_case)
+        sheet_document.find_replace_in_current_cells(replace_with, search_pattern, match_case)
 
         self.find_next_search_occurrence()
 
@@ -520,11 +520,11 @@ class SearchReplaceOverlay(Adw.Bin):
             arange = sheet_document.selection.current_active_range
             sheet_document.selection.current_search_range = arange
 
-        sheet_document.replace_all_in_current_cells(search_pattern,
-                                                    replace_with,
-                                                    match_case,
-                                                    match_cell,
-                                                    within_selection,
-                                                    use_regexp)
+        sheet_document.find_replace_all_in_current_cells(search_pattern,
+                                                         replace_with,
+                                                         match_case,
+                                                         match_cell,
+                                                         within_selection,
+                                                         use_regexp)
 
         self.search_status.set_visible(False)

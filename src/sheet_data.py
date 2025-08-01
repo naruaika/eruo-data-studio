@@ -21,7 +21,6 @@
 from gi.repository import GObject
 from datetime import datetime
 import gc
-import numpy
 import polars
 import re
 
@@ -181,7 +180,7 @@ class SheetData(GObject.Object):
     __gtype_name__ = 'SheetData'
 
     bbs: list[SheetCellBoundingBox] = [] # visual bounding boxes
-    dfs: list[polars.DataFrame | numpy.ndarray] = []
+    dfs: list[polars.DataFrame] = []
 
     def __init__(self,
                  document:  SheetDocument,
@@ -195,6 +194,16 @@ class SheetData(GObject.Object):
         if dataframe is not None:
             width = dataframe.width
             height = dataframe.height + 1 # +1 for the header
+
+            # TODO: auto-rechunk every dataframe on application idle?
+            dataframe = dataframe.rechunk()
+
+            # Remove leading '$' from column names to prevent collision
+            # from internal column names
+            for col_name in dataframe.columns:
+                if not col_name.startswith('$'):
+                    continue
+                dataframe = dataframe.rename({col_name: col_name.lstrip('$')})
 
             self.bbs = [SheetCellBoundingBox(column, row, width, height)]
             self.dfs = [dataframe]
@@ -448,10 +457,6 @@ class SheetData(GObject.Object):
             column_name = self.dfs[dfi].columns[column]
             column_dtype = self.dfs[dfi].dtypes[column]
 
-            # Cast empty string
-            if new_value == '':
-                replace_with = None
-
             # Convert the input value to the correct type
             try:
                 match column_dtype:
@@ -466,17 +471,25 @@ class SheetData(GObject.Object):
             except Exception:
                 replace_with = str(new_value)
 
+            # Cast empty string
+            if replace_with == '':
+                replace_with = None
+
             # Update the entire column
             if row_span < 0:
-                self.dfs[dfi] = self.dfs[dfi].with_columns(polars.repeat(replace_with, row_count, eager=True, dtype=column_dtype)
+                self.dfs[dfi] = self.dfs[dfi].with_columns(polars.repeat(replace_with, row_count,
+                                                                         eager=True, dtype=column_dtype)
                                                                  .alias(column_name))
             # Update the dataframe in range, excluding the header row
             elif stop - start > 0:
                 when_expression = polars.col('$ridx').is_between(start, stop - 1)
                 if len(row_vseries):
                     when_expression &= polars.col('$ridx').is_in(row_vseries[1:] - 1)
+                # FIXME: this strategy automatically converts column to string when needed,
+                #        but it won't restore the dtype when undoing
                 self.dfs[dfi] = self.dfs[dfi].with_row_index('$ridx') \
-                                             .with_columns(polars.when(when_expression).then(polars.lit(replace_with))
+                                             .with_columns(polars.when(when_expression)
+                                                                 .then(polars.lit(replace_with))
                                                                  .otherwise(polars.col(column_name))
                                                                  .alias(column_name)) \
                                              .drop('$ridx')
@@ -485,7 +498,7 @@ class SheetData(GObject.Object):
                 continue # skip header cell
 
             # Remove leading '$' to prevent collision from internal column names
-            replace_with = new_value.strip('$')
+            replace_with = new_value.lstrip('$')
 
             def generate_next_column_name(column_name: str) -> str:
                 cnumber = 1
@@ -504,6 +517,132 @@ class SheetData(GObject.Object):
 
             # Update the column name
             self.dfs[dfi] = self.dfs[dfi].rename({column_name: replace_with})
+
+        return True
+
+    def update_cell_data_block_with_range_from_metadata(self,
+                                                        t_column:         int,
+                                                        t_row:            int,
+                                                        column_span:      int,
+                                                        row_span:         int,
+                                                        t_dfi:            int,
+                                                        t_include_header: bool,
+                                                        crange:           any,
+                                                        column_vseries:   polars.Series,
+                                                        row_vseries:      polars.Series) -> bool:
+        if t_dfi < 0 or len(self.dfs) <= t_dfi:
+            return False
+
+        s_dfi = crange.metadata.dfi
+        s_include_header = crange.metadata.row == 0 # by now header is always in the first row
+
+        s_row_start = max(0, crange.metadata.row - 1)
+        s_row_stop = min(crange.metadata.row - 1 + row_span, self.dfs[s_dfi].height)
+
+        t_row_start = max(0, t_row - 1)
+        t_row_stop = min(t_row - 1 + row_span, self.dfs[t_dfi].height)
+
+        t_n_rows = t_row_stop - t_row_start
+        s_n_rows = s_row_stop - s_row_start
+
+        # Prepare for source row index
+        if len(row_vseries):
+            s_ridx_length = self.dfs[s_dfi].height
+            s_ridx = (
+                polars.DataFrame({'$ridx': polars.int_range(0, s_ridx_length, eager=True)})
+                      .filter(polars.col('$ridx').is_in(row_vseries[1:] - 1) |
+                              polars.col('$ridx').ge(self.dfs[s_dfi].height))
+                      .slice(s_row_start + s_include_header - 1, s_n_rows + s_include_header)['$ridx']
+            )
+            if s_include_header:
+                s_ridx = polars.concat([polars.Series([-1]), s_ridx[1:].cast(polars.Int64) - 1])
+        else:
+            s_ridx = polars.int_range(s_row_start, s_row_stop, eager=True)
+
+        # Prepare for target row index
+        if len(row_vseries):
+            t_ridx_offset = row_vseries.index_of(t_row)
+            t_ridx = row_vseries.slice(t_ridx_offset + t_include_header, t_n_rows) - 1
+            if t_include_header:
+                t_ridx = polars.concat([polars.Series([-1]), t_ridx.cast(polars.Int64)])
+        else:
+            t_ridx_offset = t_row_start + s_include_header - t_include_header
+            t_ridx = polars.int_range(t_ridx_offset, t_ridx_offset + row_span - s_include_header, eager=True)
+
+        t_end_column = t_column + column_span
+        if column_span < 0:
+            t_end_column = self.dfs[t_dfi].width
+
+        s_column_index = crange.metadata.column
+
+        for t_column in range(t_column, t_end_column):
+            # Skip if the column is hidden
+            if len(column_vseries) and t_column not in column_vseries:
+                continue
+
+            # Skip out of range columns
+            if self.dfs[t_dfi].width <= t_column:
+                break
+
+            t_column_name = self.dfs[t_dfi].columns[t_column]
+
+            s_column_name = self.dfs[s_dfi].columns[s_column_index]
+            s_column_index += 1
+
+            # Update the dataframe in range, excluding the header row
+            if t_n_rows > 0:
+                self.dfs[t_dfi] = (
+                    self.dfs[t_dfi]
+                        .with_row_index('$t_ridx')
+                        .join(
+                            polars.DataFrame({
+                                '$t_nval': self.dfs[s_dfi][s_column_name].gather(s_ridx),
+                                '$t_ridx': t_ridx
+                            }),
+                            on='$t_ridx',
+                            how='left',
+                        )
+                        .with_columns(
+                            polars.coalesce([
+                                polars.col('$t_nval'),
+                                polars.col(t_column_name),
+                            ]).alias(t_column_name)
+                        )
+                        .drop(['$t_ridx', '$t_nval'])
+                )
+
+            if not s_include_header and not t_include_header:
+                continue
+
+            t_first_row = self.dfs[s_dfi][s_row_start, s_column_name]
+
+            if s_include_header:
+                t_first_row = s_column_name
+
+            if not t_include_header:
+                self.dfs[t_dfi][t_row_start, t_column_name] = t_first_row
+                continue
+
+            # Remove leading '$' to prevent collision from internal column names
+            t_new_col_name = t_first_row.lstrip('$')
+
+            def generate_next_column_name(column_name: str) -> str:
+                cnumber = 1
+                for cname in self.dfs[t_dfi].columns:
+                    if match := re.match(column_name + r'_(\d+)', cname):
+                        cnumber = max(cnumber, int(match.group(1)) + 1)
+                return f'{column_name}_{cnumber}'
+
+            # Generate a new column name if needed
+            if t_new_col_name in ['', None]:
+                t_new_col_name = generate_next_column_name('column')
+            else:
+                t_new_col_name = str(t_new_col_name)
+                if t_new_col_name in self.dfs[t_dfi].columns:
+                    t_new_col_name = generate_next_column_name(t_new_col_name)
+
+            # Update the column name
+            self.dfs[t_dfi] = self.dfs[t_dfi].rename({t_column_name: t_new_col_name})
 
         return True
 

@@ -26,6 +26,7 @@ import re
 
 from . import globals
 from . import utils
+from .clipboard_manager import ClipboardManager
 
 class SheetDocument(GObject.Object):
     __gtype_name__ = 'SheetDocument'
@@ -77,21 +78,18 @@ class SheetDocument(GObject.Object):
         self.is_cutting_cells: bool = False
         self.is_copying_cells: bool = False
 
-        self.current_dfi: int = 0 if dataframe is not None else -1
+        self.current_dfi: int = 0 if dataframe is not None \
+                                  else -1
 
         self.pending_sorts: dict = {}
         self.current_sorts: dict = {}
 
-        # Should be consist of one or more dictionary with keys:
-        # - `qhash` is used for checking if there's a duplicate filter
-        # - `qtype` can be used to check where the filter comes from
-        # - `expression` is used by the SheetData for efficient filtering
-        # - `query-builder` can be used for pretty much anything else
         self.pending_filters: list = []
         self.current_filters: list = []
 
-        from .clipboard_manager import ClipboardManager
         self.clipboard: ClipboardManager = None
+
+        self.canvas_tick_callback: int = 0
 
         self.setup_main_canvas()
         self.setup_scrollbars()
@@ -731,20 +729,6 @@ class SheetDocument(GObject.Object):
             arange = self.selection.current_active_range
             self.selection.current_search_range = arange
 
-        # Update the current cut/copy range
-        if self.selection.current_cutcopy_range is not None:
-            ccrange = self.selection.current_cutcopy_range
-
-            x = self.display.get_cell_x_from_column(ccrange.column)
-            y = self.display.get_cell_y_from_row(ccrange.row)
-            end_x = self.display.get_cell_x_from_column(ccrange.column + ccrange.column_span)
-            end_y = self.display.get_cell_y_from_row(ccrange.row + ccrange.row_span)
-
-            ccrange.x = x
-            ccrange.y = y
-            ccrange.width = end_x - x
-            ccrange.height = end_y - y
-
     #
     # Manipulations
     #
@@ -798,6 +782,7 @@ class SheetDocument(GObject.Object):
                     row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
                 self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
+            self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, False)
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -806,7 +791,9 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def insert_blank_from_current_rows(self, above: bool = False, row_span: int = -1) -> bool:
+    def insert_blank_from_current_rows(self,
+                                       above:    bool = False,
+                                       row_span: int = -1) -> bool:
         arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
@@ -867,6 +854,7 @@ class SheetDocument(GObject.Object):
                     row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
                 self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
+            self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -922,6 +910,7 @@ class SheetDocument(GObject.Object):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
                 self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
+            self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, False)
             self.repopulate_auto_filter_widgets()
             self.renderer.render_caches = {}
@@ -933,7 +922,9 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def insert_blank_from_current_columns(self, left: bool = False, column_span: int = -1) -> bool:
+    def insert_blank_from_current_columns(self,
+                                          left:        bool = False,
+                                          column_span: int = -1) -> bool:
         arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
@@ -990,6 +981,7 @@ class SheetDocument(GObject.Object):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
                 self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
+            self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
             self.repopulate_auto_filter_widgets()
             self.renderer.render_caches = {}
@@ -1028,6 +1020,9 @@ class SheetDocument(GObject.Object):
                 mdfi = self.data.bbs.index(bbox)
                 should_expand = True
                 break
+
+        if mdfi < 0:
+            return False # TODO: do something
 
         bbox = self.data.bbs[mdfi]
 
@@ -1102,6 +1097,7 @@ class SheetDocument(GObject.Object):
         if row_span < 0:
             row_span = bbox.row_span - 1
 
+        # By now header is always in the first row
         include_header = arange.metadata.row == 0
 
         # Prepare for snapshot
@@ -1128,6 +1124,157 @@ class SheetDocument(GObject.Object):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
+
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
+
+            active_cell = self.selection.current_active_cell
+            self.notify_selection_changed(active_cell.column, active_cell.row, active_cell.metadata)
+
+            if self.is_cutting_cells:
+                self.cancel_cutcopy_operation()
+
+            return True
+
+        return False
+
+    def update_current_cells_from_range(self, crange: any) -> bool:
+        arange = self.selection.current_active_range
+        active = self.selection.current_active_cell
+        cursor = self.selection.current_cursor_cell
+
+        mdfi = arange.metadata.dfi
+
+        should_expand = False
+        collision_info = {}
+
+        # Check bounding box collision
+        from .sheet_data import SheetCellBoundingBox
+        arange_bbox = SheetCellBoundingBox(arange.column,
+                                           arange.row,
+                                           crange.column_span,
+                                           crange.row_span)
+        for bbox in self.data.bbs:
+            collision_info = bbox.check_collision(arange_bbox)
+
+            has_collision = collision_info['has_collision']
+            in_bounds = collision_info['nonov_column_span'] + collision_info['nonov_row_span'] == 0
+            is_sticky = collision_info['horizontal_gap'] + collision_info['vertical_gap'] == 0
+
+            if (has_collision and not in_bounds) or is_sticky:
+                mdfi = self.data.bbs.index(bbox)
+                should_expand = True
+                break
+
+        if mdfi < 0:
+            return False # TODO: do something
+
+        bbox = self.data.bbs[mdfi]
+
+        # Exclude the case where the cell is being inserted below right,
+        # it should not expand the target dataframe
+        if should_expand and collision_info['direction'] == 'right-below':
+            return False
+
+        def move_selection(corner: str = 'bottom-right') -> None:
+            column = bbox.column + bbox.column_span - 1
+            row = bbox.row + bbox.row_span - 1
+
+            if corner == 'bottom-left':
+                column = bbox.column
+
+            self.update_selection_from_position(column, row,
+                                                column, row,
+                                                follow_cursor=False,
+                                                auto_scroll=False)
+
+        # Automatically expand the dataframe if needed
+        if should_expand and 'below' in collision_info['direction']:
+            move_selection('bottom-right')
+            row_span = collision_info['nonov_row_span']
+            self.insert_blank_from_current_rows(False, row_span)
+
+        if should_expand and 'right' in collision_info['direction']:
+            move_selection('bottom-right')
+            column_span = collision_info['nonov_column_span']
+            self.insert_blank_from_current_columns(False, column_span)
+
+        if should_expand and 'left' in collision_info['direction']:
+            move_selection('bottom-left')
+            column_span = collision_info['nonov_column_span']
+            self.insert_blank_from_current_columns(True, column_span)
+
+        if should_expand:
+            # Restore the selection range
+            self.update_selection_from_position(active.column,
+                                                active.row,
+                                                cursor.column,
+                                                cursor.row,
+                                                keep_order=True,
+                                                follow_cursor=True,
+                                                auto_scroll=True)
+            arange = self.selection.current_active_range
+
+        mcolumn = arange.metadata.column
+        mrow = arange.metadata.row
+        column_span = crange.column_span
+        row_span = crange.row_span
+
+        # Take hidden column(s) into account
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+        column_span = end_vcolumn - start_vcolumn + 1
+
+        # Take hidden row(s) into account
+        start_vrow = self.display.get_vrow_from_row(arange.row)
+        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
+        row_span = end_vrow - start_vrow + 1
+
+        if column_span < 0:
+            column_span = bbox.column_span
+
+        if row_span < 0:
+            row_span = bbox.row_span - 1
+
+        # By now header is always in the first row
+        include_header = arange.metadata.row == 0
+
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UpdateRangeDataState
+            content = self.data.read_cell_data_block_from_metadata(mcolumn,
+                                                                   mrow,
+                                                                   column_span,
+                                                                   row_span,
+                                                                   mdfi,
+                                                                   include_header)
+            state = UpdateRangeDataState(content, crange, include_header)
+
+        # Update data
+        if self.data.update_cell_data_block_with_range_from_metadata(mcolumn,
+                                                                     mrow,
+                                                                     crange.column_span,
+                                                                     crange.row_span,
+                                                                     mdfi,
+                                                                     include_header,
+                                                                     crange,
+                                                                     self.display.column_visible_series,
+                                                                     self.display.row_visible_series):
+            # Save snapshot
+            if not globals.is_changing_state:
+                globals.history.save(state)
+
+            if self.is_cutting_cells:
+                self.cancel_cutcopy_operation()
+
+            # Update selection to fit the size of the dataframe being updated
+            self.update_selection_from_position(arange.column,
+                                                arange.row,
+                                                arange.column + crange.column_span - 1,
+                                                arange.row + crange.row_span - 1,
+                                                keep_order=True,
+                                                follow_cursor=False,
+                                                auto_scroll=False)
 
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -1186,6 +1333,7 @@ class SheetDocument(GObject.Object):
                     row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
                 self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
+            self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -1240,6 +1388,7 @@ class SheetDocument(GObject.Object):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
                 self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
+            self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
             self.repopulate_auto_filter_widgets()
             self.renderer.render_caches = {}
@@ -1298,6 +1447,7 @@ class SheetDocument(GObject.Object):
                     row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
                 self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
+            self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, True)
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -1351,6 +1501,7 @@ class SheetDocument(GObject.Object):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
                 self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
+            self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, True)
             self.repopulate_auto_filter_widgets()
             self.renderer.render_caches = {}
@@ -1452,6 +1603,7 @@ class SheetDocument(GObject.Object):
             row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
             self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
+        self.cancel_cutcopy_operation()
         self.auto_adjust_selections_by_crud(0, 0, True)
         self.auto_adjust_locators_size_by_scroll()
         self.repopulate_auto_filter_widgets()
@@ -1491,6 +1643,7 @@ class SheetDocument(GObject.Object):
         if len(self.display.row_heights):
             self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
+        self.cancel_cutcopy_operation()
         self.auto_adjust_selections_by_crud(0, 0, True)
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
@@ -1562,6 +1715,7 @@ class SheetDocument(GObject.Object):
         if len(self.display.row_visibility_flags):
             self.data.dfs[mdfi].drop_in_place('$vrow')
 
+        self.cancel_cutcopy_operation()
         self.auto_adjust_selections_by_crud(0, 0, True)
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
@@ -1714,10 +1868,10 @@ class SheetDocument(GObject.Object):
 
         return search_results, search_results_length
 
-    def replace_in_current_cells(self,
-                                 replace_with:   str,
-                                 search_pattern: str,
-                                 match_case:     bool) -> bool:
+    def find_replace_in_current_cells(self,
+                                      replace_with:   str,
+                                      search_pattern: str,
+                                      match_case:     bool) -> bool:
         arange = self.selection.current_active_range
         mcolumn = arange.metadata.column
         mrow = arange.metadata.row
@@ -1750,13 +1904,13 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def replace_all_in_current_cells(self,
-                                     search_pattern: str,
-                                     replace_with: str,
-                                     match_case: bool,
-                                     match_cell: bool,
-                                     within_selection: bool,
-                                     use_regexp: bool) -> None:
+    def find_replace_all_in_current_cells(self,
+                                          search_pattern: str,
+                                          replace_with: str,
+                                          match_case: bool,
+                                          match_cell: bool,
+                                          within_selection: bool,
+                                          use_regexp: bool) -> None:
         # Collect hidden column names
         hidden_column_names = []
         for col_index, is_visible in enumerate(self.display.column_visibility_flags):
@@ -1867,7 +2021,6 @@ class SheetDocument(GObject.Object):
                                            .with_columns(**with_columns) \
                                            .drop('$ridx')
 
-        self.auto_adjust_selections_by_crud(0, 0, False)
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
@@ -1942,25 +2095,138 @@ class SheetDocument(GObject.Object):
             column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
         self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
+        # Update the current cut/copy range
+        if self.selection.current_cutcopy_range is not None:
+            ccrange = self.selection.current_cutcopy_range
+
+            x = self.display.get_cell_x_from_column(ccrange.column)
+            y = self.display.get_cell_y_from_row(ccrange.row)
+            end_x = self.display.get_cell_x_from_column(ccrange.column + ccrange.column_span)
+            end_y = self.display.get_cell_y_from_row(ccrange.row + ccrange.row_span)
+
+            if ccrange.column_span > 0:
+                ccrange.x = x
+                ccrange.width = end_x - x
+
+            if ccrange.row_span > 0:
+                ccrange.y = y
+                ccrange.height = end_y - y
+
         self.auto_adjust_selections_by_crud(0, 0, False)
         self.repopulate_auto_filter_widgets()
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
+    def copy_from_current_selection(self, clipboard: ClipboardManager) -> None:
+        if self.focused_widget is not None:
+            return # TODO: do something
+
+        self.is_copying_cells = True
+
+        arange = self.selection.current_active_range
+
+        if arange.metadata.dfi < 0:
+            return # TODO: do something
+
+        self.selection.current_cutcopy_range = arange
+
+        mrow = arange.metadata.row
+        mcolumn = arange.metadata.column
+
+        row_span = arange.row_span
+        column_span = arange.column_span
+
+        # Take hidden column(s) into account
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+        column_span = end_vcolumn - start_vcolumn + 1
+
+        # Take hidden row(s) into account
+        start_vrow = self.display.get_vrow_from_row(arange.row)
+        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
+        row_span = end_vrow - start_vrow + 1
+
+        # Collect hidden column names
+        hidden_column_names = []
+        for col_index, is_visible in enumerate(self.display.column_visibility_flags):
+            if not is_visible:
+                hidden_column_names.append(self.data.dfs[0].columns[col_index])
+
+        select_expression = polars.all().exclude(hidden_column_names)
+
+        # Collect column names within the selection
+        selected_column_names = self.data.dfs[0].columns[mcolumn:mcolumn + column_span]
+
+        # Reset the select expression
+        select_expression = polars.col(selected_column_names).exclude(hidden_column_names)
+
+        # Handle edge cases where the user selected the entire column(s),
+        # so there's no point to filter by row.
+        has_selected_rows = row_span > 0
+
+        selected_rows_expression = (polars.col('$ridx') >= (mrow - 1)) & (polars.col('$ridx') < (mrow - 1) + row_span) \
+                                   if has_selected_rows else polars.lit(True)
+
+        # -1 because we exclude the header row
+        visible_rows_expression = polars.col('$ridx').is_in(self.display.row_visible_series[1:] - 1) \
+                                  if len(self.display.row_visible_series) else polars.lit(True)
+
+        # Get selected cell contents
+        # TODO: support multiple dataframes?
+        cell_contents = self.data.dfs[0].select(select_expression) \
+                                        .with_row_index('$ridx') \
+                                        .filter(selected_rows_expression & visible_rows_expression) \
+                                        .drop('$ridx')
+
+        # By now header is always in the first row
+        include_header = arange.metadata.row == 0
+
+        # Transform contents to tab-separated values
+        cell_contents = cell_contents.write_csv(include_header=include_header, separator='\t').strip('\n')
+
+        clipboard.set_text(cell_contents)
+        clipboard.range = arange
+
+        self.clipboard = clipboard
+
+        # Run the cut/copy animation
+        self.canvas_tick_callback = self.view.main_canvas.add_tick_callback(self.run_cutcopy_animation)
+
+    def paste_into_current_selection(self,
+                                     clipboard: ClipboardManager,
+                                     content:   any) -> None:
+        if self.focused_widget is not None:
+            return # TODO: do something
+
+        crange = clipboard.range
+
+        if crange is not None and (crange.column_span > 1 or crange.row_span > 1):
+            self.update_current_cells_from_range(crange)
+            return
+
+        self.update_current_cells(content)
+
     #
     # Helpers
     #
 
-    # TODO: call this function if any cells within the range is edited
+    def run_cutcopy_animation(self,
+                              widget:      Gtk.Widget,
+                              frame_clock: Gdk.FrameClock) -> bool:
+        self.view.main_canvas.queue_draw()
+        return True
+
     def cancel_cutcopy_operation(self) -> None:
-        if self.is_cutting_cells and self.clipboard is not None:
+        if self.clipboard is not None:
             self.clipboard.clear()
-        self.clipboard = None
+            self.clipboard = None
 
         self.is_cutting_cells = False
         self.is_copying_cells = False
 
         self.selection.current_cutcopy_range = None
+
+        self.view.main_canvas.remove_tick_callback(self.canvas_tick_callback)
 
     def check_selection_changed(self) -> bool:
         current_cell_clss = self.selection.current_active_range.__class__
@@ -1979,6 +2245,10 @@ class SheetDocument(GObject.Object):
         arange = self.selection.current_active_range
         return arange.x <= x <= arange.x + arange.width and \
                arange.y <= y <= arange.y + arange.height
+
+    #
+    # Signals
+    #
 
     def notify_selection_changed(self, column: int, row: int, metadata) -> None:
         column_vseries = self.display.column_visible_series

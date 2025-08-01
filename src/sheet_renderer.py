@@ -19,6 +19,7 @@
 
 
 from gi.repository import Adw, GObject, Gtk, Pango, PangoCairo
+from time import time
 import cairo
 
 from . import globals
@@ -42,7 +43,11 @@ class SheetRenderer(GObject.Object):
         self.document = document
         self.render_caches = {}
 
-    def render(self, canvas: Gtk.DrawingArea, context: cairo.Context, width: int, height: int) -> None:
+    def render(self,
+               canvas:  Gtk.DrawingArea,
+               context: cairo.Context,
+               width:   int,
+               height:  int) -> None:
         display = self.document.display
         data = self.document.data
         selection = self.document.selection
@@ -78,7 +83,11 @@ class SheetRenderer(GObject.Object):
         context.set_font_options(font_options)
         context.set_antialias(cairo.Antialias.NONE)
 
-    def draw_headers_backgrounds(self, context: cairo.Context, width: int, height: int, display: SheetDisplay) -> None:
+    def draw_headers_backgrounds(self,
+                                 context: cairo.Context,
+                                 width:   int,
+                                 height:  int,
+                                 display: SheetDisplay) -> None:
         context.save()
 
         # The only reason is because we want to separate the headers from the contents.
@@ -95,7 +104,12 @@ class SheetRenderer(GObject.Object):
 
         context.restore()
 
-    def draw_selection_backgrounds(self, context: cairo.Context, width: int, height: int, display: SheetDisplay, selection: SheetSelection) -> None:
+    def draw_selection_backgrounds(self,
+                                   context:   cairo.Context,
+                                   width:     int,
+                                   height:    int,
+                                   display:   SheetDisplay,
+                                   selection: SheetSelection) -> None:
         context.save()
 
         # range_x and range_y were adjusted by the sheet document, so now they are relative to the top
@@ -240,7 +254,13 @@ class SheetRenderer(GObject.Object):
 
         context.restore()
 
-    def draw_headers_contents(self, canvas: Gtk.DrawingArea, context: cairo.Context, width: int, height: int, display: SheetDisplay, data: SheetData) -> None:
+    def draw_headers_contents(self,
+                              canvas:  Gtk.DrawingArea,
+                              context: cairo.Context,
+                              width:   int,
+                              height:  int,
+                              display: SheetDisplay,
+                              data:    SheetData) -> None:
         context.save()
 
         # Monospace is the best in my opinion for the headers, especially when it comes to the row headers
@@ -357,7 +377,13 @@ class SheetRenderer(GObject.Object):
 
         context.restore()
 
-    def draw_cells_contents(self, canvas: Gtk.DrawingArea, context: cairo.Context, width: int, height: int, display: SheetDisplay, data: SheetData) -> None:
+    def draw_cells_contents(self,
+                            canvas:  Gtk.DrawingArea,
+                            context: cairo.Context,
+                            width:   int,
+                            height:  int,
+                            display: SheetDisplay,
+                            data:    SheetData) -> None:
         if len(data.dfs) == 0:
             return
 
@@ -572,7 +598,11 @@ class SheetRenderer(GObject.Object):
         context.set_source_surface(rcache['surface'], 0, 0)
         context.paint()
 
-    def draw_cells_borders(self, context: cairo.Context, width: int, height: int, display: SheetDisplay) -> None:
+    def draw_cells_borders(self,
+                           context: cairo.Context,
+                           width:   int,
+                           height:  int,
+                           display: SheetDisplay) -> None:
         context.save()
 
         # We need to make sure that the cell borders are contrast enough to the canvas background
@@ -707,10 +737,18 @@ class SheetRenderer(GObject.Object):
 
         context.restore()
 
-    def draw_selection_borders(self, context: cairo.Context, width: int, height: int, display: SheetDisplay, selection: SheetSelection) -> None:
+    def draw_selection_borders(self,
+                               context:   cairo.Context,
+                               width:     int,
+                               height:    int,
+                               display:   SheetDisplay,
+                               selection: SheetSelection) -> None:
         context.save()
 
-        def auto_adjust_selection_range(range_x: int, range_y: int, range_width: int, range_height: int) -> tuple[int, int, int, int]:
+        def auto_adjust_selection_range(range_x:      int,
+                                        range_y:      int,
+                                        range_width:  int,
+                                        range_height: int) -> tuple[int, int, int, int]:
             # Hide the top of the selection if it is exceeded by the scroll viewport
             if range_y < 0:
                 range_height += range_y
@@ -746,17 +784,30 @@ class SheetRenderer(GObject.Object):
             return range_x, range_y, range_width, range_height
 
         arange = selection.current_active_range
-        range_x, range_y, range_width, range_height = auto_adjust_selection_range(arange.x, arange.y, arange.width, arange.height)
+        range_x, range_y, range_width, range_height = auto_adjust_selection_range(arange.x,
+                                                                                  arange.y,
+                                                                                  arange.width,
+                                                                                  arange.height)
 
         search_range = selection.current_search_range
         if display.document.is_searching_cells and search_range is not None:
-            search_range_x, search_range_y, search_range_width, search_range_height = auto_adjust_selection_range(search_range.x, search_range.y,
-                                                                                                                  search_range.width, search_range.height)
+            search_range_x, \
+            search_range_y, \
+            search_range_width, \
+            search_range_height = auto_adjust_selection_range(search_range.x,
+                                                              search_range.y,
+                                                              search_range.width,
+                                                              search_range.height)
 
         cutcopy_range = selection.current_cutcopy_range
         if (display.document.is_cutting_cells or display.document.is_copying_cells) and cutcopy_range is not None:
-            cutcopy_range_x, cutcopy_range_y, cutcopy_range_width, cutcopy_range_height = auto_adjust_selection_range(cutcopy_range.x, cutcopy_range.y,
-                                                                                                                      cutcopy_range.width, cutcopy_range.height)
+            cutcopy_range_x, \
+            cutcopy_range_y, \
+            cutcopy_range_width, \
+            cutcopy_range_height = auto_adjust_selection_range(cutcopy_range.x,
+                                                               cutcopy_range.y,
+                                                               cutcopy_range.width,
+                                                               cutcopy_range.height)
 
         # Clipping for when the user selects the entire row(s). You may notice that
         # I didn't adjust the width and height as it's not worth the complexity.
@@ -775,34 +826,6 @@ class SheetRenderer(GObject.Object):
         # We use a bold style here
         context.set_source_rgba(*self.color_accent)
         context.set_line_width(2)
-
-        # Don't render the active selection when the user selects the entire sheet
-        if not (range_x == 0 and range_y == 0) and not globals.is_editing_cells:
-            context.rectangle(range_x, range_y, range_width, range_height)
-            context.stroke()
-
-            # Render the search range
-            if display.document.is_searching_cells and search_range is not None:
-                context.save()
-                context.set_line_width(1)
-                context.set_dash([4, 4], 0)
-                context.rectangle(search_range_x, search_range_y, search_range_width, search_range_height)
-                context.stroke()
-                context.restore()
-
-            # Render the cut/copy range
-            if (display.document.is_cutting_cells or display.document.is_copying_cells) and cutcopy_range is not None:
-                context.save()
-                context.rectangle(cutcopy_range_x, cutcopy_range_y, cutcopy_range_width, cutcopy_range_height)
-                context.stroke()
-                if self.prefers_dark:
-                    context.set_source_rgb(0.13, 0.13, 0.15)
-                else:
-                    context.set_source_rgb(0.98, 0.98, 0.98)
-                context.set_dash([4, 4], 0)
-                context.rectangle(cutcopy_range_x, cutcopy_range_y, cutcopy_range_width, cutcopy_range_height)
-                context.stroke()
-                context.restore()
 
         # Indicates that the user has selected the entire column(s) by drawing a vertical line
         # next to the row headers
@@ -826,9 +849,55 @@ class SheetRenderer(GObject.Object):
             context.line_to(display.row_header_width, range_y + range_height)
             context.stroke()
 
+        # Don't render the active selection when the user selects the entire sheet
+        if not (range_x == 0 and range_y == 0) and not globals.is_editing_cells:
+            context.rectangle(range_x, range_y, range_width - 1, range_height - 1)
+            context.stroke()
+
+        context.reset_clip()
+        context.rectangle(display.row_header_width - 1, 0, width, height)
+        context.clip()
+
+        context.set_line_width(1)
+
+        # Render the search range
+        if display.document.is_searching_cells and search_range is not None:
+            context.save()
+            context.rectangle(search_range_x, search_range_y, search_range_width, search_range_height)
+            context.stroke()
+            if self.prefers_dark:
+                context.set_source_rgb(0.13, 0.13, 0.15)
+            else:
+                context.set_source_rgb(0.98, 0.98, 0.98)
+            context.set_dash([4, 4], time() * 30)
+            if search_range_width > 0 and search_range_height > 0:
+                context.rectangle(search_range_x, search_range_y, search_range_width, search_range_height)
+                context.stroke()
+            context.restore()
+
+        # Render the cut/copy range
+        if (display.document.is_cutting_cells or display.document.is_copying_cells) and cutcopy_range is not None:
+            context.save()
+            context.rectangle(cutcopy_range_x, cutcopy_range_y, cutcopy_range_width, cutcopy_range_height)
+            context.stroke()
+            if self.prefers_dark:
+                context.set_source_rgb(0.13, 0.13, 0.15)
+            else:
+                context.set_source_rgb(0.98, 0.98, 0.98)
+            context.set_dash([4, 4], time() * 30)
+            if cutcopy_range_width > 0 and cutcopy_range_height > 0:
+                context.rectangle(cutcopy_range_x, cutcopy_range_y, cutcopy_range_width, cutcopy_range_height)
+                context.stroke()
+            context.restore()
+
         context.restore()
 
-    def draw_virtual_widgets(self, context: cairo.Context, width: int, height: int, display: SheetDisplay, widgets: list[SheetWidget]) -> None:
+    def draw_virtual_widgets(self,
+                             context: cairo.Context,
+                             width:   int,
+                             height:  int,
+                             display: SheetDisplay,
+                             widgets: list[SheetWidget]) -> None:
         context.save()
 
         context.set_antialias(cairo.Antialias.DEFAULT)

@@ -188,7 +188,7 @@
     animation: slide-up-animation 0.2s ease-out forwards;
 }
 .slide-down-dialog {
-    animation: slide-down-animation 0.2s ease-out forwards;
+    animation: slide-down-animation 0.3s ease-out forwards;
 }
 @keyframes slide-up-animation {
     from { transform: translateY(200px); }

@@ -274,12 +274,12 @@ class SearchReplaceAllView(Gtk.Box):
             arange = sheet_document.selection.current_active_range
             sheet_document.selection.current_search_range = arange
 
-        sheet_document.replace_all_in_current_cells(search_pattern,
-                                                    replace_with,
-                                                    match_case,
-                                                    match_cell,
-                                                    within_selection,
-                                                    use_regexp)
+        sheet_document.find_replace_all_in_current_cells(search_pattern,
+                                                         replace_with,
+                                                         match_case,
+                                                         match_cell,
+                                                         within_selection,
+                                                         use_regexp)
 
         self.search_status.set_visible(False)
 

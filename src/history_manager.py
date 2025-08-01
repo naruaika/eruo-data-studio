@@ -269,6 +269,51 @@ class UpdateDataState(State):
 
 
 
+class UpdateRangeDataState(State):
+    __gtype_name__ = 'UpdateRangeDataState'
+
+    content: any
+    file_path: str
+
+    crange: SheetCell
+
+    include_header: bool
+
+    def __init__(self,
+                 content:        any,
+                 crange:         SheetCell,
+                 include_header: bool) -> None:
+        super().__init__()
+
+        self.save_selection(True)
+
+        self.file_path = self.write_snapshot(content)
+
+        self.crange = crange
+
+        self.include_header = include_header
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        arange = document.selection.current_active_range
+
+        document.data.update_cell_data_block_from_metadata(arange.metadata.column,
+                                                           arange.metadata.row,
+                                                           self.crange.column_span,
+                                                           self.crange.row_span,
+                                                           arange.metadata.dfi,
+                                                           self.include_header,
+                                                           polars.read_parquet(self.file_path))
+
+        self.restore_selection()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.update_current_cells_from_range(self.crange)
+
+
+
 class DuplicateRowState(State):
     __gtype_name__ = 'DuplicateRowState'
 
@@ -681,7 +726,7 @@ class ReplaceDataState(State):
 
     def redo(self) -> None:
         document = globals.history.document
-        document.replace_in_current_cells(self.replace_with, self.search_pattern, self.match_case)
+        document.find_replace_in_current_cells(self.replace_with, self.search_pattern, self.match_case)
 
 
 
@@ -745,12 +790,12 @@ class ReplaceAllState(State):
 
         self.restore_selection()
 
-        document.replace_all_in_current_cells(self.search_pattern,
-                                              self.replace_with,
-                                              self.match_case,
-                                              self.match_cell,
-                                              self.within_selection,
-                                              self.use_regexp)
+        document.find_replace_all_in_current_cells(self.search_pattern,
+                                                   self.replace_with,
+                                                   self.match_case,
+                                                   self.match_cell,
+                                                   self.within_selection,
+                                                   self.use_regexp)
 
 
 
