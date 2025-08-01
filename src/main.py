@@ -262,7 +262,9 @@ class Application(Adw.Application):
             focused_widget.activate_action('clipboard.cut', None)
             return True
 
-        # TODO
+        document = self.get_current_active_document()
+        if focused_widget == document.view.main_canvas:
+            document.cut_from_current_selection(self.clipboard)
 
         return True
 
