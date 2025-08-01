@@ -697,8 +697,8 @@ class ConvertColumnDataTypeState(State):
 
 
 
-class ReplaceDataState(State):
-    __gtype_name__ = 'ReplaceDataState'
+class FindReplaceDataState(State):
+    __gtype_name__ = 'FindReplaceDataState'
 
     content: str
     replace_with: str
@@ -730,8 +730,8 @@ class ReplaceDataState(State):
 
 
 
-class ReplaceAllState(State):
-    __gtype_name__ = 'ReplaceAllState'
+class FindReplaceAllDataState(State):
+    __gtype_name__ = 'FindReplaceAllDataState'
 
     file_path: str
 

@@ -1038,6 +1038,7 @@ class SheetDocument(GObject.Object):
             if corner == 'bottom-left':
                 column = bbox.column
 
+            # FIXME: should be grouped into one history state
             self.update_selection_from_position(column, row,
                                                 column, row,
                                                 follow_cursor=False,
@@ -1183,6 +1184,7 @@ class SheetDocument(GObject.Object):
             if corner == 'bottom-left':
                 column = bbox.column
 
+            # FIXME: should be grouped into one history state
             self.update_selection_from_position(column, row,
                                                 column, row,
                                                 follow_cursor=False,
@@ -1230,6 +1232,12 @@ class SheetDocument(GObject.Object):
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
 
+        if arange.rtl:
+            mcolumn = mcolumn - arange.column_span + 1
+
+        if arange.btt:
+            mrow = mrow - row_span + 1
+
         if column_span < 0:
             column_span = bbox.column_span
 
@@ -1260,13 +1268,6 @@ class SheetDocument(GObject.Object):
                                                                      crange,
                                                                      self.display.column_visible_series,
                                                                      self.display.row_visible_series):
-            # Save snapshot
-            if not globals.is_changing_state:
-                globals.history.save(state)
-
-            if self.is_cutting_cells:
-                self.cancel_cutcopy_operation()
-
             # Update selection to fit the size of the dataframe being updated
             self.update_selection_from_position(arange.column,
                                                 arange.row,
@@ -1275,6 +1276,14 @@ class SheetDocument(GObject.Object):
                                                 keep_order=True,
                                                 follow_cursor=False,
                                                 auto_scroll=False)
+
+            # Save snapshot
+            if not globals.is_changing_state:
+                state.save_selection(True)
+                globals.history.save(state)
+
+            if self.is_cutting_cells:
+                self.cancel_cutcopy_operation()
 
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -1879,9 +1888,9 @@ class SheetDocument(GObject.Object):
 
         # Prepare for snapshot
         if not globals.is_changing_state:
-            from .history_manager import ReplaceDataState
+            from .history_manager import FindReplaceDataState
             content = self.data.read_single_cell_data_from_metadata(mcolumn, mrow, mdfi)
-            state = ReplaceDataState(content, replace_with, search_pattern, match_case)
+            state = FindReplaceDataState(content, replace_with, search_pattern, match_case)
 
         # Update data
         if self.data.replace_cell_data_by_pattern_from_metadata(mcolumn,
@@ -2002,18 +2011,18 @@ class SheetDocument(GObject.Object):
 
         # Save snapshot
         if not globals.is_changing_state:
-            from .history_manager import ReplaceAllState
-            globals.history.save(ReplaceAllState(self.data.read_cell_data_chunks_from_metadata(target_column_names, start_row, row_span, 0),
-                                                 target_column_names,
-                                                 start_row,
-                                                 row_span,
-                                                 0,
-                                                 search_pattern,
-                                                 replace_with,
-                                                 match_case,
-                                                 match_cell,
-                                                 within_selection,
-                                                 use_regexp))
+            from .history_manager import FindReplaceAllDataState
+            globals.history.save(FindReplaceAllDataState(self.data.read_cell_data_chunks_from_metadata(target_column_names, start_row, row_span, 0),
+                                                         target_column_names,
+                                                         start_row,
+                                                         row_span,
+                                                         0,
+                                                         search_pattern,
+                                                         replace_with,
+                                                         match_case,
+                                                         match_cell,
+                                                         within_selection,
+                                                         use_regexp))
 
         # Bulk replace cells
         # TODO: support multiple dataframes?
@@ -2117,6 +2126,11 @@ class SheetDocument(GObject.Object):
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
+    def cut_from_current_selection(self, clipboard: ClipboardManager) -> None:
+        self.copy_from_current_selection(clipboard)
+        self.is_copying_cells = False
+        self.is_cutting_cells = True
+
     def copy_from_current_selection(self, clipboard: ClipboardManager) -> None:
         if self.focused_widget is not None:
             return # TODO: do something
@@ -2198,10 +2212,35 @@ class SheetDocument(GObject.Object):
         if self.focused_widget is not None:
             return # TODO: do something
 
+        is_cutting_cells = self.is_cutting_cells
+
         crange = clipboard.range
 
         if crange is not None and (crange.column_span > 1 or crange.row_span > 1):
             self.update_current_cells_from_range(crange)
+
+            if is_cutting_cells:
+                arange = self.selection.current_active_range
+
+                self.update_selection_from_position(crange.column,
+                                                    crange.row,
+                                                    crange.column + crange.column_span - 1,
+                                                    crange.row + crange.row_span - 1,
+                                                    keep_order=True,
+                                                    follow_cursor=False,
+                                                    auto_scroll=False)
+                self.update_current_cells('')
+
+                self.update_selection_from_position(arange.column,
+                                                    arange.row,
+                                                    arange.column + arange.column_span - 1,
+                                                    arange.row + arange.row_span - 1,
+                                                    keep_order=True,
+                                                    follow_cursor=False,
+                                                    auto_scroll=False)
+
+                self.notify_selection_changed(arange.column, arange.row, arange.metadata)
+
             return
 
         self.update_current_cells(content)
@@ -2392,8 +2431,6 @@ class SheetDocument(GObject.Object):
         globals.is_changing_state = False
 
     def auto_adjust_scrollbars_by_scroll(self) -> None:
-        globals.is_changing_state = True
-
         canvas_height = self.view.main_canvas.get_height()
         canvas_width = self.view.main_canvas.get_width()
 
@@ -2417,11 +2454,7 @@ class SheetDocument(GObject.Object):
         self.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x_upper)
         self.view.horizontal_scrollbar.get_adjustment().set_page_size(canvas_width)
 
-        globals.is_changing_state = False
-
     def auto_adjust_selections_by_scroll(self) -> None:
-        globals.is_changing_state = True
-
         self.selection.current_active_range.x = self.display.get_cell_x_from_column(self.selection.current_active_range.column)
         self.selection.current_active_range.y = self.display.get_cell_y_from_row(self.selection.current_active_range.row)
 
@@ -2436,11 +2469,7 @@ class SheetDocument(GObject.Object):
             self.selection.current_cutcopy_range.x = self.display.get_cell_x_from_column(self.selection.current_cutcopy_range.column)
             self.selection.current_cutcopy_range.y = self.display.get_cell_y_from_row(self.selection.current_cutcopy_range.row)
 
-        globals.is_changing_state = False
-
     def auto_adjust_locators_size_by_scroll(self) -> None:
-        globals.is_changing_state = True
-
         canvas_height = self.view.main_canvas.get_height()
         y_start = self.display.column_header_height
         cell_height = self.display.DEFAULT_CELL_HEIGHT
@@ -2462,15 +2491,11 @@ class SheetDocument(GObject.Object):
             self.display.row_header_width = new_row_header_width
             self.renderer.render_caches = {}
 
-        globals.is_changing_state = False
-
     def auto_adjust_scrollbars_by_selection(self,
                                             follow_cursor: bool = True,
                                             scroll_axis:   str = 'both',
                                             with_offset:   bool = False,
                                             smooth_scroll: bool = False) -> None:
-        globals.is_changing_state = True
-
         column = self.selection.current_cursor_cell.column
         row = self.selection.current_cursor_cell.row
         viewport_height = self.view.main_canvas.get_height() - self.display.column_header_height
@@ -2502,12 +2527,11 @@ class SheetDocument(GObject.Object):
         vertical_adjustment.handler_unblock_by_func(self.on_sheet_view_scrolled)
         horizontal_adjustment.handler_unblock_by_func(self.on_sheet_view_scrolled)
 
-        globals.is_changing_state = False
-
     def auto_adjust_selections_by_crud(self,
                                        column_offset: int,
                                        row_offset:    int,
                                        shrink:        bool) -> None:
+        cstate = globals.is_changing_state
         globals.is_changing_state = True
 
         active = self.selection.current_active_cell
@@ -2529,4 +2553,4 @@ class SheetDocument(GObject.Object):
                                             follow_cursor=True,
                                             auto_scroll=False)
 
-        globals.is_changing_state = False
+        globals.is_changing_state = cstate
