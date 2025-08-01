@@ -569,6 +569,11 @@ class SheetData(GObject.Object):
             t_ridx_offset = t_row_start + s_include_header - t_include_header
             t_ridx = polars.int_range(t_ridx_offset, t_ridx_offset + row_span - s_include_header, eager=True)
 
+        # Handle a case when the user selects a range that contains cells
+        # that are vetically out of range of the source dataframe.
+        if s_n_rows < t_n_rows:
+            s_ridx.extend(polars.Series([-1] * (t_n_rows - s_n_rows)))
+
         t_end_column = t_column + column_span
         if column_span < 0:
             t_end_column = self.dfs[t_dfi].width
@@ -586,30 +591,58 @@ class SheetData(GObject.Object):
 
             t_column_name = self.dfs[t_dfi].columns[t_column]
 
-            s_column_name = self.dfs[s_dfi].columns[s_column_index]
-            s_column_index += 1
-
-            # Update the dataframe in range, excluding the header row
-            if t_n_rows > 0:
+            # Handle a case when the user selects a range that contains cells
+            # that are horizontally out of range of the source dataframe.
+            if self.dfs[s_dfi].width <= s_column_index and t_n_rows > 0:
                 self.dfs[t_dfi] = (
                     self.dfs[t_dfi]
                         .with_row_index('$t_ridx')
                         .join(
                             polars.DataFrame({
-                                '$t_nval': self.dfs[s_dfi][s_column_name].gather(s_ridx),
+                                '$t_nval': polars.DataFrame({
+                                    t_column_name: [None] * (t_n_rows + (t_n_rows - s_n_rows))
+                                }),
                                 '$t_ridx': t_ridx
                             }),
                             on='$t_ridx',
                             how='left',
                         )
-                        .with_columns(
-                            polars.coalesce([
-                                polars.col('$t_nval'),
-                                polars.col(t_column_name),
-                            ]).alias(t_column_name)
+                        .with_columns(polars.when(polars.col('$t_ridx').is_in(t_ridx))
+                                            .then(polars.col('$t_nval'))
+                                            .otherwise(polars.col(t_column_name))
+                                            .alias(t_column_name)
                         )
                         .drop(['$t_ridx', '$t_nval'])
                 )
+                continue
+
+            s_column_name = self.dfs[s_dfi].columns[s_column_index]
+            s_column_index += 1
+
+            # Update the dataframe in range, excluding the header row
+            self.dfs[t_dfi] = (
+                self.dfs[t_dfi]
+                    .with_row_index('$t_ridx')
+                    .join(
+                        polars.DataFrame({
+                            '$t_nval': (
+                                polars.concat([
+                                    self.dfs[s_dfi][s_column_name],
+                                    polars.Series([None] * (t_n_rows - s_n_rows)),
+                                ]).gather(s_ridx)
+                            ),
+                            '$t_ridx': t_ridx
+                        }),
+                        on='$t_ridx',
+                        how='left',
+                    )
+                    .with_columns(polars.when(polars.col('$t_ridx').is_in(t_ridx))
+                                        .then(polars.col('$t_nval'))
+                                        .otherwise(polars.col(t_column_name))
+                                        .alias(t_column_name)
+                    )
+                    .drop(['$t_ridx', '$t_nval'])
+            )
 
             if not s_include_header and not t_include_header:
                 continue
