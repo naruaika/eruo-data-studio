@@ -2397,6 +2397,7 @@ class SheetDocument(GObject.Object):
         from .sheet_widget import SheetAutoFilter
 
         # Remove existing auto filter widgets
+        # FIXME: do not repopulate if not hide/unhide/delete/insert/resizing rows/columns
         self.widgets = [widget for widget in self.widgets if not isinstance(widget, SheetAutoFilter)]
 
         icon_size = self.display.ICON_SIZE

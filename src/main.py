@@ -263,8 +263,7 @@ class Application(Adw.Application):
             return True
 
         document = self.get_current_active_document()
-        if focused_widget == document.view.main_canvas:
-            document.cut_from_current_selection(self.clipboard)
+        document.cut_from_current_selection(self.clipboard)
 
         return True
 
@@ -279,8 +278,7 @@ class Application(Adw.Application):
             return True
 
         document = self.get_current_active_document()
-        if focused_widget == document.view.main_canvas:
-            document.copy_from_current_selection(self.clipboard)
+        document.copy_from_current_selection(self.clipboard)
 
         return True
 
@@ -303,8 +301,7 @@ class Application(Adw.Application):
             document.paste_into_current_selection(self.clipboard, text)
 
         document = self.get_current_active_document()
-        if focused_widget == document.view.main_canvas:
-            self.clipboard.read_text_async(on_clipboard_text_received)
+        self.clipboard.read_text_async(on_clipboard_text_received)
 
         return True
 
