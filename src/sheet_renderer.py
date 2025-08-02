@@ -818,11 +818,11 @@ class SheetRenderer(GObject.Object):
         # Clipping for when the user selects the entire row(s). You may notice that
         # I didn't adjust the width and height as it's not worth the complexity.
         if arange.column == 0:
-            context.rectangle(-1, display.column_header_height - 1, width, height)
+            context.rectangle(0, display.column_header_height - 1, width, height)
             context.clip()
         # Clipping for when the user selects the entire column(s)
         if arange.row == 0:
-            context.rectangle(display.row_header_width - 1, -1, width, height)
+            context.rectangle(display.row_header_width - 1, 0, width, height)
             context.clip()
         # Clipping for general use cases
         if arange.column > 0 and arange.row > 0:

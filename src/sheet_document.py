@@ -1170,6 +1170,18 @@ class SheetDocument(GObject.Object):
         if mdfi < 0:
             return False # TODO: do something
 
+        if 'nonov_column_span' in collision_info and collision_info['nonov_column_span'] == -1:
+            collision_info['nonov_column_span'] = arange.column - 1
+            collision_info['direction'] = collision_info['direction'].replace('above', '') \
+                                                                     .replace('below', '') \
+                                                                     .replace('left', 'right')
+
+        if 'nonov_row_span' in collision_info and collision_info['nonov_row_span'] == -1:
+            collision_info['nonov_row_span'] = arange.row - 1
+            collision_info['direction'] = collision_info['direction'].replace('left', '') \
+                                                                     .replace('right', '') \
+                                                                     .replace('above', 'below')
+
         bbox = self.data.bbs[mdfi]
 
         # Exclude the case where the cell is being inserted below right,
@@ -1268,14 +1280,17 @@ class SheetDocument(GObject.Object):
                                                                      crange,
                                                                      self.display.column_visible_series,
                                                                      self.display.row_visible_series):
-            # Update selection to fit the size of the dataframe being updated
-            self.update_selection_from_position(arange.column,
-                                                arange.row,
-                                                arange.column + crange.column_span - 1,
-                                                arange.row + crange.row_span - 1,
-                                                keep_order=True,
-                                                follow_cursor=False,
-                                                auto_scroll=False)
+            from .sheet_selection import SheetLocatorCell
+
+            if not isinstance(crange, SheetLocatorCell):
+                # Update selection to fit the size of the dataframe being updated
+                self.update_selection_from_position(arange.column,
+                                                    arange.row,
+                                                    arange.column + crange.column_span - 1,
+                                                    arange.row + crange.row_span - 1,
+                                                    keep_order=True,
+                                                    follow_cursor=False,
+                                                    auto_scroll=False)
 
             # Save snapshot
             if not globals.is_changing_state:
@@ -2135,6 +2150,7 @@ class SheetDocument(GObject.Object):
         if self.focused_widget is not None:
             return # TODO: do something
 
+        self.is_cutting_cells = False
         self.is_copying_cells = True
 
         arange = self.selection.current_active_range
@@ -2212,9 +2228,11 @@ class SheetDocument(GObject.Object):
         if self.focused_widget is not None:
             return # TODO: do something
 
-        is_cutting_cells = self.is_cutting_cells
-
         crange = clipboard.range
+
+        is_single_cell = crange is not None and crange.column_span == 1 and crange.row_span == 1
+
+        is_cutting_cells = self.is_cutting_cells
 
         def post_cutting_cells_action() -> None:
             arange = self.selection.current_active_range
@@ -2238,7 +2256,7 @@ class SheetDocument(GObject.Object):
 
             self.notify_selection_changed(arange.column, arange.row, arange.metadata)
 
-        if crange is not None and (crange.column_span > 1 or crange.row_span > 1):
+        if not is_single_cell:
             self.update_current_cells_from_range(crange)
 
             if is_cutting_cells:

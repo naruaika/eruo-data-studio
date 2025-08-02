@@ -536,6 +536,13 @@ class SheetData(GObject.Object):
         s_dfi = crange.metadata.dfi
         s_include_header = crange.metadata.row == 0 # by now header is always in the first row
 
+        # TODO: support multiple dataframes?
+        if column_span == -1:
+            column_span = self.bbs[s_dfi].column_span
+
+        if row_span == -1:
+            row_span = self.bbs[s_dfi].row_span
+
         s_row_start = max(0, crange.metadata.row - 1)
         s_row_stop = min(crange.metadata.row - 1 + row_span, self.dfs[s_dfi].height)
 
@@ -570,7 +577,7 @@ class SheetData(GObject.Object):
             t_ridx = polars.int_range(t_ridx_offset, t_ridx_offset + row_span - s_include_header, eager=True)
 
         # Handle a case when the user selects a range that contains cells
-        # that are vetically out of range of the source dataframe.
+        # that are vertically out of range of the source dataframe.
         if s_n_rows < t_n_rows:
             s_ridx.extend(polars.Series([-1] * (t_n_rows - s_n_rows)))
 
@@ -620,6 +627,7 @@ class SheetData(GObject.Object):
             s_column_index += 1
 
             # Update the dataframe in range, excluding the header row
+            # FIXME: updating the same area as the source area will clear its contents
             self.dfs[t_dfi] = (
                 self.dfs[t_dfi]
                     .with_row_index('$t_ridx')
@@ -648,6 +656,11 @@ class SheetData(GObject.Object):
                 continue
 
             t_first_row = self.dfs[s_dfi][s_row_start, s_column_name]
+
+            if t_first_row is None:
+                t_first_row = ''
+
+            t_first_row = str(t_first_row)
 
             if s_include_header:
                 t_first_row = s_column_name
