@@ -346,6 +346,12 @@ def get_filter_basic_expression(item_data: FilterListItem,
 
     match operator:
         # GENERIC
+        case '='                           : return polars.col(field).eq(cvalues[0]) if fdtype != 'text' \
+                                                    else polars.col(field).str.to_lowercase().eq(cvalues[0].lower())
+        case '!='                          : return polars.col(field).ne(cvalues[0]) if fdtype != 'text' \
+                                                    else polars.col(field).str.to_lowercase().ne(cvalues[0].lower())
+        case '<>'                          : return polars.col(field).ne(cvalues[0]) if fdtype != 'text' \
+                                                    else polars.col(field).str.to_lowercase().ne(cvalues[0].lower())
         case 'equals'                      : return polars.col(field).eq(cvalues[0]) if fdtype != 'text' \
                                                     else polars.col(field).str.to_lowercase().eq(cvalues[0].lower())
         case 'does not equal'              : return polars.col(field).ne(cvalues[0]) if fdtype != 'text' \
@@ -362,6 +368,10 @@ def get_filter_basic_expression(item_data: FilterListItem,
         case 'does not contain'            : return polars.col(field).str.contains_any([cvalues[0]], ascii_case_insensitive=True).not_()
 
         # NUMERIC
+        case '>'                           : return polars.col(field).gt(cvalues[0])
+        case '>='                          : return polars.col(field).ge(cvalues[0])
+        case '>'                           : return polars.col(field).lt(cvalues[0])
+        case '>='                          : return polars.col(field).le(cvalues[0])
         case 'is greater than'             : return polars.col(field).gt(cvalues[0])
         case 'is greater than or equal to' : return polars.col(field).ge(cvalues[0])
         case 'is less than'                : return polars.col(field).lt(cvalues[0])
@@ -964,7 +974,7 @@ class SidebarHomeView(Adw.Bin):
 
             if not isinstance(value, list):
                 value = [value]
-            value = {x: v for x, v in enumerate(condition['value'])}
+            value = {x: v for x, v in enumerate(value)}
 
             query = query.strip()
             if query.startswith('and'):
