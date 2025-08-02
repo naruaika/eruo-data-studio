@@ -501,10 +501,9 @@ class SheetDocument(GObject.Object):
                                   x:     float,
                                   y:     float,
                                   state: Gdk.ModifierType = None) -> None:
-        # Trigger the on_click event of the hovered widget if the pointer is under one,
+        # Trigger the on_pressed event of the hovered widget if the pointer is under one,
         # otherwise select the hovered cell.
         self.focused_widget = self.hovered_widget
-
         if self.focused_widget is not None:
             if self.focused_widget.do_on_pressed(x, y):
                 return

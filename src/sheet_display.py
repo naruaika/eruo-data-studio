@@ -63,14 +63,18 @@ class SheetDisplay(GObject.Object):
     # FIXME: functions don't share their coordinate system
 
     def get_vcolumn_from_column(self, column: int) -> int:
-        if 0 <= column < len(self.column_visible_series):
+        if column == 0:
+            return 0
+        if 0 < column < len(self.column_visible_series):
             return self.column_visible_series[column - 1] + 1
         if len(self.column_visible_series):
             return self.column_visible_series[-1] + column - len(self.column_visible_series) + 1
         return column
 
     def get_vrow_from_row(self, row: int) -> int:
-        if 0 <= row < len(self.row_visible_series):
+        if row == 0:
+            return 0
+        if 0 < row < len(self.row_visible_series):
             return self.row_visible_series[row - 1] + 1
         if len(self.row_visible_series):
             return self.row_visible_series[-1] + row - len(self.row_visible_series) + 1
