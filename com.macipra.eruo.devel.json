@@ -12,11 +12,10 @@
         "--device=dri",
         "--socket=wayland",
         "--filesystem=host",
-        "--env=DEBUG_MODE=1",
-        "--env=DEBUG_LEVEL=8",
         "--env=RUST_BACKTRACE=1",
         "--env=RUST_BACKTRACE=full",
-        "--env=GTK_DEBUG="
+        "--env=GTK_DEBUG=",
+        "--env=EDS_DEBUG=0"
     ],
     "cleanup" : [
         "/include",
@@ -30,6 +29,20 @@
         "*.a"
     ],
     "modules" : [
+        {
+            "name": "python3-debugpy",
+            "buildsystem": "simple",
+            "build-commands": [
+                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"debugpy\" --no-build-isolation"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/8c/8b/3a9a28ddb750a76eaec445c7f4d3147ea2c579a97dbd9e25d39001b92b21/debugpy-1.8.15.tar.gz",
+                    "sha256": "58d7a20b7773ab5ee6bdfb2e6cf622fdf1e40c9d5aef2857d85391526719ac00"
+                }
+            ]
+        },
         {
             "name": "python3-polars",
             "buildsystem": "simple",

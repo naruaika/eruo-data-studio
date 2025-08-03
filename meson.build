@@ -9,7 +9,7 @@ gnome = import('gnome')
 python = import('python')
 
 pkgdatadir = get_option('prefix') / get_option('datadir') / meson.project_name()
-moduledir = pkgdatadir / 'eruo_data_studio'
+moduledir = pkgdatadir
 
 conf = configuration_data()
 conf.set('PYTHON', python.find_installation('python3').full_path())

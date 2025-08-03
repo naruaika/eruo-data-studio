@@ -19,12 +19,20 @@
 
 
 import gi
+import os
 import polars
 import sys
-import threading
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
+
+if (debug_mode := int(os.environ.get('EDS_DEBUG', '0'))) > 0:
+    try:
+        import debugpy
+        debugpy.listen(('127.0.0.1', 5678))
+        debugpy.wait_for_client()
+    except ModuleNotFoundError:
+        pass
 
 from gi.repository import Adw, Gdk, Gio, GObject, Gtk
 
