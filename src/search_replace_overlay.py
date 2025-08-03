@@ -316,14 +316,19 @@ class SearchReplaceOverlay(Adw.Bin):
 
         sheet_view = self.window.get_current_active_view()
 
-        # Reset the current search range
-        sheet_view.document.selection.current_search_range = None
+        if sheet_view is None:
+            return
 
+        # Reset the search states
+        sheet_view.document.selection.current_search_range = None
         sheet_view.document.is_searching_cells = False
 
         # Focus on the main canvas
         sheet_view.main_canvas.set_focusable(True)
         sheet_view.main_canvas.grab_focus()
+
+        if self.search_within_selection.get_active():
+            sheet_view.document.search_range_performer = ''
 
     def get_current_search_states(self) -> bool:
         text_value = self.search_entry.get_text()
@@ -479,6 +484,9 @@ class SearchReplaceOverlay(Adw.Bin):
         self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of '
                                     f'{format(self.search_results_length, ',d')} results')
         self.search_status.set_visible(True)
+
+        if self.search_within_selection.get_active():
+            sheet_document.search_range_performer = 'quick-search'
 
     def replace_current_search_occurence(self) -> None:
         if self.get_current_search_states() != self.search_states \

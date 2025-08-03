@@ -31,6 +31,12 @@ class SheetManager(GObject.Object):
     def __init__(self) -> None:
         super().__init__()
 
+        from time import time
+        # SheetManager is highly coupled to the main window. Because we can
+        # have multiple instances of the main window, we need to identify
+        # each window with a unique id.
+        self.shmid = str(time()).split('.')[0]
+
         self.sheets: dict[int, SheetDocument] = {}
         self.sheet_counter: int = 0
 
@@ -50,7 +56,7 @@ class SheetManager(GObject.Object):
                     sheet_number = max(sheet_number, int(match.group(1)) + 1)
             title = f'Sheet {sheet_number}'
 
-        docid = self.sheet_counter
+        docid = f'{self.shmid}_{self.sheet_counter}'
         self.sheet_counter += 1
 
         sheet = SheetDocument(docid, title, dataframe)

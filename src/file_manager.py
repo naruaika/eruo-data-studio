@@ -122,9 +122,9 @@ class FileManager(GObject.Object):
             return False
 
         except Exception as e:
-            globals.send_notification(f'Cannot write file: {file_path}')
             print(e)
 
+        globals.send_notification(f'Cannot write file: {file_path}')
         return False
 
     def delete_file(self, file_path: str) -> bool:

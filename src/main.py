@@ -213,6 +213,9 @@ class Application(Adw.Application):
         if not file_path:
             return # shouldn't happen, but for completeness
 
+        # TODO: reuse the current active window if the window references to no file
+        #       and there's not any sheet opened or the current active sheet has no
+        #       editing history
         self.create_new_window(file_path)
 
     def on_file_saved(self, source: GObject.Object, file_path: str) -> None:
@@ -456,7 +459,8 @@ class Application(Adw.Application):
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(file_path)
 
-        window = Window(application=self, file=file, dataframe=dataframe)
+        window = Window(application=self)
+        window.setup_new_document(file, dataframe)
         window.present()
 
 def main(version):

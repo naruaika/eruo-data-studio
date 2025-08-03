@@ -41,6 +41,7 @@ is_changing_state: bool = False
 # case, we may also need another global variable to track any
 # changes in the input bar.
 is_editing_cells: bool = False
+docid_being_edited: str = ''
 
 
 # This is supposed to be set by any current window to enable any module

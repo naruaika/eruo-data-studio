@@ -39,11 +39,11 @@ class SheetDocument(GObject.Object):
         'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
     }
 
-    docid = GObject.Property(type=int, default=0)
+    docid = GObject.Property(type=str, default='sheet_1')
     title = GObject.Property(type=str, default='Sheet 1')
 
     def __init__(self,
-                 docid: int,
+                 docid: str,
                  title: str,
                  dataframe: polars.DataFrame = None) -> None:
         super().__init__()
@@ -73,10 +73,18 @@ class SheetDocument(GObject.Object):
         self.focused_widget: SheetWidget = None
 
         self.is_refreshing_uis: bool = False
-        self.is_searching_cells: bool = False
         self.is_selecting_cells: bool = False
         self.is_cutting_cells: bool = False
         self.is_copying_cells: bool = False
+
+        self.is_searching_cells: bool = False
+        # Basically we want to know which widget is currently performing
+        # a search range operation, specifically to decide when or not to
+        # draw the search range selection box. For example, when we performs
+        # a search range operation from the widget on the sidebar but at the same
+        # time we have the quick search bar open and want to close it, the search
+        # range selection box should keep be shown.
+        self.search_range_performer: str = ''
 
         self.current_dfi: int = 0 if dataframe is not None \
                                   else -1
@@ -1112,6 +1120,10 @@ class SheetDocument(GObject.Object):
             state = UpdateDataState(content, new_value, include_header)
 
         # Update data
+        # TODO: we still miss to tell the user when the update isn't successful.
+        # Looking at other applications, it should always commit the update,
+        # but make the cells appear in some way e.g. "######" whenever there's
+        # an error or something that the user should do in response.
         if self.data.update_cell_data_block_with_single_from_metadata(mcolumn,
                                                                       mrow,
                                                                       column_span,

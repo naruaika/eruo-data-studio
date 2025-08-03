@@ -123,6 +123,9 @@ class SearchReplaceAllView(Gtk.Box):
         self.search_status.set_text(f'Found {format(self.search_results_length, ',d')} results')
         self.search_status.set_visible(True)
 
+        if within_selection:
+            sheet_document.search_range_performer = 'search-all'
+
         def update_search_list() -> None:
             globals.is_changing_state = True
 
@@ -287,4 +290,11 @@ class SearchReplaceAllView(Gtk.Box):
         self.window.toggle_search_all.set_active(False)
 
         sheet_document = self.window.get_current_active_document()
+
+        if sheet_document is None:
+            return
+
         sheet_document.is_searching_cells = False
+
+        if self.search_within_selection.get_active():
+            sheet_document.search_range_performer = ''

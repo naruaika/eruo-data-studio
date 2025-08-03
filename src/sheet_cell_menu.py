@@ -199,6 +199,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
                                ctype:     SheetCell) -> None:
         convert_section = Gio.Menu.new()
 
+        # TODO: wondering that we need to simplify this to fewer options as possible?
         convert_int_section = Gio.Menu.new()
         convert_int_section.append(_('Integer _8'), 'app.convert-to-int8')
         convert_int_section.append(_('Integer _16'), 'app.convert-to-int16')
