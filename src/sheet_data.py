@@ -180,7 +180,7 @@ class SheetData(GObject.Object):
     __gtype_name__ = 'SheetData'
 
     bbs: list[SheetCellBoundingBox] = [] # visual bounding boxes
-    dfs: list[polars.DataFrame] = []
+    dfs: list[polars.DataFrame] = [] # dataframes
 
     def __init__(self,
                  document:  SheetDocument,
@@ -207,6 +207,8 @@ class SheetData(GObject.Object):
 
             self.bbs = [SheetCellBoundingBox(column, row, width, height)]
             self.dfs = [dataframe]
+
+        self.unique_caches = {}
 
     def get_cell_metadata_from_position(self,
                                         column: int,
@@ -325,6 +327,10 @@ class SheetData(GObject.Object):
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
 
+        if self.check_cell_data_unique_cache(column, dfi) \
+                and search_query is None:
+            return self.unique_caches[dfi][column]
+
         column_name = self.dfs[dfi].columns[column]
 
         filter_expression = polars.lit(True)
@@ -334,11 +340,27 @@ class SheetData(GObject.Object):
                 filter_expression = polars.col(column_name).str.contains(f'(?i){search_query}')
 
         if sample_only:
-            return self.dfs[dfi].filter(filter_expression).get_column(column_name) \
-                                .sample(1_000_000, seed=99, with_replacement=True) \
-                                .unique().sort()
+            unique_values = self.dfs[dfi].filter(filter_expression).get_column(column_name) \
+                                         .sample(1_000_000, seed=99, with_replacement=True) \
+                                         .unique().sort()
 
-        return self.dfs[dfi].filter(filter_expression).get_column(column_name).unique().sort()
+        unique_values = self.dfs[dfi].filter(filter_expression).get_column(column_name).unique().sort()
+
+        if search_query is None:
+            self.unique_caches[dfi][column] = unique_values
+
+        return unique_values
+
+    def check_cell_data_unique_cache(self,
+                                     column: int,
+                                     dfi:    int) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        if dfi not in self.unique_caches:
+            self.unique_caches[dfi] = {}
+
+        return column in self.unique_caches[dfi]
 
     def read_cell_bbox_from_metadata(self, dfi: int) -> SheetCellBoundingBox:
         if dfi < 0 or len(self.dfs) <= dfi:

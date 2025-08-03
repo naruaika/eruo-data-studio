@@ -2109,7 +2109,7 @@ class SheetDocument(GObject.Object):
                             width:  int) -> None:
         # Initialize column widths if needed
         if len(self.display.column_widths) == 0:
-            self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * (column - 1))
+            self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * (column - 1), dtype=polars.Int64)
 
         # Expand column widths if needed
         if len(self.display.column_widths) < column:
@@ -2375,9 +2375,6 @@ class SheetDocument(GObject.Object):
     #
 
     def populate_column_resizer_widgets(self) -> None:
-        if len(self.data.dfs) == 0:
-            return
-
         from .sheet_widget import SheetColumnResizer
 
         def on_hovered() -> None:

@@ -19,7 +19,6 @@
 
 from gi.repository import GLib, GObject, Gtk, Pango
 import copy
-import gc
 import polars
 import threading
 
@@ -47,6 +46,15 @@ class BasicFilterListItem(GObject.Object):
 
 
 
+_MAX_NO_UNIQUE_ITEMS = 20_000
+
+_basic_filter_list_items_pool = []
+
+for i in range(_MAX_NO_UNIQUE_ITEMS):
+    _basic_filter_list_items_pool.append(BasicFilterListItem('[Blank]', False))
+
+
+
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/sheet-header-menu.ui')
 class SheetHeaderMenu(Gtk.PopoverMenu):
     __gtype_name__ = 'SheetHeaderMenu'
@@ -61,21 +69,20 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
     filter_list_view = Gtk.Template.Child()
     filter_list_store = Gtk.Template.Child()
 
-    MAX_NO_UNIQUE_ITEMS = 10_000
-
     def __init__(self,
                  window:      Window,
                  column:      int,
+                 dfi:         int,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.window = window
         self.column = column
+        self.dfi = dfi
 
         sheet_document = self.window.get_current_active_document()
 
-        # TODO: support multiple dataframes?
-        column_name = sheet_document.data.dfs[0].columns[self.column]
+        column_name = sheet_document.data.dfs[dfi].columns[self.column]
 
         self.cvalues_to_show: list[str] = ['$all']
         self.cvalues_to_hide: list[str] = []
@@ -287,11 +294,10 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             elif cvalues_to_hide_hash.equals(self.current_unique_values_hash):
                 self.filter_list_store.get_item(1).active = False
 
-        # TODO: support multiple dataframes?
         sheet_document = self.window.get_current_active_document()
-        column_name = sheet_document.data.dfs[0].columns[self.column]
-        column_index = sheet_document.data.dfs[0].columns.index(column_name)
-        column_dtype = sheet_document.data.dfs[0].schema[column_name]
+        column_name = sheet_document.data.dfs[self.dfi].columns[self.column]
+        column_index = sheet_document.data.dfs[self.dfi].columns.index(column_name)
+        column_dtype = sheet_document.data.dfs[self.dfi].schema[column_name]
 
         # Build the query blocks
         operator = 'not in'
@@ -356,15 +362,16 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
     def populate_filter_list(self) -> None:
         sheet_document = self.window.get_current_active_document()
 
-        # TODO: support multiple dataframes?
-        col_dtype = sheet_document.data.dfs[0].dtypes[self.column]
+        col_dtype = sheet_document.data.dfs[self.dfi].dtypes[self.column]
+
         if col_dtype != polars.String:
             self.filter_search_entry.set_placeholder_text("This isn't a text column.")
             self.filter_search_box.set_sensitive(False)
 
-        n_unique_approx = sheet_document.data.read_cell_data_n_unique_approx_from_metadata(self.column, 0)
+        n_unique_approx = sheet_document.data.read_cell_data_n_unique_approx_from_metadata(self.column, self.dfi)
 
-        if self.MAX_NO_UNIQUE_ITEMS < n_unique_approx:
+        if _MAX_NO_UNIQUE_ITEMS < n_unique_approx \
+                and not sheet_document.data.check_cell_data_unique_cache(self.column, self.dfi):
             self.filter_status.set_text('Found approximately {:,} unique values. '
                                         'Continue anyway?'.format(n_unique_approx))
 
@@ -399,18 +406,20 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
 
         self.filter_continue.set_visible(False)
 
-        if self.MAX_NO_UNIQUE_ITEMS < n_unique:
+        if _MAX_NO_UNIQUE_ITEMS < n_unique:
             self.filter_status.set_text(f'{self.filter_status.get_text()}. '
                                         'The result set only contains a subset of the unique values.')
             sample_only = True # force sampling
 
         def show_filter_list() -> None:
+            list_items_to_add = []
+
             # Add the "Select All" option
             active = '$all' in self.cvalues_to_show or len(self.cvalues_to_show) > 0
             consistent = ('$all' in self.cvalues_to_show and len(self.cvalues_to_hide) == 0) or \
                          ('$all' in self.cvalues_to_hide and len(self.cvalues_to_show) == 0)
             list_item = BasicFilterListItem('Select All', active, not consistent, '$all')
-            GLib.idle_add(self.filter_list_store.append, list_item)
+            list_items_to_add.append(list_item)
 
             unique_values = sheet_document.data.read_cell_data_unique_from_metadata(self.column,
                                                                                     0,
@@ -426,35 +435,40 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             item_counter = 0
             blank_option_added = False
             all_results_actived = True
+
+            cvalues_to_hide = set(self.cvalues_to_hide)
+            cvalues_to_show = set(self.cvalues_to_show)
+
             for cvalue in unique_values:
-                if item_counter == self.MAX_NO_UNIQUE_ITEMS:
+                if item_counter == _MAX_NO_UNIQUE_ITEMS:
                     break
 
                 if cvalue in [None, '']:
                     if blank_option_added:
                         continue # in case we have already added the same item
-                    active = ('$blanks' in self.cvalues_to_show and '$all' in self.cvalues_to_hide) or \
-                             ('$blanks' not in self.cvalues_to_hide and '$all' in self.cvalues_to_show)
+                    active = ('$blanks' in cvalues_to_show and '$all' in cvalues_to_hide) or \
+                             ('$blanks' not in cvalues_to_hide and '$all' in cvalues_to_show)
                     all_results_actived &= active
                     list_item = BasicFilterListItem('(Blanks)', active, mvalue='$blanks')
-                    GLib.idle_add(self.filter_list_store.insert, 1, list_item)
+                    list_items_to_add.insert(1, list_item)
                     continue
 
                 cvalue = str(cvalue)
-                active = (cvalue in self.cvalues_to_show and '$all' in self.cvalues_to_hide) or \
-                         (cvalue not in self.cvalues_to_hide and '$all' in self.cvalues_to_show)
+                active = (cvalue in cvalues_to_show and '$all' in cvalues_to_hide) or \
+                         (cvalue not in cvalues_to_hide and '$all' in cvalues_to_show)
                 all_results_actived &= active
-                list_item = BasicFilterListItem(cvalue, active)
-                GLib.idle_add(self.filter_list_store.append, list_item)
+                list_item = _basic_filter_list_items_pool[item_counter]
+                list_item.set_property('cvalue', cvalue)
+                list_item.set_property('active', active)
+                list_items_to_add.append(list_item)
                 item_counter += 1
 
             # Add the "Select All Results" option if necessary
             if search_query is not None:
                 list_item = BasicFilterListItem('Select All Results', all_results_actived, mvalue='$results')
-                GLib.idle_add(self.filter_list_store.insert, 1, list_item)
+                list_items_to_add.insert(1, list_item)
 
-            del unique_values
-            gc.collect()
+            GLib.idle_add(self.filter_list_store.splice, 0, 0, list_items_to_add)
 
         # TODO: show a loading indicator
         self.filter_list_store.remove_all()

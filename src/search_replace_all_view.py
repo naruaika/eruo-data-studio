@@ -39,6 +39,15 @@ class SearchResultListItem(GObject.Object):
 
 
 
+_MAX_SEARCH_RESULT_ITEMS = 20_000
+
+_search_result_list_items_pool = []
+
+for i in range(_MAX_SEARCH_RESULT_ITEMS):
+    _search_result_list_items_pool.append(SearchResultListItem('A1', '[Blank]'))
+
+
+
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/search-replace-all-view.ui')
 class SearchReplaceAllView(Gtk.Box):
     __gtype_name__ = 'SearchReplaceAllView'
@@ -129,19 +138,18 @@ class SearchReplaceAllView(Gtk.Box):
         def update_search_list() -> None:
             globals.is_changing_state = True
 
+            list_items_to_add = []
             item_counter = 0
             has_more_items = False
 
-            MAX_SEARCH_RESULT_ITEMS = 10_000
-
             # Update the search results
             for row in range(search_results.height):
-                if item_counter == MAX_SEARCH_RESULT_ITEMS:
+                if item_counter == _MAX_SEARCH_RESULT_ITEMS:
                     has_more_items = True
                     break
 
                 for column_name in search_results.columns:
-                    if item_counter == MAX_SEARCH_RESULT_ITEMS:
+                    if item_counter == _MAX_SEARCH_RESULT_ITEMS:
                         has_more_items = True
                         break
                     if column_name == '$ridx':
@@ -156,7 +164,10 @@ class SearchReplaceAllView(Gtk.Box):
                     cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
                     cvalue = str(sheet_document.data.dfs[0][column_name][row_index - 2])[:40]
 
-                    list_item = SearchResultListItem(cname, cvalue)
+                    list_item = _search_result_list_items_pool[item_counter]
+                    list_item.cname = cname
+                    list_item.cvalue = cvalue
+                    list_items_to_add.append(list_item)
 
                     if item_counter == 0:
                         first_list_item = list_item
@@ -165,13 +176,12 @@ class SearchReplaceAllView(Gtk.Box):
                             sheet_document.update_selection_from_name(first_list_item.cname)
                             sheet_document.selection.current_search_range = search_range
                         GLib.idle_add(update_selection)
+
                     item_counter += 1
 
-                    GLib.idle_add(self.search_list_store.append, list_item)
+            GLib.idle_add(self.search_list_store.splice, 0, 0, list_items_to_add)
 
             if has_more_items:
-                # TODO: should we really show all the results? If so, we can process it in a different thread,
-                #       and append it to the store using GLib.idle_add(), maybe?
                 GLib.idle_add(self.search_status.set_text, f'{self.search_status.get_text()}. '
                                                            f'The result set only contains a subset of all matches.')
 

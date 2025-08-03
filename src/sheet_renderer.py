@@ -875,7 +875,7 @@ class SheetRenderer(GObject.Object):
                 context.set_source_rgb(0.13, 0.13, 0.15)
             else:
                 context.set_source_rgb(0.98, 0.98, 0.98)
-            context.set_dash([4, 4], time() * 30)
+            context.set_dash([4, 4], 0)
             if search_range_width > 0 and search_range_height > 0:
                 context.rectangle(search_range_x, search_range_y, search_range_width, search_range_height)
                 context.stroke()

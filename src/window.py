@@ -22,6 +22,7 @@ from gi.repository import Adw, Gdk, Gio, GObject, Gtk
 import os
 import polars
 import re
+import threading
 
 from . import globals
 from .sheet_document import SheetDocument
@@ -94,6 +95,12 @@ class Window(Adw.ApplicationWindow):
         from .search_replace_all_view import SearchReplaceAllView
         self.search_replace_all_view = SearchReplaceAllView(self)
         self.search_replace_all_page = self.sidebar_tab_view.append(self.search_replace_all_view)
+
+        # Early instantiate the list items pool
+        def instantiate_list_items_pool() -> None:
+            from . import sheet_header_menu
+            from . import search_replace_all_view
+        threading.Thread(target=instantiate_list_items_pool).start()
 
         # We override the default behavior of the Gtk.Entry for the name box,
         # so that it'll select all text when the user clicks on it for the first
@@ -549,6 +556,7 @@ class Window(Adw.ApplicationWindow):
 
         active_cell = sheet_document.selection.current_active_cell
         mcolumn = active_cell.metadata.column
+        mdfi = active_cell.metadata.dfi
 
         x = sheet_document.display.get_cell_x_from_point(x + 1)
         y = sheet_document.display.get_cell_y_from_point(y + 1)
@@ -560,7 +568,7 @@ class Window(Adw.ApplicationWindow):
         # Create context menu
         if self.context_menu is not None:
             self.context_menu.unparent()
-        self.context_menu = SheetHeaderMenu(self, mcolumn)
+        self.context_menu = SheetHeaderMenu(self, mcolumn, mdfi)
         self.context_menu.set_parent(self.content_overlay)
 
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
