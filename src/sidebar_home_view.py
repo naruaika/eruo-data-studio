@@ -697,6 +697,9 @@ class SidebarHomeView(Adw.Bin):
 
     @Gtk.Template.Callback()
     def on_add_sort_button_clicked(self, button: Gtk.Button) -> None:
+        if self.field_list_store.get_n_items() == 0:
+            return
+
         selected_item = self.field_list_store.get_item(0)
 
         cindex = selected_item.cindex - 1
@@ -770,7 +773,7 @@ class SidebarHomeView(Adw.Bin):
         label.set_halign(Gtk.Align.START)
         label.set_hexpand(True)
         label.set_ellipsize(Pango.EllipsizeMode.END)
-        label.set_label('Condition')
+        label.set_label('Expression')
         list_header.set_child(label)
 
     def setup_factory_filter(self,
@@ -920,6 +923,9 @@ class SidebarHomeView(Adw.Bin):
 
     @Gtk.Template.Callback()
     def on_add_filter_button_clicked(self, button: Gtk.Button) -> None:
+        if self.field_list_store.get_n_items() == 0:
+            return
+
         findex = 0
         field = self.field_list_store.get_item(findex).cname
         fdtype = self.field_list_store.get_item(findex).dtype
@@ -955,7 +961,7 @@ class SidebarHomeView(Adw.Bin):
         sheet_document = self.window.get_current_active_document()
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
-            self.filter_list_view.get_parent().set_visible(False)
+            self.filter_list_view_box.get_parent().set_visible(False)
             self.filter_list_status.get_parent().set_visible(True)
             self.filter_list_status_label.set_text('No table selected')
             return
@@ -988,11 +994,10 @@ class SidebarHomeView(Adw.Bin):
             self.filter_list_store.append(list_item)
 
         is_empty = self.filter_list_store.get_n_items() == 0
+
         self.filter_list_view_box.get_parent().set_visible(not is_empty)
         self.filter_list_status.get_parent().set_visible(is_empty)
-
-        if self.filter_list_store.get_n_items() == 0:
-            self.filter_list_status_label.set_text('No filters found')
+        self.filter_list_status_label.set_text('No filters found')
 
     def refresh_filter_list_item(self,
                                  position: int,
@@ -1381,7 +1386,7 @@ class SidebarHomeView(Adw.Bin):
     def create_general_text_view(self, text: str = '') -> Gtk.TextView:
         text_view = Gtk.TextView()
         text_view.set_hexpand(True)
-        text_view.set_size_request(-1, 28)
+        text_view.set_size_request(-1, 50)
 
         buffer = Gtk.TextBuffer()
         buffer.set_text(text)
