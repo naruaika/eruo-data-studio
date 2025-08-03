@@ -169,8 +169,8 @@ class SearchReplaceOverlay(Adw.Bin):
         self.search_status.set_visible(True)
 
         # Set the search cursor to the first item
-        first_column_name = self.search_results.columns[0]
-        self.search_cursor_coordinate = (0, first_column_name)
+        ridx_column_name = self.search_results.columns[0]
+        self.search_cursor_coordinate = (0, ridx_column_name)
         self.search_cursor_position = 0
 
         # Get the first occurrence of the search item index
@@ -399,16 +399,17 @@ class SearchReplaceOverlay(Adw.Bin):
             self.search_cursor_coordinate = (row_index, previous_column_name)
 
         # Check if the current cursor position is a search result
+        row_index, column_name = self.search_cursor_coordinate
         found_search_result_item = self.search_results[column_name][row_index]
 
-        # Continue to search if the current cursor position is not a search result
-        if not found_search_result_item:
-            self.find_previous_search_occurrence()
-
         # Update the search states
-        else:
+        if found_search_result_item is True:
             self.search_cursor_position -= 1
             self.show_current_search_result_item()
+
+        # Continue to search if the current cursor position is not a search result
+        else:
+            self.find_previous_search_occurrence()
 
     def find_next_search_occurrence(self) -> None:
         row_index, column_name = self.search_cursor_coordinate
@@ -438,16 +439,17 @@ class SearchReplaceOverlay(Adw.Bin):
             self.search_cursor_coordinate = (row_index, next_column_name)
 
         # Check if the current cursor position is a search result
+        row_index, column_name = self.search_cursor_coordinate
         found_search_result_item = self.search_results[column_name][row_index]
 
-        # Continue to search if the current cursor position is not a search result
-        if not found_search_result_item:
-            self.find_next_search_occurrence()
-
         # Update the search states
-        else:
+        if found_search_result_item is True:
             self.search_cursor_position += 1
             self.show_current_search_result_item()
+
+        # Continue to search if the current cursor position is not a search result
+        else:
+            self.find_next_search_occurrence()
 
     def show_current_search_result_item(self) -> None:
         sheet_document = self.window.get_current_active_document()
@@ -455,11 +457,8 @@ class SearchReplaceOverlay(Adw.Bin):
         row_index, column_name = self.search_cursor_coordinate
 
         # TODO: support multiple dataframes?
-        vcol_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the locator
-        vrow_index = self.search_results['$ridx'][row_index] + 2 # +2 for the locator and the header
-
-        col_index = sheet_document.display.get_column_from_vcolumn(vcol_index)
-        row_index = sheet_document.display.get_row_from_vrow(vrow_index)
+        col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the locator
+        row_index = self.search_results['$ridx'][row_index] + 2 # +2 for the locator and the header
 
         search_range = sheet_document.selection.current_search_range
 
