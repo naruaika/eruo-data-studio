@@ -513,6 +513,105 @@ class DeleteColumnState(State):
 
 
 
+class HideColumnState(State):
+    __gtype_name__ = 'HideColumnState'
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.save_selection()
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        self.restore_selection(False)
+
+        document.unhide_current_columns()
+
+        self.restore_selection()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.hide_current_columns()
+
+
+
+class UnhideColumnState(State):
+    __gtype_name__ = 'UnhideColumnState'
+
+    column_span: int
+
+    vflags_path: str
+
+    def __init__(self, column_span: int, vflags: polars.Series) -> None:
+        super().__init__()
+
+        self.save_selection()
+
+        self.column_span = column_span
+
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+
+    def undo(self) -> None:
+        document = globals.history.document
+        mcolumn = self.range.metadata.column
+
+        # Update column visibility flags
+        document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:mcolumn],
+                                                                  polars.read_parquet(self.vflags_path).to_series(0),
+                                                                  document.display.column_visibility_flags[mcolumn + self.column_span:]])
+        document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
+        document.data.bbs[self.range.metadata.dfi].column_span = len(document.display.column_visible_series)
+
+        document.repopulate_auto_filter_widgets()
+
+        self.restore_selection()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.unhide_current_columns()
+
+
+
+class UnhideAllColumnState(State):
+    __gtype_name__ = 'UnhideAllColumnState'
+
+    vflags_path: str
+
+    def __init__(self, vflags: polars.Series) -> None:
+        super().__init__()
+
+        self.save_selection()
+
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags}))
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        # Update column visibility flags
+        document.display.column_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+        document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
+        document.data.bbs[0].column_span = len(document.display.column_visible_series)
+
+        # Update column widths
+        if len(document.display.column_widths):
+            column_widths_visible_only = document.display.column_widths
+            if len(document.display.column_visibility_flags):
+                column_widths_visible_only = column_widths_visible_only.filter(document.display.column_visibility_flags)
+            document.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+        document.repopulate_auto_filter_widgets()
+
+        self.restore_selection()
+
+        document.emit('columns-changed', self.range.metadata.dfi)
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.unhide_all_columns()
+
+
+
 class FilterRowState(State):
     __gtype_name__ = 'FilterRowState'
 

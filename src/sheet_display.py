@@ -348,6 +348,26 @@ class SheetDisplay(GObject.Object):
             return self.row_heights[vrow - 1]
         return self.DEFAULT_CELL_HEIGHT
 
+    def get_n_hidden_columns(self, col_1: int, col_2: int) -> int:
+        if len(self.column_visible_series):
+            vcol_1 = self.get_column_from_vcolumn(col_1)
+            vcol_2 = self.get_column_from_vcolumn(col_2)
+            return (col_2 - col_1) - (vcol_2 - vcol_1)
+        return 0
+
+    def get_n_all_hidden_columns(self) -> int:
+        return len(self.column_visibility_flags) - len(self.column_visible_series)
+
+    def get_n_hidden_rows(self, row_1: int, row_2: int) -> int:
+        if len(self.row_visible_series):
+            vrow_1 = self.get_row_from_vrow(row_1)
+            vrow_2 = self.get_row_from_vrow(row_2)
+            return (row_2 - row_1) - (vrow_2 - vrow_1)
+        return 0
+
+    def get_n_all_hidden_rows(self) -> int:
+        return len(self.row_visibility_flags) - len(self.row_visible_series)
+
     def check_cell_visibility_from_position(self, vcolumn: int, vrow: int) -> bool:
         """Check if the cell at the given logical column and row index is visible."""
         is_column_visible = True

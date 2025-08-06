@@ -1640,6 +1640,122 @@ class SheetDocument(GObject.Object):
 
         return False
 
+    def hide_current_columns(self) -> None:
+        arange = self.selection.current_active_range
+
+        mcolumn = arange.metadata.column
+        column_span = arange.column_span
+
+        # Take hidden column(s) into account
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+        column_span = end_vcolumn - start_vcolumn + 1
+
+        if arange.rtl:
+            mcolumn = mcolumn - column_span + 1
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import HideColumnState
+            state = HideColumnState()
+            globals.history.save(state)
+
+        # Update column visibility flags
+        if len(self.display.column_visibility_flags):
+            self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags[:mcolumn],
+                                                                  polars.Series([False] * column_span),
+                                                                  self.display.column_visibility_flags[mcolumn + column_span:]])
+        else:
+            self.display.column_visibility_flags = polars.concat([polars.Series([True] * mcolumn),
+                                                                  polars.Series([False] * column_span),
+                                                                  polars.Series([True] * (self.data.bbs[arange.metadata.dfi].column_span - mcolumn - column_span))])
+        self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
+        self.data.bbs[arange.metadata.dfi].column_span = len(self.display.column_visible_series)
+
+        # Update column widths
+        if len(self.display.column_widths):
+            column_widths_visible_only = self.display.column_widths
+            if len(self.display.column_visibility_flags):
+                column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
+            self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+        self.auto_adjust_selections_by_crud(0, 0, True)
+        self.repopulate_auto_filter_widgets()
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        self.emit('columns-changed', arange.metadata.dfi)
+
+    def unhide_current_columns(self) -> None:
+        arange = self.selection.current_active_range
+
+        mcolumn = arange.metadata.column
+        column_span = arange.column_span
+
+        # Take hidden column(s) into account
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+        column_span = end_vcolumn - start_vcolumn + 1
+
+        if arange.rtl:
+            mcolumn = mcolumn - column_span + 1
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UnhideColumnState
+            state = UnhideColumnState(column_span,
+                                      self.display.column_visibility_flags[mcolumn:mcolumn + column_span])
+            globals.history.save(state)
+
+        # Update column visibility flags
+        self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags[:mcolumn],
+                                                              polars.Series([True] * column_span),
+                                                              self.display.column_visibility_flags[mcolumn + column_span:]])
+        self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
+        self.data.bbs[arange.metadata.dfi].column_span = len(self.display.column_visible_series)
+
+        # Update column widths
+        if len(self.display.column_widths):
+            column_widths_visible_only = self.display.column_widths
+            if len(self.display.column_visibility_flags):
+                column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
+            self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_auto_filter_widgets()
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        self.emit('columns-changed', arange.metadata.dfi)
+
+    def unhide_all_columns(self) -> None:
+        arange = self.selection.current_active_range
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UnhideAllColumnState
+            state = UnhideAllColumnState(self.display.column_visibility_flags)
+            globals.history.save(state)
+
+        # TODO: support multiple dataframes?
+        self.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
+        self.display.column_visible_series = polars.Series(dtype=polars.UInt32)
+        self.data.bbs[0].column_span = self.data.dfs[0].width
+
+        # Update column widths
+        if len(self.display.column_widths):
+            column_widths_visible_only = self.display.column_widths
+            if len(self.display.column_visibility_flags):
+                column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
+            self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_auto_filter_widgets()
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        self.emit('columns-changed', arange.metadata.dfi)
+
     def filter_current_rows(self, multiple: bool = False) -> None:
         active = self.selection.current_active_cell
 

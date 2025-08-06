@@ -622,6 +622,9 @@ class Window(Adw.ApplicationWindow):
         width = sheet_document.display.get_cell_width_from_point(x + 1)
         height = sheet_document.display.get_cell_height_from_point(y + 1)
 
+        n_hidden_columns = sheet_document.display.get_n_hidden_columns(col_1, col_2)
+        n_all_hidden_columns = sheet_document.display.get_n_all_hidden_columns()
+
         from .sheet_cell_menu import SheetCellMenu
 
         # Create context menu
@@ -630,6 +633,8 @@ class Window(Adw.ApplicationWindow):
         self.context_menu = SheetCellMenu(start_column,start_row,
                                           end_column,  end_row,
                                           column_span, row_span,
+                                          n_hidden_columns,
+                                          n_all_hidden_columns,
                                           ctype)
         self.context_menu.set_parent(self.content_overlay)
 
