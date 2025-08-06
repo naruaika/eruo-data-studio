@@ -451,6 +451,9 @@ class SheetRenderer(GObject.Object):
         col_index = display.get_starting_column()
         x = display.get_cell_x_from_column(col_index)
 
+        if not use_cache:
+            nx_start = x
+
         # TODO: support multiple dataframes?
         while x < x_end:
             if data.bbs[0].column_span < col_index:
