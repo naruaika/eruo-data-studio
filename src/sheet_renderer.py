@@ -638,15 +638,6 @@ class SheetRenderer(GObject.Object):
 
             # Draw line(s) in the locator area
             if double_lines:
-                context.stroke()
-                context.save()
-                if self.prefers_dark:
-                    context.set_source_rgb(0.11, 0.11, 0.13)
-                else:
-                    context.set_source_rgb(1.0, 1.0, 1.0)
-                context.rectangle(x - 2, 0, 4, y_start - 1)
-                context.fill()
-                context.restore()
                 context.move_to(x - 2, 0)
                 context.line_to(x - 2, y_start)
                 context.move_to(x + 2, 0)
@@ -875,7 +866,7 @@ class SheetRenderer(GObject.Object):
                 range_height = 0
             # Hide the bottom of the selection if it is not yet in the viewport
             if height < range_y + range_height:
-                range_height = height + 1 - range_y
+                range_height = height - range_y
 
             # Hide the left of the selection if it is exceeded by the scroll viewport
             if range_x < 0:
@@ -891,6 +882,6 @@ class SheetRenderer(GObject.Object):
                 range_width = 0
             # Hide the right of the selection if it is not yet in the viewport
             if width < range_x + range_width:
-                range_width = width + 1 - range_x
+                range_width = width - range_x
 
             return range_x, range_y, range_width, range_height

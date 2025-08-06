@@ -99,6 +99,7 @@
                     <property name="menu-model">home_row_menu</property>
                     <style>
                       <class name="flat"/>
+                      <class name="arrow"/>
                     </style>
                   </object>
                 </child>
@@ -127,6 +128,7 @@
                     <property name="menu-model">home_column_menu</property>
                     <style>
                       <class name="flat"/>
+                      <class name="arrow"/>
                     </style>
                   </object>
                 </child>

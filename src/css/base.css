@@ -21,6 +21,7 @@
 .toolbar-view .linked > menubutton button {
     padding: 0;
     min-width: 12px;
+    -gtk-icon-size: 16px;
 }
 
 .name-box {
