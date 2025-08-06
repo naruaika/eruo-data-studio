@@ -84,6 +84,7 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         sheet_document = self.window.get_current_active_document()
 
         column_name = sheet_document.data.dfs[dfi].columns[self.column]
+        column_dtype = sheet_document.data.dfs[self.dfi].schema[column_name]
 
         self.cvalues_to_show: list[str] = ['$all']
         self.cvalues_to_hide: list[str] = []
@@ -96,21 +97,28 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             condition = cfilter['query-builder']['conditions'][0]
 
             if condition['field'] == column_name:
+                value = copy.deepcopy(condition['value'])
+
+                if not isinstance(value, list):
+                    value = [value]
+
+                value = [str(v) for v in value]
+
                 if condition['operator'] == 'in':
-                    self.cvalues_to_show = copy.deepcopy(condition['value'])
+                    self.cvalues_to_show = value
                     self.cvalues_to_hide = ['$all']
 
                 if condition['operator'] == 'not in':
                     self.cvalues_to_show = ['$all']
-                    self.cvalues_to_hide = copy.deepcopy(condition['value'])
+                    self.cvalues_to_hide = value
 
                 if condition['operator'] == '=':
-                    self.cvalues_to_show = [condition['value']]
+                    self.cvalues_to_show = value
                     self.cvalues_to_hide = ['$all']
 
                 if condition['operator'] == '!=':
                     self.cvalues_to_show = ['$all']
-                    self.cvalues_to_hide = [condition['value']]
+                    self.cvalues_to_hide = value
 
                 break
 
@@ -393,7 +401,7 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         self.find_unique_values()
 
     def find_unique_values(self,
-                           sample_only: bool = False,
+                           sample_only:  bool = False,
                            search_query: str = None) -> None:
         if search_query == '':
             search_query = None

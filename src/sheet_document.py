@@ -2420,24 +2420,6 @@ class SheetDocument(GObject.Object):
     #
 
     def notify_selection_changed(self, column: int, row: int, metadata) -> None:
-        column_vseries = self.display.column_visible_series
-        column_vflags = self.display.column_visibility_flags
-
-        row_vseries = self.display.row_visible_series
-        row_vflags = self.display.row_visibility_flags
-
-        # Handle edge cases where the last column(s) are hidden
-        if column - 1 == len(column_vseries) \
-                and column < len(column_vflags) \
-                and not column_vflags[column]:
-            column += (len(column_vflags) - 1) - (column_vseries[-1] - 1) - 1
-
-        # Handle edge cases where the last row(s) are hidden
-        if row - 1 == len(row_vseries) \
-                and row < len(self.display.row_visibility_flags) \
-                and not row_vflags[row]:
-            row += (len(row_vflags) - 1) - (row_vseries[-1] - 1) - 1
-
         vcolumn = self.display.get_vcolumn_from_column(column)
         vrow = self.display.get_vrow_from_row(row)
 
@@ -2599,20 +2581,15 @@ class SheetDocument(GObject.Object):
 
     def auto_adjust_locators_size_by_scroll(self) -> None:
         # Determine the starting row number
-        max_row_number = self.display.get_starting_row() + 1
+        row_index = self.display.get_starting_row() + 1
+        max_row_number = row_index
 
         # Find the last visible row number
         y = self.display.top_locator_height
         while y < self.view.main_canvas_height:
-            # Handle edge cases where the last row(s) are hidden
-            if max_row_number - 1 == len(self.display.row_visible_series) \
-                    and len(self.display.row_visible_series) \
-                    and self.display.row_visible_series[-1] + 1 < len(self.display.row_visibility_flags) \
-                    and not self.display.row_visibility_flags[self.display.row_visible_series[-1] + 1]:
-                max_row_number += (len(self.display.row_visibility_flags) - 1) - (self.display.row_visible_series[-1] - 1) - 1
-
-            max_row_number += 1
+            max_row_number = self.display.get_vrow_from_row(row_index)
             y += self.display.DEFAULT_CELL_HEIGHT
+            row_index += 1
 
         context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1))
         font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {self.display.FONT_SIZE}px')
