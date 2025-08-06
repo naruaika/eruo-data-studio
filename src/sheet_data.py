@@ -233,6 +233,10 @@ class SheetData(GObject.Object):
                                         dfi:    int) -> polars.DataType:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
+
+        if len(self.dfs[dfi].columns) <= column:
+            return None
+
         return self.dfs[dfi].dtypes[column]
 
     def read_single_cell_data_from_metadata(self,
@@ -240,6 +244,9 @@ class SheetData(GObject.Object):
                                             row:    int,
                                             dfi:    int) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
+            return None
+
+        if len(self.dfs[dfi].columns) <= column:
             return None
 
         row -= 1 # coordinate to index
@@ -362,6 +369,15 @@ class SheetData(GObject.Object):
 
         return column in self.unique_caches[dfi]
 
+    def clear_cell_data_unique_cache(self,
+                                     dfi: int,
+                                     column: int = None) -> None:
+        if column is None and dfi in self.unique_caches:
+            del self.unique_caches[dfi]
+            return
+        if dfi in self.unique_caches and column in self.unique_caches[dfi]:
+            del self.unique_caches[dfi][column]
+
     def read_cell_bbox_from_metadata(self, dfi: int) -> SheetCellBoundingBox:
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
@@ -440,6 +456,44 @@ class SheetData(GObject.Object):
 
         del dataframe
         gc.collect()
+
+        return True
+
+    def update_columns_with_sql_from_metadata(self,
+                                              dfi:    int,
+                                              query:  str) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        try:
+            new_df = self.dfs[dfi].sql(query)
+
+            for col_name in new_df.columns:
+                if len(new_df.get_column(col_name)) == 1:
+                    sel_value = new_df.get_column(col_name).first()
+                    new_series = polars.Series([sel_value] * self.dfs[dfi].height)
+                    self.dfs[dfi] = self.dfs[dfi].with_columns(new_series.alias(col_name))
+                    self.bbs[dfi].column_span = self.dfs[dfi].width
+                    continue
+
+                self.dfs[dfi] = self.dfs[dfi].with_columns(new_df.get_column(col_name).alias(col_name))
+                self.bbs[dfi].column_span = self.dfs[dfi].width
+
+        except Exception as e:
+            print(e)
+
+            e = str(e)
+            message = f'Cannot execute the query'
+            if e.startswith('sql parser error: '):
+                message = f'Invalid SQL syntax: {e.split('sql parser error: ', 1)[1]}'
+            if e.startswith('unable to find column '):
+                message = f'Invalid column name: {e.split('unable to find column ', 1)[1].split(';')[0]}'
+            if e.startswith('unable to add a column of length '):
+                message = f'{message}: column length mismatch'
+
+            globals.send_notification(message)
+
+            return False
 
         return True
 
@@ -960,7 +1014,7 @@ class SheetData(GObject.Object):
             print(e)
 
         dtype = utils.get_dtype_symbol(dtype, False)
-        globals.send_notification(f'One or more columns couldn\'t be converted to: {dtype}')
+        globals.send_notification(f'Cannot be converted to: {dtype}')
 
         return False
 

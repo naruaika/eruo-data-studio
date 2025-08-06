@@ -20,7 +20,6 @@
 from gi.repository import Gdk, GObject, Gtk, Pango, PangoCairo
 import cairo
 
-from . import globals
 from . import utils
 from .sheet_display import SheetDisplay
 
@@ -125,11 +124,11 @@ class SheetAutoFilter(SheetWidget):
 
     def get_ry(self) -> int:
         if self.display.scroll_y_position > 0:
-            return self.y - self.display.column_header_height
+            return self.y - self.display.top_locator_height
         return self.y
 
     def contains(self, x: int, y: int) -> bool:
-        if x < self.display.row_header_width:
+        if x < self.display.left_locator_width:
             return False
         return self.get_rx() <= x <= self.get_rx() + self.width and \
                self.get_ry() <= y <= self.get_ry() + self.height
@@ -144,7 +143,7 @@ class SheetAutoFilter(SheetWidget):
                   height:       int,
                   prefers_dark: bool,
                   color_accent: tuple[float, float, float, float]) -> None:
-        context.rectangle(self.display.row_header_width, 0, width, height)
+        context.rectangle(self.display.left_locator_width, 0, width, height)
         context.clip()
 
         x = self.get_rx()
@@ -230,8 +229,8 @@ class SheetColumnResizer(SheetWidget):
         left_hovered = left_1 <= x <= left_2
         right_hovered = right_1 <= x <= right_2
 
-        if x <= self.display.row_header_width \
-                or (left_hovered and cell_x <= self.display.row_header_width):
+        if x <= self.display.left_locator_width \
+                or (left_hovered and cell_x <= self.display.left_locator_width):
             return False
 
         # Move the widget to around the left/right edge of the current cell
@@ -239,8 +238,7 @@ class SheetColumnResizer(SheetWidget):
 
         # Store the x coordinate of the current cell to set the left boundary of
         # the handle, so that it always appears to the right of the current cell.
-        x_offset = self.display.scroll_x_position + x
-        self.target_column = self.display.get_starting_column(x_offset)
+        self.target_column = self.display.get_starting_column(x) - 1
         self.target_cell_x = cell_x
 
         # Re-calculating the left boundary for the handle. When left_hovered is True,
@@ -255,7 +253,7 @@ class SheetColumnResizer(SheetWidget):
         self.handler_x = self.target_cell_x + self.target_cell_width
 
         return (left_hovered or right_hovered) and \
-               0 <= y <= self.display.column_header_height
+               0 <= y <= self.display.top_locator_height
 
     def do_on_enter(self, x: int, y: int) -> None:
         if self.is_clicked:
@@ -293,7 +291,7 @@ class SheetColumnResizer(SheetWidget):
         self.x = x
         self.on_hovered()
 
-        self.handler_x = max(max(self.x, self.target_cell_x), self.display.row_header_width)
+        self.handler_x = max(max(self.x, self.target_cell_x), self.display.left_locator_width)
         self.new_cell_width = self.handler_x - self.target_cell_x
         self.x_offset = self.new_cell_width - self.target_cell_width
 
@@ -313,7 +311,7 @@ class SheetColumnResizer(SheetWidget):
         if self.is_clicked:
             # We want to re-draw the top locator to show how it'll look if the user resizes the current cell.
             # This approach is already quite efficient and doesn't seem too complicated, maybe?
-            new_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, self.display.column_header_height + 1)
+            new_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, self.display.top_locator_height + 1)
             new_context = cairo.Context(new_surface)
             new_context.set_source_surface(context.get_target(), self.x_offset, 0)
             new_context.paint()
@@ -329,7 +327,7 @@ class SheetColumnResizer(SheetWidget):
             context.rectangle(self.handler_x - 1,
                               0,
                               width - self.handler_x + 1,
-                              self.display.column_header_height + 1)
+                              self.display.top_locator_height + 1)
             context.clip()
             context.set_source_surface(new_surface, 0, 0)
             context.paint()
@@ -418,7 +416,7 @@ class SheetColumnResizer(SheetWidget):
         else:
             context.set_source_rgb(1.0, 1.0, 1.0)
 
-        x = max(self.target_cell_x, self.display.row_header_width)
+        x = max(self.target_cell_x, self.display.left_locator_width)
 
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
@@ -428,13 +426,13 @@ class SheetColumnResizer(SheetWidget):
         # Adjust the rectangle position for the specific condition
         # based on pixel perfect calculation
         if arange.column + rcolumn_span - 1 < self.target_column \
-                or arange.x <= self.display.row_header_width:
+                or arange.x <= self.display.left_locator_width:
             x += 1
 
         context.rectangle(x,
                           0,
                           width - x,
-                          self.display.column_header_height - 1)
+                          self.display.top_locator_height - 1)
         context.fill()
 
         context.restore()
@@ -505,15 +503,15 @@ class SheetColumnResizer(SheetWidget):
         # Indicates that the user has selected the entire row(s) by highlighting all the column headers
         if range_column == 0:
             context.reset_clip()
-            context.rectangle(range_x, 0, width, self.display.column_header_height - 1)
+            context.rectangle(range_x, 0, width, self.display.top_locator_height - 1)
             context.fill()
 
         # Indicates that the user has a selection by highlighting the column header(s)
         if range_column > 0:
             context.reset_clip()
-            context.rectangle(self.display.row_header_width, 0, width, height)
+            context.rectangle(self.display.left_locator_width, 0, width, height)
             context.clip()
-            context.rectangle(range_x, 0, range_width, self.display.column_header_height - 1)
+            context.rectangle(range_x, 0, range_width, self.display.top_locator_height - 1)
             context.fill()
 
         # We want more emphasis for when the user has selected column(s), row(s), or even the entire sheet,
@@ -524,15 +522,15 @@ class SheetColumnResizer(SheetWidget):
         # Bold highlight all the column headers if the user has selected the entire sheet
         if range_column == 0 and range_row == 0:
             context.reset_clip()
-            context.rectangle(range_x, range_y, width, self.display.column_header_height - 1)
+            context.rectangle(range_x, range_y, width, self.display.top_locator_height - 1)
             context.fill()
 
         # Bold highlight the selected column(s) header
         if range_column > 0 and range_row == 0:
             context.reset_clip()
-            context.rectangle(self.display.row_header_width, -1, width, height)
+            context.rectangle(self.display.left_locator_width, -1, width, height)
             context.clip()
-            context.rectangle(range_x, range_y, range_width, self.display.column_header_height - 1)
+            context.rectangle(range_x, range_y, range_width, self.display.top_locator_height - 1)
             context.fill()
 
         context.restore()
@@ -554,8 +552,8 @@ class SheetColumnResizer(SheetWidget):
         else:
             context.set_source_rgb(0.75, 0.75, 0.75)
 
-        x_start = self.display.row_header_width
-        y_start = self.display.column_header_height
+        x_start = self.display.left_locator_width
+        y_start = self.display.top_locator_height
 
         # Draw separator line between headers and contents for the specific condition
         # based on pixel perfect calculation
@@ -563,7 +561,7 @@ class SheetColumnResizer(SheetWidget):
             context.move_to(x_start, 0)
             context.line_to(x_start, y_start - 1)
 
-        x_start = max(self.target_cell_x, self.display.row_header_width)
+        x_start = max(self.target_cell_x, self.display.left_locator_width)
 
         context.move_to(x_start + 1, y_start)
         context.line_to(width, y_start)
@@ -591,8 +589,8 @@ class SheetColumnResizer(SheetWidget):
         # Use system default font family for drawing text
         canvas = self.display.document.view.main_canvas
         body_font_desc = Gtk.Widget.create_pango_context(canvas).get_font_description()
-        font_family = body_font_desc.get_family() if body_font_desc else 'Sans'
-        body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Bold {self.display.FONT_SIZE}px')
+        body_font_family = body_font_desc.get_family() if body_font_desc else 'Sans'
+        body_font_desc = Pango.font_description_from_string(f'{body_font_family} Normal Bold {self.display.FONT_SIZE}px')
 
         # We should achieve the high contrast between the text and the canvas background, though I'm aware
         # of the potential problems with using the pure black and white colors. Let's decide that later.
@@ -604,44 +602,17 @@ class SheetColumnResizer(SheetWidget):
         # Determine the starting column label
         col_index = self.target_column
 
-        context.rectangle(self.display.row_header_width,
+        context.rectangle(self.display.left_locator_width,
                           0,
                           width,
-                          self.display.column_header_height)
+                          self.display.top_locator_height)
         context.clip()
 
         # Draw column headers texts (centered)
         # It's so rare to see a worksheet go beyond Z*9 columns, but it's better to be prepared for it anyway
         # by having defining the clip region to prevent the text from overflowing to the next cells. TODO: maybe
         # it's better to automatically adjust the cell widths to fit the text width if the text is overflowing?
-        x_start = self.display.row_header_width
-        x = self.target_cell_x
-        x_offset = 0
-
-        column_vseries = self.display.column_visible_series
-        column_vflags = self.display.column_visibility_flags
-
-        # Handle edge cases where the last column(s) are hidden
-        if col_index - 1 == len(column_vseries) \
-                and len(column_vseries) \
-                and column_vseries[-1] + 1 < len(column_vflags) \
-                and not column_vflags[column_vseries[-1] + 1]:
-            col_index += (len(column_vflags) - 1) - (column_vseries[-1] - 1) - 1
-
         vcol_index = self.display.get_vcolumn_from_column(col_index)
-
-        cumulative_cwidths = self.display.cumulative_column_widths
-
-        # Offset the first appearing column to account for the scroll position if necessary
-        if x == x_start \
-                and 0 < self.display.scroll_x_position \
-                and len(cumulative_cwidths):
-            x_offset = self.display.scroll_x_position
-            if 0 < col_index - 1 <= len(cumulative_cwidths):
-                x_offset -= cumulative_cwidths[col_index - 2]
-            elif len(cumulative_cwidths) < col_index - 1:
-                x_offset = (x_offset - cumulative_cwidths[-1]) % self.display.DEFAULT_CELL_WIDTH
-            x -= x_offset
 
         # Draw dataframe header
         if len(data.bbs) \
@@ -651,7 +622,7 @@ class SheetColumnResizer(SheetWidget):
             dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
             layout.set_font_description(body_font_desc)
             layout.set_text(f'{cname} [{dtype}]', -1)
-            x_text = x + self.display.DEFAULT_CELL_PADDING
+            x_text = self.target_cell_x + self.display.DEFAULT_CELL_PADDING
 
         # Draw column name
         else:
@@ -659,12 +630,12 @@ class SheetColumnResizer(SheetWidget):
             layout.set_font_description(header_font_desc)
             layout.set_text(cell_text, -1)
             text_width = layout.get_size()[0] / Pango.SCALE
-            x_text = x + (self.new_cell_width - text_width) / 2
+            x_text = self.target_cell_x + (self.new_cell_width - text_width) / 2
 
-        context.rectangle(x,
+        context.rectangle(self.target_cell_x,
                           0,
                           self.new_cell_width - 1,
-                          self.display.column_header_height)
+                          self.display.top_locator_height)
         context.clip()
 
         context.move_to(x_text, 2)
@@ -730,16 +701,16 @@ class SheetColumnResizer(SheetWidget):
         context.set_source_rgba(*color_accent)
         context.set_line_width(2)
 
-        context.rectangle(self.display.row_header_width,
+        context.rectangle(self.display.left_locator_width,
                           0,
                           width,
-                          self.display.column_header_height + 1)
+                          self.display.top_locator_height + 1)
         context.clip()
 
         # Indicates that the user has a selection by drawing a line next to the row and column header(s)
         if range_column > 0 and range_row > 0:
-            context.move_to(range_x, self.display.column_header_height)
-            context.line_to(range_x + range_width, self.display.column_header_height)
+            context.move_to(range_x, self.display.top_locator_height)
+            context.line_to(range_x + range_width, self.display.top_locator_height)
             context.stroke()
 
         context.restore()
@@ -757,7 +728,7 @@ class SheetColumnResizer(SheetWidget):
 
         context.set_hairline(True)
 
-        height = self.display.column_header_height
+        height = self.display.top_locator_height
 
         context.rectangle(width + self.x_offset, 0, width, height)
         context.clip()

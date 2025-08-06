@@ -235,19 +235,28 @@ class Window(Adw.ApplicationWindow):
             return
 
         if keyval == Gdk.KEY_Return:
-            globals.is_editing_cells = False
-            globals.docid_being_edited = ''
-            self.inline_formula_box.set_visible(False)
-            sheet_view.main_canvas.set_focusable(True)
-            sheet_view.main_canvas.grab_focus()
+            if state == Gdk.ModifierType.ALT_MASK:
+                return # prevent from executing the inline formula
+                       # when pressing Return key with any modifier
 
-            # Update the current cells
             entry_buffer = self.inline_formula.get_buffer()
             start_iter = entry_buffer.get_start_iter()
             end_iter = entry_buffer.get_end_iter()
             text = entry_buffer.get_text(start_iter, end_iter, True)
-            sheet_view.document.update_current_cells(text)
 
+            # Update the current cells
+            if not self.execute_pending_formula(text):
+                # TODO: remove the trailing newline
+                return
+
+            # Hide the inline formula
+            globals.is_editing_cells = False
+            globals.docid_being_edited = ''
+            self.inline_formula_box.set_visible(False)
+
+            # Move the focus back to the main canvas
+            sheet_view.main_canvas.set_focusable(True)
+            sheet_view.main_canvas.grab_focus()
             return
 
     def on_inline_formula_unfocused(self, event: Gtk.EventControllerFocus) -> None:
@@ -375,8 +384,9 @@ class Window(Adw.ApplicationWindow):
             return # formula bar should be insensitive when there's no active view,
                    # but this is for completeness.
 
-        # Update the current cells
-        sheet_view.document.update_current_cells(entry.get_text())
+        input_text = entry.get_text()
+        if not self.execute_pending_formula(input_text):
+            return
 
         # Move the focus back to the main canvas
         sheet_view.main_canvas.set_focusable(True)
@@ -519,19 +529,7 @@ class Window(Adw.ApplicationWindow):
     def on_inline_formula_opened(self,
                                  source:    GObject.Object,
                                  sel_value: str) -> None:
-        sheet_document = self.get_current_active_document()
-
-        if sheet_document is None:
-            return # impossible to reach, but for completeness
-
-        globals.is_editing_cells = True
-        globals.docid_being_edited = sheet_document.docid
-
-        self.inline_formula_box.get_vadjustment().set_value(0)
-        self.inline_formula_box.set_visible(True)
-
-        self.inline_formula.get_buffer().set_text(sel_value)
-        self.inline_formula.grab_focus()
+        self.open_inline_formula(sel_value)
 
     def on_context_menu_opened(self,
                                source: GObject.Object,
@@ -712,6 +710,25 @@ class Window(Adw.ApplicationWindow):
         else:
             self.formula_bar_dtype.set_visible(False)
 
+    def open_inline_formula(self, sel_value: str = None) -> None:
+        sheet_document = self.get_current_active_document()
+
+        if sheet_document is None:
+            return
+
+        globals.is_editing_cells = True
+        globals.docid_being_edited = sheet_document.docid
+
+        self.inline_formula_box.get_vadjustment().set_value(0)
+        self.inline_formula_box.set_visible(True)
+
+        if sel_value is None:
+            sel_value = self.formula_bar.get_text()
+
+        self.inline_formula.get_buffer().set_text(sel_value)
+
+        self.inline_formula.grab_focus()
+
     def do_toggle_sidebar(self) -> None:
         sheet_document = self.get_current_active_document()
 
@@ -742,3 +759,38 @@ class Window(Adw.ApplicationWindow):
     def show_toast_message(self, message: str) -> None:
         toast = Adw.Toast.new(message)
         self.toast_overlay.add_toast(toast)
+
+    def execute_pending_formula(self, formula: str) -> bool:
+        sheet_view = self.get_current_active_view()
+
+        if sheet_view is None:
+            return False
+
+        is_executed = False
+
+        # Check if the input is an SQL-like syntax
+        query_pattern = r"\s*=\s*SELECT\s*.*"
+        if not is_executed and re.fullmatch(query_pattern, formula, re.IGNORECASE):
+            if not sheet_view.document.update_columns_from_sql(formula):
+                return False
+            is_executed = True
+
+        # Check if the input is an expression
+        expression_pattern = r"\s*[A-Za-z0-9]*.*=.*"
+        if not is_executed and re.fullmatch(expression_pattern, formula, re.IGNORECASE):
+            if not sheet_view.document.update_columns_from_expression(formula):
+                return False
+            is_executed = True
+
+        # Check if the input is a formula
+        formula_pattern = r"\s*=.*"
+        if not is_executed and re.fullmatch(formula_pattern, formula, re.IGNORECASE):
+            if not sheet_view.document.update_current_cells_from_formula(formula):
+                return False
+            is_executed = True
+
+        # Update the current cells
+        if not is_executed and not sheet_view.document.update_current_cells(formula):
+            return False
+
+        return True

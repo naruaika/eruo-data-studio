@@ -22,6 +22,7 @@ import copy
 import polars
 import threading
 
+from . import utils
 from .window import Window
 
 class BasicFilterListItem(GObject.Object):
@@ -311,12 +312,21 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             value.remove('$blanks')
             value.append(None)
 
-        if len(value) == 1:
+        try:
+            if isinstance(column_dtype, polars.Boolean):
+                value = [utils.cast_to_boolean(v) for v in value]
+            value = polars.Series(value).cast(column_dtype, strict=False)
+        except Exception as e:
+            print(e)
+
+        raw_value = value.to_list()
+
+        if len(raw_value) == 1:
             if operator == 'in':
                 operator = '='
             else:
                 operator = '!='
-            value = value[0]
+            raw_value = raw_value[0]
 
         query_builder = {
             'operator': 'and',
@@ -325,17 +335,11 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
                 'fdtype': column_dtype,
                 'field': column_name,
                 'operator': operator,
-                'value': value,
+                'value': raw_value,
             }],
         }
 
-        if not isinstance(value, list):
-            value = [value]
-
-        value = copy.deepcopy(value)
-        value = polars.Series(value).cast(column_dtype, strict=False)
-
-        expression = polars.col(column_name).is_in(value)
+        expression = polars.col(column_name).is_in(value, nulls_equal=True)
         if operator in ['not in', '!=']:
             expression = expression.not_()
 

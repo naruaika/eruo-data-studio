@@ -71,14 +71,13 @@ def get_date_format_string(date_string: str) -> str:
     return None
 
 
+
 from polars import DataType, Categorical, \
                    Int8, Int16, Int32, Int64, \
                    UInt8, UInt16, UInt32, UInt64, \
                    Float32, Float64, Decimal, \
                    Date, Time, Datetime, \
                    Boolean, Utf8, Null
-
-
 
 def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
     symbol_map = {
@@ -133,3 +132,25 @@ def get_dtype_class(dtype: DataType) -> type:
         if dtype == dt or isinstance(dtype, dt):
             return cls
     return None
+
+
+
+import locale
+
+def get_list_separator():
+    try:
+        locale.setlocale(locale.LC_ALL, '')
+        conv = locale.localeconv()
+        decimal_point = conv['decimal_point']
+        if decimal_point == ',':
+            return ';'
+        return ','
+    except Exception:
+        return ','
+
+
+
+def cast_to_boolean(string: str) -> bool:
+    if string.lower() in ['true', '1']:
+        return True
+    return False

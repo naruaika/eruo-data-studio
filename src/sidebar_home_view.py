@@ -453,7 +453,6 @@ class SidebarHomeView(Adw.Bin):
 
         self.window = window
 
-
         # Setup the field section
         self.field_list_status.get_parent().set_activatable(False)
         self.field_list_view.get_parent().set_activatable(False)
@@ -464,7 +463,6 @@ class SidebarHomeView(Adw.Bin):
         factory.connect('bind', self.bind_factory_field)
         factory.connect('teardown', self.teardown_factory_field)
         self.field_list_view.set_factory(factory)
-
 
         # Setup the sort section
         self.sort_list_view_box.get_parent().set_activatable(False)
@@ -480,7 +478,6 @@ class SidebarHomeView(Adw.Bin):
         factory.connect('bind', self.bind_factory_sort)
         factory.connect('teardown', self.teardown_factory_sort)
         self.sort_list_view.set_factory(factory)
-
 
         # Setup the filter section
         self.filter_list_view_box.get_parent().set_activatable(False)
@@ -1071,12 +1068,13 @@ class SidebarHomeView(Adw.Bin):
             return query
 
         if value is None:
-            value = 'null'
+            query += f'({builder['field']} is null)'
+            return query
 
         if isinstance(value, str):
             value = f"'{value}'"
 
-        if isinstance(value, list):
+        elif isinstance(value, list):
             value_list = []
             for v in value:
                 if v is None:
@@ -1096,7 +1094,8 @@ class SidebarHomeView(Adw.Bin):
         document = self.window.get_current_active_document()
         dtypes = document.data.dfs[0].dtypes
 
-        if len(document.current_filters) == 0 and self.filter_list_store.get_n_items() == 0:
+        if len(document.current_filters) == 0 \
+                and self.filter_list_store.get_n_items() == 0:
             return # skip to prevent from saving new history item
 
         document.current_filters = []

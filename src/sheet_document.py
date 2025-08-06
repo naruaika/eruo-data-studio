@@ -27,6 +27,7 @@ import re
 from . import globals
 from . import utils
 from .clipboard_manager import ClipboardManager
+from .sheet_functions import parse_dax
 
 class SheetDocument(GObject.Object):
     __gtype_name__ = 'SheetDocument'
@@ -541,6 +542,25 @@ class SheetDocument(GObject.Object):
 
         self.notify_selected_table_changed()
 
+    def move_selection_to_corner(self,
+                                 bbox:   any, # SheetCellBoundingBox
+                                 corner: str = 'bottom-right') -> None:
+        column = bbox.column + bbox.column_span - 1
+        row = bbox.row + bbox.row_span - 1
+
+        if corner == 'bottom-left':
+            column = bbox.column
+        if corner == 'top-right':
+            row = bbox.row
+        if corner == 'top-left':
+            column = bbox.column
+            row = bbox.row
+
+        self.update_selection_from_position(column, row,
+                                            column, row,
+                                            follow_cursor=False,
+                                            auto_scroll=False)
+
     def update_selection_from_name(self, name: str) -> None:
         vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
 
@@ -549,10 +569,8 @@ class SheetDocument(GObject.Object):
         row_1 = self.display.get_row_from_vrow(vrow_1)
         row_2 = self.display.get_row_from_vrow(vrow_2)
 
-        self.update_selection_from_position(col_1,
-                                            row_1,
-                                            col_2,
-                                            row_2,
+        self.update_selection_from_position(col_1, row_1,
+                                            col_2, row_2,
                                             keep_order=False,
                                             follow_cursor=False,
                                             auto_scroll=True)
@@ -1000,6 +1018,91 @@ class SheetDocument(GObject.Object):
 
         return False
 
+    def update_columns_from_expression(self, expression: str) -> bool:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        if mdfi < 0:
+            return False # TODO: create a new table?
+
+        from pprint import pprint
+        pprint(parse_dax(expression))
+
+        return True
+
+    def update_columns_from_sql(self, query: str) -> bool:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        if mdfi < 0:
+            return False # TODO: create a new table?
+
+        # Clean up the query
+        n_query = query.split('=', 1)[1].strip()
+
+        # Add "FROM self" if needed
+        if 'from self' not in n_query.lower():
+            n_query += ' FROM self'
+
+        from .history_manager import UpdateColumnDataState
+        try:
+            sample_df = self.data.dfs[mdfi][0].sql(n_query) # get only the first row
+            target_column_names = list(set(self.data.dfs[mdfi].columns) & set(sample_df.columns))
+            added_column_names = list(set(sample_df.columns) - set(target_column_names))
+            n_added_columns = len(added_column_names)
+        except:
+            pass # ignore it as it'll also fail in the next processing step
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UpdateColumnDataState
+            state = UpdateColumnDataState(self.data.read_cell_data_chunks_from_metadata(target_column_names, 0, -1, mdfi),
+                                          target_column_names,
+                                          added_column_names,
+                                          mdfi,
+                                          query)
+
+        # Apply the query
+        if self.data.update_columns_with_sql_from_metadata(mdfi, n_query):
+            # Update column visibility flags
+            if len(self.display.column_visibility_flags):
+                self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags,
+                                                                      polars.Series([True] * n_added_columns)])
+                self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
+                self.data.bbs[mdfi].column_span = len(self.display.column_visible_series)
+
+            # Update column widths
+            if len(self.display.column_widths):
+                self.display.column_widths = polars.concat([self.display.column_widths,
+                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH] * n_added_columns)])
+                column_widths_visible_only = self.display.column_widths
+                if len(self.display.column_visibility_flags):
+                    column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
+                self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+            # TODO: what should we do instead when no new columns were added?
+            if n_added_columns > 0:
+                bbox = self.data.bbs[mdfi]
+                self.update_selection_from_position(bbox.column + bbox.column_span - n_added_columns, 0,
+                                                    bbox.column + bbox.column_span - 1, 0,
+                                                    follow_cursor=False)
+
+            # Save snapshot
+            if not globals.is_changing_state:
+                globals.history.save(state)
+
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
+
+            arange = self.selection.current_active_range
+            self.notify_selection_changed(arange.column, arange.row, arange.metadata)
+
+            self.emit('columns-changed', mdfi)
+
+            return True
+
+        return False
+
     def update_current_cells(self, new_value: any) -> bool:
         arange = self.selection.current_active_range
         active = self.selection.current_active_cell
@@ -1038,32 +1141,19 @@ class SheetDocument(GObject.Object):
         if should_expand and collision_info['direction'] == 'right-below':
             return False
 
-        def move_selection(corner: str = 'bottom-right') -> None:
-            column = bbox.column + bbox.column_span - 1
-            row = bbox.row + bbox.row_span - 1
-
-            if corner == 'bottom-left':
-                column = bbox.column
-
-            # FIXME: should be grouped into one history state
-            self.update_selection_from_position(column, row,
-                                                column, row,
-                                                follow_cursor=False,
-                                                auto_scroll=False)
-
         # Automatically expand the dataframe if needed
         if should_expand and 'below' in collision_info['direction']:
-            move_selection('bottom-right')
+            self.move_selection_to_corner(bbox, 'bottom-right')
             row_span = collision_info['nonov_row_span']
             self.insert_blank_from_current_rows(False, row_span)
 
         if should_expand and 'right' in collision_info['direction']:
-            move_selection('bottom-right')
+            self.move_selection_to_corner(bbox, 'bottom-right')
             column_span = collision_info['nonov_column_span']
             self.insert_blank_from_current_columns(False, column_span)
 
         if should_expand and 'left' in collision_info['direction']:
-            move_selection('bottom-left')
+            self.move_selection_to_corner(bbox, 'bottom-left')
             column_span = collision_info['nonov_column_span']
             self.insert_blank_from_current_columns(True, column_span)
 
@@ -1137,18 +1227,30 @@ class SheetDocument(GObject.Object):
             if not globals.is_changing_state:
                 globals.history.save(state)
 
+            if self.is_cutting_cells:
+                self.cancel_cutcopy_operation()
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
             active_cell = self.selection.current_active_cell
             self.notify_selection_changed(active_cell.column, active_cell.row, active_cell.metadata)
 
-            if self.is_cutting_cells:
-                self.cancel_cutcopy_operation()
-
             return True
 
         return False
+
+    def update_current_cells_from_formula(self, formula: str) -> bool:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        if mdfi < 0:
+            return False # TODO: create a new table?
+
+        from pprint import pprint
+        pprint(parse_dax(formula))
+
+        return True
 
     def update_current_cells_from_range(self, crange: any) -> bool:
         arange = self.selection.current_active_range
@@ -1200,32 +1302,19 @@ class SheetDocument(GObject.Object):
         if should_expand and collision_info['direction'] == 'right-below':
             return False
 
-        def move_selection(corner: str = 'bottom-right') -> None:
-            column = bbox.column + bbox.column_span - 1
-            row = bbox.row + bbox.row_span - 1
-
-            if corner == 'bottom-left':
-                column = bbox.column
-
-            # FIXME: should be grouped into one history state
-            self.update_selection_from_position(column, row,
-                                                column, row,
-                                                follow_cursor=False,
-                                                auto_scroll=False)
-
         # Automatically expand the dataframe if needed
         if should_expand and 'below' in collision_info['direction']:
-            move_selection('bottom-right')
+            self.move_selection_to_corner(bbox, 'bottom-right')
             row_span = collision_info['nonov_row_span']
             self.insert_blank_from_current_rows(False, row_span)
 
         if should_expand and 'right' in collision_info['direction']:
-            move_selection('bottom-right')
+            self.move_selection_to_corner(bbox, 'bottom-right')
             column_span = collision_info['nonov_column_span']
             self.insert_blank_from_current_columns(False, column_span)
 
         if should_expand and 'left' in collision_info['direction']:
-            move_selection('bottom-left')
+            self.move_selection_to_corner(bbox, 'bottom-left')
             column_span = collision_info['nonov_column_span']
             self.insert_blank_from_current_columns(True, column_span)
 
@@ -1314,8 +1403,8 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            active_cell = self.selection.current_active_cell
-            self.notify_selection_changed(active_cell.column, active_cell.row, active_cell.metadata)
+            active = self.selection.current_active_cell
+            self.notify_selection_changed(active.column, active.row, active.metadata)
 
             return True
 
@@ -1635,12 +1724,12 @@ class SheetDocument(GObject.Object):
 
         # Update row heights
         if len(self.display.row_heights):
-            row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
+            row_heights_visible_only = self.display.row_heights.filter(self.display.row_visibility_flags)
             self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
         self.cancel_cutcopy_operation()
-        self.auto_adjust_selections_by_crud(0, 0, True)
         self.auto_adjust_locators_size_by_scroll()
+        self.auto_adjust_selections_by_crud(0, 0, True)
         self.repopulate_auto_filter_widgets()
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
@@ -2036,6 +2125,7 @@ class SheetDocument(GObject.Object):
                                               .otherwise(polars.col(column_name))
 
         # Save snapshot
+        # TODO: support multiple dataframes?
         if not globals.is_changing_state:
             from .history_manager import FindReplaceAllDataState
             globals.history.save(FindReplaceAllDataState(self.data.read_cell_data_chunks_from_metadata(target_column_names, start_row, row_span, 0),
@@ -2051,7 +2141,6 @@ class SheetDocument(GObject.Object):
                                                          use_regexp))
 
         # Bulk replace cells
-        # TODO: support multiple dataframes?
         self.data.dfs[0] = self.data.dfs[0].with_row_index('$ridx') \
                                            .with_columns(**with_columns) \
                                            .drop('$ridx')
@@ -2065,13 +2154,17 @@ class SheetDocument(GObject.Object):
     def toggle_column_visibility(self,
                                  column: int,
                                  show:   bool) -> None:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
         # Save snapshot
         if not globals.is_changing_state:
             from .history_manager import ToggleColumnVisibilityState
             globals.history.save(ToggleColumnVisibilityState(column, show))
 
+        df_width = self.data.dfs[mdfi].width
+
         # Update column visibility flags
-        # TODO: support multiple dataframes?
         if len(self.display.column_visibility_flags):
             self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags[:column - 1],
                                                                   polars.Series([show]),
@@ -2080,14 +2173,14 @@ class SheetDocument(GObject.Object):
             if show:
                 self.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
             else:
-                self.display.column_visibility_flags = polars.concat([polars.Series([True] * (column - 1)),
+                self.display.column_visibility_flags = polars.concat([polars.Series([True] * (column - 1), dtype=polars.Boolean),
                                                                       polars.Series([False]),
-                                                                      polars.Series([True] * (self.data.dfs[0].width - column))])
+                                                                      polars.Series([True] * (df_width - column), dtype=polars.Boolean)])
         self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
         if len(self.display.column_visible_series):
-            self.data.bbs[0].column_span = len(self.display.column_visible_series)
+            self.data.bbs[mdfi].column_span = len(self.display.column_visible_series)
         else:
-            self.data.bbs[0].column_span = self.data.dfs[0].width
+            self.data.bbs[mdfi].column_span = df_width
 
         # Update column widths
         if len(self.display.column_widths):
@@ -2102,7 +2195,7 @@ class SheetDocument(GObject.Object):
         self.view.main_canvas.queue_draw()
 
         if not self.is_refreshing_uis:
-            self.emit('columns-changed', 0)
+            self.emit('columns-changed', mdfi)
 
     def update_column_width(self,
                             column: int,
@@ -2241,7 +2334,9 @@ class SheetDocument(GObject.Object):
 
         crange = clipboard.range
 
-        is_single_cell = crange is not None and crange.column_span == 1 and crange.row_span == 1
+        is_single_cell = crange is None or (crange is not None
+                                            and crange.column_span == 1
+                                            and crange.row_span == 1)
 
         is_cutting_cells = self.is_cutting_cells
 
@@ -2391,7 +2486,7 @@ class SheetDocument(GObject.Object):
         x = 0
         y = 3
         width = 8 # in pixels
-        height = self.display.column_header_height - 6
+        height = self.display.top_locator_height - 6
 
         # We need only one column resizer that'll adapt to the position of the pointer on the canvas
         # around any nearby column horizontal edges
@@ -2479,11 +2574,11 @@ class SheetDocument(GObject.Object):
             if len(self.display.cumulative_column_widths):
                 content_width = self.display.cumulative_column_widths[-1] + self.display.DEFAULT_CELL_WIDTH * 1
 
-        scroll_y_upper = max(content_height + self.display.column_header_height, self.display.scroll_y_position + canvas_height)
+        scroll_y_upper = max(content_height + self.display.top_locator_height, self.display.scroll_y_position + canvas_height)
         self.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y_upper)
         self.view.vertical_scrollbar.get_adjustment().set_page_size(canvas_height)
 
-        scroll_x_upper = max(content_width + self.display.row_header_width, self.display.scroll_x_position + canvas_width)
+        scroll_x_upper = max(content_width + self.display.left_locator_width, self.display.scroll_x_position + canvas_width)
         self.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x_upper)
         self.view.horizontal_scrollbar.get_adjustment().set_page_size(canvas_width)
 
@@ -2503,12 +2598,21 @@ class SheetDocument(GObject.Object):
             self.selection.current_cutcopy_range.y = self.display.get_cell_y_from_row(self.selection.current_cutcopy_range.row)
 
     def auto_adjust_locators_size_by_scroll(self) -> None:
-        canvas_height = self.view.main_canvas.get_height()
-        y_start = self.display.column_header_height
-        cell_height = self.display.DEFAULT_CELL_HEIGHT
+        # Determine the starting row number
+        max_row_number = self.display.get_starting_row() + 1
 
-        max_row_number = int(self.display.get_starting_row()) + 1 + int((canvas_height - y_start) // cell_height)
-        max_row_number = self.display.get_vrow_from_row(max_row_number)
+        # Find the last visible row number
+        y = self.display.top_locator_height
+        while y < self.view.main_canvas_height:
+            # Handle edge cases where the last row(s) are hidden
+            if max_row_number - 1 == len(self.display.row_visible_series) \
+                    and len(self.display.row_visible_series) \
+                    and self.display.row_visible_series[-1] + 1 < len(self.display.row_visibility_flags) \
+                    and not self.display.row_visibility_flags[self.display.row_visible_series[-1] + 1]:
+                max_row_number += (len(self.display.row_visibility_flags) - 1) - (self.display.row_visible_series[-1] - 1) - 1
+
+            max_row_number += 1
+            y += self.display.DEFAULT_CELL_HEIGHT
 
         context = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1))
         font_desc = Pango.font_description_from_string(f'Monospace Normal Bold {self.display.FONT_SIZE}px')
@@ -2518,10 +2622,10 @@ class SheetDocument(GObject.Object):
         layout.set_font_description(font_desc)
 
         text_width = layout.get_size()[0] / Pango.SCALE
-        new_row_header_width = max(40, int(text_width + self.display.DEFAULT_CELL_PADDING * 2 + 0.5))
+        new_left_locator_width = max(40, int(text_width + self.display.DEFAULT_CELL_PADDING * 2 + 0.5))
 
-        if new_row_header_width != self.display.row_header_width:
-            self.display.row_header_width = new_row_header_width
+        if new_left_locator_width != self.display.left_locator_width:
+            self.display.left_locator_width = new_left_locator_width
             self.renderer.render_caches = {}
 
     def auto_adjust_scrollbars_by_selection(self,
@@ -2531,8 +2635,8 @@ class SheetDocument(GObject.Object):
                                             smooth_scroll: bool = False) -> None:
         column = self.selection.current_cursor_cell.column
         row = self.selection.current_cursor_cell.row
-        viewport_height = self.view.main_canvas.get_height() - self.display.column_header_height
-        viewport_width = self.view.main_canvas.get_width() - self.display.row_header_width
+        viewport_height = self.view.main_canvas.get_height() - self.display.top_locator_height
+        viewport_width = self.view.main_canvas.get_width() - self.display.left_locator_width
 
         # TODO: implement smooth scrolling so that the cursor doesn't jump infinitely
         # when the cursor near the edge of the viewport
@@ -2546,6 +2650,7 @@ class SheetDocument(GObject.Object):
             row = self.selection.current_active_cell.row
             self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis, with_offset)
 
+        self.display.discretize_scroll_position()
         self.auto_adjust_scrollbars_by_scroll()
 
         vertical_adjustment = self.view.vertical_scrollbar.get_adjustment()

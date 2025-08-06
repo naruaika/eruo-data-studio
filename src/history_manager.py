@@ -224,6 +224,57 @@ class InsertBlankColumnState(State):
 
 
 
+class UpdateColumnDataState(State):
+    __gtype_name__ = 'UpdateColumnDataState'
+
+    file_path: str
+
+    t_column_names: list[str] # targeted columns
+    n_column_names: list[str] # added columns
+    dfi: int
+    query: str
+
+    def __init__(self,
+                 content:      any,
+                 t_column_names: list[str],
+                 n_column_names: list[str],
+                 dfi:          int,
+                 query:        str) -> None:
+        super().__init__()
+
+        self.save_selection(True)
+
+        self.file_path = self.write_snapshot(content)
+
+        self.t_column_names = t_column_names
+        self.n_column_names = n_column_names
+        self.dfi = dfi
+        self.query = query
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        # Delete added columns
+        bbox = document.data.bbs[self.dfi]
+        for _ in self.n_column_names:
+            document.move_selection_to_corner(bbox, 'bottom-right')
+            document.delete_current_columns()
+
+        # Restore targeted columns
+        document.data.update_cell_data_blocks_from_metadata(self.t_column_names,
+                                                            0,  # from the first row
+                                                            -1, # to the last row
+                                                            self.dfi,
+                                                            polars.read_parquet(self.file_path))
+
+        self.restore_selection()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.update_columns_from_sql(self.query)
+
+
+
 class UpdateDataState(State):
     __gtype_name__ = 'UpdateDataState'
 

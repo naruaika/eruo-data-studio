@@ -129,8 +129,8 @@ class SearchReplaceOverlay(Adw.Bin):
 
         # Continue previous search
         if new_search_states == self.search_states and self.search_results_length > 0:
-            vheight = sheet_document.view.main_canvas.get_height() - sheet_document.display.column_header_height
-            vwidth = sheet_document.view.main_canvas.get_width() - sheet_document.display.row_header_width
+            vheight = sheet_document.view.main_canvas.get_height() - sheet_document.display.top_locator_height
+            vwidth = sheet_document.view.main_canvas.get_width() - sheet_document.display.left_locator_width
 
             cell_name = sheet_document.selection.cell_name
             vcol_index, vrow_index = sheet_document.display.get_cell_position_from_name(cell_name)
@@ -466,8 +466,8 @@ class SearchReplaceOverlay(Adw.Bin):
 
         column = sheet_document.selection.current_active_cell.column
         row = sheet_document.selection.current_active_cell.row
-        viewport_height = sheet_document.view.main_canvas.get_height() - sheet_document.display.column_header_height
-        viewport_width = sheet_document.view.main_canvas.get_width() - sheet_document.display.row_header_width
+        viewport_height = sheet_document.view.main_canvas.get_height() - sheet_document.display.top_locator_height
+        viewport_width = sheet_document.view.main_canvas.get_width() - sheet_document.display.left_locator_width
 
         # Scroll to account for the search box if necessary
         if 'bottom' in sheet_document.display.check_cell_position_near_edges(column, row, viewport_height, viewport_width):

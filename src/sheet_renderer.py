@@ -99,8 +99,8 @@ class SheetRenderer(GObject.Object):
         else:
             context.set_source_rgb(1.0, 1.0, 1.0)
 
-        context.rectangle(0, 0, width, display.column_header_height)
-        context.rectangle(0, display.column_header_height, display.row_header_width, height)
+        context.rectangle(0, 0, width, display.top_locator_height)
+        context.rectangle(0, display.top_locator_height, display.left_locator_width, height)
         context.fill()
 
         context.restore()
@@ -118,53 +118,26 @@ class SheetRenderer(GObject.Object):
         # is only for optimization purposes or to handle the case where the selection size is too big so
         # that it can only be partially drawn.
         arange = selection.current_active_range
-        range_x = arange.x
-        range_y = arange.y
-        range_width = arange.width
-        range_height = arange.height
-
-        # Hide the top of the selection if it is exceeded by the scroll viewport
-        if range_y < 0:
-            range_height += range_y
-            range_y = 0
-        # Hide the entire selection if it is exceeded by the scroll viewport
-        if range_height < 0:
-            range_height = 0
-        # Hide the entire selection if the viewport has not reached it yet
-        if height < range_y:
-            range_y = height
-            range_height = 0
-        # Hide the bottom of the selection if it is not yet in the viewport
-        if height < range_y + range_height:
-            range_height = height - range_y
-
-        # Hide the left of the selection if it is exceeded by the scroll viewport
-        if range_x < 0:
-            range_width += range_x
-            range_x = 0
-        # Hide the entire selection if it is exceeded by the scroll viewport
-        if range_width < 0:
-            range_width = 0
-        # Hide the entire selection if the viewport has not reached it yet
-        if width < range_x:
-            range_x = width
-            range_width = 0
-        # Hide the right of the selection if it is not yet in the viewport
-        if width < range_x + range_width:
-            range_width = width - range_x
+        range_x, range_y, range_width, range_height = self.auto_adjust_selection_range(arange.x,
+                                                                                       arange.y,
+                                                                                       arange.width,
+                                                                                       arange.height,
+                                                                                       width,
+                                                                                       height,
+                                                                                       display)
 
         # Clipping for when the user selects the entire row(s). You may notice that
         # I didn't adjust the width and height as it's not worth the complexity.
         if arange.column == 0:
-            context.rectangle(-1, display.column_header_height - 1, width, height)
+            context.rectangle(-1, display.top_locator_height - 1, width, height)
             context.clip()
         # Clipping for when the user selects the entire column(s)
         if arange.row == 0:
-            context.rectangle(display.row_header_width - 1, -1, width, height)
+            context.rectangle(display.left_locator_width - 1, -1, width, height)
             context.clip()
         # Clipping for general use cases
         if arange.column > 0 and arange.row > 0:
-            context.rectangle(display.row_header_width - 1, display.column_header_height - 1, width, height)
+            context.rectangle(display.left_locator_width - 1, display.top_locator_height - 1, width, height)
             context.clip()
 
         # Reduces the opacity of the accent color so that it doesn't look too bright,
@@ -181,27 +154,27 @@ class SheetRenderer(GObject.Object):
         # Indicates that the user has selected the entire column(s) by highlighting all the row headers
         if arange.column > 0 and arange.row == 0:
             context.reset_clip()
-            context.rectangle(0, display.column_header_height, display.row_header_width, height)
+            context.rectangle(0, display.top_locator_height, display.left_locator_width, height)
             context.fill()
 
         # Indicates that the user has selected the entire row(s) by highlighting all the column headers
         if arange.column == 0 and arange.row > 0:
             context.reset_clip()
-            context.rectangle(display.row_header_width, 0, width, display.column_header_height)
+            context.rectangle(display.left_locator_width, 0, width, display.top_locator_height)
             context.fill()
 
         # Indicates that the user has a selection by highlighting the row and column header(s)
         if arange.column > 0 and arange.row > 0:
             context.reset_clip()
-            context.rectangle(display.row_header_width - 1, 0, width, height)
+            context.rectangle(display.left_locator_width - 1, 0, width, height)
             context.clip()
-            context.rectangle(range_x, 0, range_width, display.column_header_height)
+            context.rectangle(range_x, 0, range_width, display.top_locator_height)
             context.fill()
 
             context.reset_clip()
-            context.rectangle(0, display.column_header_height - 1, width, height)
+            context.rectangle(0, display.top_locator_height - 1, width, height)
             context.clip()
-            context.rectangle(0, range_y, display.row_header_width, range_height)
+            context.rectangle(0, range_y, display.left_locator_width, range_height)
             context.fill()
 
         # We want more emphasis for when the user has selected column(s), row(s), or even the entire sheet,
@@ -212,24 +185,24 @@ class SheetRenderer(GObject.Object):
         # Bold highlight all the headers if the user has selected the entire sheet
         if arange.column == 0 and arange.row == 0:
             context.reset_clip()
-            context.rectangle(display.row_header_width, range_y, width, display.column_header_height)
-            context.rectangle(range_x, display.column_header_height, display.row_header_width, range_height)
+            context.rectangle(display.left_locator_width, range_y, width, display.top_locator_height)
+            context.rectangle(range_x, display.top_locator_height, display.left_locator_width, range_height)
             context.fill()
 
         # Bold highlight the selected column(s) header
         if arange.column > 0 and arange.row == 0:
             context.reset_clip()
-            context.rectangle(display.row_header_width - 1, -1, width, height)
+            context.rectangle(display.left_locator_width - 1, -1, width, height)
             context.clip()
-            context.rectangle(range_x, range_y, range_width, display.column_header_height)
+            context.rectangle(range_x, range_y, range_width, display.top_locator_height)
             context.fill()
 
         # Bold highlight the selected row(s) header
         if arange.column == 0 and arange.row > 0:
             context.reset_clip()
-            context.rectangle(-1, display.column_header_height - 1, width, height)
+            context.rectangle(-1, display.top_locator_height - 1, width, height)
             context.clip()
-            context.rectangle(range_x, range_y, display.row_header_width, range_height)
+            context.rectangle(range_x, range_y, display.left_locator_width, range_height)
             context.fill()
 
         # It's important to differentiate between the active cell and the selection range
@@ -248,7 +221,7 @@ class SheetRenderer(GObject.Object):
         cell = selection.current_active_cell
 
         context.reset_clip()
-        context.rectangle(display.row_header_width - 1, display.column_header_height - 1, width, height)
+        context.rectangle(display.left_locator_width - 1, display.top_locator_height - 1, width, height)
         context.clip()
         context.rectangle(cell.x, cell.y, cell.width, cell.height)
         context.fill()
@@ -272,8 +245,8 @@ class SheetRenderer(GObject.Object):
 
         # Use system default font family for drawing text
         body_font_desc = Gtk.Widget.create_pango_context(canvas).get_font_description()
-        font_family = body_font_desc.get_family() if body_font_desc else 'Sans'
-        body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Bold {display.FONT_SIZE}px')
+        body_font_family = body_font_desc.get_family() if body_font_desc else 'Sans'
+        body_font_desc = Pango.font_description_from_string(f'{body_font_family} Normal Bold {display.FONT_SIZE}px')
 
         # We should achieve the high contrast between the text and the canvas background, though I'm aware
         # of the potential problems with using the pure black and white colors. Let's decide that later.
@@ -282,46 +255,26 @@ class SheetRenderer(GObject.Object):
             text_color = (1.0, 1.0, 1.0)
         context.set_source_rgb(*text_color)
 
-        # Determine the starting column label
-        col_index = display.get_starting_column() + 1
-
         context.save()
-        context.rectangle(display.row_header_width, 0, width, height)
+        context.rectangle(display.left_locator_width, 0, width, height)
         context.clip()
 
         # Draw column headers texts (centered)
         # It's so rare to see a worksheet go beyond Z*9 columns, but it's better to be prepared for it anyway
         # by having defining the clip region to prevent the text from overflowing to the next cells. TODO: maybe
         # it's better to automatically adjust the cell widths to fit the text width if the text is overflowing?
-        x_start = display.row_header_width
-        x = x_start
-        x_offset = 0
+        col_index = display.get_starting_column()
+        x = display.get_cell_x_from_column(col_index)
+
         while x < width:
-            # Handle edge cases where the last column(s) are hidden
-            if col_index - 1 == len(display.column_visible_series) \
-                    and len(display.column_visible_series) \
-                    and display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) \
-                    and not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
-                col_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1) - 1
-
             vcol_index = display.get_vcolumn_from_column(col_index)
-
-            # Get the width of the next appearing column
-            cell_width = display.DEFAULT_CELL_WIDTH
-            if vcol_index - 1 < len(display.column_widths):
-                cell_width = display.column_widths[vcol_index - 1]
-
-            # Offset the first appearing column to account for the scroll position if necessary
-            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
-                x_offset = display.scroll_x_position
-                if 0 < col_index - 1 <= len(display.cumulative_column_widths):
-                    x_offset -= display.cumulative_column_widths[col_index - 2]
-                elif len(display.cumulative_column_widths) < col_index - 1:
-                    x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
-                x -= x_offset
+            cell_width = display.get_cell_width_from_column(col_index)
 
             # Draw dataframe header
-            if len(data.bbs) and 0 < display.scroll_y_position and col_index <= data.bbs[0].column_span:
+            # TODO: support multiple dataframes?
+            if len(data.bbs) \
+                    and 0 < display.scroll_y_position \
+                    and col_index <= data.bbs[0].column_span:
                 cname = data.dfs[0].columns[vcol_index - 1]
                 dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
                 layout.set_font_description(body_font_desc)
@@ -337,7 +290,7 @@ class SheetRenderer(GObject.Object):
                 x_text = x + (cell_width - text_width) / 2
 
             context.save()
-            context.rectangle(x, 0, cell_width - 1, display.column_header_height)
+            context.rectangle(x, 0, cell_width - 1, display.top_locator_height)
             context.clip()
             context.move_to(x_text, 2)
             PangoCairo.show_layout(context, layout)
@@ -350,31 +303,23 @@ class SheetRenderer(GObject.Object):
 
         layout.set_font_description(header_font_desc)
 
-        # Determine the starting row number
-        row_index = display.get_starting_row() + 1
-
         # Draw row headers texts (right-aligned)
         # Here we don't necessarily need the clip region because the row headers are usually if not always
         # readjusted before even moving to the rendering process.
-        y = display.column_header_height
-        while y < height:
-            # Handle edge cases where the last row(s) are hidden
-            if row_index - 1 == len(display.row_visible_series) \
-                    and len(display.row_visible_series) \
-                    and display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) \
-                    and not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
-                row_index += (len(display.row_visibility_flags) - 1) - (display.row_visible_series[-1] - 1) - 1
+        row_index = display.get_starting_row()
+        y = display.get_cell_y_from_row(row_index)
 
+        while y < height:
             cell_text = display.get_vrow_from_row(row_index)
             layout.set_text(str(cell_text), -1)
             text_width = layout.get_size()[0] / Pango.SCALE
-            x = display.row_header_width - text_width - display.DEFAULT_CELL_PADDING
+            x = display.left_locator_width - text_width - display.DEFAULT_CELL_PADDING
 
             context.move_to(x, 2 + y)
             PangoCairo.show_layout(context, layout)
 
+            y += display.get_cell_height_from_row(row_index)
             row_index += 1
-            y += display.DEFAULT_CELL_HEIGHT
 
         context.restore()
 
@@ -389,8 +334,8 @@ class SheetRenderer(GObject.Object):
             return
 
         # Drawing loop boundaries
-        x_start = display.row_header_width
-        y_start = display.column_header_height
+        x_start = display.left_locator_width
+        y_start = display.top_locator_height
         x_end = width
         y_end = height
 
@@ -432,26 +377,41 @@ class SheetRenderer(GObject.Object):
 
             # Use cache if only the cache area will be visible in the viewport
             # and the canvas movement is not diagonal.
-            if abs(x_offset) < width and abs(y_offset) < height and \
+            if abs(x_offset) < width and \
+                    abs(y_offset) < height and \
                     (abs(x_offset) > 0 and y_offset == 0) or \
                     (abs(y_offset) > 0 and x_offset == 0):
+                # When the user scrolls the canvas to the right
                 if x_offset > 0:
                     nx_start = display.get_cell_x_from_point(width - x_offset)
                     cwidth = nx_start - x_start
                     ncontext.rectangle(x_start, y_start, cwidth, y_end)
+
+                # When the user scrolls the canvas to the left
                 elif x_offset < 0:
                     nx_end = display.get_cell_x_from_point(x_start - x_offset)
                     cwidth = display.get_cell_width_from_point(x_start - x_offset)
                     ncontext.rectangle(nx_end + cwidth, y_start, x_end, y_end)
 
+                    col_index = display.get_starting_column()
+                    x = display.get_cell_x_from_column(col_index)
+                    nx_start = x
+
+                # When the user scrolls the canvas down
                 if y_offset > 0:
                     ny_start = display.get_cell_y_from_point(height - y_offset)
                     cheight = ny_start - y_start
                     ncontext.rectangle(x_start, y_start, x_end, cheight)
+
+                # When the user scrolls the canvas up
                 elif y_offset < 0:
-                    ny_end = display.get_cell_y_from_point(y_start - y_offset)
+                    ny_end = display.get_cell_y_from_point(y_start - y_offset, -1)
                     cheight = display.get_cell_height_from_point(y_start - y_offset)
                     ncontext.rectangle(x_start, ny_end + cheight, x_end, y_end)
+
+                    row_index = display.get_starting_row()
+                    y = display.get_cell_y_from_row(row_index)
+                    ny_start = y
 
                 ncontext.translate(rcache['x_trans'], rcache['y_trans'])
                 ncontext.clip()
@@ -488,80 +448,56 @@ class SheetRenderer(GObject.Object):
         else:
             ccontext.set_source_rgb(0.0, 0.0, 0.0)
 
-        cell_width = display.DEFAULT_CELL_WIDTH
-        cell_height = display.DEFAULT_CELL_HEIGHT
+        col_index = display.get_starting_column()
+        x = display.get_cell_x_from_column(col_index)
 
         # TODO: support multiple dataframes?
-        x = x_start
-        x_offset = 0
-        col_index = display.get_starting_column()
         while x < x_end:
-            if data.bbs[0].column_span <= col_index:
+            if data.bbs[0].column_span < col_index:
                 width = x # prevent iteration over empty cells
                 break
 
-            vcol_index = display.get_vcolumn_from_column(col_index + 1)
-
-            # Get the width of the next appearing column
-            cell_width = display.DEFAULT_CELL_WIDTH
-            if vcol_index - 1 < len(display.column_widths):
-                cell_width = display.column_widths[vcol_index - 1]
-
-            # Offset the first appearing column to account for the scroll position if necessary
-            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
-                x_offset = display.scroll_x_position
-                if 0 < col_index <= len(display.cumulative_column_widths):
-                    x_offset -= display.cumulative_column_widths[col_index - 1]
-                elif len(display.cumulative_column_widths) < col_index:
-                    x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
-                x -= x_offset
-                if nx_start == x_start:
-                    nx_start -= x_offset
+            vcol_index = display.get_vcolumn_from_column(col_index)
+            cell_width = display.get_cell_width_from_column(col_index)
 
             ccontext.save()
-            ccontext.rectangle(x, display.column_header_height, cell_width - 1, height)
+            ccontext.rectangle(x, display.top_locator_height, cell_width - 1, height)
             ccontext.clip()
 
-            y = y_start
-            row_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
+            row_index = display.get_starting_row()
+            y = display.get_cell_y_from_row(row_index)
 
             while y < y_end:
-                if y < ny_start or ny_end < y or x < nx_start or nx_end < x:
+                vrow_index = display.get_vrow_from_row(row_index)
+                cell_height = display.get_cell_height_from_row(row_index)
+
+                if y < ny_start \
+                        or ny_end < y \
+                        or x < nx_start \
+                        or nx_end < x:
                     y += cell_height
                     row_index += 1
                     continue # skip cached area
 
-                if data.bbs[0].row_span <= row_index:
+                if data.bbs[0].row_span < row_index:
                     height = y
                     break # prevent iteration over empty cells
 
                 x_text = x + display.DEFAULT_CELL_PADDING
 
                 # Draw dataframe header
-                if row_index == 0:
+                if vrow_index == 1:
                     layout.set_font_description(header_font_desc)
-                    if col_index < len(display.column_visible_series):
-                        vcol_index = display.column_visible_series[col_index]
-                    else:
-                        vcol_index = col_index
-                    cname = data.dfs[0].columns[vcol_index]
-                    dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index])
+                    cname = data.dfs[0].columns[vcol_index - 1]
+                    dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
                     cell_text = f'{cname} [{dtype}]'
                     layout.set_text(cell_text, -1)
 
                 # Draw dataframe content
                 else:
                     layout.set_font_description(body_font_desc)
-                    if row_index < len(display.row_visible_series):
-                        vrow_index = display.row_visible_series[row_index]
-                    else:
-                        vrow_index = row_index
-                    if col_index < len(display.column_visible_series):
-                        vcol_index = display.column_visible_series[col_index]
-                    else:
-                        vcol_index = col_index
-                    cell_text = data.dfs[0][vrow_index - 1, vcol_index]
-                    col_dtype = data.dfs[0].dtypes[vcol_index]
+                    cell_text = data.dfs[0][vrow_index - 2, vcol_index - 1]
+                    col_dtype = data.dfs[0].dtypes[vcol_index - 1]
 
                     if cell_text in ['', None]:
                         y += cell_height
@@ -586,13 +522,13 @@ class SheetRenderer(GObject.Object):
                 ccontext.move_to(x_text, y + 2)
                 PangoCairo.show_layout(ccontext, layout)
 
-                # TODO: add support for custom row heights
                 y += cell_height
                 row_index += 1
 
-            ccontext.restore()
             x += cell_width
             col_index += 1
+
+            ccontext.restore()
 
         ccontext.restore()
 
@@ -612,10 +548,11 @@ class SheetRenderer(GObject.Object):
         else:
             context.set_source_rgb(0.75, 0.75, 0.75)
 
-        x_start = display.row_header_width
-        y_start = display.column_header_height
-        cell_width = display.DEFAULT_CELL_WIDTH
-        cell_height = display.DEFAULT_CELL_HEIGHT
+        # I bet this is better than a thick line!
+        context.set_hairline(True)
+
+        x_start = display.left_locator_width
+        y_start = display.top_locator_height
 
         # Draw separator line between headers and contents
         context.move_to(0, y_start)
@@ -624,40 +561,33 @@ class SheetRenderer(GObject.Object):
         context.line_to(x_start, height)
         context.stroke()
 
-        # I bet this is better than a thick line!
-        context.set_hairline(True)
-
         # Draw horizontal lines
-        y = y_start
-
-        nrow_index = int((y - display.column_header_height) // cell_height + display.get_starting_row())
-        prow_index = nrow_index
-
         context.reset_clip()
-        context.rectangle(0, display.column_header_height, width, height)
+        context.rectangle(0, display.top_locator_height, width, height)
         context.clip()
 
-        # TODO: add support for custom row heights
-        while y < height:
-            context.move_to(x_start, y)
-            context.line_to(width, y)
+        nrow_index = display.get_starting_row()
+        prow_index = nrow_index
 
-            # Skipping rows that are hidden will result in double lines
-            double_lines = False
-            if nrow_index < len(display.row_visible_series):
-                vrow_index = display.row_visible_series[nrow_index]
-                if vrow_index != prow_index:
-                    double_lines = True
-                    prow_index = vrow_index
+        y = display.get_cell_y_from_row(nrow_index)
 
-            # Handle edge cases where the last row(s) are hidden
-            elif nrow_index == len(display.row_visible_series) \
-                    and len(display.row_visible_series) \
-                    and display.row_visible_series[-1] + 1 < len(display.row_visibility_flags) \
-                    and not display.row_visibility_flags[display.row_visible_series[-1] + 1]:
-                double_lines = True
-                nrow_index += (len(display.row_visibility_flags) - 1) - (display.row_visible_series[-1] - 1)
+        # Prevent showing double lines at the first row when the logical cell
+        # right above it is visible
+        if nrow_index > 1:
+            vrow_index = display.get_vrow_from_row(nrow_index)
+            if display.check_cell_visibility_from_position(vrow_index - 1, -1):
+                prow_index = vrow_index
 
+        while y < width:
+            vrow_index = display.get_vrow_from_row(nrow_index)
+            hidden_row_exists = prow_index != vrow_index
+
+            if hidden_row_exists:
+                prow_index = vrow_index
+
+            double_lines = hidden_row_exists
+
+            # Draw line(s) in the locator area
             if double_lines:
                 context.move_to(0, y - 2)
                 context.line_to(x_start, y - 2)
@@ -667,57 +597,53 @@ class SheetRenderer(GObject.Object):
                 context.move_to(0, y)
                 context.line_to(x_start, y)
 
-            y += cell_height
+            # Draw line in the content area
+            context.move_to(x_start, y)
+            context.line_to(width, y)
+
+            y += display.get_cell_height_from_row(nrow_index)
             nrow_index += 1
             prow_index += 1
 
         context.stroke()
 
         # Draw vertical lines
+        context.reset_clip()
+        context.rectangle(display.left_locator_width, 0, width, height)
+        context.clip()
+
         ncol_index = display.get_starting_column()
         pcol_index = ncol_index
 
-        context.reset_clip()
-        context.rectangle(display.row_header_width, 0, width, height)
-        context.clip()
+        x = display.get_cell_x_from_column(ncol_index)
 
-        x = x_start
-        x_offset = 0
+        # Prevent showing double lines at the first column when the logical cell
+        # right before it is visible
+        if ncol_index > 1:
+            vcol_index = display.get_vcolumn_from_column(ncol_index)
+            if display.check_cell_visibility_from_position(vcol_index - 1, -1):
+                pcol_index = vcol_index
+
         while x < width:
-            # Skipping columns that are hidden will result in double lines
-            double_lines = False
-            if ncol_index < len(display.column_visible_series):
-                vcol_index = display.column_visible_series[ncol_index]
-                if vcol_index != pcol_index:
-                    double_lines = True
-                    pcol_index = vcol_index
+            vcol_index = display.get_vcolumn_from_column(ncol_index)
+            hidden_column_exists = pcol_index != vcol_index
 
-            # Handle edge cases where the last column(s) are hidden
-            elif ncol_index == len(display.column_visible_series) \
-                    and len(display.column_visible_series) \
-                    and display.column_visible_series[-1] + 1 < len(display.column_visibility_flags) \
-                    and not display.column_visibility_flags[display.column_visible_series[-1] + 1]:
-                double_lines = True
-                ncol_index += (len(display.column_visibility_flags) - 1) - (display.column_visible_series[-1] - 1)
+            if hidden_column_exists:
+                pcol_index = vcol_index
 
-            vcol_index = display.get_vcolumn_from_column(ncol_index + 1)
-
-            # Get the width of the next appearing column
-            cell_width = display.DEFAULT_CELL_WIDTH
-            if vcol_index - 1 < len(display.column_widths):
-                cell_width = display.column_widths[vcol_index - 1]
-
-            # Offset the first appearing column to account for the scroll position if necessary
-            if x == x_start and 0 < display.scroll_x_position and len(display.cumulative_column_widths):
-                x_offset = display.scroll_x_position
-                if 0 < ncol_index <= len(display.cumulative_column_widths):
-                    x_offset -= display.cumulative_column_widths[ncol_index - 1]
-                elif len(display.cumulative_column_widths) < ncol_index:
-                    x_offset = (x_offset - display.cumulative_column_widths[-1]) % display.DEFAULT_CELL_WIDTH
-                x -= x_offset
+            double_lines = hidden_column_exists
 
             # Draw line(s) in the locator area
             if double_lines:
+                context.stroke()
+                context.save()
+                if self.prefers_dark:
+                    context.set_source_rgb(0.11, 0.11, 0.13)
+                else:
+                    context.set_source_rgb(1.0, 1.0, 1.0)
+                context.rectangle(x - 2, 0, 4, y_start - 1)
+                context.fill()
+                context.restore()
                 context.move_to(x - 2, 0)
                 context.line_to(x - 2, y_start)
                 context.move_to(x + 2, 0)
@@ -730,7 +656,7 @@ class SheetRenderer(GObject.Object):
             context.move_to(x, y_start)
             context.line_to(x, height)
 
-            x += cell_width
+            x += display.get_cell_width_from_column(ncol_index)
             ncol_index += 1
             pcol_index += 1
 
@@ -747,7 +673,9 @@ class SheetRenderer(GObject.Object):
         context.save()
 
         cutcopy_range = selection.current_cutcopy_range
-        if (display.document.is_cutting_cells or display.document.is_copying_cells) and cutcopy_range is not None:
+        if cutcopy_range is not None \
+                and (display.document.is_cutting_cells or
+                     display.document.is_copying_cells):
             cutcopy_range_x, \
             cutcopy_range_y, \
             cutcopy_range_width, \
@@ -818,15 +746,15 @@ class SheetRenderer(GObject.Object):
         # Clipping for when the user selects the entire row(s). You may notice that
         # I didn't adjust the width and height as it's not worth the complexity.
         if arange.column == 0:
-            context.rectangle(0, display.column_header_height - 1, width, height)
+            context.rectangle(0, display.top_locator_height - 1, width, height)
             context.clip()
         # Clipping for when the user selects the entire column(s)
         if arange.row == 0:
-            context.rectangle(display.row_header_width - 1, 0, width, height)
+            context.rectangle(display.left_locator_width - 1, 0, width, height)
             context.clip()
         # Clipping for general use cases
         if arange.column > 0 and arange.row > 0:
-            context.rectangle(display.row_header_width - 1, display.column_header_height - 1, width, height)
+            context.rectangle(display.left_locator_width - 1, display.top_locator_height - 1, width, height)
             context.clip()
 
         # We use a bold style here
@@ -836,23 +764,23 @@ class SheetRenderer(GObject.Object):
         # Indicates that the user has selected the entire column(s) by drawing a vertical line
         # next to the row headers
         if arange.column > 0 and arange.row == 0:
-            context.move_to(display.row_header_width, display.column_header_height - 1)
-            context.line_to(display.row_header_width, height)
+            context.move_to(display.left_locator_width, display.top_locator_height - 1)
+            context.line_to(display.left_locator_width, height)
             context.stroke()
 
         # Indicates that the user has selected the entire row(s) by drawing a horizontal line
         # next to the column headers
         if arange.column == 0 and arange.row > 0:
-            context.move_to(display.row_header_width - 1, display.column_header_height)
-            context.line_to(width, display.column_header_height)
+            context.move_to(display.left_locator_width - 1, display.top_locator_height)
+            context.line_to(width, display.top_locator_height)
             context.stroke()
 
         # Indicates that the user has a selection by drawing a line next to the row and column header(s)
         if arange.column > 0 and arange.row > 0:
-            context.move_to(range_x, display.column_header_height)
-            context.line_to(range_x + range_width, display.column_header_height)
-            context.move_to(display.row_header_width, range_y)
-            context.line_to(display.row_header_width, range_y + range_height)
+            context.move_to(range_x, display.top_locator_height)
+            context.line_to(range_x + range_width, display.top_locator_height)
+            context.move_to(display.left_locator_width, range_y)
+            context.line_to(display.left_locator_width, range_y + range_height)
             context.stroke()
 
         # Don't render the active selection when the user selects the entire sheet
@@ -861,7 +789,7 @@ class SheetRenderer(GObject.Object):
             context.stroke()
 
         context.reset_clip()
-        context.rectangle(display.row_header_width - 1, 0, width, height)
+        context.rectangle(display.left_locator_width - 1, 0, width, height)
         context.clip()
 
         context.set_line_width(1)
@@ -933,8 +861,8 @@ class SheetRenderer(GObject.Object):
             # Hide the top of the selection if it is exceeded by the scroll viewport
             if range_y < 0:
                 range_height += range_y
-                range_y = display.column_header_height
-                range_height -= display.column_header_height
+                range_y = display.top_locator_height
+                range_height -= display.top_locator_height
             # Hide the entire selection if it is exceeded by the scroll viewport
             if range_height < 0:
                 range_height = 0
@@ -949,8 +877,8 @@ class SheetRenderer(GObject.Object):
             # Hide the left of the selection if it is exceeded by the scroll viewport
             if range_x < 0:
                 range_width += range_x
-                range_x = display.row_header_width
-                range_width -= display.row_header_width
+                range_x = display.left_locator_width
+                range_width -= display.left_locator_width
             # Hide the entire selection if it is exceeded by the scroll viewport
             if range_width < 0:
                 range_width = 0

@@ -111,6 +111,7 @@ class Application(Adw.Application):
         self.create_action('convert-to-categorical', self.on_convert_to_categorical_action)
         self.create_action('convert-to-boolean', self.on_convert_to_boolean_action)
         self.create_action('convert-to-text', self.on_convert_to_text_action)
+        self.create_action('open-inline-formula', self.on_open_inline_formula_action, ['F2'])
 
     def do_activate(self) -> None:
         if window := self.get_active_window():
@@ -441,6 +442,10 @@ class Application(Adw.Application):
     def convert_to(self, dtype: polars.DataType) -> None:
         document = self.get_current_active_document()
         document.convert_current_columns_dtype(dtype)
+
+    def on_open_inline_formula_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        window.open_inline_formula()
 
     def get_current_active_document(self) -> SheetDocument:
         window = self.get_active_window()
