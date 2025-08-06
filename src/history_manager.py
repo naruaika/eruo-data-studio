@@ -21,6 +21,7 @@
 from collections import deque
 from gi.repository import GObject
 from tempfile import NamedTemporaryFile
+from typing import Any
 import copy
 import polars
 import time
@@ -68,6 +69,7 @@ class State(GObject.Object):
     def restore_selection(self, notify: bool = True) -> None:
         document = globals.history.document
 
+        # TODO: in some conditions, no senses to restore the selection
         document.selection.current_active_range = self.range
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
@@ -224,27 +226,31 @@ class InsertBlankColumnState(State):
 
 
 
-class UpdateColumnDataState(State):
-    __gtype_name__ = 'UpdateColumnDataState'
+class UpdateColumnDataFromDAXState(State):
+    __gtype_name__ = 'UpdateColumnDataFromDAXState'
 
     file_path: str
 
     t_column_names: list[str] # targeted columns
     n_column_names: list[str] # added columns
+
     dfi: int
     query: str
 
     def __init__(self,
-                 content:      any,
+                 content:        Any,
                  t_column_names: list[str],
                  n_column_names: list[str],
-                 dfi:          int,
-                 query:        str) -> None:
+                 dfi:            int,
+                 query:          str) -> None:
         super().__init__()
 
         self.save_selection(True)
 
-        self.file_path = self.write_snapshot(content)
+        if content is not None:
+            self.file_path = self.write_snapshot(content)
+        else:
+            self.file_path = None
 
         self.t_column_names = t_column_names
         self.n_column_names = n_column_names
@@ -261,11 +267,68 @@ class UpdateColumnDataState(State):
             document.delete_current_columns()
 
         # Restore targeted columns
-        document.data.update_cell_data_blocks_from_metadata(self.t_column_names,
-                                                            0,  # from the first row
-                                                            -1, # to the last row
-                                                            self.dfi,
-                                                            polars.read_parquet(self.file_path))
+        if self.file_path is not None:
+            document.data.update_cell_data_blocks_from_metadata(self.t_column_names,
+                                                                0,  # from the first row
+                                                                -1, # to the last row
+                                                                self.dfi,
+                                                                polars.read_parquet(self.file_path))
+
+        self.restore_selection()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.update_columns_from_dax(self.query)
+
+
+
+class UpdateColumnDataFromSQLState(State):
+    __gtype_name__ = 'UpdateColumnDataFromSQLState'
+
+    file_path: str
+
+    t_column_names: list[str] # targeted columns
+    n_column_names: list[str] # added columns
+
+    dfi: int
+    query: str
+
+    def __init__(self,
+                 content:        Any,
+                 t_column_names: list[str],
+                 n_column_names: list[str],
+                 dfi:            int,
+                 query:          str) -> None:
+        super().__init__()
+
+        self.save_selection(True)
+
+        if content is not None:
+            self.file_path = self.write_snapshot(content)
+        else:
+            self.file_path = None
+
+        self.t_column_names = t_column_names
+        self.n_column_names = n_column_names
+        self.dfi = dfi
+        self.query = query
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        # Delete added columns
+        bbox = document.data.bbs[self.dfi]
+        for _ in self.n_column_names:
+            document.move_selection_to_corner(bbox, 'bottom-right')
+            document.delete_current_columns()
+
+        # Restore targeted columns
+        if self.file_path is not None:
+            document.data.update_cell_data_blocks_from_metadata(self.t_column_names,
+                                                                0,  # from the first row
+                                                                -1, # to the last row
+                                                                self.dfi,
+                                                                polars.read_parquet(self.file_path))
 
         self.restore_selection()
 
@@ -278,16 +341,16 @@ class UpdateColumnDataState(State):
 class UpdateDataState(State):
     __gtype_name__ = 'UpdateDataState'
 
-    content: any
+    content: Any
     file_path: str
 
-    new_value: any
+    new_value: Any
 
     include_header: bool
 
     def __init__(self,
-                 content:        any,
-                 new_value:      any,
+                 content:        Any,
+                 new_value:      Any,
                  include_header: bool) -> None:
         super().__init__()
 
@@ -323,7 +386,7 @@ class UpdateDataState(State):
 class UpdateRangeDataState(State):
     __gtype_name__ = 'UpdateRangeDataState'
 
-    content: any
+    content: Any
     file_path: str
 
     crange: SheetCell
@@ -331,7 +394,7 @@ class UpdateRangeDataState(State):
     include_header: bool
 
     def __init__(self,
-                 content:        any,
+                 content:        Any,
                  crange:         SheetCell,
                  include_header: bool) -> None:
         super().__init__()
@@ -898,7 +961,7 @@ class FindReplaceAllDataState(State):
     use_regexp: bool
 
     def __init__(self,
-                 content:          any,
+                 content:          Any,
                  column_names:     list[str],
                  row:              int,
                  row_span:         int,

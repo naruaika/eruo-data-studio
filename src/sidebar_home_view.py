@@ -569,14 +569,15 @@ class SidebarHomeView(Adw.Bin):
             list_item = FieldListItem(cindex + 1, cname, dtype, active)
             self.field_list_store.append(list_item)
 
-        self.repopulate_sort_list(dfi)
-
         is_empty = self.field_list_store.get_n_items() == 0
         self.field_list_view.get_parent().set_visible(not is_empty)
         self.field_list_status.get_parent().set_visible(is_empty)
 
         if self.field_list_store.get_n_items() == 0:
             self.field_list_status.set_text('No fields found')
+
+        self.repopulate_sort_list(dfi)
+        self.repopulate_filter_list(dfi)
 
     #
     # Sort section
@@ -745,6 +746,8 @@ class SidebarHomeView(Adw.Bin):
         column_names = sheet_document.data.dfs[dfi].columns
 
         for cname in sheet_document.current_sorts:
+            if cname not in column_names:
+                continue
             cindex = column_names.index(cname)
             descending = sheet_document.current_sorts[cname]['descending']
             order = 'Descending' if descending else 'Ascending'

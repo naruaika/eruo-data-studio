@@ -19,6 +19,7 @@
 
 
 from gi.repository import Gdk, GLib, GObject, Gtk, Pango, PangoCairo
+from typing import Any
 import cairo
 import copy
 import polars
@@ -107,7 +108,7 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_scrollbars_by_scroll()
 
         self.setup_document_history()
-        self.populate_column_resizer_widgets()
+        self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 
     #
@@ -1018,73 +1019,81 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def update_columns_from_expression(self, expression: str) -> bool:
+    def update_columns_from_dax(self, query: str) -> bool:
         arange = self.selection.current_active_range
         mdfi = arange.metadata.dfi
+
+        # Check bounding box collision
+        from .sheet_data import SheetCellBoundingBox
+        arange_bbox = SheetCellBoundingBox(arange.column,
+                                           arange.row,
+                                           arange.column_span,
+                                           arange.row_span)
+        for bbox in self.data.bbs:
+            collision_info = bbox.check_collision(arange_bbox)
+
+            has_collision = collision_info['has_collision']
+            in_bounds = collision_info['nonov_column_span'] + collision_info['nonov_row_span'] == 0
+            is_sticky = collision_info['horizontal_gap'] + collision_info['vertical_gap'] == 0
+
+            if (has_collision and not in_bounds) or is_sticky:
+                mdfi = self.data.bbs.index(bbox)
+                break
 
         if mdfi < 0:
             return False # TODO: create a new table?
 
-        from pprint import pprint
-        pprint(parse_dax(expression))
+        # from pprint import pprint
+        # pprint(parse_dax(query), sort_dicts=False)
 
-        return True
+        expression = parse_dax(query)
 
-    def update_columns_from_sql(self, query: str) -> bool:
-        arange = self.selection.current_active_range
-        mdfi = arange.metadata.dfi
+        if 'error' in expression:
+            globals.send_notification('Cannot execute the query')
+            return False
 
-        if mdfi < 0:
-            return False # TODO: create a new table?
+        is_new_column = expression['measure-name'] not in self.data.dfs[mdfi].columns
 
-        # Clean up the query
-        n_query = query.split('=', 1)[1].strip()
-
-        # Add "FROM self" if needed
-        if 'from self' not in n_query.lower():
-            n_query += ' FROM self'
-
-        from .history_manager import UpdateColumnDataState
-        try:
-            sample_df = self.data.dfs[mdfi][0].sql(n_query) # get only the first row
-            target_column_names = list(set(self.data.dfs[mdfi].columns) & set(sample_df.columns))
-            added_column_names = list(set(sample_df.columns) - set(target_column_names))
-            n_added_columns = len(added_column_names)
-        except:
-            pass # ignore it as it'll also fail in the next processing step
+        if is_new_column:
+            target_column_names = []
+            added_column_names = [expression['measure-name']]
+        else:
+            target_column_names = [expression['measure-name']]
+            added_column_names = []
 
         # Save snapshot
         if not globals.is_changing_state:
-            from .history_manager import UpdateColumnDataState
-            state = UpdateColumnDataState(self.data.read_cell_data_chunks_from_metadata(target_column_names, 0, -1, mdfi),
-                                          target_column_names,
-                                          added_column_names,
-                                          mdfi,
-                                          query)
+            from .history_manager import UpdateColumnDataFromDAXState
+            state = UpdateColumnDataFromDAXState(self.data.read_cell_data_chunks_from_metadata(target_column_names, 0, -1, mdfi),
+                                                 target_column_names,
+                                                 added_column_names,
+                                                 mdfi,
+                                                 query)
 
         # Apply the query
-        if self.data.update_columns_with_sql_from_metadata(mdfi, n_query):
+        if self.data.update_columns_with_expression_from_metadata(mdfi,
+                                                                  expression['measure-name'],
+                                                                  expression['expression']):
             # Update column visibility flags
             if len(self.display.column_visibility_flags):
                 self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags,
-                                                                      polars.Series([True] * n_added_columns)])
+                                                                      polars.Series([True])])
                 self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
-                self.data.bbs[mdfi].column_span = len(self.display.column_visible_series)
 
             # Update column widths
             if len(self.display.column_widths):
                 self.display.column_widths = polars.concat([self.display.column_widths,
-                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH] * n_added_columns)])
+                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH])])
                 column_widths_visible_only = self.display.column_widths
                 if len(self.display.column_visibility_flags):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
                 self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
             # TODO: what should we do instead when no new columns were added?
-            if n_added_columns > 0:
+            if is_new_column:
                 bbox = self.data.bbs[mdfi]
-                self.update_selection_from_position(bbox.column + bbox.column_span - n_added_columns, 0,
-                                                    bbox.column + bbox.column_span - 1, 0,
+                self.update_selection_from_position(bbox.column + bbox.column_span - 1, 1,
+                                                    bbox.column + bbox.column_span - 1, 1,
                                                     follow_cursor=False)
 
             # Save snapshot
@@ -1103,7 +1112,101 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def update_current_cells(self, new_value: any) -> bool:
+    def update_columns_from_sql(self, query: str) -> bool:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        # Check bounding box collision
+        from .sheet_data import SheetCellBoundingBox
+        arange_bbox = SheetCellBoundingBox(arange.column,
+                                           arange.row,
+                                           arange.column_span,
+                                           arange.row_span)
+        for bbox in self.data.bbs:
+            collision_info = bbox.check_collision(arange_bbox)
+
+            has_collision = collision_info['has_collision']
+            in_bounds = collision_info['nonov_column_span'] + collision_info['nonov_row_span'] == 0
+            is_sticky = collision_info['horizontal_gap'] + collision_info['vertical_gap'] == 0
+
+            if (has_collision and not in_bounds) or is_sticky:
+                mdfi = self.data.bbs.index(bbox)
+                break
+
+        if mdfi < 0:
+            return False # TODO: create a new table?
+
+        # Clean up the query
+        nquery = query.split('=', 1)[1].strip()
+
+        # Add "FROM self" if needed
+        if 'from self' not in nquery.lower():
+            if 'where' in nquery.lower():
+                nquery = nquery.replace('where', 'FROM self where', 1)
+            else:
+                nquery += ' FROM self'
+
+        target_column_names = []
+        added_column_names = []
+
+        try:
+            sample_df = self.data.dfs[mdfi][0].sql(nquery) # get only the first row
+            target_column_names = list(set(self.data.dfs[mdfi].columns) & set(sample_df.columns))
+            added_column_names = list(set(sample_df.columns) - set(target_column_names))
+            n_added_columns = len(added_column_names)
+        except:
+            pass # ignore it as it'll also fail in the next processing step
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UpdateColumnDataFromSQLState
+            state = UpdateColumnDataFromSQLState(self.data.read_cell_data_chunks_from_metadata(target_column_names, 0, -1, mdfi),
+                                                 target_column_names,
+                                                 added_column_names,
+                                                 mdfi,
+                                                 query)
+
+        # Apply the query
+        if self.data.update_columns_with_sql_from_metadata(mdfi, nquery):
+            # Update column visibility flags
+            if len(self.display.column_visibility_flags):
+                self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags,
+                                                                      polars.Series([True] * n_added_columns)])
+                self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
+
+            # Update column widths
+            if len(self.display.column_widths):
+                self.display.column_widths = polars.concat([self.display.column_widths,
+                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH] * n_added_columns)])
+                column_widths_visible_only = self.display.column_widths
+                if len(self.display.column_visibility_flags):
+                    column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
+                self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+            # TODO: what should we do instead when no new columns were added?
+            if n_added_columns > 0:
+                bbox = self.data.bbs[mdfi]
+                self.update_selection_from_position(bbox.column + bbox.column_span - n_added_columns, 1,
+                                                    bbox.column + bbox.column_span - 1, 1,
+                                                    follow_cursor=False)
+
+            # Save snapshot
+            if not globals.is_changing_state:
+                globals.history.save(state)
+
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
+
+            arange = self.selection.current_active_range
+            self.notify_selection_changed(arange.column, arange.row, arange.metadata)
+
+            self.emit('columns-changed', mdfi)
+
+            return True
+
+        return False
+
+    def update_current_cells(self, new_value: Any) -> bool:
         arange = self.selection.current_active_range
         active = self.selection.current_active_cell
         cursor = self.selection.current_cursor_cell
@@ -1248,11 +1351,11 @@ class SheetDocument(GObject.Object):
             return False # TODO: create a new table?
 
         from pprint import pprint
-        pprint(parse_dax(formula))
+        pprint(parse_dax(formula), sort_dicts=False)
 
         return True
 
-    def update_current_cells_from_range(self, crange: any) -> bool:
+    def update_current_cells_from_range(self, crange: Any) -> bool:
         arange = self.selection.current_active_range
         active = self.selection.current_active_cell
         cursor = self.selection.current_cursor_cell
@@ -1631,10 +1734,12 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(mdfi)
+
             if not self.is_refreshing_uis:
-                # FIXME: should we remove incompatible filters?
+                # FIXME: remove incompatible filters?
                 self.emit('columns-changed', mdfi)
-                self.emit('filters-changed', mdfi)
 
             return True
 
@@ -2357,6 +2462,7 @@ class SheetDocument(GObject.Object):
                 ccrange.height = end_y - y
 
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
@@ -2444,7 +2550,7 @@ class SheetDocument(GObject.Object):
 
     def paste_into_current_selection(self,
                                      clipboard: ClipboardManager,
-                                     content:   any) -> None:
+                                     content:   Any) -> None:
         if self.focused_widget is not None:
             return # TODO: do something
 
@@ -2560,15 +2666,16 @@ class SheetDocument(GObject.Object):
         if force or self.current_dfi != mdfi:
             self.current_dfi = mdfi
             self.emit('columns-changed', mdfi)
-            self.emit('sorts-changed', mdfi)
-            self.emit('filters-changed', mdfi)
 
     #
     # Adjustments
     #
 
-    def populate_column_resizer_widgets(self) -> None:
+    def repopulate_column_resizer_widgets(self) -> None:
         from .sheet_widget import SheetColumnResizer
+
+        # Remove existing column resizer widget
+        self.widgets = [widget for widget in self.widgets if not isinstance(widget, SheetColumnResizer)]
 
         def on_hovered() -> None:
             self.view.main_canvas.queue_draw()
@@ -2639,14 +2746,18 @@ class SheetDocument(GObject.Object):
         layout = PangoCairo.create_layout(context)
         layout.set_font_description(font_desc)
 
-        self.display.column_widths = polars.Series([0] * self.data.dfs[0].width)
+        self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * self.data.dfs[0].width)
         for col_index, col_name in enumerate(self.data.dfs[0].columns):
             sample_data = sample_data.with_columns(polars.col(col_name).fill_null('[Blank]').cast(polars.Utf8))
             max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
-            sample_text = sample_data.with_columns(polars.when(polars.col(col_name).str.len_chars() == max_length)
-                                                         .then(polars.col(col_name)).otherwise(None)
-                                                         .alias('sample_text')) \
-                                     .drop_nulls('sample_text').sample(1).item(0, 'sample_text')
+            try:
+                sample_text = sample_data.with_columns(polars.when(polars.col(col_name).str.len_chars() == max_length)
+                                                             .then(polars.col(col_name))
+                                                             .otherwise(None)
+                                                             .alias('sample_text')) \
+                                         .drop_nulls('sample_text').sample(1).item(0, 'sample_text')
+            except Exception:
+                continue
             layout.set_text(str(sample_text), -1)
             text_width = layout.get_size()[0] / Pango.SCALE
             preferred_width = text_width + 2 * self.display.DEFAULT_CELL_PADDING

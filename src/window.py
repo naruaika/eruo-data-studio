@@ -780,10 +780,10 @@ class Window(Adw.ApplicationWindow):
                 return False
             is_executed = True
 
-        # Check if the input is an expression
+        # Check if the input is an DAX-like syntax
         expression_pattern = r"\s*[A-Za-z0-9]*.*=.*"
         if not is_executed and re.fullmatch(expression_pattern, formula, re.IGNORECASE):
-            if not sheet_view.document.update_columns_from_expression(formula):
+            if not sheet_view.document.update_columns_from_dax(formula):
                 return False
             is_executed = True
 

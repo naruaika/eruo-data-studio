@@ -285,6 +285,9 @@ class SheetData(GObject.Object):
         if dfi < 0 or len(self.dfs) <= dfi:
             return None
 
+        if len(column_names) == 0:
+            None
+
         # Get the entire content
         if row_span < 0:
             return self.dfs[dfi].select(column_names)
@@ -459,6 +462,24 @@ class SheetData(GObject.Object):
 
         return True
 
+    def update_columns_with_expression_from_metadata(self,
+                                                     dfi:          int,
+                                                     measure_name: str,
+                                                     expr:         polars.Expr) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        try:
+            self.dfs[dfi] = self.dfs[dfi].with_columns(expr.alias(measure_name))
+            self.bbs[dfi].column_span += 1
+            return True
+
+        except Exception as e:
+            print(e)
+
+        globals.send_notification('Cannot execute the query')
+        return False
+
     def update_columns_with_sql_from_metadata(self,
                                               dfi:    int,
                                               query:  str) -> bool:
@@ -468,16 +489,20 @@ class SheetData(GObject.Object):
         try:
             new_df = self.dfs[dfi].sql(query)
 
+            existing_column_names = self.dfs[dfi].columns
+            added_column_names = list(set(new_df.columns) - set(existing_column_names))
+            n_added_columns = len(added_column_names)
+
             for col_name in new_df.columns:
                 if len(new_df.get_column(col_name)) == 1:
                     sel_value = new_df.get_column(col_name).first()
                     new_series = polars.Series([sel_value] * self.dfs[dfi].height)
                     self.dfs[dfi] = self.dfs[dfi].with_columns(new_series.alias(col_name))
-                    self.bbs[dfi].column_span = self.dfs[dfi].width
                     continue
 
                 self.dfs[dfi] = self.dfs[dfi].with_columns(new_df.get_column(col_name).alias(col_name))
-                self.bbs[dfi].column_span = self.dfs[dfi].width
+
+            self.bbs[dfi].column_span += n_added_columns
 
         except Exception as e:
             print(e)

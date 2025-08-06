@@ -104,9 +104,18 @@ class FileManager(GObject.Object):
                    sheet_data:  SheetData,
                    dfi:         int = 0,
                    **kwargs) -> bool:
+        has_backup = False
+
+        # Make a backup of the original file
+        # TODO: make this behaviour customizable
+        if os.path.exists(file_path):
+            os.rename(file_path, file_path + '.backup')
+            has_backup = True
+
         # This function can be called whenever the users want to save their work
         # or they just want to save the file in a different format.
         try:
+
             file_format = file_path.split('.')[-1]
             write_methods = {
                 'json':    sheet_data.dfs[dfi].write_json,
@@ -123,6 +132,10 @@ class FileManager(GObject.Object):
 
         except Exception as e:
             print(e)
+
+            # Restore the original file
+            if has_backup:
+                os.rename(file_path + '.backup', file_path)
 
         globals.send_notification(f'Cannot write file: {file_path}')
         return False

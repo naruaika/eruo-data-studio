@@ -18,6 +18,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
+from typing import Literal
+
 # A comprehensive list of common date formats. Order can be important for
 # performance and ambiguity resolution; more specific formats should be
 # listed before more general ones.
@@ -76,7 +78,7 @@ from polars import DataType, Categorical, \
                    Int8, Int16, Int32, Int64, \
                    UInt8, UInt16, UInt32, UInt64, \
                    Float32, Float64, Decimal, \
-                   Date, Time, Datetime, \
+                   Date, Time, Datetime, Duration, \
                    Boolean, Utf8, Null
 
 def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
@@ -96,6 +98,7 @@ def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
         Date:        {'short': 'date',  'long': 'date'},
         Time:        {'short': 'time',  'long': 'time'},
         Datetime:    {'short': 'date.', 'long': 'datetime'},
+        Duration:    {'short': 'dur.',  'long': 'duration'},
         Boolean:     {'short': 'bool',  'long': 'boolean'},
         Utf8:        {'short': 'text',  'long': 'text'},
         Null:        {'short': 'null',  'long': 'null'},
@@ -124,6 +127,7 @@ def get_dtype_class(dtype: DataType) -> type:
         Date:        'temporal',
         Time:        'other',
         Datetime:    'temporal',
+        Duration:    'other',
         Boolean:     'other',
         Utf8:        'text',
         Null:        'other',
@@ -137,7 +141,7 @@ def get_dtype_class(dtype: DataType) -> type:
 
 import locale
 
-def get_list_separator():
+def get_list_separator() -> Literal[',', ';']:
     try:
         locale.setlocale(locale.LC_ALL, '')
         conv = locale.localeconv()
