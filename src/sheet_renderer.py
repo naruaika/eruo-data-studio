@@ -393,10 +393,6 @@ class SheetRenderer(GObject.Object):
                     cwidth = display.get_cell_width_from_point(x_start - x_offset)
                     ncontext.rectangle(nx_end + cwidth, y_start, x_end, y_end)
 
-                    col_index = display.get_starting_column()
-                    x = display.get_cell_x_from_column(col_index)
-                    nx_start = x
-
                 # When the user scrolls the canvas down
                 if y_offset > 0:
                     ny_start = display.get_cell_y_from_point(height - y_offset)
@@ -412,6 +408,11 @@ class SheetRenderer(GObject.Object):
                     row_index = display.get_starting_row()
                     y = display.get_cell_y_from_row(row_index)
                     ny_start = y
+
+                if not (x_offset > 0):
+                    col_index = display.get_starting_column()
+                    x = display.get_cell_x_from_column(col_index)
+                    nx_start = x
 
                 ncontext.translate(rcache['x_trans'], rcache['y_trans'])
                 ncontext.clip()

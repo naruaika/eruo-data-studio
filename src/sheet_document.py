@@ -231,7 +231,6 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (1, # first column
                                                 active_cell_position[1])
-                    self.renderer.render_caches = {}
 
                 # Include a cell at the left to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
@@ -250,7 +249,6 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (active_cell_position,
                                                 (1, cursor_cell_position[1]))
-                    self.renderer.render_caches = {}
 
                 # Select a cell at the left to the selection
                 else:
@@ -266,7 +264,6 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (active_cell_position[0] + 1,
                                                 active_cell_position[1])
-                    self.renderer.render_caches = {}
 
                 # Include a cell at the right to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
@@ -287,7 +284,6 @@ class SheetDocument(GObject.Object):
                                                     cursor_cell_position[1])
                         target_cell_position = (active_cell_position,
                                                 new_cursor_cell_position)
-                    self.renderer.render_caches = {}
 
                 # Select a cell at the right to the selection
                 else:
@@ -303,7 +299,6 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (active_cell_position[0],
                                                 1) # first row
-                    self.renderer.render_caches = {}
 
                 # Include a cell at the top to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
@@ -324,7 +319,6 @@ class SheetDocument(GObject.Object):
                                                     1) # first row
                         target_cell_position = (active_cell_position,
                                                 new_cursor_cell_position)
-                    self.renderer.render_caches = {}
 
                 # Select a cell at the top to the selection
                 else:
@@ -340,7 +334,6 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (active_cell_position[0],
                                                 active_cell_position[1] + 1)
-                    self.renderer.render_caches = {}
 
                 # Include a cell at the bottom to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
@@ -361,7 +354,6 @@ class SheetDocument(GObject.Object):
                                                     cursor_cell_position[1] + 1)
                         target_cell_position = (active_cell_position,
                                                 new_cursor_cell_position)
-                    self.renderer.render_caches = {}
 
                 # Select a cell at the bottom to the selection
                 else:
