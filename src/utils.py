@@ -24,17 +24,13 @@ from typing import Literal
 # performance and ambiguity resolution; more specific formats should be
 # listed before more general ones.
 COMMON_DATE_FORMATS = [
-    '%s',                 # 1577836800
     '%Y-%m-%d %H:%M:%S',  # 2025-01-15 10:30:00
-    '%+',                 # 2025-01-15T10:30:00+0000
-    '%Y-%m-%dT%H:%M:%SZ', # 2025-01-15T10:30:00Z
     '%Y-%m-%dT%H:%M:%S',  # 2025-01-15T10:30:00
     '%Y/%m/%d %H:%M:%S',  # 2025/01/15 10:30:00
     '%m/%d/%Y %H:%M:%S',  # 01/15/2025 10:30:00
     '%d/%m/%Y %H:%M:%S',  # 15/01/2025 10:30:00
     '%b %d, %Y %I:%M %p', # Jan 15, 2025 10:30 AM
     '%B %d, %Y %I:%M %p', # January 15, 2025 10:30 AM
-    '%c',                 # Sun Jul  8 00:34:60 2001
     '%Y-%m-%d',           # 2025-01-15
     '%m/%d/%Y',           # 01/15/2025
     '%d/%m/%Y',           # 15/01/2025
@@ -43,8 +39,20 @@ COMMON_DATE_FORMATS = [
     '%d-%b-%Y',           # 15-Jan-2025
     '%d %B %Y',           # 15 January 2025
     '%Y%m%d',             # 20250115
+    '%Y',                 # 2025
+    '%Y-%m',              # 2025-01
+    '%m-%Y',              # 01-2025
+    '%m/%Y',              # 01/2025
+    '%b %Y',              # Jan 2025
+    '%b-%Y',              # Jan-2025
+    '%B %Y',              # January 2025
+]
+
+
+COMMON_TIME_FORMATS = [
     '%H:%M:%S',           # 10:30:00
     '%I:%M %p',           # 10:30 AM
+    '%H:%M',              # 10:30
 ]
 
 
@@ -52,8 +60,14 @@ def get_date_format_string(date_string: str) -> str:
     from dateutil import parser as date_parser
     from datetime import datetime
 
+    if isinstance(date_string, int):
+        return None
+
     if date_string in ['', None]:
         return None
+
+    if not isinstance(date_string, str):
+        date_string = str(date_string)
 
     try:
         # We'll use the result of the dateutil parsing as
@@ -66,6 +80,38 @@ def get_date_format_string(date_string: str) -> str:
         try:
             parsed_date_2 = datetime.strptime(date_string, date_format)
             if parsed_date_1 == parsed_date_2:
+                return date_format
+        except Exception:
+            continue
+
+    return None
+
+
+def get_time_format_string(date_string: str) -> str:
+    from dateutil import parser as date_parser
+    from datetime import datetime
+
+    if isinstance(date_string, int):
+        return None
+
+    if date_string in ['', None]:
+        return None
+
+    if not isinstance(date_string, str):
+        date_string = str(date_string)
+
+    try:
+        # We'll use the result of the dateutil parsing as
+        # a reference due to its robustness.
+        parsed_date_1 = date_parser.parse(date_string)
+    except Exception:
+        return None
+
+    for date_format in COMMON_TIME_FORMATS:
+        try:
+            parsed_date_2 = datetime.strptime(date_string, date_format)
+            if parsed_date_1.hour == parsed_date_2.hour \
+                    and parsed_date_1.minute == parsed_date_2.minute:
                 return date_format
         except Exception:
             continue

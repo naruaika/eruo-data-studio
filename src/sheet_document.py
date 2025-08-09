@@ -231,6 +231,7 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (1, # first column
                                                 active_cell_position[1])
+                    self.renderer.render_caches = {}
 
                 # Include a cell at the left to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
@@ -249,6 +250,7 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (active_cell_position,
                                                 (1, cursor_cell_position[1]))
+                    self.renderer.render_caches = {}
 
                 # Select a cell at the left to the selection
                 else:
@@ -264,6 +266,7 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (active_cell_position[0] + 1,
                                                 active_cell_position[1])
+                    self.renderer.render_caches = {}
 
                 # Include a cell at the right to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
@@ -284,6 +287,7 @@ class SheetDocument(GObject.Object):
                                                     cursor_cell_position[1])
                         target_cell_position = (active_cell_position,
                                                 new_cursor_cell_position)
+                    self.renderer.render_caches = {}
 
                 # Select a cell at the right to the selection
                 else:
@@ -299,6 +303,7 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (active_cell_position[0],
                                                 1) # first row
+                    self.renderer.render_caches = {}
 
                 # Include a cell at the top to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
@@ -319,6 +324,7 @@ class SheetDocument(GObject.Object):
                                                     1) # first row
                         target_cell_position = (active_cell_position,
                                                 new_cursor_cell_position)
+                    self.renderer.render_caches = {}
 
                 # Select a cell at the top to the selection
                 else:
@@ -334,6 +340,7 @@ class SheetDocument(GObject.Object):
                     else:
                         target_cell_position = (active_cell_position[0],
                                                 active_cell_position[1] + 1)
+                    self.renderer.render_caches = {}
 
                 # Include a cell at the bottom to the selection
                 elif state == Gdk.ModifierType.SHIFT_MASK:
@@ -354,6 +361,7 @@ class SheetDocument(GObject.Object):
                                                     cursor_cell_position[1] + 1)
                         target_cell_position = (active_cell_position,
                                                 new_cursor_cell_position)
+                    self.renderer.render_caches = {}
 
                 # Select a cell at the bottom to the selection
                 else:
@@ -1043,22 +1051,19 @@ class SheetDocument(GObject.Object):
         if mdfi < 0:
             return False # TODO: create a new table?
 
-        # from pprint import pprint
-        # pprint(parse_dax(query), sort_dicts=False)
-
         expression = parse_dax(query)
 
         if 'error' in expression:
-            globals.send_notification('Cannot execute the query')
+            globals.send_notification(expression['error'])
             return False
 
-        is_new_column = expression['measure-name'] not in self.data.dfs[mdfi].columns
+        is_new_column = expression['measure'] not in self.data.dfs[mdfi].columns
 
         if is_new_column:
             target_column_names = []
-            added_column_names = [expression['measure-name']]
+            added_column_names = [expression['measure']]
         else:
-            target_column_names = [expression['measure-name']]
+            target_column_names = [expression['measure']]
             added_column_names = []
 
         # Save snapshot
@@ -1072,7 +1077,7 @@ class SheetDocument(GObject.Object):
 
         # Apply the query
         if self.data.update_columns_with_expression_from_metadata(mdfi,
-                                                                  expression['measure-name'],
+                                                                  expression['measure'],
                                                                   expression['expression']):
             # Update column visibility flags
             if len(self.display.column_visibility_flags):
@@ -1771,9 +1776,10 @@ class SheetDocument(GObject.Object):
                                                                   polars.Series([False] * column_span),
                                                                   self.display.column_visibility_flags[mcolumn + column_span:]])
         else:
-            self.display.column_visibility_flags = polars.concat([polars.Series([True] * mcolumn),
+            rcolumn = self.data.bbs[arange.metadata.dfi].column_span - mcolumn - column_span
+            self.display.column_visibility_flags = polars.concat([polars.Series([True] * mcolumn, dtype=polars.Boolean),
                                                                   polars.Series([False] * column_span),
-                                                                  polars.Series([True] * (self.data.bbs[arange.metadata.dfi].column_span - mcolumn - column_span))])
+                                                                  polars.Series([True] * rcolumn, dtype=polars.Boolean)])
         self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
         self.data.bbs[arange.metadata.dfi].column_span = len(self.display.column_visible_series)
 

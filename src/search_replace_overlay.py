@@ -457,12 +457,13 @@ class SearchReplaceOverlay(Adw.Bin):
         row_index, column_name = self.search_cursor_coordinate
 
         # TODO: support multiple dataframes?
-        col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the locator
+        col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the $ridx column
         row_index = self.search_results['$ridx'][row_index] + 2 # +2 for the locator and the header
+        cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
 
         search_range = sheet_document.selection.current_search_range
 
-        sheet_document.update_selection_from_position(col_index, row_index, col_index, row_index)
+        sheet_document.update_selection_from_name(cname)
 
         column = sheet_document.selection.current_active_cell.column
         row = sheet_document.selection.current_active_cell.row
@@ -474,10 +475,12 @@ class SearchReplaceOverlay(Adw.Bin):
             offset_size = self.get_height() + self.get_margin_bottom() + sheet_document.display.DEFAULT_CELL_HEIGHT
             sheet_document.display.scroll_y_position += offset_size
             sheet_document.display.discretize_scroll_position()
-            sheet_document.update_selection_from_position(col_index, row_index, col_index, row_index)
+            cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
+            sheet_document.update_selection_from_name(cname)
 
         sheet_document.selection.current_search_range = search_range
 
+        sheet_document.renderer.render_caches = {}
         sheet_document.view.main_canvas.queue_draw()
 
         self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of '

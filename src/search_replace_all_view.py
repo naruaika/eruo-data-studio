@@ -87,6 +87,7 @@ class SearchReplaceAllView(Gtk.Box):
         search_range = sheet_document.selection.current_search_range
 
         cname = self.search_list_store.get_item(position).cname
+        sheet_document.renderer.render_caches = {}
         sheet_document.update_selection_from_name(cname)
 
         sheet_document.selection.current_search_range = search_range

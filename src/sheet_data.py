@@ -295,7 +295,7 @@ class SheetData(GObject.Object):
         # Get the content in range
         return self.dfs[dfi].select(column_names)[row:row + row_span]
 
-    def read_cell_data_n_unique_approx_from_metadata(self,
+    def read_cell_data_approx_n_unique_from_metadata(self,
                                                      column: int,
                                                      dfi:    int) -> any:
         if dfi < 0 or len(self.dfs) <= dfi:
@@ -439,6 +439,8 @@ class SheetData(GObject.Object):
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
+        # FIXME: exclude hidden column/rows
+
         self.dfs[dfi] = polars.concat([self.dfs[dfi].slice(0, row - 1),
                                        dataframe,
                                        self.dfs[dfi].slice(row - 1)])
@@ -453,6 +455,8 @@ class SheetData(GObject.Object):
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
+        # FIXME: exclude hidden column/rows
+
         for counter, column in enumerate(range(column, column + dataframe.width)):
             self.dfs[dfi] = self.dfs[dfi].insert_column(column, dataframe[:, counter])
             self.bbs[dfi].column_span += 1
@@ -463,15 +467,19 @@ class SheetData(GObject.Object):
         return True
 
     def update_columns_with_expression_from_metadata(self,
-                                                     dfi:          int,
-                                                     measure_name: str,
-                                                     expr:         polars.Expr) -> bool:
+                                                     dfi:     int,
+                                                     measure: str,
+                                                     expr:    polars.Expr) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
+        if not isinstance(expr, polars.Expr):
+            expr = polars.lit(expr)
+
         try:
-            self.dfs[dfi] = self.dfs[dfi].with_columns(expr.alias(measure_name))
-            self.bbs[dfi].column_span += 1
+            is_new_column = measure not in self.dfs[dfi].columns
+            self.dfs[dfi] = self.dfs[dfi].with_columns(expr.alias(measure))
+            self.bbs[dfi].column_span += is_new_column
             return True
 
         except Exception as e:
@@ -876,6 +884,8 @@ class SheetData(GObject.Object):
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
+        # FIXME: exclude hidden column/rows
+
         self.dfs[dfi] = polars.concat([self.dfs[dfi].slice(0, row + row_span - 1),
                                        self.dfs[dfi].slice(row - 1, row_span),
                                        self.dfs[dfi].slice(row + row_span - 1)])
@@ -890,6 +900,8 @@ class SheetData(GObject.Object):
                                         left:        bool = False) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
+
+        # FIXME: exclude hidden column/rows
 
         if left:
             column += column_span - 1
@@ -928,7 +940,7 @@ class SheetData(GObject.Object):
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        # TODO: should we shift all dataframes below the current selection up?
+        # FIXME: exclude hidden column/rows
 
         row -= 1
 
@@ -951,7 +963,7 @@ class SheetData(GObject.Object):
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
-        # TODO: should we shift all dataframes on the right side of the current selection to the left?
+        # FIXME: exclude hidden column/rows
 
         column_names = self.dfs[dfi].columns[column:column + column_span]
         self.dfs[dfi] = self.dfs[dfi].drop(column_names)
@@ -1022,7 +1034,10 @@ class SheetData(GObject.Object):
                                               .head(1)[column_name].item()
 
                 if isinstance(original_dtype, polars.String) and first_non_null:
-                    dformat = utils.get_date_format_string(first_non_null)
+                    if dtype in (polars.Datetime, polars.Date):
+                        dformat = utils.get_date_format_string(first_non_null)
+                    if dtype in (polars.Time):
+                        dformat = utils.get_time_format_string(first_non_null)
                     expressions.append(polars.col(column_name).str.strip_chars()
                                                               .str.strptime(dtype, dformat)
                                                               .alias(column_name))

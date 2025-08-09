@@ -380,12 +380,12 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
             self.filter_search_entry.set_placeholder_text("This isn't a text column.")
             self.filter_search_box.set_sensitive(False)
 
-        n_unique_approx = sheet_document.data.read_cell_data_n_unique_approx_from_metadata(self.column, self.dfi)
+        approx_n_unique = sheet_document.data.read_cell_data_approx_n_unique_from_metadata(self.column, self.dfi)
 
-        if _MAX_NO_UNIQUE_ITEMS < n_unique_approx \
+        if _MAX_NO_UNIQUE_ITEMS < approx_n_unique \
                 and not sheet_document.data.check_cell_data_unique_cache(self.column, self.dfi):
             self.filter_status.set_text('Found approximately {:,} unique values. '
-                                        'Continue anyway?'.format(n_unique_approx))
+                                        'Continue anyway?'.format(approx_n_unique))
 
             if col_dtype == polars.String:
                 self.filter_status.set_text(f'{self.filter_status.get_text()} '
