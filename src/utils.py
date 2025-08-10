@@ -132,29 +132,31 @@ from polars import DataType, Categorical, \
                    UInt8, UInt16, UInt32, UInt64, \
                    Float32, Float64, Decimal, \
                    Date, Time, Datetime, Duration, \
-                   Boolean, Utf8, Null
+                   Boolean, Utf8, Null, List, Struct
 
 def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
     symbol_map = {
-        Categorical: {'short': 'cat',   'long': 'categorical'},
-        Int8:        {'short': 'i8',    'long': 'integer 8'},
-        Int16:       {'short': 'i16',   'long': 'integer 16'},
-        Int32:       {'short': 'i32',   'long': 'integer 32'},
-        Int64:       {'short': 'i64',   'long': 'integer 64'},
-        UInt8:       {'short': 'u8',    'long': 'unsigned integer 8'},
-        UInt16:      {'short': 'u16',   'long': 'unsigned integer 16'},
-        UInt32:      {'short': 'u32',   'long': 'unsigned integer 32'},
-        UInt64:      {'short': 'u64',   'long': 'unsigned integer 64'},
-        Float32:     {'short': 'f32',   'long': 'float 32'},
-        Float64:     {'short': 'f64',   'long': 'float 64'},
-        Decimal:     {'short': 'dec.',  'long': 'decimal'},
-        Date:        {'short': 'date',  'long': 'date'},
-        Time:        {'short': 'time',  'long': 'time'},
-        Datetime:    {'short': 'date.', 'long': 'datetime'},
-        Duration:    {'short': 'dur.',  'long': 'duration'},
-        Boolean:     {'short': 'bool',  'long': 'boolean'},
-        Utf8:        {'short': 'text',  'long': 'text'},
-        Null:        {'short': 'null',  'long': 'null'},
+        Categorical: {'short': 'cat',    'long': 'categorical'},
+        Int8:        {'short': 'i8',     'long': 'integer 8'},
+        Int16:       {'short': 'i16',    'long': 'integer 16'},
+        Int32:       {'short': 'i32',    'long': 'integer 32'},
+        Int64:       {'short': 'i64',    'long': 'integer 64'},
+        UInt8:       {'short': 'u8',     'long': 'unsigned integer 8'},
+        UInt16:      {'short': 'u16',    'long': 'unsigned integer 16'},
+        UInt32:      {'short': 'u32',    'long': 'unsigned integer 32'},
+        UInt64:      {'short': 'u64',    'long': 'unsigned integer 64'},
+        Float32:     {'short': 'f32',    'long': 'float 32'},
+        Float64:     {'short': 'f64',    'long': 'float 64'},
+        Decimal:     {'short': 'dec.',   'long': 'decimal'},
+        Date:        {'short': 'date',   'long': 'date'},
+        Time:        {'short': 'time',   'long': 'time'},
+        Datetime:    {'short': 'date.',  'long': 'datetime'},
+        Duration:    {'short': 'dur.',   'long': 'duration'},
+        Boolean:     {'short': 'bool',   'long': 'boolean'},
+        Utf8:        {'short': 'text',   'long': 'text'},
+        Null:        {'short': 'null',   'long': 'null'},
+        List:        {'short': 'list',   'long': 'list'},
+        Struct:      {'short': 'struct', 'long': 'struct'},
     }
     for dt, symbol in symbol_map.items():
         if dtype == dt or isinstance(dtype, dt):
@@ -184,6 +186,8 @@ def get_dtype_class(dtype: DataType) -> type:
         Boolean:     'other',
         Utf8:        'text',
         Null:        'other',
+        List:        'other',
+        Struct:      'other',
     }
     for dt, cls in class_map.items():
         if dtype == dt or isinstance(dtype, dt):

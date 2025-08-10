@@ -599,6 +599,9 @@ class SheetData(GObject.Object):
             column_name = self.dfs[dfi].columns[column]
             column_dtype = self.dfs[dfi].dtypes[column]
 
+            if isinstance(column_dtype, (polars.List, polars.Struct, polars.Object)):
+                continue # we cannot update a list or struct
+
             # Convert the input value to the correct type
             try:
                 match column_dtype:

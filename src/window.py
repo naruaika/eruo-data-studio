@@ -849,7 +849,7 @@ class Window(Adw.ApplicationWindow):
         # Add "FROM self" if needed
         if 'from' not in query.lower():
             if 'where' in query.lower():
-                query = query.replace('where', 'FROM self where', 1)
+                query = query.replace('where', 'FROM self WHERE', 1)
             else:
                 query += ' FROM self'
 

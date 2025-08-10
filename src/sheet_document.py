@@ -1143,7 +1143,7 @@ class SheetDocument(GObject.Object):
         # Add "FROM self" if needed
         if 'from' not in nquery.lower():
             if 'where' in nquery.lower():
-                nquery = nquery.replace('where', 'FROM self where', 1)
+                nquery = nquery.replace('where', 'FROM self WHERE', 1)
             else:
                 nquery += ' FROM self'
 
@@ -1181,7 +1181,7 @@ class SheetDocument(GObject.Object):
             # Update column visibility flags
             if len(self.display.column_visibility_flags):
                 self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags,
-                                                                        polars.Series([True] * n_added_columns)])
+                                                                      polars.Series([True] * n_added_columns)])
                 self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
 
             # Update column widths
@@ -2667,6 +2667,15 @@ class SheetDocument(GObject.Object):
         # Cache the selected cell data usually for resetting the input bar
         self.selection.cell_name = self.display.get_cell_name_from_position(vcolumn, vrow)
         self.selection.cell_data = self.data.read_single_cell_data_from_metadata(mcolumn, mrow, mdfi)
+
+        # We don't natively support object types, but in any case the user has perfomed
+        # an operation that returned an object, we want to show it properly in minimal.
+        # FIXME: we should prevent this from happening in the first place, maybe spread
+        #        it to multiple columns. A use case would be the user executing SQL query
+        #        that involves a function that do similar to split_part().
+        # See https://duckdb.org/docs/stable/sql/functions/text#splitstring-separator
+        if isinstance(self.selection.cell_data, polars.Series):
+            self.selection.cell_data = self.selection.cell_data.to_list()
 
         cell_dtype = self.data.read_column_dtype_from_metadata(mcolumn, mdfi)
         self.selection.cell_dtype = utils.get_dtype_symbol(cell_dtype) if cell_dtype is not None else None

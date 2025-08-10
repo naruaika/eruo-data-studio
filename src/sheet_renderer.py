@@ -21,6 +21,7 @@
 from gi.repository import Adw, GObject, Gtk, Pango, PangoCairo
 from time import time
 import cairo
+import polars
 
 from . import globals
 from . import utils
@@ -503,6 +504,13 @@ class SheetRenderer(GObject.Object):
                     cell_text = data.dfs[0][vrow_index - 2, vcol_index - 1]
                     col_dtype = data.dfs[0].dtypes[vcol_index - 1]
 
+                    # We don't natively support object types, but in any case the user has perfomed
+                    # an operation that returned an object, we want to show it properly in minimal.
+                    if isinstance(cell_text, polars.Series):
+                        cell_text = cell_text.to_list()
+
+                    cell_text = str(cell_text)
+
                     if cell_text in ['', None]:
                         y += cell_height
                         row_index += 1
@@ -510,7 +518,6 @@ class SheetRenderer(GObject.Object):
 
                     # Right-align numeric and temporal values
                     if col_dtype.is_numeric() or col_dtype.is_temporal():
-                        cell_text = str(cell_text)
                         layout.set_text(cell_text, -1)
                         text_width = layout.get_size()[0] / Pango.SCALE
                         x_text = x + cell_width - text_width - display.DEFAULT_CELL_PADDING
@@ -518,7 +525,7 @@ class SheetRenderer(GObject.Object):
                     # Otherwise keep it left-aligned
                     else:
                         # Truncate before the first line break to prevent overflow
-                        cell_text = str(cell_text).split('\n', 1)[0]
+                        cell_text = cell_text.split('\n', 1)[0]
                         # Truncate the contents for performance reasons
                         cell_text = cell_text[:int(cell_width * 0.2)] # TODO: 0.2 is a magic number
                         layout.set_text(cell_text, -1)
