@@ -557,6 +557,10 @@ class SidebarHomeView(Adw.Bin):
             self.field_list_view.get_parent().set_visible(False)
             self.field_list_status.get_parent().set_visible(True)
             self.field_list_status.set_text('No table selected')
+
+            self.repopulate_sort_list(dfi)
+            self.repopulate_filter_list(dfi)
+
             return
 
         schema = sheet_document.data.dfs[dfi].schema
@@ -971,12 +975,16 @@ class SidebarHomeView(Adw.Bin):
             condition = builder['conditions'][0]
 
             qtype = afilter['qtype']
-            query = self.parse_query(builder)
             findex = condition['findex']
             fdtype = condition['fdtype']
             field = condition['field']
             operator = condition['operator']
             value = condition['value']
+
+            if operator == 'custom':
+                query = value
+            else:
+                query = self.parse_query(builder)
 
             if not isinstance(value, list):
                 value = [value]
@@ -1110,15 +1118,17 @@ class SidebarHomeView(Adw.Bin):
             fdtype = filter_item.fdtype
             field = filter_item.field
             operator = filter_item.operator
-            value = list(filter_item.value.values())
+
+            if operator == 'custom':
+                value = filter_item.query
+            else:
+                value = list(filter_item.value.values())
+                try:
+                    value = polars.Series(value).cast(dtypes[findex]).to_list()
+                except Exception:
+                    continue # skip invalid filters, FIXME: show a warning to user
+
             expression = polars.lit(True)
-
-            # Try to cast the value to the right type
-            try:
-                value = polars.Series(value).cast(dtypes[findex]).to_list()
-            except Exception:
-                continue # skip invalid filters, FIXME: show a warning to user
-
             try:
                 expression = get_filter_basic_expression(filter_item, value)
             except Exception:
@@ -1148,7 +1158,9 @@ class SidebarHomeView(Adw.Bin):
         document.filter_current_rows(multiple=True)
         document.is_refreshing_uis = False
 
-
+    #
+    # Helpers
+    #
 
     def create_field_dropdown(self) -> Gtk.DropDown:
         field_dropdown = Gtk.DropDown.new()
