@@ -69,7 +69,7 @@ class SheetManager(GObject.Object):
         document_id = f'{self.sheet_id}_{self.sheet_counter}'
         self.sheet_counter += 1
 
-        sheet = SheetDocument(document_id, title, dataframe)
+        sheet = SheetDocument(self, document_id, title, dataframe)
         self.sheets[document_id] = sheet
 
         return sheet.view

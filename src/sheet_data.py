@@ -21,6 +21,7 @@
 from gi.repository import GObject
 from datetime import datetime
 from time import time
+import duckdb
 import gc
 import polars
 import re
@@ -512,18 +513,14 @@ class SheetData(GObject.Object):
         return False
 
     def update_columns_with_sql_from_metadata(self,
-                                              dfi:    int,
-                                              query:  str) -> bool:
+                                              dfi:        int,
+                                              query:      str,
+                                              connection: duckdb.DuckDBPyConnection) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
         try:
-            frames = {}
-
-            if len(self.dfs):
-                frames['self'] = self.dfs[0]
-
-            new_dataframe = polars.SQLContext(frames).execute(query).collect()
+            new_dataframe = connection.sql(query).pl()
 
             incoming_column_names = new_dataframe.columns
             existing_column_names = self.dfs[dfi].columns
@@ -543,18 +540,15 @@ class SheetData(GObject.Object):
 
             self.bbs[dfi].column_span += n_added_columns
 
+            return True
+
         except Exception as e:
             print(e)
 
-            message = f'Cannot execute the query'
             action = ()
-            e = str(e)
+            message = str(e)
 
-            if e.startswith('sql parser error: '):
-                message = f'Invalid SQL syntax: {e.split('sql parser error: ', 1)[1]}'
-            if e.startswith('unable to find column '):
-                message = f'Unknown column name: {e.split('unable to find column ', 1)[1].split(';')[0]}'
-            if e.startswith('unable to add a column of length '):
+            if message.startswith('unable to add a column of length '):
                 message = 'Column length mismatch. Create a new table?'
 
                 action_data_id = str(int(time()))
@@ -567,9 +561,7 @@ class SheetData(GObject.Object):
 
             globals.send_notification(message, action)
 
-            return False
-
-        return True
+        return False
 
     def update_cell_data_block_with_single_from_metadata(self,
                                                          column:         int,
@@ -1075,9 +1067,9 @@ class SheetData(GObject.Object):
                                               .head(1)[column_name].item()
 
                 if isinstance(original_dtype, polars.String) and first_non_null:
-                    if dtype in (polars.Datetime, polars.Date):
+                    if dtype in [polars.Datetime, polars.Date]:
                         dformat = utils.get_date_format_string(first_non_null)
-                    if dtype in (polars.Time):
+                    if dtype in [polars.Time]:
                         dformat = utils.get_time_format_string(first_non_null)
                     expressions.append(polars.col(column_name).str.strip_chars()
                                                               .str.strptime(dtype, dformat)

@@ -22,6 +22,7 @@ from gi.repository import Gdk, GLib, GObject, Gtk, Pango, PangoCairo
 from typing import Any
 import cairo
 import copy
+import duckdb
 import polars
 import re
 
@@ -45,10 +46,13 @@ class SheetDocument(GObject.Object):
     title = GObject.Property(type=str, default='Sheet 1')
 
     def __init__(self,
+                 sheet_manager,
                  document_id: str,
                  title:       str,
                  dataframe:   polars.DataFrame = None) -> None:
         super().__init__()
+
+        self.sheet_manager = sheet_manager
 
         self.document_id = document_id
         self.title = title
@@ -1146,10 +1150,19 @@ class SheetDocument(GObject.Object):
         target_column_names = []
         added_column_names = []
 
+        connection = duckdb.connect()
+
+        # Register all the main dataframes
+        if self.data.has_main_dataframe:
+            connection.register('self', self.data.dfs[0])
+        for sheet in self.sheet_manager.sheets.values():
+            if sheet.data.has_main_dataframe:
+                connection.register(sheet.title, sheet.data.dfs[0])
+
         try:
-            sample_df = self.data.dfs[mdfi][0].sql(nquery) # get only the first row
-            target_column_names = list(set(self.data.dfs[mdfi].columns) & set(sample_df.columns))
-            added_column_names = list(set(sample_df.columns) - set(target_column_names))
+            relation = connection.sql(nquery)
+            target_column_names = list(set(self.data.dfs[mdfi].columns) & set(relation.columns))
+            added_column_names = list(set(relation.columns) - set(target_column_names))
             n_added_columns = len(added_column_names)
         except:
             pass # ignore it as it'll also fail in the next processing step
@@ -1164,11 +1177,11 @@ class SheetDocument(GObject.Object):
                                                  query)
 
         # Apply the query
-        if self.data.update_columns_with_sql_from_metadata(mdfi, nquery):
+        if self.data.update_columns_with_sql_from_metadata(mdfi, nquery, connection):
             # Update column visibility flags
             if len(self.display.column_visibility_flags):
                 self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags,
-                                                                      polars.Series([True] * n_added_columns)])
+                                                                        polars.Series([True] * n_added_columns)])
                 self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
 
             # Update column widths
@@ -1199,7 +1212,11 @@ class SheetDocument(GObject.Object):
 
             self.emit('columns-changed', mdfi)
 
+            connection.close()
+
             return True
+
+        connection.close()
 
         return False
 

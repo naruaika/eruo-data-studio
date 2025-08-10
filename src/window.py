@@ -19,6 +19,7 @@
 
 
 from gi.repository import Adw, Gdk, Gio, GObject, Gtk
+import duckdb
 import os
 import polars
 import re
@@ -852,20 +853,22 @@ class Window(Adw.ApplicationWindow):
             else:
                 query += ' FROM self'
 
-        frames = {}
+        connection = duckdb.connect()
 
         # Register all the main dataframes
         if sheet_document.data.has_main_dataframe:
-            frames['self'] = sheet_document.data.dfs[0]
+            connection.register('self', sheet_document.data.dfs[0])
         for sheet in self.sheet_manager.sheets.values():
             if sheet.data.has_main_dataframe:
-                frames[sheet.title] = sheet.data.dfs[0]
+                connection.register(sheet.title, sheet.data.dfs[0])
 
         try:
-            new_dataframe = polars.SQLContext(frames).execute(query).collect()
+            new_dataframe = connection.sql(query).pl()
 
             sheet_view = self.sheet_manager.create_sheet(new_dataframe, table_name)
             self.add_new_tab(sheet_view)
+
+            connection.close()
 
             return True
 
@@ -881,5 +884,7 @@ class Window(Adw.ApplicationWindow):
                 message = f'Unknown column name: {e.split('unable to find column ', 1)[1].split(';')[0]}'
 
             self.show_toast_message(message)
+
+        connection.close()
 
         return False
