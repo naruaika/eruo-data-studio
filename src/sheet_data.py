@@ -20,6 +20,7 @@
 
 from gi.repository import GObject
 from datetime import datetime
+from time import time
 import gc
 import polars
 import re
@@ -182,6 +183,8 @@ class SheetData(GObject.Object):
     bbs: list[SheetCellBoundingBox] = [] # visual bounding boxes
     dfs: list[polars.DataFrame] = [] # dataframes
 
+    has_main_dataframe: bool = False
+
     def __init__(self,
                  document:  SheetDocument,
                  dataframe: polars.DataFrame,
@@ -191,24 +194,44 @@ class SheetData(GObject.Object):
 
         self.document = document
 
-        if dataframe is not None:
-            width = dataframe.width
-            height = dataframe.height + 1 # +1 for the header
+        self.unique_caches = {}
 
-            # TODO: auto-rechunk every dataframe on application idle?
-            dataframe = dataframe.rechunk()
+        self.setup_main_df(dataframe, column, row)
 
-            # Remove leading '$' from column names to prevent collision
-            # from internal column names
-            for col_name in dataframe.columns:
-                if not col_name.startswith('$'):
-                    continue
-                dataframe = dataframe.rename({col_name: col_name.lstrip('$')})
+    def setup_main_df(self,
+                      dataframe: polars.DataFrame,
+                      column:    int,
+                      row:       int) -> None:
+        if dataframe is None:
+            return
 
+        width = dataframe.width
+        height = dataframe.height + 1 # +1 for the header
+
+        # TODO: auto-rechunk every dataframe on application idle?
+        dataframe = dataframe.rechunk()
+
+        # Remove leading '$' from column names to prevent collision
+        # from internal column names
+        for col_name in dataframe.columns:
+            if not col_name.startswith('$'):
+                continue
+            dataframe = dataframe.rename({col_name: col_name.lstrip('$')})
+
+        # Replace the main dataframe
+        if self.has_main_dataframe:
+            self.bbs[0] = SheetCellBoundingBox(column, row, width, height)
+            del self.dfs[0]
+            self.dfs.insert(0, dataframe)
+
+        # Set the first dataframe as the main dataframe
+        else:
             self.bbs = [SheetCellBoundingBox(column, row, width, height)]
             self.dfs = [dataframe]
 
-        self.unique_caches = {}
+        self.has_main_dataframe = True
+
+        gc.collect()
 
     def get_cell_metadata_from_position(self,
                                         column: int,
@@ -495,36 +518,49 @@ class SheetData(GObject.Object):
             return False
 
         try:
-            new_df = self.dfs[dfi].sql(query)
+            new_dataframe = self.dfs[dfi].sql(query)
 
+            incoming_column_names = new_dataframe.columns
             existing_column_names = self.dfs[dfi].columns
-            added_column_names = list(set(new_df.columns) - set(existing_column_names))
+
+            added_column_names = list(set(incoming_column_names) - set(existing_column_names))
             n_added_columns = len(added_column_names)
 
-            for col_name in new_df.columns:
-                if len(new_df.get_column(col_name)) == 1:
-                    sel_value = new_df.get_column(col_name).first()
+            for col_name in incoming_column_names:
+                if len(new_dataframe.get_column(col_name)) == 1:
+                    sel_value = new_dataframe.get_column(col_name).first()
                     new_series = polars.Series([sel_value] * self.dfs[dfi].height)
                     self.dfs[dfi] = self.dfs[dfi].with_columns(new_series.alias(col_name))
                     continue
 
-                self.dfs[dfi] = self.dfs[dfi].with_columns(new_df.get_column(col_name).alias(col_name))
+                expr = new_dataframe.get_column(col_name).alias(col_name)
+                self.dfs[dfi] = self.dfs[dfi].with_columns(expr)
 
             self.bbs[dfi].column_span += n_added_columns
 
         except Exception as e:
             print(e)
 
-            e = str(e)
             message = f'Cannot execute the query'
+            action = ()
+            e = str(e)
+
             if e.startswith('sql parser error: '):
                 message = f'Invalid SQL syntax: {e.split('sql parser error: ', 1)[1]}'
             if e.startswith('unable to find column '):
-                message = f'Invalid column name: {e.split('unable to find column ', 1)[1].split(';')[0]}'
+                message = f'Unknown column name: {e.split('unable to find column ', 1)[1].split(';')[0]}'
             if e.startswith('unable to add a column of length '):
-                message = f'{message}: column length mismatch'
+                message = 'Column length mismatch. Create a new table?'
 
-            globals.send_notification(message)
+                action_data_id = str(int(time()))
+                action_name = f"app.apply-pending-table('{action_data_id}')"
+                action = ('Create', action_name, action_data_id)
+
+                # We keep the dataframe in a temporary place so that we don't need to re-execute the query
+                # when the user proceeds to create a new table.
+                globals.pending_action_data[action_data_id] = new_dataframe
+
+            globals.send_notification(message, action)
 
             return False
 

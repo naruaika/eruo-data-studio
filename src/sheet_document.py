@@ -41,16 +41,16 @@ class SheetDocument(GObject.Object):
         'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
     }
 
-    docid = GObject.Property(type=str, default='sheet_1')
+    document_id = GObject.Property(type=str, default='sheet_1')
     title = GObject.Property(type=str, default='Sheet 1')
 
     def __init__(self,
-                 docid: str,
-                 title: str,
-                 dataframe: polars.DataFrame = None) -> None:
+                 document_id: str,
+                 title:       str,
+                 dataframe:   polars.DataFrame = None) -> None:
         super().__init__()
 
-        self.docid = docid
+        self.document_id = document_id
         self.title = title
 
         from .sheet_widget import SheetWidget

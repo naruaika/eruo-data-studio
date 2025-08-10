@@ -227,7 +227,7 @@ class Window(Adw.ApplicationWindow):
 
         if keyval == Gdk.KEY_Escape:
             globals.is_editing_cells = False
-            globals.docid_being_edited = ''
+            globals.current_document_id = ''
             self.inline_formula_box.set_visible(False)
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
@@ -251,7 +251,7 @@ class Window(Adw.ApplicationWindow):
 
             # Hide the inline formula
             globals.is_editing_cells = False
-            globals.docid_being_edited = ''
+            globals.current_document_id = ''
             self.inline_formula_box.set_visible(False)
 
             # Move the focus back to the main canvas
@@ -262,7 +262,7 @@ class Window(Adw.ApplicationWindow):
     def on_inline_formula_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         # TODO: should we keep it open when the user is performing vlookup, etc?
         globals.is_editing_cells = False
-        globals.docid_being_edited = ''
+        globals.current_document_id = ''
         self.inline_formula_box.set_visible(False)
 
         sheet_view = self.get_current_active_view()
@@ -475,7 +475,7 @@ class Window(Adw.ApplicationWindow):
         # For now, we just reset the flag because we don't want to
         # see visual glitches.
         globals.is_editing_cells = False
-        globals.docid_being_edited = ''
+        globals.current_document_id = ''
 
         # Reset the input bar to represent the current selection
         self.reset_inputbar()
@@ -489,9 +489,9 @@ class Window(Adw.ApplicationWindow):
             return # impossible to happen, but for safety
 
         # Close the inline formula box if it references the closed sheet
-        if sheet_view.document.docid == globals.docid_being_edited:
+        if sheet_view.document.document_id == globals.current_document_id:
             globals.is_editing_cells = False
-            globals.docid_being_edited = ''
+            globals.current_document_id = ''
             self.inline_formula_box.set_visible(False)
 
         # Clean up the history, mainly to free up disk space
@@ -722,7 +722,7 @@ class Window(Adw.ApplicationWindow):
             return
 
         globals.is_editing_cells = True
-        globals.docid_being_edited = sheet_document.docid
+        globals.current_document_id = sheet_document.document_id
 
         self.inline_formula_box.get_vadjustment().set_value(0)
         self.inline_formula_box.set_visible(True)
@@ -733,6 +733,19 @@ class Window(Adw.ApplicationWindow):
         self.inline_formula.get_buffer().set_text(sel_value)
 
         self.inline_formula.grab_focus()
+
+    def apply_pending_table(self, action_data_id: str) -> None:
+        dataframe = None
+        if action_data_id is not None:
+            dataframe = globals.pending_action_data[action_data_id]
+
+        sheet_view = self.sheet_manager.create_sheet(dataframe)
+
+        self.add_new_tab(sheet_view)
+
+        self.sidebar_home_view.repopulate_field_list()
+
+        del globals.pending_action_data[action_data_id]
 
     def do_toggle_sidebar(self) -> None:
         sheet_document = self.get_current_active_document()
@@ -761,8 +774,23 @@ class Window(Adw.ApplicationWindow):
         if selected_page == self.search_replace_all_page:
             sheet_document.is_searching_cells = True
 
-    def show_toast_message(self, message: str) -> None:
+    def show_toast_message(self,
+                           message: str,
+                           action:  tuple = ()) -> None:
+
+        def on_dismissed(toast: Adw.Toast, action_data_id: str) -> None:
+            if action_data_id in globals.pending_action_data:
+                del globals.pending_action_data[action_data_id]
+
         toast = Adw.Toast.new(message)
+
+        if len(action) >= 2:
+            toast.set_button_label(action[0])
+            toast.set_detailed_action_name(action[1])
+
+        if len(action) >= 3:
+            toast.connect('dismissed', on_dismissed, action[2])
+
         self.toast_overlay.add_toast(toast)
 
     def execute_pending_formula(self, formula: str) -> bool:
@@ -771,31 +799,73 @@ class Window(Adw.ApplicationWindow):
         if sheet_view is None:
             return False
 
-        is_executed = False
+        # Check if the input is an SQL-like syntax but for DDL
+        query_pattern = r"\s*[A-Za-z0-9]+.*=\s*SELECT\s*.*"
+        if re.fullmatch(query_pattern, formula, re.IGNORECASE):
+            return self.create_table_from_sql(formula)
 
         # Check if the input is an SQL-like syntax
         query_pattern = r"\s*=\s*SELECT\s*.*"
-        if not is_executed and re.fullmatch(query_pattern, formula, re.IGNORECASE):
-            if not sheet_view.document.update_columns_from_sql(formula):
-                return False
-            is_executed = True
+        if re.fullmatch(query_pattern, formula, re.IGNORECASE):
+            return sheet_view.document.update_columns_from_sql(formula)
 
         # Check if the input is an DAX-like syntax
-        expression_pattern = r"\s*[A-Za-z0-9]*.*=.*"
-        if not is_executed and re.fullmatch(expression_pattern, formula, re.IGNORECASE):
-            if not sheet_view.document.update_columns_from_dax(formula):
-                return False
-            is_executed = True
+        expression_pattern = r"\s*[A-Za-z0-9]+.*=.*"
+        if re.fullmatch(expression_pattern, formula, re.IGNORECASE):
+            return sheet_view.document.update_columns_from_dax(formula)
 
         # Check if the input is a formula
         formula_pattern = r"\s*=.*"
-        if not is_executed and re.fullmatch(formula_pattern, formula, re.IGNORECASE):
-            if not sheet_view.document.update_current_cells_from_formula(formula):
-                return False
-            is_executed = True
+        if re.fullmatch(formula_pattern, formula, re.IGNORECASE):
+            return sheet_view.document.update_current_cells_from_formula(formula)
 
         # Update the current cells
-        if not is_executed and not sheet_view.document.update_current_cells(formula):
-            return False
+        return sheet_view.document.update_current_cells(formula)
 
-        return True
+    def create_table_from_sql(self, query: str) -> bool:
+        sheet_document = self.get_current_active_document()
+
+        if sheet_document is None:
+            return False # shouldn't happen
+
+        table_name, query = query.split('=', 1)
+
+        table_name = table_name.strip()
+        query = query.strip()
+
+        try:
+            if len(sheet_document.data.dfs):
+                # TODO: register all of the main tables from different sheets
+                frames = {'self': sheet_document.data.dfs[0]}
+
+                # Add "FROM self" if needed
+                if 'from self' not in query.lower():
+                    if 'where' in query.lower():
+                        query = query.replace('where', 'FROM self where', 1)
+                    else:
+                        query += ' FROM self'
+
+                new_dataframe = polars.SQLContext(frames).execute(query).collect()
+
+            else:
+                new_dataframe = polars.SQLContext().execute(query).collect()
+
+            sheet_view = self.sheet_manager.create_sheet(new_dataframe, table_name)
+            self.add_new_tab(sheet_view)
+
+            return True
+
+        except Exception as e:
+            print(e)
+
+            message = f'Cannot execute the query'
+            e = str(e)
+
+            if e.startswith('sql parser error: '):
+                message = f'Invalid SQL syntax: {e.split('sql parser error: ', 1)[1]}'
+            if e.startswith('unable to find column '):
+                message = f'Unknown column name: {e.split('unable to find column ', 1)[1].split(';')[0]}'
+
+            self.show_toast_message(message)
+
+        return False

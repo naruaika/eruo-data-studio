@@ -274,7 +274,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
         convert_menu.append(_('To _Boolean'), 'app.convert-to-boolean')
         convert_menu.append(_('To _Text'), 'app.convert-to-text')
 
-        convert_menu_item = Gio.MenuItem.new(_('_Convert'), None)
+        convert_menu_item = Gio.MenuItem.new(_('_Change Type'), None)
         convert_menu_item.set_submenu(convert_menu)
 
         convert_section.append_item(convert_menu_item)

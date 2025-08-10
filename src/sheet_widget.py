@@ -552,6 +552,8 @@ class SheetColumnResizer(SheetWidget):
         else:
             context.set_source_rgb(0.75, 0.75, 0.75)
 
+        context.set_hairline(True)
+
         x_start = self.display.left_locator_width
         y_start = self.display.top_locator_height
 
@@ -695,7 +697,7 @@ class SheetColumnResizer(SheetWidget):
         # Adjust the range if necessary to prevent from drawing over translucent cells
         if range_column <= self.target_column <= range_column + rcolumn_span - 1:
             range_x = max(range_x, self.target_cell_x)
-            range_width = max(range_width, self.new_cell_width)
+            range_width = max(self.target_cell_width, self.new_cell_width)
 
         # We use a bold style here
         context.set_source_rgba(*color_accent)

@@ -35,7 +35,7 @@
     </section>
     <section>
       <item>
-        <attribute name="label" translatable="yes">Convert</attribute>
+        <attribute name="label" translatable="yes">Change Type</attribute>
         <link name="submenu">
           <item>
             <attribute name="label" translatable="yes">To _Categorical</attribute>

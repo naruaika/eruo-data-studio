@@ -41,7 +41,7 @@ is_changing_state: bool = False
 # case, we may also need another global variable to track any
 # changes in the input bar.
 is_editing_cells: bool = False
-docid_being_edited: str = ''
+current_document_id: str = ''
 
 
 # This is supposed to be set by any current window to enable any module
@@ -49,3 +49,4 @@ docid_being_edited: str = ''
 # It may will appear a bit technical to common users, but could somehow
 # be useful especially when asking in a community forum.
 send_notification: callable = lambda *_: None
+pending_action_data: dict = {}

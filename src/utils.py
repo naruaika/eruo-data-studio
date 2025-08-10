@@ -46,6 +46,13 @@ COMMON_DATE_FORMATS = [
     '%b %Y',              # Jan 2025
     '%b-%Y',              # Jan-2025
     '%B %Y',              # January 2025
+#   '%m-%d',              # 01-15
+#   '%m/%d',              # 01/15
+#   '%d/%m',              # 15/01
+#   '%B %d,',             # January 15
+#   '%b %d,',             # Jan 15
+#   '%d-%b',              # 15-Jan
+#   '%d %B',              # 15 January
 ]
 
 

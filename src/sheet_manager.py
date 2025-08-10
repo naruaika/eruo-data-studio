@@ -35,7 +35,7 @@ class SheetManager(GObject.Object):
         # SheetManager is highly coupled to the main window. Because we can
         # have multiple instances of the main window, we need to identify
         # each window with a unique id.
-        self.shmid = str(time()).split('.')[0]
+        self.sheet_id = str(int(time()))
 
         self.sheets: dict[int, SheetDocument] = {}
         self.sheet_counter: int = 0
@@ -48,21 +48,31 @@ class SheetManager(GObject.Object):
                      # the remaining dataframe should be loaded progressively.
                      dataframe: polars.DataFrame,
                      title:     str = None) -> SheetView:
-        # Automatically generate the sheet title when not provided
-        if title is None:
+
+        def generate_new_title(title: str = None) -> str:
+            if title is None:
+                title = 'Sheet'
             sheet_number = 1
             for sheet_name in self.get_sheet_names():
-                if match := re.match(r'Sheet\s+(\d+)', sheet_name):
+                if match := re.match(title + r'\s+(\d+)', sheet_name):
                     sheet_number = max(sheet_number, int(match.group(1)) + 1)
-            title = f'Sheet {sheet_number}'
+            return f'{title} {sheet_number}'
 
-        docid = f'{self.shmid}_{self.sheet_counter}'
+        # Automatically generate the sheet title when not provided
+        if title is None:
+            title = generate_new_title()
+
+        # Generate a new column name if needed
+        if title in self.get_sheet_names():
+            title = generate_new_title(title)
+
+        document_id = f'{self.sheet_id}_{self.sheet_counter}'
         self.sheet_counter += 1
 
-        sheet = SheetDocument(docid, title, dataframe)
-        self.sheets[docid] = sheet
+        sheet = SheetDocument(document_id, title, dataframe)
+        self.sheets[document_id] = sheet
 
         return sheet.view
 
     def delete_sheet(self, sheet_view: SheetView) -> None:
-        self.sheets.pop(sheet_view.document.docid)
+        self.sheets.pop(sheet_view.document.document_id)

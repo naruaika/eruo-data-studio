@@ -34,7 +34,7 @@ if (debug_mode := int(os.environ.get('EDS_DEBUG', '0'))) > 0:
     except ModuleNotFoundError:
         pass
 
-from gi.repository import Adw, Gdk, Gio, GObject, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk
 
 from . import globals
 from .clipboard_manager import ClipboardManager
@@ -115,6 +115,7 @@ class Application(Adw.Application):
         self.create_action('convert-to-boolean', self.on_convert_to_boolean_action)
         self.create_action('convert-to-text', self.on_convert_to_text_action)
         self.create_action('open-inline-formula', self.on_open_inline_formula_action, ['F2'])
+        self.create_action('apply-pending-table', self.on_apply_pending_table_action, param_type=GLib.VariantType('s'))
 
     def do_activate(self) -> None:
         if window := self.get_active_window():
@@ -462,15 +463,21 @@ class Application(Adw.Application):
         window = self.get_active_window()
         window.open_inline_formula()
 
+    def on_apply_pending_table_action(self, action: Gio.SimpleAction, *args) -> None:
+        action_data_id = args[0].get_string()
+        window = self.get_active_window()
+        window.apply_pending_table(action_data_id)
+
     def get_current_active_document(self) -> SheetDocument:
         window = self.get_active_window()
         return window.get_current_active_document()
 
     def create_action(self,
-                      name:      str,
-                      callback:  callable,
-                      shortcuts: list = None) -> None:
-        action = Gio.SimpleAction.new(name, None)
+                      name:       str,
+                      callback:   callable,
+                      shortcuts:  list = None,
+                      param_type: GLib.VariantType = None) -> None:
+        action = Gio.SimpleAction.new(name, param_type)
         action.connect('activate', callback)
         self.add_action(action)
         if shortcuts:
