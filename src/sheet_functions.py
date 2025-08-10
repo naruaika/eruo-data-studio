@@ -728,36 +728,39 @@ def _get_dax_expression(func_name: str, args: List) -> polars.Expr:
         case 'YEAR'                        : return _get_dax_year_expression(args)
         case 'YEARFRAC'                    : return None
 
+        # FIXME: some functions below in the current implementation doesn't make sense,
+        #        since they're expected to generate a generate a new date range table
+        #        to be used as a filter parameter for the CALCULATE() function.
         case 'CLOSINGBALANCEMONTH'         : return None
         case 'CLOSINGBALANCEQUARTER'       : return None
         case 'CLOSINGBALANCEYEAR'          : return None
-        case 'DATEADD'                     : return None
-        case 'DATESBETWEEN'                : return None
-        case 'DATESINPERIOD'               : return None
-        case 'DATESMTD'                    : return None
-        case 'DATESQTD'                    : return None
-        case 'DATESYTD'                    : return None
-        case 'ENDOFMONTH'                  : return None
-        case 'ENDOFQUARTER'                : return None
-        case 'ENDOFYEAR'                   : return None
-        case 'FIRSTDATE'                   : return None
-        case 'LASTDATE'                    : return None
-        case 'NEXTDAY'                     : return None
-        case 'NEXTMONTH'                   : return None
-        case 'NEXTQUARTER'                 : return None
-        case 'NEXTYEAR'                    : return None
+        case 'DATEADD'                     : return _get_dax_date_add_expression(args)
+        case 'DATESBETWEEN'                : return None # TODO: support for multiple tables
+        case 'DATESINPERIOD'               : return None # TODO: support for multiple tables
+        case 'DATESMTD'                    : return None # TODO: support for multiple tables
+        case 'DATESQTD'                    : return None # TODO: support for multiple tables
+        case 'DATESYTD'                    : return None # TODO: support for multiple tables
+        case 'ENDOFMONTH'                  : return _get_dax_end_of_month_expression(args)
+        case 'ENDOFQUARTER'                : return _get_dax_end_of_quarter_expression(args)
+        case 'ENDOFYEAR'                   : return _get_dax_end_of_year_expression(args)
+        case 'FIRSTDATE'                   : return _get_dax_first_date_expression(args)
+        case 'LASTDATE'                    : return _get_dax_last_date_expression(args)
+        case 'NEXTDAY'                     : return _get_dax_next_day_expression(args)
+        case 'NEXTMONTH'                   : return _get_dax_next_month_expression(args)
+        case 'NEXTQUARTER'                 : return _get_dax_next_quarter_expression(args)
+        case 'NEXTYEAR'                    : return _get_dax_next_year_expression(args)
         case 'OPENINGBALANCEMONTH'         : return None
         case 'OPENINGBALANCEQUARTER'       : return None
         case 'OPENINGBALANCEYEAR'          : return None
         case 'PARALLELPERIOD'              : return None
-        case 'PREVIOUSDAY'                 : return None
-        case 'PREVIOUSMONTH'               : return None
-        case 'PREVIOUSQUARTER'             : return None
-        case 'PREVIOUSYEAR'                : return None
+        case 'PREVIOUSDAY'                 : return _get_dax_previous_day_expression(args)
+        case 'PREVIOUSMONTH'               : return _get_dax_previous_month_expression(args)
+        case 'PREVIOUSQUARTER'             : return _get_dax_previous_quarter_expression(args)
+        case 'PREVIOUSYEAR'                : return _get_dax_previous_year_expression(args)
         case 'SAMEPERIODLASTYEAR'          : return None
-        case 'STARTOFMONTH'                : return None
-        case 'STARTOFQUARTER'              : return None
-        case 'STARTOFYEAR'                 : return None
+        case 'STARTOFMONTH'                : return _get_dax_start_of_month_expression(args)
+        case 'STARTOFQUARTER'              : return _get_dax_start_of_quarter_expression(args)
+        case 'STARTOFYEAR'                 : return _get_dax_start_of_year_expression(args)
         case 'TOTALMTD'                    : return None
         case 'TOTALQTD'                    : return None
         case 'TOTALYTD'                    : return None
@@ -1213,6 +1216,149 @@ def _get_dax_year_expression(args: List) -> polars.Expr:
     if len(args) < 1:
         raise Exception('Invalid argument count for YEAR(datetime)')
     return _convert_dax_arg_to_date_time_or_column_expr(args[0]).dt.year()
+
+def _get_dax_date_add_expression(args: List) -> polars.Expr:
+    if len(args) < 3:
+        raise Exception('Invalid argument count for DATEADD(dates, number_of_intervals, interval)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    args[1] = int(_convert_dax_arg_to_literal(args[1]))
+    args[2] = str(_convert_dax_arg_to_literal(args[2])).upper()
+    AVAILABLE_INTERVALS = {
+        'YEAR'    : 'y',
+        'QUARTER' : 'q',
+        'MONTH'   : 'mo',
+        'DAY'     : 'd',
+    }
+    if args[2] not in AVAILABLE_INTERVALS:
+        raise Exception('Invalid type of argument 3 for DATEADD(dates, number_of_intervals, interval)')
+    interval = AVAILABLE_INTERVALS[args[2]]
+    return args[0].dt.offset_by(f'{args[1]}{interval}').cast(polars.Date)
+
+def _get_dax_end_of_month_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for ENDOFMONTH(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    return args[0].dt.month_end().dt.date()
+
+def _get_dax_end_of_quarter_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for ENDOFQUARTER(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    target_quarter = args[0].dt.quarter()
+    target_year = args[0].dt.year()
+    expr = polars.when(target_quarter.eq(1)).then(polars.date(target_year, 3, 31)) \
+                 .when(target_quarter.eq(2)).then(polars.date(target_year, 6, 30)) \
+                 .when(target_quarter.eq(3)).then(polars.date(target_year, 9, 30)) \
+                 .otherwise(polars.date(target_year, 12, 31))
+    return expr.cast(polars.Date)
+
+def _get_dax_end_of_year_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for ENDOFYEAR(dates, [year_end_date])')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    target_year = args[0].dt.year()
+    target_month = args[0].dt.month()
+    target_day = args[0].dt.day()
+    year_end_date = polars.date(target_year, 12, 31)
+    if len(args) > 1:
+        year_end_date = _convert_dax_arg_to_date_time_or_column_expr(args[1])
+    end_month = year_end_date.dt.month()
+    end_day = year_end_date.dt.day()
+    return polars.when((target_month <= end_month) & (target_day <= end_day)) \
+                 .then(polars.date(target_year, end_month, end_day)) \
+                 .otherwise(polars.date(target_year + 1, end_month, end_day))
+
+def _get_dax_first_date_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for FIRSTDATE(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    if args[0].meta.is_column():
+        return args[0].min()
+    return args[0].dt.date()
+
+def _get_dax_last_date_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for LASTDATE(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    if args[0].meta.is_column():
+        return args[0].max()
+    return args[0].dt.date()
+
+def _get_dax_next_day_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for NEXTDAY(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    return args[0].dt.offset_by('1d').dt.date()
+
+def _get_dax_next_month_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for NEXTMONTH(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    return args[0].dt.offset_by('1mo').dt.date()
+
+def _get_dax_next_quarter_expression(args: List) -> polars.Expr:
+    return None
+
+def _get_dax_next_year_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for NEXTYEAR(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    return args[0].dt.offset_by('1y').dt.date()
+
+def _get_dax_previous_day_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for PREVIOUSDAY(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    return args[0].dt.offset_by('-1d').dt.date()
+
+def _get_dax_previous_month_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for PREVIOUSMONTH(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    return args[0].dt.offset_by('-1mo').dt.date()
+
+def _get_dax_previous_quarter_expression(args: List) -> polars.Expr:
+    return None
+
+def _get_dax_previous_year_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for PREVIOUSYEAR(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    return args[0].dt.offset_by('-1y').dt.date()
+
+def _get_dax_start_of_month_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for STARTOFMONTH(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    return args[0].dt.month_start().dt.date()
+
+def _get_dax_start_of_quarter_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for STARTOFQUARTER(dates)')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    target_quarter = args[0].dt.quarter()
+    target_year = args[0].dt.year()
+    expr = polars.when(target_quarter.eq(1)).then(polars.date(target_year, 1, 31)) \
+                 .when(target_quarter.eq(2)).then(polars.date(target_year, 4, 30)) \
+                 .when(target_quarter.eq(3)).then(polars.date(target_year, 7, 31)) \
+                 .otherwise(polars.date(target_year, 10, 31))
+    return expr.cast(polars.Date)
+
+def _get_dax_start_of_year_expression(args: List) -> polars.Expr:
+    if len(args) < 1:
+        raise Exception('Invalid argument count for STARTOFYEAR(dates, [year_end_date])')
+    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
+    target_year = args[0].dt.year()
+    target_month = args[0].dt.month()
+    target_day = args[0].dt.day()
+    year_end_date = polars.date(target_year, 1, 31)
+    if len(args) > 1:
+        year_end_date = _convert_dax_arg_to_date_time_or_column_expr(args[1])
+    end_month = year_end_date.dt.month()
+    end_day = year_end_date.dt.day()
+    return polars.when((target_month <= end_month) & (target_day <= end_day)) \
+                 .then(polars.date(target_year - 1, end_month, end_day).dt.offset_by('1d')) \
+                 .otherwise(polars.date(target_year, end_month, end_day).dt.offset_by('1d'))
 
 def _get_dax_and_expression(args: List) -> polars.Expr:
     if len(args) < 2:
@@ -2158,8 +2304,7 @@ def _build_polars_expr(formula_dict: dict, func_type: str) -> polars.Expr:
         raise Exception(f'Cell reference and range are not yet supported')
 
     if formula_dict['type'] == 'function':
-        parsed_arguments = [_build_polars_expr(arg, func_type)
-                            for arg in formula_dict['arguments']]
+        parsed_arguments = [_build_polars_expr(arg, func_type) for arg in formula_dict['arguments']]
 
         func_name = formula_dict['name'].upper()
 

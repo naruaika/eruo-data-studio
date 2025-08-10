@@ -18,7 +18,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
+from dateutil.relativedelta import relativedelta
 from typing import Any
 import math
 import polars
@@ -541,9 +542,7 @@ class TestDaxFunction:
         expression = 'Now = NOW()'
         df = self._run_expression(self.df2, 'Now', expression)
         assert isinstance(df[0, 'Now'], datetime)
-        assert df[0, 'Now'].year == datetime.now().year
-        assert df[0, 'Now'].month == datetime.now().month
-        assert df[0, 'Now'].day == datetime.now().day
+        assert df[0, 'Now'].date() == datetime.now().date()
         assert df[0, 'Now'].hour == datetime.now().hour
         assert df[0, 'Now'].minute == datetime.now().minute
         assert df[0, 'Now'].second == datetime.now().second
@@ -632,29 +631,21 @@ class TestDaxFunction:
     def test_today(self):
         expression = 'Today = TODAY()'
         df = self._run_expression(self.df2, 'Today', expression)
-        assert isinstance(df[0, 'Today'], date)
-        assert df[0, 'Today'].year == date.today().year
-        assert df[0, 'Today'].month == date.today().month
-        assert df[0, 'Today'].day == date.today().day
+        assert df[0, 'Today'] == date.today()
 
     def test_utc_now(self):
         expression = 'Now = UTCNOW()'
         df = self._run_expression(self.df2, 'Now', expression)
-        assert isinstance(df[0, 'Now'], datetime)
-        assert df[0, 'Now'].year == datetime.now(timezone.utc).year
-        assert df[0, 'Now'].month == datetime.now(timezone.utc).month
-        assert df[0, 'Now'].day == datetime.now(timezone.utc).day
-        assert df[0, 'Now'].hour == datetime.now(timezone.utc).hour
-        assert df[0, 'Now'].minute == datetime.now(timezone.utc).minute
-        assert df[0, 'Now'].second == datetime.now(timezone.utc).second
+        now = datetime.now(timezone.utc)
+        assert df[0, 'Now'].date() == now.date()
+        assert df[0, 'Now'].hour == now.hour
+        assert df[0, 'Now'].minute == now.minute
+        assert df[0, 'Now'].second == now.second
 
     def test_utc_today(self):
         expression = 'Today = UTCTODAY()'
         df = self._run_expression(self.df2, 'Today', expression)
-        assert isinstance(df[0, 'Today'], date)
-        assert df[0, 'Today'].year == datetime.now(timezone.utc).year
-        assert df[0, 'Today'].month == datetime.now(timezone.utc).month
-        assert df[0, 'Today'].day == datetime.now(timezone.utc).day
+        assert df[0, 'Today'] == datetime.now(timezone.utc).date()
 
     def test_week_day(self):
         expression = "Weekend = WEEKDAY('2025-10-25')"
@@ -706,6 +697,223 @@ class TestDaxFunction:
             self._run_expression(self.df2, 'Error', expression)
 
         expression = 'Error = YEAR()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_date_add(self):
+        expression = "Tomorrow = DATEADD('2025-11-01', 1, DAY)"
+        df = self._run_expression(self.df2, 'Tomorrow', expression)
+        tomorrow = date(2025, 11, 1) + timedelta(days=1)
+        assert df[0, 'Tomorrow'] == tomorrow
+
+        expression = 'Tomorrow = DATEADD([OrderDate], 1, DAY)'
+        df = self._run_expression(self.df2, 'Tomorrow', expression)
+        tomorrow = df[0, 'OrderDate'] + timedelta(days=1)
+        assert df[0, 'Tomorrow'] == tomorrow
+
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "Error = DATEADD('2025-99-01', 1, DAY)"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = DATEADD([Undefined], 1, DAY)"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = DATEADD()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_end_of_month(self):
+        expressions = [
+            "End_of_Month = ENDOFMONTH('2025-11-02')",
+            "End_of_Month = ENDOFMONTH([OrderDate])"
+        ]
+
+        for expression in expressions:
+            df = self._run_expression(self.df2, 'End_of_Month', expression)
+            target_date = df[0, 'End_of_Month']
+            first_of_next_month = date(target_date.year, target_date.month + 1, 1)
+            expected_end_of_month = first_of_next_month - timedelta(days=1)
+            assert target_date == expected_end_of_month
+
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "Error = ENDOFMONTH('2025-99-02')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = ENDOFMONTH([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = ENDOFMONTH()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_end_of_quarter(self):
+
+        def get_quarter_end(target: date) -> date:
+            if 1 <= target.month <= 3:
+                month_day = (3, 31)
+            if 4 <= target.month <= 6:
+                month_day = (6, 30)
+            if 7 <= target.month <= 9:
+                month_day = (9, 30)
+            if 10 <= target.month <= 12:
+                month_day = (12, 31)
+            return date(target.year, *month_day)
+
+        expression = "End_of_Quarter = ENDOFQUARTER('2025-11-03')"
+        df = self._run_expression(self.df2, 'End_of_Quarter', expression)
+        assert df[0, 'End_of_Quarter'] == get_quarter_end(date(2025, 11, 3))
+
+        expression = 'End_of_Quarter = ENDOFQUARTER([OrderDate])'
+        df = self._run_expression(self.df2, 'End_of_Quarter', expression)
+        assert df[0, 'End_of_Quarter'] == get_quarter_end(df[0, 'OrderDate'])
+
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "Error = ENDOFQUARTER('2025-99-03')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = ENDOFQUARTER([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = ENDOFQUARTER()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_end_of_year(self):
+        expression = "End_of_Year = ENDOFYEAR('2025-11-04')"
+        df = self._run_expression(self.df2, 'End_of_Year', expression)
+        assert df[0, 'End_of_Year'] == date(2025, 12, 31)
+
+        expression = "End_of_Year = ENDOFYEAR('2025-11-04', '2025-06-30')"
+        df = self._run_expression(self.df2, 'End_of_Year', expression)
+        assert df[0, 'End_of_Year'] == date(2026, 6, 30)
+
+        expression = "End_of_Year = ENDOFYEAR('2025-01-04', '2025-06-30')"
+        df = self._run_expression(self.df2, 'End_of_Year', expression)
+        assert df[0, 'End_of_Year'] == date(2025, 6, 30)
+
+        expression = "End_of_Year = ENDOFYEAR([OrderDate])"
+        df = self._run_expression(self.df2, 'End_of_Year', expression)
+        target_date = df[0, 'End_of_Year']
+        assert target_date == date(target_date.year, 12, 31)
+
+        # TODO: support parsing dates without year?
+        #       See https://github.com/python/cpython/issues/70647.
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "End_of_Year = ENDOFYEAR('2025-01-04', 'June 30')"
+            df = self._run_expression(self.df2, 'End_of_Year', expression)
+            assert df[0, 'End_of_Year'] == date(2025, 6, 30)
+
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "Error = ENDOFYEAR('2025-99-04')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = ENDOFYEAR([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = ENDOFYEAR()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_first_date(self):
+        expression = f"OrderDate_First = FIRSTDATE([OrderDate])"
+        df = self._run_expression(self.df2, 'OrderDate_First', expression)
+        assert df[0, 'OrderDate_First'] == date(2023, 1, 10)
+
+        expression = f"OrderDate_First = FIRSTDATE('2025-01-05')"
+        df = self._run_expression(self.df2, 'OrderDate_First', expression)
+        assert df[0, 'OrderDate_First'] == date(2025, 1, 5)
+
+        with pytest.raises(polars.exceptions.ComputeError):
+            expression = "Error = FIRSTDATE('2025-99-05')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = FIRSTDATE([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = FIRSTDATE()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_last_date(self):
+        expression = f"OrderDate_Last = LASTDATE([OrderDate])"
+        df = self._run_expression(self.df2, 'OrderDate_Last', expression)
+        assert df[0, 'OrderDate_Last'] == date(2023, 5, 30)
+
+        expression = f"OrderDate_Last = LASTDATE('2025-01-06')"
+        df = self._run_expression(self.df2, 'OrderDate_Last', expression)
+        assert df[0, 'OrderDate_Last'] == date(2025, 1, 6)
+
+        with pytest.raises(polars.exceptions.ComputeError):
+            expression = "Error = LASTDATE('2025-99-06')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = LASTDATE([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = LASTDATE()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_next_day(self):
+        expression = f"OrderDate_Next = NEXTDAY('2025-01-07')"
+        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
+        assert df[0, 'OrderDate_Next'] == date(2025, 1, 8)
+
+        expression = f"OrderDate_Next = NEXTDAY([OrderDate])"
+        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
+        assert df[0, 'OrderDate_Next'] == df[0, 'OrderDate'] + relativedelta(days=1)
+
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "Error = NEXTDAY('2025-99-07')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = NEXTDAY([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = NEXTDAY()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_next_month(self):
+        expression = f"OrderDate_Next = NEXTMONTH('2025-01-08')"
+        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
+        assert df[0, 'OrderDate_Next'] == date(2025, 2, 8)
+
+        expression = f"OrderDate_Next = NEXTMONTH([OrderDate])"
+        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
+        assert df[0, 'OrderDate_Next'] == df[0, 'OrderDate'] + relativedelta(months=1)
+
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "Error = NEXTMONTH('2025-99-08')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = NEXTMONTH([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = NEXTMONTH()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
+    def test_next_quarter(self):
+        assert False
+
+    def test_next_year(self):
+        expression = f"OrderDate_Next = NEXTYEAR('2025-01-10')"
+        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
+        assert df[0, 'OrderDate_Next'] == date(2026, 1, 10)
+
+        expression = f"OrderDate_Next = NEXTYEAR([OrderDate])"
+        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
+        assert df[0, 'OrderDate_Next'] == df[0, 'OrderDate'] + relativedelta(years=1)
+
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "Error = NEXTYEAR('2025-99-10')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = NEXTYEAR([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = NEXTYEAR()'
         assert self._argument_count_error_triggered(self.df2, expression)
 
     #
