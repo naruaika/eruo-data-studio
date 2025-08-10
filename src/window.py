@@ -36,6 +36,8 @@ class Window(Adw.ApplicationWindow):
     window_title = Gtk.Template.Child()
 
     toggle_sidebar = Gtk.Template.Child()
+    toggle_sidebar_size = Gtk.Template.Child()
+
     sidebar_tab_view = Gtk.Template.Child()
 
     toggle_search_all = Gtk.Template.Child()
@@ -773,6 +775,16 @@ class Window(Adw.ApplicationWindow):
 
         if selected_page == self.search_replace_all_page:
             sheet_document.is_searching_cells = True
+
+    def do_toggle_sidebar_size(self) -> None:
+        if self.toggle_sidebar_size.get_active():
+            self.toggle_sidebar_size.set_active(False)
+            self.split_view.set_sidebar_width_fraction(75)
+            self.split_view.set_max_sidebar_width(0)
+        else:
+            self.toggle_sidebar_size.set_active(True)
+            self.split_view.set_sidebar_width_fraction(25)
+            self.split_view.set_max_sidebar_width(280)
 
     def show_toast_message(self,
                            message: str,

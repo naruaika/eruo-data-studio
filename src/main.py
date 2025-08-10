@@ -60,6 +60,7 @@ class Application(Adw.Application):
         self.create_action('about', self.on_about_action)
         self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
         self.create_action('toggle-sidebar', self.on_toggle_sidebar_action, ['<primary>b'])
+        self.create_action('toggle-sidebar-size', self.on_toggle_sidebar_size_action)
         self.create_action('open', self.on_open_file_action, ['<primary>o'])
         self.create_action('save', self.on_save_file_action, ['<primary>s'])
         self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
@@ -114,6 +115,7 @@ class Application(Adw.Application):
         self.create_action('convert-to-categorical', self.on_convert_to_categorical_action)
         self.create_action('convert-to-boolean', self.on_convert_to_boolean_action)
         self.create_action('convert-to-text', self.on_convert_to_text_action)
+        self.create_action('toggle-formula-bar', self.on_toggle_formula_bar_action)
         self.create_action('open-inline-formula', self.on_open_inline_formula_action, ['F2'])
         self.create_action('apply-pending-table', self.on_apply_pending_table_action, param_type=GLib.VariantType('s'))
 
@@ -161,6 +163,10 @@ class Application(Adw.Application):
     def on_toggle_sidebar_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
         window.do_toggle_sidebar()
+
+    def on_toggle_sidebar_size_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        window.do_toggle_sidebar_size()
 
     def on_open_file_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
@@ -458,6 +464,9 @@ class Application(Adw.Application):
     def convert_to(self, dtype: polars.DataType) -> None:
         document = self.get_current_active_document()
         document.convert_current_columns_dtype(dtype)
+
+    def on_toggle_formula_bar_action(self, action: Gio.SimpleAction, *args) -> None:
+        pass
 
     def on_open_inline_formula_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()

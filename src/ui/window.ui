@@ -52,6 +52,22 @@
                     <property name="vexpand">true</property>
                   </object>
                 </property>
+                <child type="bottom">
+                  <object class="GtkBox">
+                    <property name="halign">end</property>
+                    <property name="visible">false</property>
+                    <child>
+                      <object class="GtkToggleButton" id="toggle_sidebar_size">
+                        <property name="icon-name">view-fullscreen-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">Toggle Sidebar Size</property>
+                        <property name="action-name">app.toggle-sidebar-size</property>
+                      </object>
+                    </child>
+                  <style>
+                    <class name="toolbar"/>
+                  </style>
+                  </object>
+                </child>
               </object>
             </property>
           </object>
@@ -199,18 +215,35 @@
                             <child>
                               <object class="GtkOverlay">
                                 <child>
-                                  <object class="GtkEntry" id="formula_bar">
-                                    <property name="tooltip-text">Formula Bar</property>
-                                    <property name="halign">fill</property>
-                                    <property name="hexpand">True</property>
-                                    <signal name="activate" handler="on_formula_bar_activated" swapped="no" />
+                                  <object class="GtkBox">
+                                    <property name="orientation">horizontal</property>
+                                    <child>
+                                      <object class="GtkEntry" id="formula_bar">
+                                        <property name="tooltip-text">Formula Bar</property>
+                                        <property name="halign">fill</property>
+                                        <property name="hexpand">True</property>
+                                        <signal name="activate" handler="on_formula_bar_activated" swapped="no" />
+                                        <style>
+                                          <class name="formula-bar"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkToggleButton" id="toggle_formula_bar">
+                                        <property name="icon-name">view-fullscreen-symbolic</property>
+                                        <property name="tooltip-text" translatable="yes">Toggle Formula Bar</property>
+                                        <property name="action-name">app.toggle-formula-bar</property>
+                                        <property name="visible">false</property>
+                                      </object>
+                                    </child>
                                     <style>
-                                      <class name="formula-bar"/>
+                                      <class name="linked"/>
                                     </style>
                                   </object>
                                 </child>
                                 <child type="overlay">
                                   <object class="GtkLabel" id="formula_bar_dtype">
+                                    <property name="margin-end">0</property>
                                     <property name="halign">end</property>
                                     <property name="valign">center</property>
                                     <property name="label">text</property>
