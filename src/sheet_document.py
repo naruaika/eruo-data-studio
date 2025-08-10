@@ -1137,7 +1137,7 @@ class SheetDocument(GObject.Object):
         nquery = query.split('=', 1)[1].strip()
 
         # Add "FROM self" if needed
-        if 'from self' not in nquery.lower():
+        if 'from' not in nquery.lower():
             if 'where' in nquery.lower():
                 nquery = nquery.replace('where', 'FROM self where', 1)
             else:

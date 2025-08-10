@@ -845,22 +845,24 @@ class Window(Adw.ApplicationWindow):
         table_name = table_name.strip()
         query = query.strip()
 
-        try:
-            if len(sheet_document.data.dfs):
-                # TODO: register all of the main tables from different sheets
-                frames = {'self': sheet_document.data.dfs[0]}
-
-                # Add "FROM self" if needed
-                if 'from self' not in query.lower():
-                    if 'where' in query.lower():
-                        query = query.replace('where', 'FROM self where', 1)
-                    else:
-                        query += ' FROM self'
-
-                new_dataframe = polars.SQLContext(frames).execute(query).collect()
-
+        # Add "FROM self" if needed
+        if 'from' not in query.lower():
+            if 'where' in query.lower():
+                query = query.replace('where', 'FROM self where', 1)
             else:
-                new_dataframe = polars.SQLContext().execute(query).collect()
+                query += ' FROM self'
+
+        frames = {}
+
+        # Register all the main dataframes
+        if sheet_document.data.has_main_dataframe:
+            frames['self'] = sheet_document.data.dfs[0]
+        for sheet in self.sheet_manager.sheets.values():
+            if sheet.data.has_main_dataframe:
+                frames[sheet.title] = sheet.data.dfs[0]
+
+        try:
+            new_dataframe = polars.SQLContext(frames).execute(query).collect()
 
             sheet_view = self.sheet_manager.create_sheet(new_dataframe, table_name)
             self.add_new_tab(sheet_view)

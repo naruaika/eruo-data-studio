@@ -518,7 +518,12 @@ class SheetData(GObject.Object):
             return False
 
         try:
-            new_dataframe = self.dfs[dfi].sql(query)
+            frames = {}
+
+            if len(self.dfs):
+                frames['self'] = self.dfs[0]
+
+            new_dataframe = polars.SQLContext(frames).execute(query).collect()
 
             incoming_column_names = new_dataframe.columns
             existing_column_names = self.dfs[dfi].columns
