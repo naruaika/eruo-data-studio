@@ -212,6 +212,10 @@ class SearchReplaceAllView(Gtk.Box):
         self.window.sidebar_tab_view.set_selected_page(tab_page)
 
         sheet_document = self.window.get_current_active_document()
+
+        if sheet_document is None:
+            return
+
         sheet_document.is_searching_cells = True
 
         self.search_entry.grab_focus()

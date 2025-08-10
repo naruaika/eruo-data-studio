@@ -508,6 +508,8 @@ class Window(Adw.ApplicationWindow):
         if len(self.sheet_manager.sheets) == 0:
             self.name_box.set_sensitive(False)
             self.formula_bar.set_sensitive(False)
+            self.toolbar_tab_view.set_sensitive(False)
+            self.sidebar_tab_view.set_sensitive(False)
             self.update_inputbar()
             self.grab_focus()
 
@@ -687,6 +689,8 @@ class Window(Adw.ApplicationWindow):
         sheet_view.main_canvas.grab_focus()
         self.name_box.set_sensitive(True)
         self.formula_bar.set_sensitive(True)
+        self.toolbar_tab_view.set_sensitive(True)
+        self.sidebar_tab_view.set_sensitive(True)
 
     def reset_inputbar(self) -> None:
         sheet_document = self.get_current_active_document()
@@ -753,13 +757,13 @@ class Window(Adw.ApplicationWindow):
     def do_toggle_sidebar(self) -> None:
         sheet_document = self.get_current_active_document()
 
-        if sheet_document is None:
-            return
-
         # Close the sidebar when it's already open
         if self.toggle_sidebar.get_active():
             self.toggle_sidebar.set_active(False)
             self.split_view.set_collapsed(True)
+
+            if sheet_document is None:
+                return
 
             # Hide the search range selection box if necessary
             if sheet_document.search_range_performer == 'search-all':
@@ -771,6 +775,9 @@ class Window(Adw.ApplicationWindow):
         # Open the sidebar
         self.toggle_sidebar.set_active(True)
         self.split_view.set_collapsed(False)
+
+        if sheet_document is None:
+            return
 
         selected_page = self.sidebar_tab_view.get_selected_page()
 
