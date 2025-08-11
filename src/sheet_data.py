@@ -509,7 +509,9 @@ class SheetData(GObject.Object):
         except Exception as e:
             print(e)
 
-        globals.send_notification('Cannot execute the query')
+            message = str(e)
+            globals.send_notification(message)
+
         return False
 
     def update_columns_with_sql_from_metadata(self,

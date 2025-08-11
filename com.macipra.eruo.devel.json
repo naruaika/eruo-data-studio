@@ -87,6 +87,20 @@
             ]
         },
         {
+            "name": "python3-numpy",
+            "buildsystem": "simple",
+            "build-commands": [
+                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"numpy\" --no-build-isolation"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/59/ef/f96536f1df42c668cbacb727a8c6da7afc9c05ece6d558927fb1722693e1/numpy-2.3.2-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+                    "sha256": "8145dd6d10df13c559d1e4314df29695613575183fa2e2d11fac4c208c8a1f73"
+                }
+            ]
+        },
+        {
             "name": "python3-polars",
             "buildsystem": "simple",
             "build-commands": [

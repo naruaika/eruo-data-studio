@@ -27,6 +27,7 @@ import threading
 
 from . import globals
 from .sheet_document import SheetDocument
+from .sheet_functions import register_sql_functions
 from .sheet_view import SheetView
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/window.ui')
@@ -820,12 +821,12 @@ class Window(Adw.ApplicationWindow):
             return False
 
         # Check if the input is an SQL-like syntax but for DDL
-        query_pattern = r"\s*[A-Za-z0-9]+.*=\s*SELECT\s*.*"
+        query_pattern = r"\s*[A-Za-z0-9]+.*=\s*[SELECT|WITH]\s*.*"
         if re.fullmatch(query_pattern, formula, re.IGNORECASE):
             return self.create_table_from_sql(formula)
 
         # Check if the input is an SQL-like syntax
-        query_pattern = r"\s*=\s*SELECT\s*.*"
+        query_pattern = r"\s*=\s*[SELECT|WITH]\s*.*"
         if re.fullmatch(query_pattern, formula, re.IGNORECASE):
             return sheet_view.document.update_columns_from_sql(formula)
 
@@ -863,11 +864,14 @@ class Window(Adw.ApplicationWindow):
         connection = duckdb.connect()
 
         # Register all the main dataframes
+        # FIXME: this process takes 0.2-0.3 seconds
         if sheet_document.data.has_main_dataframe:
             connection.register('self', sheet_document.data.dfs[0])
         for sheet in self.sheet_manager.sheets.values():
             if sheet.data.has_main_dataframe:
                 connection.register(sheet.title, sheet.data.dfs[0])
+
+        register_sql_functions(connection)
 
         try:
             new_dataframe = connection.sql(query).pl()
@@ -882,14 +886,7 @@ class Window(Adw.ApplicationWindow):
         except Exception as e:
             print(e)
 
-            message = f'Cannot execute the query'
-            e = str(e)
-
-            if e.startswith('sql parser error: '):
-                message = f'Invalid SQL syntax: {e.split('sql parser error: ', 1)[1]}'
-            if e.startswith('unable to find column '):
-                message = f'Unknown column name: {e.split('unable to find column ', 1)[1].split(';')[0]}'
-
+            message = str(e)
             self.show_toast_message(message)
 
         connection.close()

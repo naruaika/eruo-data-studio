@@ -1675,7 +1675,7 @@ def _convert_dax_arg_to_time_or_column_expr(arg: Any) -> polars.Expr:
 def _convert_dax_arg_to_column_expr(arg: Any) -> polars.Expr:
     if isinstance(arg, str):
         return polars.col(arg)
-    if isinstance(arg, polars.Expr) and arg.meta.is_column():
+    if isinstance(arg, polars.Expr):
         return arg
     return polars.col(str(arg))
 
@@ -2419,3 +2419,28 @@ def parse_dax(expression: str, transform: bool = True) -> Dict[str, Any]:
 
     # Invalid syntax
     return {'error': 'Invalid syntax'}
+
+#
+# SQL Function Extensions
+#
+
+from pyarrow import compute
+from duckdb.typing import DOUBLE
+from duckdb import DuckDBPyConnection
+
+def _sql_function_acot(x):
+    return compute.atan(compute.divide(1, x))
+
+SQL_FUNCTIONS = [
+    ('ACOT', _sql_function_acot, [DOUBLE], DOUBLE),
+]
+
+def register_sql_functions(connection: DuckDBPyConnection) -> None:
+    for name, func, param, rtype in SQL_FUNCTIONS:
+        connection.create_function(
+            name,
+            func,
+            parameters=param,
+            return_type=rtype,
+            type='arrow',
+        )

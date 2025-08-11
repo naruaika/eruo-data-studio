@@ -29,7 +29,7 @@ import re
 from . import globals
 from . import utils
 from .clipboard_manager import ClipboardManager
-from .sheet_functions import parse_dax
+from .sheet_functions import parse_dax, register_sql_functions
 
 class SheetDocument(GObject.Object):
     __gtype_name__ = 'SheetDocument'
@@ -1153,11 +1153,14 @@ class SheetDocument(GObject.Object):
         connection = duckdb.connect()
 
         # Register all the main dataframes
+        # FIXME: this process takes 0.2-0.3 seconds
         if self.data.has_main_dataframe:
             connection.register('self', self.data.dfs[0])
         for sheet in self.sheet_manager.sheets.values():
             if sheet.data.has_main_dataframe:
                 connection.register(sheet.title, sheet.data.dfs[0])
+
+        register_sql_functions(connection)
 
         try:
             relation = connection.sql(nquery)
