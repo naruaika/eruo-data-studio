@@ -4,8 +4,8 @@
   <requires lib="Adw" version="1.0"/>
   <template class="Window" parent="AdwApplicationWindow">
     <property name="title">Eruo Data Studio</property>
-    <property name="default-width">1200</property>
-    <property name="default-height">800</property>
+    <property name="default-width">1440</property>
+    <property name="default-height">900</property>
     <property name="focusable">true</property>
     <property name="content">
       <object class="AdwNavigationSplitView" id="split_view">
