@@ -54,16 +54,21 @@ class SheetRenderer(GObject.Object):
         selection = self.document.selection
         widgets = self.document.widgets
 
+        edit_mode_enabled = globals.is_editing_cells and globals.current_document_id != self.document.document_id
+
         # We may not want to change the order of these calls as it can causes
         # unoptimal rendering results :)
         self.setup_cairo_context(context)
         self.draw_headers_backgrounds(context, width, height, display)
-        self.draw_selection_backgrounds(context, width, height, display, selection)
+        if not edit_mode_enabled:
+            self.draw_selection_backgrounds(context, width, height, display, selection)
         self.draw_headers_contents(canvas, context, width, height, display, data)
         self.draw_cells_contents(canvas, context, width, height, display, data)
-        self.draw_selection_overlay(context, width, height, display, selection)
+        if not edit_mode_enabled:
+            self.draw_selection_overlay(context, width, height, display, selection)
         self.draw_cells_borders(context, width, height, display)
-        self.draw_selection_borders(context, width, height, display, selection)
+        if not edit_mode_enabled:
+            self.draw_selection_borders(context, width, height, display, selection)
         self.draw_virtual_widgets(context, width, height, display, widgets)
 
     def setup_cairo_context(self, context: cairo.Context) -> None:
@@ -507,14 +512,14 @@ class SheetRenderer(GObject.Object):
                     # We don't natively support object types, but in any case the user has perfomed
                     # an operation that returned an object, we want to show it properly in minimal.
                     if isinstance(cell_text, polars.Series):
-                        cell_text = cell_text.to_list()
-
-                    cell_text = str(cell_text)
+                        cell_text = str(cell_text.to_list())
 
                     if cell_text in ['', None]:
                         y += cell_height
                         row_index += 1
                         continue # skip empty cells
+
+                    cell_text = str(cell_text)
 
                     # Right-align numeric and temporal values
                     if col_dtype.is_numeric() or col_dtype.is_temporal():

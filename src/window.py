@@ -151,6 +151,9 @@ class Window(Adw.ApplicationWindow):
         self.file = None
         self.context_menu = None
 
+        self.inline_formula_box_x = 0
+        self.inline_formula_box_y = 0
+
     def setup_new_document(self,
                            file:      Gio.File,
                            dataframe: polars.DataFrame) -> None:
@@ -223,19 +226,8 @@ class Window(Adw.ApplicationWindow):
                                       keyval:  int,
                                       keycode: int,
                                       state:   Gdk.ModifierType) -> None:
-        sheet_view = self.get_current_active_view()
-
-        if sheet_view is None:
-            return # inline formula should be closed when there's no active view,
-                   # but this is for completeness.
-
         if keyval == Gdk.KEY_Escape:
-            globals.is_editing_cells = False
-            globals.current_document_id = ''
-            self.inline_formula_box.set_visible(False)
-            sheet_view.main_canvas.set_focusable(True)
-            sheet_view.main_canvas.grab_focus()
-            sheet_view.main_canvas.queue_draw()
+            self.close_inline_formula()
             return
 
         if keyval == Gdk.KEY_Return:
@@ -253,30 +245,16 @@ class Window(Adw.ApplicationWindow):
                 # TODO: remove the trailing newline
                 return
 
-            # Hide the inline formula
-            globals.is_editing_cells = False
-            globals.current_document_id = ''
-            self.inline_formula_box.set_visible(False)
+            self.close_inline_formula()
 
-            # Move the focus back to the main canvas
-            sheet_view.main_canvas.set_focusable(True)
-            sheet_view.main_canvas.grab_focus()
             return
 
     def on_inline_formula_unfocused(self, event: Gtk.EventControllerFocus) -> None:
-        # TODO: should we keep it open when the user is performing vlookup, etc?
-        globals.is_editing_cells = False
-        globals.current_document_id = ''
-        self.inline_formula_box.set_visible(False)
-
         sheet_view = self.get_current_active_view()
 
         if sheet_view is None:
             return # inline formula should be closed when there's no active view,
                    # but this is for completeness.
-
-        # Reset the selection box style
-        sheet_view.main_canvas.queue_draw()
 
     def on_content_overlay_get_child_position(self,
                                               overlay:    Gtk.Overlay,
@@ -285,6 +263,16 @@ class Window(Adw.ApplicationWindow):
         if widget == self.inline_formula_box:
             sheet_view = self.get_current_active_view()
             sheet_document = sheet_view.document
+
+            if globals.current_document_id != '' \
+                    and self.inline_formula_box_x > 0 \
+                    and self.inline_formula_box_y > 0:
+                allocation.x = self.inline_formula_box_x
+                allocation.y = self.inline_formula_box_y
+                return True
+
+            if sheet_document is None:
+                return False
 
             # I had been trying to make it intelligently resize itself, but sadly I didn't succeed.
             # My PangoCairo calculation is always different than what I perceived on the GtkEntry,
@@ -323,6 +311,9 @@ class Window(Adw.ApplicationWindow):
             allocation.y = new_y
             allocation.width = new_width
             allocation.height = new_height
+
+            self.inline_formula_box_x = new_x
+            self.inline_formula_box_y = new_y
 
             widget.set_size_request(new_width, new_height)
 
@@ -475,12 +466,6 @@ class Window(Adw.ApplicationWindow):
         # Update the global references to the current active document
         globals.history = sheet_document.history
 
-        # TODO: should be possible to continue the editing session
-        # For now, we just reset the flag because we don't want to
-        # see visual glitches.
-        globals.is_editing_cells = False
-        globals.current_document_id = ''
-
         # Reset the input bar to represent the current selection
         self.reset_inputbar()
 
@@ -498,6 +483,9 @@ class Window(Adw.ApplicationWindow):
             globals.current_document_id = ''
             self.inline_formula_box.set_visible(False)
 
+            self.inline_formula_box_x = 0
+            self.inline_formula_box_y = 0
+
         # Clean up the history, mainly to free up disk space
         # from the temporary files created for undo/redo operations.
         sheet_view.document.history.cleanup_all()
@@ -513,6 +501,9 @@ class Window(Adw.ApplicationWindow):
             self.sidebar_tab_view.set_sensitive(False)
             self.update_inputbar()
             self.grab_focus()
+
+    def on_operation_cancelled(self, source: GObject.Object) -> None:
+        self.close_inline_formula()
 
     def on_selection_changed(self, source: GObject.Object) -> None:
         self.reset_inputbar()
@@ -674,6 +665,7 @@ class Window(Adw.ApplicationWindow):
 
         # Setup proper handling of signals and bindings
         tab_page.bind_property('title', sheet_view.document, 'title', GObject.BindingFlags.BIDIRECTIONAL)
+        sheet_view.document.connect('cancel-operation', self.on_operation_cancelled)
         sheet_view.document.connect('selection-changed', self.on_selection_changed)
         sheet_view.document.connect('columns-changed', self.on_columns_changed)
         sheet_view.document.connect('sorts-changed', self.on_sorts_changed)
@@ -741,6 +733,25 @@ class Window(Adw.ApplicationWindow):
         self.inline_formula.get_buffer().set_text(sel_value)
 
         self.inline_formula.grab_focus()
+
+    def close_inline_formula(self) -> None:
+        globals.is_editing_cells = False
+        globals.current_document_id = ''
+
+        self.inline_formula_box_x = 0
+        self.inline_formula_box_y = 0
+
+        self.inline_formula_box.set_visible(False)
+
+        sheet_view = self.get_current_active_view()
+
+        if sheet_view is None:
+            return # inline formula should be closed when there's no active view,
+                   # but this is for completeness.
+
+        sheet_view.main_canvas.set_focusable(True)
+        sheet_view.main_canvas.grab_focus()
+        sheet_view.main_canvas.queue_draw()
 
     def apply_pending_table(self, action_data_id: str) -> None:
         dataframe = None

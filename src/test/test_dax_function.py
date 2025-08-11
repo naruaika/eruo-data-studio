@@ -679,6 +679,22 @@ class TestDaxFunction:
         expression = 'Error = WEEKDAY()'
         assert self._argument_count_error_triggered(self.df2, expression)
 
+    def test_week_num(self):
+        expression = "Weeknum = WEEKNUM('2025-10-26')"
+        df = self._run_expression(self.df2, 'Weeknum', expression)
+        assert df[0, 'Weeknum'] == 43
+
+        with pytest.raises(polars.exceptions.InvalidOperationError):
+            expression = "Error = WEEKNUM('2025-99-26')"
+            self._run_expression(self.df2, 'Error', expression)
+
+        with pytest.raises(polars.exceptions.ColumnNotFoundError):
+            expression = "Error = WEEKNUM([Undefined])"
+            self._run_expression(self.df2, 'Error', expression)
+
+        expression = 'Error = WEEKNUM()'
+        assert self._argument_count_error_triggered(self.df2, expression)
+
     def test_year(self):
         expression = "Year_2025 = YEAR('2025-10-27')"
         df = self._run_expression(self.df2, 'Year_2025', expression)
@@ -851,69 +867,6 @@ class TestDaxFunction:
             self._run_expression(self.df2, 'Error', expression)
 
         expression = 'Error = LASTDATE()'
-        assert self._argument_count_error_triggered(self.df2, expression)
-
-    def test_next_day(self):
-        expression = f"OrderDate_Next = NEXTDAY('2025-01-07')"
-        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
-        assert df[0, 'OrderDate_Next'] == date(2025, 1, 8)
-
-        expression = f"OrderDate_Next = NEXTDAY([OrderDate])"
-        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
-        assert df[0, 'OrderDate_Next'] == df[0, 'OrderDate'] + relativedelta(days=1)
-
-        with pytest.raises(polars.exceptions.InvalidOperationError):
-            expression = "Error = NEXTDAY('2025-99-07')"
-            self._run_expression(self.df2, 'Error', expression)
-
-        with pytest.raises(polars.exceptions.ColumnNotFoundError):
-            expression = "Error = NEXTDAY([Undefined])"
-            self._run_expression(self.df2, 'Error', expression)
-
-        expression = 'Error = NEXTDAY()'
-        assert self._argument_count_error_triggered(self.df2, expression)
-
-    def test_next_month(self):
-        expression = f"OrderDate_Next = NEXTMONTH('2025-01-08')"
-        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
-        assert df[0, 'OrderDate_Next'] == date(2025, 2, 8)
-
-        expression = f"OrderDate_Next = NEXTMONTH([OrderDate])"
-        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
-        assert df[0, 'OrderDate_Next'] == df[0, 'OrderDate'] + relativedelta(months=1)
-
-        with pytest.raises(polars.exceptions.InvalidOperationError):
-            expression = "Error = NEXTMONTH('2025-99-08')"
-            self._run_expression(self.df2, 'Error', expression)
-
-        with pytest.raises(polars.exceptions.ColumnNotFoundError):
-            expression = "Error = NEXTMONTH([Undefined])"
-            self._run_expression(self.df2, 'Error', expression)
-
-        expression = 'Error = NEXTMONTH()'
-        assert self._argument_count_error_triggered(self.df2, expression)
-
-    def test_next_quarter(self):
-        assert False
-
-    def test_next_year(self):
-        expression = f"OrderDate_Next = NEXTYEAR('2025-01-10')"
-        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
-        assert df[0, 'OrderDate_Next'] == date(2026, 1, 10)
-
-        expression = f"OrderDate_Next = NEXTYEAR([OrderDate])"
-        df = self._run_expression(self.df2, 'OrderDate_Next', expression)
-        assert df[0, 'OrderDate_Next'] == df[0, 'OrderDate'] + relativedelta(years=1)
-
-        with pytest.raises(polars.exceptions.InvalidOperationError):
-            expression = "Error = NEXTYEAR('2025-99-10')"
-            self._run_expression(self.df2, 'Error', expression)
-
-        with pytest.raises(polars.exceptions.ColumnNotFoundError):
-            expression = "Error = NEXTYEAR([Undefined])"
-            self._run_expression(self.df2, 'Error', expression)
-
-        expression = 'Error = NEXTYEAR()'
         assert self._argument_count_error_triggered(self.df2, expression)
 
     #

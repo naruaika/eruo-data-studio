@@ -41,6 +41,10 @@
     <file preprocess="xml-stripblanks">erase-symbolic.svg</file>
     <file preprocess="xml-stripblanks">filter-symbolic.svg</file>
     <file preprocess="xml-stripblanks">search-symbolic.svg</file>
+
+    <file preprocess="xml-stripblanks">table-shortcut-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">table-built-symbolic.svg</file>
+
     <file preprocess="xml-stripblanks">chevron-down-symbolic.svg</file>
   </gresource>
 </gresources>

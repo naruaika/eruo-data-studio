@@ -35,6 +35,7 @@ class SheetDocument(GObject.Object):
     __gtype_name__ = 'SheetDocument'
 
     __gsignals__ = {
+        'cancel-operation': (GObject.SIGNAL_RUN_FIRST, None, ()),
         'selection-changed': (GObject.SIGNAL_RUN_FIRST, None, ()),
         'columns-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
         'sorts-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
@@ -87,9 +88,9 @@ class SheetDocument(GObject.Object):
         # Basically we want to know which widget is currently performing
         # a search range operation, specifically to decide when or not to
         # draw the search range selection box. For example, when we performs
-        # a search range operation from the widget on the sidebar but at the same
-        # time we have the quick search bar open and want to close it, the search
-        # range selection box should keep be shown.
+        # a search range operation from the widget on the sidebar but at the
+        # same time we have the quick search bar open and want to close it,
+        # the search range selection box should keep be shown.
         self.search_range_performer: str = ''
 
         self.current_dfi: int = 0 if dataframe is not None \
@@ -175,6 +176,7 @@ class SheetDocument(GObject.Object):
     def on_operation_cancelled(self, source: GObject.Object) -> None:
         self.cancel_cutcopy_operation()
         self.view.main_canvas.queue_draw()
+        self.emit('cancel-operation')
 
     def on_update_selection_by_keypress(self,
                                         source: GObject.Object,
@@ -596,7 +598,7 @@ class SheetDocument(GObject.Object):
                                        with_offset:   bool = False,
                                        smooth_scroll: bool = False) -> None:
         # Save snapshot
-        if not globals.is_changing_state:
+        if not globals.is_changing_state and not globals.is_editing_cells:
             from .history_manager import SelectionState
             state = SelectionState(col_1, row_1,
                                    col_2, row_2,

@@ -340,7 +340,7 @@ class SheetDisplay(GObject.Object):
         return self.DEFAULT_CELL_WIDTH
 
     def get_cell_height_from_row(self, row: int) -> int:
-        """Get the hegiht of the cell at the given visual row index."""
+        """Get the height of the cell at the given visual row index."""
         vrow = self.get_vrow_from_row(row)
         if vrow == 0:
             return self.top_locator_height

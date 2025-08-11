@@ -197,12 +197,12 @@ class SheetData(GObject.Object):
 
         self.unique_caches = {}
 
-        self.setup_main_df(dataframe, column, row)
+        self.setup_main_dataframe(dataframe, column, row)
 
-    def setup_main_df(self,
-                      dataframe: polars.DataFrame,
-                      column:    int,
-                      row:       int) -> None:
+    def setup_main_dataframe(self,
+                             dataframe: polars.DataFrame,
+                             column:    int,
+                             row:       int) -> None:
         if dataframe is None:
             return
 

@@ -30,7 +30,8 @@ if (debug_mode := int(os.environ.get('EDS_DEBUG', '0'))) > 0:
     try:
         import debugpy
         debugpy.listen(('127.0.0.1', 5678))
-        debugpy.wait_for_client()
+        if debug_mode > 1:
+            debugpy.wait_for_client()
     except ModuleNotFoundError:
         pass
 
@@ -88,12 +89,11 @@ class Application(Adw.Application):
         self.create_action('delete-row', self.on_delete_row_action)
         self.create_action('delete-column', self.on_delete_column_action)
         self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
+        self.create_action('import-table', self.on_import_table_action)
         self.create_action('hide-column', self.on_hide_column_action)
         self.create_action('unhide-column', self.on_unhide_column_action)
         self.create_action('unhide-all-columns', self.on_unhide_all_columns_action)
         self.create_action('filter-cell-value', self.on_filter_cell_value_action)
-        # self.create_action('filter-cell-color', self.on_filter_cell_color_action)
-        # self.create_action('filter-font-color', self.on_filter_font_color_action)
         self.create_action('filter-cell-values', self.on_filter_cell_values_action)
         self.create_action('reset-all-filters', self.on_reset_all_filters_action)
         self.create_action('sort-smallest-to-largest', self.on_sort_smallest_to_largest_action)
@@ -229,9 +229,19 @@ class Application(Adw.Application):
     def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
         pass
 
-    def on_file_opened(self, source: GObject.Object, file_path: str) -> None:
+    def on_file_opened(self, source: GObject.Object, file_path: str, in_place: bool) -> None:
         if not file_path:
             return # shouldn't happen, but for completeness
+
+        # Insert the file content to a new tab
+        if in_place:
+            file = Gio.File.new_for_path(file_path)
+            dataframe = self.file_manager.read_file(file_path)
+
+            window = self.get_active_window()
+            window.setup_new_document(file, dataframe)
+
+            return
 
         # TODO: reuse the current active window if the window references to no file
         #       and there's not any sheet opened or the current active sheet has no
@@ -371,6 +381,10 @@ class Application(Adw.Application):
     def on_clear_contents_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()
         document.update_current_cells('')
+
+    def on_import_table_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        self.file_manager.open_file(window, in_place=True)
 
     def on_hide_column_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()

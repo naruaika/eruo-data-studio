@@ -32,7 +32,7 @@ class FileManager(GObject.Object):
     __gtype_name__ = 'FileManager'
 
     __gsignals__ = {
-        'file-opened': (GObject.SIGNAL_RUN_FIRST, None, (str,)),
+        'file-opened': (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
         'file-saved': (GObject.SIGNAL_RUN_FIRST, None, (str,)),
     }
 
@@ -156,7 +156,7 @@ class FileManager(GObject.Object):
         globals.send_notification(f'Cannot delete file: {file_path}')
         return False
 
-    def open_file(self, window: Window) -> None:
+    def open_file(self, window: Window, in_place: bool = False) -> None:
         # This function is intended to open the file dialog and let the user
         # select a file to open. Then we call the `read_file` function to read
         # the actual file content.
@@ -202,11 +202,11 @@ class FileManager(GObject.Object):
         def on_open_file_dialog_dismissed(dialog: Gtk.FileDialog,
                                           result: Gio.Task) -> None:
             if result.had_error():
-                self.emit('file-opened', '')
+                self.emit('file-opened', '', in_place)
                 return
 
             file = dialog.open_finish(result)
-            self.emit('file-opened', file.get_path())
+            self.emit('file-opened', file.get_path(), in_place)
 
         # Return the result to the main application thread. If an error
         # had occurred or the user cancelled, we pass an empty string.

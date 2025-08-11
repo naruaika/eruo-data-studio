@@ -682,29 +682,29 @@ def _get_dax_expression(func_name: str, args: List) -> polars.Expr:
         case 'APPROXIMATEDISTINCTCOUNT'    : return _get_dax_approximate_distinct_count_expression(args)
         case 'AVERAGE'                     : return _get_dax_average_expression(args)
         case 'AVERAGEA'                    : return _get_dax_average_a_expression(args)
-        case 'AVERAGEX'                    : return None # TODO: support for multiple tables
+        case 'AVERAGEX'                    : return None # not supported
         case 'COUNT'                       : return _get_dax_count_expression(args)
         case 'COUNTA'                      : return _get_dax_count_a_expression(args)
-        case 'COUNTAX'                     : return None # TODO: support for multiple tables
+        case 'COUNTAX'                     : return None # not supported
         case 'COUNTBLANK'                  : return _get_dax_count_blank_expression(args)
         case 'COUNTROWS'                   : return _get_dax_count_rows_expression(args)
-        case 'COUNTX'                      : return None # TODO: support for multiple tables
+        case 'COUNTX'                      : return None # not supported
         case 'DISTINCTCOUNT'               : return _get_dax_distinct_count_expression(args)
         case 'DISTINCTCOUNTNOBLANK'        : return _get_dax_distinct_count_no_blank_expression(args)
         case 'MAX'                         : return _get_dax_max_expression(args)
         case 'MAXA'                        : return _get_dax_max_a_expression(args)
-        case 'MAXX'                        : return None # TODO: support for multiple tables
+        case 'MAXX'                        : return None # not supported
         case 'MIN'                         : return _get_dax_min_expression(args)
         case 'MINA'                        : return _get_dax_min_a_expression(args)
-        case 'MINX'                        : return None # TODO: support for multiple tables
+        case 'MINX'                        : return None # not supported
         case 'PRODUCT'                     : return _get_dax_product_expression(args)
-        case 'PRODUCTX'                    : return None # TODO: support for multiple tables
+        case 'PRODUCTX'                    : return None # not supported
         case 'SUM'                         : return _get_dax_sum_expression(args)
-        case 'SUMX'                        : return None # TODO: support for multiple tables
+        case 'SUMX'                        : return None # not supported
 
         # Date and time
-        case 'CALENDAR'                    : return None # TODO: support for generating new table
-        case 'CALENDARAUTO'                : return None # TODO: support for generating new table
+        case 'CALENDAR'                    : return None # not supported
+        case 'CALENDARAUTO'                : return None # not supported
         case 'DATE'                        : return _get_dax_date_expression(args)
         case 'DATEDIFF'                    : return _get_dax_date_diff_expression(args)
         case 'DATEVALUE'                   : return _get_dax_date_value_expression(args)
@@ -724,13 +724,11 @@ def _get_dax_expression(func_name: str, args: List) -> polars.Expr:
         case 'UTCNOW'                      : return polars.lit(datetime.now(timezone.utc))
         case 'UTCTODAY'                    : return polars.lit(datetime.now(timezone.utc).date())
         case 'WEEKDAY'                     : return _get_dax_week_day_expression(args)
-        case 'WEEKNUM'                     : return None
+        case 'WEEKNUM'                     : return _get_dax_week_num_expression(args)
         case 'YEAR'                        : return _get_dax_year_expression(args)
         case 'YEARFRAC'                    : return None
 
-        # FIXME: some functions below in the current implementation doesn't make sense,
-        #        since they're expected to generate a generate a new date range table
-        #        to be used as a filter parameter for the CALCULATE() function.
+        # Time Intelligence
         case 'CLOSINGBALANCEMONTH'         : return None
         case 'CLOSINGBALANCEQUARTER'       : return None
         case 'CLOSINGBALANCEYEAR'          : return None
@@ -745,18 +743,18 @@ def _get_dax_expression(func_name: str, args: List) -> polars.Expr:
         case 'ENDOFYEAR'                   : return _get_dax_end_of_year_expression(args)
         case 'FIRSTDATE'                   : return _get_dax_first_date_expression(args)
         case 'LASTDATE'                    : return _get_dax_last_date_expression(args)
-        case 'NEXTDAY'                     : return _get_dax_next_day_expression(args)
-        case 'NEXTMONTH'                   : return _get_dax_next_month_expression(args)
-        case 'NEXTQUARTER'                 : return _get_dax_next_quarter_expression(args)
-        case 'NEXTYEAR'                    : return _get_dax_next_year_expression(args)
+        case 'NEXTDAY'                     : return None # not supported
+        case 'NEXTMONTH'                   : return None # not supported
+        case 'NEXTQUARTER'                 : return None # not supported
+        case 'NEXTYEAR'                    : return None # not supported
         case 'OPENINGBALANCEMONTH'         : return None
         case 'OPENINGBALANCEQUARTER'       : return None
         case 'OPENINGBALANCEYEAR'          : return None
         case 'PARALLELPERIOD'              : return None
-        case 'PREVIOUSDAY'                 : return _get_dax_previous_day_expression(args)
-        case 'PREVIOUSMONTH'               : return _get_dax_previous_month_expression(args)
-        case 'PREVIOUSQUARTER'             : return _get_dax_previous_quarter_expression(args)
-        case 'PREVIOUSYEAR'                : return _get_dax_previous_year_expression(args)
+        case 'PREVIOUSDAY'                 : return None # not supported
+        case 'PREVIOUSMONTH'               : return None # not supported
+        case 'PREVIOUSQUARTER'             : return None # not supported
+        case 'PREVIOUSYEAR'                : return None # not supported
         case 'SAMEPERIODLASTYEAR'          : return None
         case 'STARTOFMONTH'                : return _get_dax_start_of_month_expression(args)
         case 'STARTOFQUARTER'              : return _get_dax_start_of_quarter_expression(args)
@@ -1212,6 +1210,13 @@ def _get_dax_week_day_expression(args: List) -> polars.Expr:
             return expr.dt.weekday() - 1
     return polars.when(expr.dt.weekday() == 1).then(7).otherwise(expr.dt.weekday() - 2 + rtype)
 
+def _get_dax_week_num_expression(args: List) -> polars.Expr:
+    # TODO: implement the return_type parameter
+    # See https://learn.microsoft.com/en-us/dax/weeknum-function-dax
+    if len(args) < 1:
+        raise Exception('Invalid argument count for WEEKNUM(date)')
+    return _convert_dax_arg_to_date_time_or_column_expr(args[0]).dt.week()
+
 def _get_dax_year_expression(args: List) -> polars.Expr:
     if len(args) < 1:
         raise Exception('Invalid argument count for YEAR(datetime)')
@@ -1283,48 +1288,6 @@ def _get_dax_last_date_expression(args: List) -> polars.Expr:
     if args[0].meta.is_column():
         return args[0].max()
     return args[0].dt.date()
-
-def _get_dax_next_day_expression(args: List) -> polars.Expr:
-    if len(args) < 1:
-        raise Exception('Invalid argument count for NEXTDAY(dates)')
-    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
-    return args[0].dt.offset_by('1d').dt.date()
-
-def _get_dax_next_month_expression(args: List) -> polars.Expr:
-    if len(args) < 1:
-        raise Exception('Invalid argument count for NEXTMONTH(dates)')
-    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
-    return args[0].dt.offset_by('1mo').dt.date()
-
-def _get_dax_next_quarter_expression(args: List) -> polars.Expr:
-    return None
-
-def _get_dax_next_year_expression(args: List) -> polars.Expr:
-    if len(args) < 1:
-        raise Exception('Invalid argument count for NEXTYEAR(dates)')
-    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
-    return args[0].dt.offset_by('1y').dt.date()
-
-def _get_dax_previous_day_expression(args: List) -> polars.Expr:
-    if len(args) < 1:
-        raise Exception('Invalid argument count for PREVIOUSDAY(dates)')
-    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
-    return args[0].dt.offset_by('-1d').dt.date()
-
-def _get_dax_previous_month_expression(args: List) -> polars.Expr:
-    if len(args) < 1:
-        raise Exception('Invalid argument count for PREVIOUSMONTH(dates)')
-    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
-    return args[0].dt.offset_by('-1mo').dt.date()
-
-def _get_dax_previous_quarter_expression(args: List) -> polars.Expr:
-    return None
-
-def _get_dax_previous_year_expression(args: List) -> polars.Expr:
-    if len(args) < 1:
-        raise Exception('Invalid argument count for PREVIOUSYEAR(dates)')
-    args[0] = _convert_dax_arg_to_date_time_or_column_expr(args[0])
-    return args[0].dt.offset_by('-1y').dt.date()
 
 def _get_dax_start_of_month_expression(args: List) -> polars.Expr:
     if len(args) < 1:
