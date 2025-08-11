@@ -697,6 +697,8 @@ class SidebarHomeView(Adw.Bin):
             self.sort_list_status.get_parent().set_visible(True)
             self.sort_list_status_label.set_text('No sorts found')
 
+            self.apply_pending_sort() # force apply sort
+
     @Gtk.Template.Callback()
     def on_add_sort_button_clicked(self, button: Gtk.Button) -> None:
         if self.field_list_store.get_n_items() == 0:
@@ -722,8 +724,13 @@ class SidebarHomeView(Adw.Bin):
         self.sort_list_status.get_parent().set_visible(True)
         self.sort_list_status_label.set_text('No sorts found')
 
+        self.apply_pending_sort() # force apply sort
+
     @Gtk.Template.Callback()
     def on_apply_sort_button_clicked(self, button: Gtk.Button) -> None:
+        self.apply_pending_sort()
+
+    def apply_pending_sort(self) -> None:
         document = self.window.get_current_active_document()
 
         document.pending_sorts = {}
@@ -742,7 +749,7 @@ class SidebarHomeView(Adw.Bin):
         sheet_document = self.window.get_current_active_document()
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
-            self.sort_list_view.get_parent().set_visible(False)
+            self.sort_list_view_box.get_parent().set_visible(False)
             self.sort_list_status.get_parent().set_visible(True)
             self.sort_list_status_label.set_text('No table selected')
             return
