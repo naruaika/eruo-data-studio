@@ -32,12 +32,27 @@
     font-feature-settings: "tnum" 1;
 }
 .formula-bar-dtype {
-    margin-right: 6px;
+    margin-right: 38px;
     padding: 4px 8px;
     border-radius: 6px;
     font-size: 12px;
     font-weight: bold;
     background: var(--view-bg-color);
+}
+
+.multiline-formula-bar-box {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+.multiline-formula-bar {
+    padding: 8px 0;
+}
+.multiline-formula-bar,
+.multiline-formula-bar border,
+.multiline-formula-bar border gutter,
+.multiline-formula-bar text {
+    background-color: transparent;
 }
 
 .inline-formula {

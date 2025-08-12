@@ -2,6 +2,7 @@
 <interface>
   <requires lib="gtk" version="4.0"/>
   <requires lib="Adw" version="1.0"/>
+  <requires lib="gtksource" version="5.0"/>
   <template class="Window" parent="AdwApplicationWindow">
     <property name="title">Eruo Data Studio</property>
     <property name="default-width">1440</property>
@@ -52,22 +53,6 @@
                     <property name="vexpand">true</property>
                   </object>
                 </property>
-                <child type="bottom">
-                  <object class="GtkBox">
-                    <property name="halign">end</property>
-                    <property name="visible">false</property>
-                    <child>
-                      <object class="GtkToggleButton" id="toggle_sidebar_size">
-                        <property name="icon-name">view-fullscreen-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">Toggle Sidebar Size</property>
-                        <property name="action-name">app.toggle-sidebar-size</property>
-                      </object>
-                    </child>
-                  <style>
-                    <class name="toolbar"/>
-                  </style>
-                  </object>
-                </child>
               </object>
             </property>
           </object>
@@ -206,6 +191,7 @@
                               <object class="GtkEntry" id="name_box">
                                 <property name="tooltip-text">Name Box</property>
                                 <property name="halign">fill</property>
+                                <property name="valign">start</property>
                                 <signal name="activate" handler="on_name_box_activated" swapped="no" />
                                 <style>
                                   <class name="name-box"/>
@@ -221,7 +207,8 @@
                                       <object class="GtkEntry" id="formula_bar">
                                         <property name="tooltip-text">Formula Bar</property>
                                         <property name="halign">fill</property>
-                                        <property name="hexpand">True</property>
+                                        <property name="hexpand">true</property>
+                                        <property name="visible">true</property>
                                         <signal name="activate" handler="on_formula_bar_activated" swapped="no" />
                                         <style>
                                           <class name="formula-bar"/>
@@ -229,11 +216,37 @@
                                       </object>
                                     </child>
                                     <child>
+                                      <object class="GtkScrolledWindow" id="multiline_formula_bar_box">
+                                        <property name="valign">fill</property>
+                                        <property name="halign">fill</property>
+                                        <property name="hexpand">true</property>
+                                        <property name="height-request">145</property>
+                                        <property name="visible">false</property>
+                                        <child>
+                                          <object class="GtkSourceView" id="multiline_formula_bar">
+                                            <property name="tooltip-text">Formula Bar</property>
+                                            <property name="show-line-numbers">true</property>
+                                            <property name="monospace">true</property>
+                                            <property name="tab-width">4</property>
+                                            <property name="halign">fill</property>
+                                            <property name="hexpand">true</property>
+                                            <property name="wrap-mode">word</property>
+                                            <style>
+                                              <class name="multiline-formula-bar"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <style>
+                                          <class name="multiline-formula-bar-box"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child>
                                       <object class="GtkToggleButton" id="toggle_formula_bar">
                                         <property name="icon-name">view-fullscreen-symbolic</property>
                                         <property name="tooltip-text" translatable="yes">Toggle Formula Bar</property>
-                                        <property name="action-name">app.toggle-formula-bar</property>
-                                        <property name="visible">false</property>
+                                        <property name="valign">start</property>
+                                        <signal name="toggled" handler="on_toggle_formula_bar_toggled" swapped="no" />
                                       </object>
                                     </child>
                                     <style>

@@ -38,7 +38,6 @@ class Window(Adw.ApplicationWindow):
     window_title = Gtk.Template.Child()
 
     toggle_sidebar = Gtk.Template.Child()
-    toggle_sidebar_size = Gtk.Template.Child()
 
     sidebar_tab_view = Gtk.Template.Child()
 
@@ -50,6 +49,10 @@ class Window(Adw.ApplicationWindow):
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
     formula_bar_dtype = Gtk.Template.Child()
+
+    multiline_formula_bar_box = Gtk.Template.Child()
+    multiline_formula_bar = Gtk.Template.Child()
+    toggle_formula_bar = Gtk.Template.Child()
 
     inline_formula_box = Gtk.Template.Child()
     inline_formula = Gtk.Template.Child()
@@ -113,7 +116,7 @@ class Window(Adw.ApplicationWindow):
 
         # We add some margin to the formula bar to prevent its content from being hidden
         # by the dtype indicator widget.
-        self.formula_bar.get_first_child().set_margin_end(45)
+        self.formula_bar.get_first_child().set_margin_end(40)
 
         click_event_controller = Gtk.GestureClick()
         click_event_controller.connect('pressed', self.on_name_box_pressed)
@@ -130,6 +133,10 @@ class Window(Adw.ApplicationWindow):
         key_event_controller = Gtk.EventControllerKey()
         key_event_controller.connect('key-pressed', self.on_formula_bar_key_pressed)
         self.formula_bar.add_controller(key_event_controller)
+
+        key_event_controller = Gtk.EventControllerKey()
+        key_event_controller.connect('key-pressed', self.on_multiline_formula_bar_key_pressed)
+        self.multiline_formula_bar.add_controller(key_event_controller)
 
         self.content_overlay.connect('get-child-position', self.on_content_overlay_get_child_position)
 
@@ -256,6 +263,8 @@ class Window(Adw.ApplicationWindow):
             return # inline formula should be closed when there's no active view,
                    # but this is for completeness.
 
+        self.close_inline_formula() # TODO: should hide instead
+
     def on_content_overlay_get_child_position(self,
                                               overlay:    Gtk.Overlay,
                                               widget:     Gtk.Widget,
@@ -331,6 +340,27 @@ class Window(Adw.ApplicationWindow):
         selected_view = getattr(self, f'toolbar_{tab_view_name}_page', None)
         if selected_view is not None:
             self.toolbar_tab_view.set_selected_page(selected_view)
+
+    @Gtk.Template.Callback()
+    def on_toggle_formula_bar_toggled(self, toggle_button: Gtk.ToggleButton) -> None:
+        if toggle_button.get_active():
+            self.formula_bar.set_visible(False)
+            self.formula_bar_dtype.set_visible(False)
+            self.multiline_formula_bar_box.set_visible(True)
+
+            text = self.formula_bar.get_text()
+            self.multiline_formula_bar.get_buffer().set_text(text)
+
+        else:
+            self.formula_bar.set_visible(True)
+            self.formula_bar_dtype.set_visible(True)
+            self.multiline_formula_bar_box.set_visible(False)
+
+            entry_buffer = self.multiline_formula_bar.get_buffer()
+            start_iter = entry_buffer.get_start_iter()
+            end_iter = entry_buffer.get_end_iter()
+            text = entry_buffer.get_text(start_iter, end_iter, True)
+            self.formula_bar.set_text(text)
 
     @Gtk.Template.Callback()
     def on_name_box_activated(self, widget: Gtk.Widget) -> None:
@@ -449,6 +479,40 @@ class Window(Adw.ApplicationWindow):
                        # but this is for completeness.
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
+            return
+
+    def on_multiline_formula_bar_key_pressed(self,
+                                             event:   Gtk.EventControllerKey,
+                                             keyval:  int,
+                                             keycode: int,
+                                             state:   Gdk.ModifierType) -> None:
+        # Pressing escape key will reset the input bar
+        # and return the focus to the main canvas back.
+        if keyval == Gdk.KEY_Escape:
+            self.reset_inputbar()
+            sheet_view = self.get_current_active_view()
+            if sheet_view is None:
+                return # formula bar should be insensitive when there's no active view,
+                       # but this is for completeness.
+            sheet_view.main_canvas.set_focusable(True)
+            sheet_view.main_canvas.grab_focus()
+            return
+
+        if keyval == Gdk.KEY_Return:
+            if state != Gdk.ModifierType.CONTROL_MASK:
+                return # prevent from executing the inline formula
+                       # when pressing Return key with any modifier
+
+            entry_buffer = self.multiline_formula_bar.get_buffer()
+            start_iter = entry_buffer.get_start_iter()
+            end_iter = entry_buffer.get_end_iter()
+            text = entry_buffer.get_text(start_iter, end_iter, True)
+
+            # Update the current cells
+            if not self.execute_pending_formula(text):
+                # TODO: remove the trailing newline
+                return
+
             return
 
     def on_selected_page_changed(self,
@@ -708,12 +772,13 @@ class Window(Adw.ApplicationWindow):
                         sel_dtype: str = None) -> None:
         self.name_box.set_text(sel_name)
         self.formula_bar.set_text(sel_value)
+        self.multiline_formula_bar.get_buffer().set_text(sel_value)
 
         if sel_dtype is not None:
             self.formula_bar_dtype.set_text(sel_dtype)
-            self.formula_bar_dtype.set_visible(True)
-        else:
-            self.formula_bar_dtype.set_visible(False)
+
+            if not self.toggle_formula_bar.get_active():
+                self.formula_bar_dtype.set_visible(sel_dtype is not None)
 
     def open_inline_formula(self, sel_value: str = None) -> None:
         sheet_document = self.get_current_active_document()
@@ -796,16 +861,6 @@ class Window(Adw.ApplicationWindow):
         if selected_page == self.search_replace_all_page:
             sheet_document.is_searching_cells = True
 
-    def do_toggle_sidebar_size(self) -> None:
-        if self.toggle_sidebar_size.get_active():
-            self.toggle_sidebar_size.set_active(False)
-            self.split_view.set_sidebar_width_fraction(75)
-            self.split_view.set_max_sidebar_width(0)
-        else:
-            self.toggle_sidebar_size.set_active(True)
-            self.split_view.set_sidebar_width_fraction(25)
-            self.split_view.set_max_sidebar_width(280)
-
     def show_toast_message(self,
                            message: str,
                            action:  tuple = ()) -> None:
@@ -832,22 +887,24 @@ class Window(Adw.ApplicationWindow):
             return False
 
         # Check if the input is an SQL-like syntax but for DDL
-        query_pattern = r"\s*[A-Za-z0-9]+.*=\s*[SELECT|WITH]\s*.*"
+        query_pattern = r"(\r\n|\r|\n|\s)*[A-Za-z0-9]+.*=(\r\n|\r|\n|\s)*" \
+                        r"[SELECT|WITH](\r\n|\r|\n|.)*"
         if re.fullmatch(query_pattern, formula, re.IGNORECASE):
             return self.create_table_from_sql(formula)
 
         # Check if the input is an SQL-like syntax
-        query_pattern = r"\s*=\s*[SELECT|WITH]\s*.*"
+        query_pattern = r"(\r\n|\r|\n|\s)*=(\r\n|\r|\n|\s)*" \
+                        r"[SELECT|WITH](\r\n|\r|\n|.)*"
         if re.fullmatch(query_pattern, formula, re.IGNORECASE):
             return sheet_view.document.update_columns_from_sql(formula)
 
         # Check if the input is an DAX-like syntax
-        expression_pattern = r"\s*[A-Za-z0-9]+.*=.*"
+        expression_pattern = r"(\r\n|\r|\n|\s)*[A-Za-z0-9]+.*=.*"
         if re.fullmatch(expression_pattern, formula, re.IGNORECASE):
             return sheet_view.document.update_columns_from_dax(formula)
 
         # Check if the input is a formula
-        formula_pattern = r"\s*=.*"
+        formula_pattern = r"(\r\n|\r|\n|\s)*=.*"
         if re.fullmatch(formula_pattern, formula, re.IGNORECASE):
             return sheet_view.document.update_current_cells_from_formula(formula)
 
