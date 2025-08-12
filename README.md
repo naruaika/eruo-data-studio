@@ -2,9 +2,16 @@
 
 A powerful, intuitive, and integrated data platform for data analysts.
 
-![Eruo Data Studio](docs/screenshot.png)
+<span style="display: block; margin: -20px; margin-bottom: -10px;">
+  <img src="docs/screenshot.png" alt="Eruo Data Studio" />
+</span>
 
 **Eruo Data Studio** is an innovative, free, and open-source application designed to revolutionize how you interact with and understand your data. Built on the lightning-fast [Polars](https://pola.rs/) data processing library, **Eruo Data Studio** brings together the best of Excel's flexibility, business intelligence's interactive visualization, and ETL's robust data preparation, *all in one seamless environment*.
+
+<span style="display: block; margin: -20px; margin-bottom: -10px;">
+  <img src="docs/screenshot-1.png" alt="Eruo Data Studio" />
+</span>
+
 
 **Disclaimer:** We know this project sounds ambitious! We're actively exploring the best path forward, balancing community needs with what's technically achievable. Our direction and approaches may evolve as we learn and build.
 
@@ -152,4 +159,4 @@ Here are some useful references for the project development:
 
 ## Licenses
 
-This project is distributed under the [GNU General Public License Version 3](https://www.gnu.org/licenses/gpl-3.0.en.html). We use GTK and [Libadwaita](https://gitlab.gnome.org/GNOME/libadwaita) to build the user interface, which are licensed under the [GNU Lesser General Public License Version 2.1](https://www.gnu.org/licenses/lgpl-2.1.en.html). The backend for data manipulation uses [Polars](https://pola.rs/), which is distributed under the [MIT License](https://opensource.org/license/mit). For other dependencies, see the `requirements.txt` file. We use icons from [Carbon Design System](https://carbondesignsystem.com/elements/icons/library/), which is distributed under the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).
+This project is distributed under the [GNU General Public License Version 3](https://www.gnu.org/licenses/gpl-3.0.en.html). We use GTK and [Libadwaita](https://gitlab.gnome.org/GNOME/libadwaita) to build the user interface, which are licensed under the [GNU Lesser General Public License Version 2.1](https://www.gnu.org/licenses/lgpl-2.1.en.html). The backend for data manipulation uses [Polars](https://pola.rs/) and [DuckDB](https://duckdb.org/), which are distributed under the [MIT License](https://opensource.org/license/mit). For other dependencies, see the `requirements.txt` file. We use icons from [Carbon Design System](https://carbondesignsystem.com/elements/icons/library/), which is distributed under the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).

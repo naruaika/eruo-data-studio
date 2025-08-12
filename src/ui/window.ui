@@ -77,7 +77,7 @@
                           </object>
                         </child>
                         <child>
-                          <object class="GtkBox">
+                          <object class="GtkBox" id="toolbar_tab_bar">
                             <property name="orientation">horizontal</property>
                             <property name="valign">center</property>
                             <property name="spacing">3</property>
@@ -177,11 +177,12 @@
                             <property name="hexpand">true</property>
                             <style>
                               <class name="toolbar-view"/>
+                              <class name="card"/>
                             </style>
                           </object>
                         </child>
                         <child>
-                          <object class="GtkBox">
+                          <object class="GtkBox" id="name_formula_box">
                             <property name="orientation">horizontal</property>
                             <property name="spacing">6</property>
                             <property name="margin-start">6</property>
@@ -332,10 +333,14 @@
                             <property name="expand_tabs">false</property>
                             <property name="view">tab_view</property>
                             <property name="end-action-widget">
-                              <object class="GtkButton">
+                              <object class="AdwSplitButton">
                                 <property name="icon-name">list-add-symbolic</property>
                                 <property name="tooltip-text" translatable="yes">New Sheet</property>
+                                <property name="menu-model">new_sheet_menu</property>
                                 <signal name="clicked" handler="on_new_sheet_clicked" swapped="no" />
+                                <style>
+                                  <class name="flat"/>
+                                </style>
                               </object>
                             </property>
                             <style>
@@ -390,6 +395,18 @@
       <item>
         <attribute name="label" translatable="yes">_Quit</attribute>
         <attribute name="action">app.quit</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="new_sheet_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">New _Worksheet</attribute>
+        <attribute name="action">app.new-sheet</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">New _Notebook</attribute>
+        <attribute name="action">app.new-notebook</attribute>
       </item>
     </section>
   </menu>

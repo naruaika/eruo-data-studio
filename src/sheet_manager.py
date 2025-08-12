@@ -23,6 +23,7 @@ import polars
 import re
 
 from .sheet_document import SheetDocument
+from .sheet_notebook import SheetNotebook
 from .sheet_view import SheetView
 
 class SheetManager(GObject.Object):
@@ -37,7 +38,7 @@ class SheetManager(GObject.Object):
         # each window with a unique id.
         self.sheet_id = str(int(time()))
 
-        self.sheets: dict[int, SheetDocument] = {}
+        self.sheets: dict[int, SheetDocument | SheetNotebook] = {}
         self.sheet_counter: int = 0
 
     def get_sheet_names(self) -> list[str]:
@@ -47,7 +48,8 @@ class SheetManager(GObject.Object):
                      # The initial dataframe to display in the newly created sheet,
                      # the remaining dataframe should be loaded progressively.
                      dataframe: polars.DataFrame,
-                     title:     str = None) -> SheetView:
+                     title:     str = None,
+                     stype:     str = 'default') -> SheetView:
 
         def generate_new_title(title: str = None) -> str:
             if title is None:
@@ -69,9 +71,13 @@ class SheetManager(GObject.Object):
         document_id = f'{self.sheet_id}_{self.sheet_counter}'
         self.sheet_counter += 1
 
+        if stype == 'notebook':
+            sheet = SheetNotebook(self, document_id, title)
+            self.sheets[document_id] = sheet
+            return sheet.view
+
         sheet = SheetDocument(self, document_id, title, dataframe)
         self.sheets[document_id] = sheet
-
         return sheet.view
 
     def delete_sheet(self, sheet_view: SheetView) -> None:

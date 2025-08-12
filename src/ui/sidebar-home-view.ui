@@ -14,7 +14,7 @@
             <property name="margin-bottom">6</property>
             <property name="spacing">10</property>
             <child>
-              <object class="AdwPreferencesGroup">
+              <object class="AdwPreferencesGroup" id="fields_section">
                 <child>
                   <object class="AdwExpanderRow">
                     <property name="title">Fields</property>
@@ -55,7 +55,7 @@
               </object>
             </child>
             <child>
-              <object class="AdwPreferencesGroup">
+              <object class="AdwPreferencesGroup" id="sorts_section">
                 <child>
                   <object class="AdwExpanderRow">
                     <property name="title">Sorts</property>
@@ -82,9 +82,6 @@
                             <property name="icon-name">list-add-symbolic</property>
                             <property name="tooltip-text">Add sort</property>
                             <signal name="clicked" handler="on_add_sort_button_clicked" swapped="no"/>
-                            <style>
-                              <class name="success"/>
-                            </style>
                           </object>
                         </child>
                         <style>
@@ -124,16 +121,15 @@
                                 <property name="tooltip-text">Add sort</property>
                                 <signal name="clicked" handler="on_add_sort_button_clicked" swapped="no"/>
                                 <style>
-                                  <class name="success"/>
                                   <class name="row-button"/>
                                 </style>
                               </object>
                             </child>
-                      <child>
-                        <object class="GtkBox">
-                          <property name="hexpand">true</property>
-                        </object>
-                      </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="hexpand">true</property>
+                              </object>
+                            </child>
                             <child>
                               <object class="GtkButton">
                                 <child>
@@ -176,7 +172,7 @@
               </object>
             </child>
             <child>
-              <object class="AdwPreferencesGroup">
+              <object class="AdwPreferencesGroup" id="filters_section">
                 <child>
                   <object class="AdwExpanderRow">
                     <property name="title">Filters</property>
@@ -203,9 +199,6 @@
                             <property name="icon-name">list-add-symbolic</property>
                             <property name="tooltip-text">Add filter</property>
                             <signal name="clicked" handler="on_add_filter_button_clicked" swapped="no"/>
-                            <style>
-                              <class name="success"/>
-                            </style>
                           </object>
                         </child>
                         <style>
@@ -246,7 +239,6 @@
                                 <property name="tooltip-text">Add filter</property>
                                 <signal name="clicked" handler="on_add_filter_button_clicked" swapped="no"/>
                                 <style>
-                                  <class name="success"/>
                                   <class name="row-button"/>
                                 </style>
                               </object>

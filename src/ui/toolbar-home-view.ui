@@ -71,6 +71,98 @@
               </object>
             </child>
             <child>
+              <object class="GtkBox" id="sheet_1_section">
+                <property name="orientation">horizontal</property>
+                <child>
+                  <object class="GtkSeparator">
+                    <property name="orientation">vertical</property>
+                    <property name="margin-top">6</property>
+                    <property name="margin-bottom">6</property>
+                    <property name="margin-start">6</property>
+                    <property name="margin-end">6</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox">
+                    <property name="orientation">horizontal</property>
+                    <child>
+                      <object class="GtkButton">
+                        <property name="icon-name">row-insert-symbolic</property>
+                        <property name="tooltip-text">Insert Row(s) Above</property>
+                        <property name="action-name">app.insert-row-above</property>
+                        <style>
+                          <class name="flat"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuButton">
+                        <property name="icon-name">chevron-down-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">More Options</property>
+                        <property name="menu-model">home_row_menu</property>
+                        <style>
+                          <class name="flat"/>
+                          <class name="arrow"/>
+                        </style>
+                      </object>
+                    </child>
+                    <style>
+                      <class name="linked"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox">
+                    <property name="orientation">horizontal</property>
+                    <child>
+                      <object class="GtkButton">
+                        <property name="icon-name">column-insert-symbolic</property>
+                        <property name="tooltip-text">Insert Column(s) Right</property>
+                        <property name="action-name">app.insert-column-right</property>
+                        <style>
+                          <class name="flat"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuButton">
+                        <property name="icon-name">chevron-down-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">More Options</property>
+                        <property name="menu-model">home_column_menu</property>
+                        <style>
+                          <class name="flat"/>
+                          <class name="arrow"/>
+                        </style>
+                      </object>
+                    </child>
+                    <style>
+                      <class name="linked"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkButton">
+                    <property name="icon-name">row-delete-symbolic</property>
+                    <property name="tooltip-text">Delete Row(s)</property>
+                    <property name="action-name">app.delete-row</property>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkButton">
+                    <property name="icon-name">column-delete-symbolic</property>
+                    <property name="tooltip-text">Delete Column(s)</property>
+                    <property name="action-name">app.delete-column</property>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
               <object class="GtkSeparator">
                 <property name="orientation">vertical</property>
                 <property name="margin-top">6</property>
@@ -80,110 +172,28 @@
               </object>
             </child>
             <child>
-              <object class="GtkBox">
+              <object class="GtkBox" id="sheet_2_section">
                 <property name="orientation">horizontal</property>
                 <child>
                   <object class="GtkButton">
-                    <property name="icon-name">row-insert-symbolic</property>
-                    <property name="tooltip-text">Insert Row(s) Above</property>
-                    <property name="action-name">app.insert-row-above</property>
+                    <property name="icon-name">erase-symbolic</property>
+                    <property name="tooltip-text">Clear Content(s)</property>
+                    <property name="action-name">app.clear-contents</property>
                     <style>
                       <class name="flat"/>
                     </style>
                   </object>
                 </child>
-                <child>
-                  <object class="GtkMenuButton">
-                    <property name="icon-name">chevron-down-symbolic</property>
-                    <property name="tooltip-text" translatable="yes">More Options</property>
-                    <property name="menu-model">home_row_menu</property>
-                    <style>
-                      <class name="flat"/>
-                      <class name="arrow"/>
-                    </style>
-                  </object>
-                </child>
-                <style>
-                  <class name="linked"/>
-                </style>
-              </object>
-            </child>
-            <child>
-              <object class="GtkBox">
-                <property name="orientation">horizontal</property>
                 <child>
                   <object class="GtkButton">
-                    <property name="icon-name">column-insert-symbolic</property>
-                    <property name="tooltip-text">Insert Column(s) Right</property>
-                    <property name="action-name">app.insert-column-right</property>
+                    <property name="icon-name">filter-symbolic</property>
+                    <property name="tooltip-text">Open Sort &amp; Filter</property>
+                    <property name="action-name">app.open-sort-filter</property>
                     <style>
                       <class name="flat"/>
                     </style>
                   </object>
                 </child>
-                <child>
-                  <object class="GtkMenuButton">
-                    <property name="icon-name">chevron-down-symbolic</property>
-                    <property name="tooltip-text" translatable="yes">More Options</property>
-                    <property name="menu-model">home_column_menu</property>
-                    <style>
-                      <class name="flat"/>
-                      <class name="arrow"/>
-                    </style>
-                  </object>
-                </child>
-                <style>
-                  <class name="linked"/>
-                </style>
-              </object>
-            </child>
-            <child>
-              <object class="GtkButton">
-                <property name="icon-name">row-delete-symbolic</property>
-                <property name="tooltip-text">Delete Row(s)</property>
-                <property name="action-name">app.delete-row</property>
-                <style>
-                  <class name="flat"/>
-                </style>
-              </object>
-            </child>
-            <child>
-              <object class="GtkButton">
-                <property name="icon-name">column-delete-symbolic</property>
-                <property name="tooltip-text">Delete Column(s)</property>
-                <property name="action-name">app.delete-column</property>
-                <style>
-                  <class name="flat"/>
-                </style>
-              </object>
-            </child>
-            <child>
-              <object class="GtkSeparator">
-                <property name="orientation">vertical</property>
-                <property name="margin-top">6</property>
-                <property name="margin-bottom">6</property>
-                <property name="margin-start">6</property>
-                <property name="margin-end">6</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkButton">
-                <property name="icon-name">erase-symbolic</property>
-                <property name="tooltip-text">Clear Content(s)</property>
-                <property name="action-name">app.clear-contents</property>
-                <style>
-                  <class name="flat"/>
-                </style>
-              </object>
-            </child>
-            <child>
-              <object class="GtkButton">
-                <property name="icon-name">filter-symbolic</property>
-                <property name="tooltip-text">Open Sort &amp; Filter</property>
-                <property name="action-name">app.open-sort-filter</property>
-                <style>
-                  <class name="flat"/>
-                </style>
               </object>
             </child>
             <child>

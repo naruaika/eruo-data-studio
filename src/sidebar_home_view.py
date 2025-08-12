@@ -428,6 +428,10 @@ def get_filter_basic_expression(item_data: FilterListItem,
 class SidebarHomeView(Adw.Bin):
     __gtype_name__ = 'SidebarHomeView'
 
+    fields_section = Gtk.Template.Child()
+    sorts_section = Gtk.Template.Child()
+    filters_section = Gtk.Template.Child()
+
     field_list_status = Gtk.Template.Child()
     field_list_view = Gtk.Template.Child()
     field_list_store = Gtk.Template.Child()

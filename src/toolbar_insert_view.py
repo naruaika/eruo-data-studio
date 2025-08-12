@@ -26,6 +26,8 @@ from .window import Window
 class ToolbarInsertView(Gtk.Box):
     __gtype_name__ = 'ToolbarInsertView'
 
+    sheet_1_section = Gtk.Template.Child()
+
     def __init__(self, window: Window, **kwargs) -> None:
         super().__init__(**kwargs)
 

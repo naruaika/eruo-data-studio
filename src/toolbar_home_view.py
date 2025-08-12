@@ -26,6 +26,9 @@ from .window import Window
 class ToolbarHomeView(Gtk.Box):
     __gtype_name__ = 'ToolbarHomeView'
 
+    sheet_1_section = Gtk.Template.Child()
+    sheet_2_section = Gtk.Template.Child()
+
     def __init__(self, window: Window, **kwargs) -> None:
         super().__init__(**kwargs)
 

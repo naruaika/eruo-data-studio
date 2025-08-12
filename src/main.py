@@ -75,6 +75,7 @@ class Application(Adw.Application):
         self.create_action('toggle-replace-all', self.on_toggle_replace_all_action, ['<primary><shift>h'])
         self.create_action('toggle-history', self.on_toggle_history_action)
         self.create_action('new-sheet', self.on_new_sheet_action, ['<primary>t'])
+        self.create_action('new-notebook', self.on_new_notebook_action, ['<primary>n'])
         self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
         self.create_action('undo', self.on_undo_action, ['<primary>z'])
         self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
@@ -254,6 +255,11 @@ class Application(Adw.Application):
         sheet_view = window.sheet_manager.create_sheet(None)
         window.add_new_tab(sheet_view)
 
+    def on_new_notebook_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        sheet_view = window.sheet_manager.create_sheet(None, stype='notebook')
+        window.add_new_tab(sheet_view)
+
     def on_close_sheet_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
         tab_page = window.tab_view.get_selected_page()
@@ -407,12 +413,6 @@ class Application(Adw.Application):
     def on_reset_all_filters_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()
         document.reset_all_filters()
-
-    def on_filter_cell_color_action(self, action: Gio.SimpleAction, *args) -> None:
-        pass
-
-    def on_filter_font_color_action(self, action: Gio.SimpleAction, *args) -> None:
-        pass
 
     def on_sort_smallest_to_largest_action(self, action: Gio.SimpleAction, *args) -> None:
         document = self.get_current_active_document()

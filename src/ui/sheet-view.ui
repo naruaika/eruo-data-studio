@@ -12,9 +12,6 @@
             <property name="valign">fill</property>
             <property name="vexpand">true</property>
             <property name="hexpand">true</property>
-            <style>
-              <class name="background"/>
-            </style>
           </object>
         </child>
         <child type="overlay">
@@ -40,7 +37,7 @@
       </object>
     </child>
     <style>
-      <class name="tab-page"/>
+      <class name="background"/>
     </style>
   </template>
 </interface>

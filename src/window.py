@@ -29,6 +29,7 @@ from . import globals
 from .sheet_document import SheetDocument
 from .sheet_functions import register_sql_functions
 from .sheet_view import SheetView
+from .sheet_notebook_view import SheetNotebookView
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/window.ui')
 class Window(Adw.ApplicationWindow):
@@ -45,7 +46,15 @@ class Window(Adw.ApplicationWindow):
     toggle_history = Gtk.Template.Child()
 
     toolbar_tab_view = Gtk.Template.Child()
+    toolbar_tab_bar = Gtk.Template.Child()
 
+    home_toggle_button = Gtk.Template.Child()
+    insert_toggle_button = Gtk.Template.Child()
+    formulas_toggle_button = Gtk.Template.Child()
+    data_toggle_button = Gtk.Template.Child()
+    view_toggle_button = Gtk.Template.Child()
+
+    name_formula_box = Gtk.Template.Child()
     name_box = Gtk.Template.Child()
     formula_bar = Gtk.Template.Child()
     formula_bar_dtype = Gtk.Template.Child()
@@ -518,10 +527,44 @@ class Window(Adw.ApplicationWindow):
     def on_selected_page_changed(self,
                                  tab_view: Adw.TabView,
                                  pspec:    GObject.ParamSpec) -> None:
-        sheet_document = self.get_current_active_document()
+        sheet_view = self.get_current_active_view()
 
-        if sheet_document is None:
+        if sheet_view is None:
             return
+
+        if isinstance(sheet_view, SheetView):
+            self.toolbar_home_view.sheet_1_section.set_visible(True)
+            self.toolbar_home_view.sheet_2_section.set_visible(True)
+
+            self.toolbar_insert_view.sheet_1_section.set_visible(True)
+
+            self.formulas_toggle_button.set_visible(True)
+            self.data_toggle_button.set_visible(True)
+
+            self.name_formula_box.set_visible(True)
+
+            self.sidebar_home_view.fields_section.set_visible(True)
+            self.sidebar_home_view.sorts_section.set_visible(True)
+            self.sidebar_home_view.filters_section.set_visible(True)
+
+        if isinstance(sheet_view, SheetNotebookView):
+            self.toolbar_home_view.sheet_1_section.set_visible(False)
+            self.toolbar_home_view.sheet_2_section.set_visible(False)
+
+            self.toolbar_insert_view.sheet_1_section.set_visible(False)
+
+            self.formulas_toggle_button.set_visible(False)
+            self.data_toggle_button.set_visible(False)
+
+            self.name_formula_box.set_visible(False)
+
+            self.sidebar_home_view.fields_section.set_visible(False)
+            self.sidebar_home_view.sorts_section.set_visible(False)
+            self.sidebar_home_view.filters_section.set_visible(False)
+
+        self.home_toggle_button.set_active(True)
+
+        sheet_document = sheet_view.document
 
         # Force the sidebar to update its content based on the current
         # active selection
@@ -718,9 +761,14 @@ class Window(Adw.ApplicationWindow):
         # Show context menu
         self.context_menu.popup()
 
-    def add_new_tab(self, sheet_view: SheetView) -> None:
+    def add_new_tab(self, sheet_view: SheetView | SheetNotebookView) -> None:
         tab_page = self.tab_view.append(sheet_view)
         tab_page.set_title(sheet_view.document.title)
+
+        if isinstance(sheet_view, SheetView):
+            tab_page.set_indicator_icon(Gio.ThemedIcon.new('table-symbolic'))
+        if isinstance(sheet_view, SheetNotebookView):
+            tab_page.set_indicator_icon(Gio.ThemedIcon.new('notepad-symbolic'))
 
         # Shrink the tab box size
         # self.tab_bar.get_first_child().get_first_child().get_first_child() \
@@ -729,14 +777,18 @@ class Window(Adw.ApplicationWindow):
 
         # Setup proper handling of signals and bindings
         tab_page.bind_property('title', sheet_view.document, 'title', GObject.BindingFlags.BIDIRECTIONAL)
-        sheet_view.document.connect('cancel-operation', self.on_operation_cancelled)
-        sheet_view.document.connect('selection-changed', self.on_selection_changed)
-        sheet_view.document.connect('columns-changed', self.on_columns_changed)
-        sheet_view.document.connect('sorts-changed', self.on_sorts_changed)
-        sheet_view.document.connect('filters-changed', self.on_filters_changed)
-        sheet_view.document.connect('open-context-menu', self.on_context_menu_opened)
-        sheet_view.document.view.connect('open-inline-formula', self.on_inline_formula_opened)
-        sheet_view.document.view.connect('open-context-menu', self.on_context_menu_opened)
+
+        from .sheet_document import SheetDocument
+
+        if isinstance(sheet_view.document, SheetDocument):
+            sheet_view.document.connect('cancel-operation', self.on_operation_cancelled)
+            sheet_view.document.connect('selection-changed', self.on_selection_changed)
+            sheet_view.document.connect('columns-changed', self.on_columns_changed)
+            sheet_view.document.connect('sorts-changed', self.on_sorts_changed)
+            sheet_view.document.connect('filters-changed', self.on_filters_changed)
+            sheet_view.document.connect('open-context-menu', self.on_context_menu_opened)
+            sheet_view.document.view.connect('open-inline-formula', self.on_inline_formula_opened)
+            sheet_view.document.view.connect('open-context-menu', self.on_context_menu_opened)
 
         # Switch to the new tab automatically
         self.tab_view.set_selected_page(tab_page)
@@ -774,11 +826,15 @@ class Window(Adw.ApplicationWindow):
         self.formula_bar.set_text(sel_value)
         self.multiline_formula_bar.get_buffer().set_text(sel_value)
 
-        if sel_dtype is not None:
-            self.formula_bar_dtype.set_text(sel_dtype)
+        if sel_dtype is None:
+            self.formula_bar_dtype.set_visible(False)
+            return
 
-            if not self.toggle_formula_bar.get_active():
-                self.formula_bar_dtype.set_visible(sel_dtype is not None)
+        self.formula_bar_dtype.set_text(sel_dtype)
+        self.formula_bar_dtype.set_visible(True)
+
+        if not self.toggle_formula_bar.get_active():
+            self.formula_bar_dtype.set_visible(sel_dtype is not None)
 
     def open_inline_formula(self, sel_value: str = None) -> None:
         sheet_document = self.get_current_active_document()

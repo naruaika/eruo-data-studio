@@ -8,25 +8,29 @@
     <file preprocess="xml-stripblanks">ui/file-save-as-parquet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/search-replace-all-view.ui</file>
     <file preprocess="xml-stripblanks">ui/search-replace-overlay.ui</file>
+    <file preprocess="xml-stripblanks">ui/sheet-header-menu.ui</file>
+    <file preprocess="xml-stripblanks">ui/sheet-notebook-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/sidebar-home-view.ui</file>
     <file preprocess="xml-stripblanks">ui/toolbar-home-view.ui</file>
     <file preprocess="xml-stripblanks">ui/toolbar-insert-view.ui</file>
     <file preprocess="xml-stripblanks">ui/toolbar-formulas-view.ui</file>
     <file preprocess="xml-stripblanks">ui/toolbar-data-view.ui</file>
     <file preprocess="xml-stripblanks">ui/toolbar-view-view.ui</file>
-    <file preprocess="xml-stripblanks">ui/sheet-header-menu.ui</file>
-    <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/window.ui</file>
     <file alias="base.css">css/base.css</file>
     <file alias="style.css">css/style.css</file>
     <file alias="style-dark.css">css/style-dark.css</file>
   </gresource>
   <gresource prefix="/com/macipra/eruo/icons/scalable/actions/">
-    <file preprocess="xml-stripblanks">history-undo-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">regex-symbolic.svg</file>
     <file preprocess="xml-stripblanks">checkmark-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">history-undo-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">regex-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">notepad-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">table-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">terminal-symbolic.svg</file>
 
     <!-- Carbon Design System -->
     <file preprocess="xml-stripblanks">undo-symbolic.svg</file>

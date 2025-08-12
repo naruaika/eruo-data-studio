@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="SheetNotebookView" parent="GtkBox">
+    <property name="orientation">vertical</property>
+    <child>
+      <object class="GtkScrolledWindow">
+        <property name="valign">fill</property>
+        <property name="halign">fill</property>
+        <property name="vexpand">true</property>
+        <property name="hexpand">true</property>
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            <property name="margin-start">6</property>
+            <property name="margin-end">6</property>
+            <property name="spacing">10</property>
+            <property name="valign">fill</property>
+            <property name="halign">fill</property>
+            <property name="hexpand">true</property>
+            <property name="vexpand">true</property>
+            <child>
+              <object class="GtkBox">
+                <property name="orientation">horizontal</property>
+                <property name="hexpand">true</property>
+                <property name="spacing">6</property>
+                <child>
+                  <object class="GtkButton">
+                    <child>
+                      <object class="AdwButtonContent">
+                        <property name="icon-name">list-add-symbolic</property>
+                        <property name="label" translatable="yes">SQL</property>
+                      </object>
+                    </child>
+                    <signal name="clicked" handler="on_add_sql_query_clicked" swapped="no"/>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkButton">
+                    <child>
+                      <object class="AdwButtonContent">
+                        <property name="icon-name">list-add-symbolic</property>
+                        <property name="label" translatable="yes">Markdown</property>
+                      </object>
+                    </child>
+                    <signal name="clicked" handler="on_add_markdown_clicked" swapped="no"/>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkButton">
+                    <child>
+                      <object class="AdwButtonContent">
+                        <property name="icon-name">media-playback-start-symbolic</property>
+                        <property name="label" translatable="yes">Run All</property>
+                      </object>
+                    </child>
+                    <signal name="clicked" handler="on_run_all_clicked" swapped="no"/>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+                <style>
+                  <class name="notebook-toolbar"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkListView" id="list_view">
+                <property name="visible">false</property>
+                <property name="model">
+                  <object class="GtkNoSelection">
+                    <property name="model">
+                      <object class="GListStore" id="list_store"/>
+                    </property>
+                  </object>
+                </property>
+                <style>
+                  <class name="notebook-list-view"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <style>
+      <class name="notebook-view"/>
+      <class name="background"/>
+    </style>
+  </template>
+</interface>

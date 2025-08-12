@@ -29,6 +29,12 @@
     background-color: color(srgb 0 0 0.0235294 / 0.14);
 }
 
+.notebook-source-view {
+    color: #000;
+    caret-color: #000;
+    background-color: rgb(235, 235, 235);
+}
+
 check {
     color: #000;
 }

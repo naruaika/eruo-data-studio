@@ -124,6 +124,10 @@ class SheetSelection(GObject.Object):
 
         self.document = document
 
+        self.cell_name = ''
+        self.cell_data = None
+        self.cell_dtype = None
+
         self.current_active_range = SheetCell(0, 0, 0, 0, 0, 0, 0, 0, SheetCellMetadata(0, 0, 0))
         self.previous_active_range = self.current_active_range
 
