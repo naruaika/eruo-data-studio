@@ -768,7 +768,7 @@ class Window(Adw.ApplicationWindow):
         if isinstance(sheet_view, SheetView):
             tab_page.set_indicator_icon(Gio.ThemedIcon.new('table-symbolic'))
         if isinstance(sheet_view, SheetNotebookView):
-            tab_page.set_indicator_icon(Gio.ThemedIcon.new('notepad-symbolic'))
+            tab_page.set_indicator_icon(Gio.ThemedIcon.new('terminal-symbolic'))
 
         # Shrink the tab box size
         # self.tab_bar.get_first_child().get_first_child().get_first_child() \
