@@ -28,14 +28,17 @@ class CellListItem(GObject.Object):
 
     ctype = GObject.Property(type=str, default='sql')
     query = GObject.Property(type=str, default='')
+    status = GObject.Property(type=str, default='')
 
     def __init__(self,
-                 ctype: str = 'sql',
-                 query: str = '') -> None:
+                 ctype:  str = '',
+                 query:  str = '',
+                 status: str = '') -> None:
         super().__init__()
 
         self.ctype = ctype
         self.query = query
+        self.status = status
 
 
 
@@ -100,11 +103,23 @@ class SheetNotebookView(Gtk.Box):
         source_view.set_size_request(-1, 68)
         content_container.append(source_view)
 
+        status_text = Gtk.TextView()
+        status_text.set_halign(Gtk.Align.FILL)
+        status_text.set_hexpand(True)
+        status_text.set_editable(False)
+        status_text.set_cursor_visible(False)
+        status_text.set_wrap_mode(Gtk.WrapMode.WORD)
+        status_text.add_css_class('notebook-status')
+        status_text.add_css_class('error')
+        status_text.add_css_class('frame')
+        status_text.remove_css_class('view')
+        status_text.set_visible(False)
+        content_container.append(status_text)
+
         from .sheet_document import SheetDocument
         sheet_document = SheetDocument(configs={'show-auto-filters'    : False,
                                                 'ctrl-wheel-to-scroll' : True})
 
-        sheet_document.view.set_size_request(-1, 600 + 16 + 2)
         sheet_document.view.add_css_class('notebook-output')
         sheet_document.view.add_css_class('frame')
         sheet_document.view.set_visible(False)
@@ -118,6 +133,7 @@ class SheetNotebookView(Gtk.Box):
 
         list_item.run_button = run_button
         list_item.source_view = source_view
+        list_item.status_text = status_text
         list_item.sheet_document = sheet_document
         list_item.delete_button = delete_button
 
@@ -127,25 +143,40 @@ class SheetNotebookView(Gtk.Box):
         position = list_item.get_position()
         item_data = list_item.get_item()
 
+        def auto_resize_sheet_view(sheet_view: Gtk.Widget, n_rows: int) -> None:
+            MAX_VIEW_HEIGHT = 600 + 16 + 2
+            new_view_height = (n_rows + 3) * 20 + 16 + 2
+            new_view_height = min(new_view_height, MAX_VIEW_HEIGHT)
+            sheet_view.set_size_request(-1, new_view_height)
+
         def on_run_button_clicked(button: Gtk.Button) -> None:
             result = self.document.run_sql_query(item_data.query)
 
             if not isinstance(result, polars.DataFrame):
-                return # TODO: show any errors
+                list_item.sheet_document.view.set_visible(False)
 
-            self.document.data.dfs[position] = result
+                list_item.status_text.get_buffer().set_text(result)
+                list_item.status_text.set_visible(True)
 
-            MAX_VIEW_HEIGHT = 600 + 16 + 2
-            new_view_height = (result.height + 2) * 20 + 16 + 2
-            new_view_height = min(new_view_height, MAX_VIEW_HEIGHT)
+                self.document.data.dfs[position] = polars.DataFrame()
 
-            list_item.sheet_document.view.set_size_request(-1, new_view_height)
+                item_data.status = result
+
+                return
+
+            auto_resize_sheet_view(list_item.sheet_document.view, result.height)
+
             list_item.sheet_document.view.set_visible(True)
+            list_item.status_text.set_visible(False)
 
             list_item.sheet_document.data.setup_main_dataframe(result)
             list_item.sheet_document.setup_document()
             list_item.sheet_document.renderer.render_caches = {}
             list_item.sheet_document.view.main_canvas.queue_draw()
+
+            self.document.data.dfs[position] = result
+
+            item_data.status = ''
 
         def on_source_view_changed(text_buffer: Gtk.TextBuffer) -> None:
             start_iter = text_buffer.get_start_iter()
@@ -173,12 +204,17 @@ class SheetNotebookView(Gtk.Box):
 
         dataframe = self.document.data.dfs[position]
 
+        auto_resize_sheet_view(list_item.sheet_document.view, dataframe.height)
+
         list_item.sheet_document.view.set_visible(dataframe.width > 0 and
                                                   dataframe.height > 0)
 
         list_item.sheet_document.data.setup_main_dataframe(dataframe)
         list_item.sheet_document.setup_document()
         list_item.sheet_document.view.main_canvas.queue_draw()
+
+        list_item.status_text.get_buffer().set_text(item_data.status)
+        list_item.status_text.set_visible(item_data.status != '')
 
         list_item.source_view.get_buffer().set_text(item_data.query)
 
@@ -195,13 +231,28 @@ class SheetNotebookView(Gtk.Box):
                          list_item:         Gtk.ListItem) -> None:
         # list_item.run_button = None
         # list_item.source_view = None
+        # list_item.status_text = None
         # list_item.sheet_document = None
         # list_item.delete_button = None
         pass
 
     @Gtk.Template.Callback()
     def on_run_all_clicked(self, button: Gtk.Button) -> None:
-        pass
+        # Try to execute all cells
+        for cindex in range(self.list_store.get_n_items()):
+            list_item = self.list_store.get_item(cindex)
+            result = self.document.run_sql_query(list_item.query)
+            if not isinstance(result, polars.DataFrame):
+                self.document.data.dfs[cindex] = polars.DataFrame()
+                list_item.status = result
+                break
+            self.document.data.dfs[cindex] = result
+            list_item.status = ''
+
+        # Force the list view to re-bind the factory
+        old_model = self.list_view.get_model()
+        self.list_view.set_model(None)
+        self.list_view.set_model(old_model)
 
     @Gtk.Template.Callback()
     def on_add_sql_query_clicked(self, button: Gtk.Button) -> None:

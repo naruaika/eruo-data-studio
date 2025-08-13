@@ -203,9 +203,13 @@
     background-color: transparent;
 }
 
-.notebook-output {
+.notebook-output,
+.notebook-status {
     padding: 8px;
     border-radius: 8px;
+}
+.notebook-status {
+    line-height: 1.25;
 }
 
 /* CUSTOMS */

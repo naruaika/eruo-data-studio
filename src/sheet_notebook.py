@@ -83,17 +83,12 @@ class SheetNotebook(GObject.Object):
 
         try:
             dataframe = connection.sql(query).pl()
-
             connection.close()
-
             return dataframe
-
         except Exception as e:
             print(e)
             message = str(e)
-
         connection.close()
-
         return message
 
     def cut_from_current_selection(self, clipboard: ClipboardManager) -> None:
