@@ -112,6 +112,14 @@ class Window(Adw.ApplicationWindow):
         self.search_replace_all_view = SearchReplaceAllView(self)
         self.search_replace_all_page = self.sidebar_tab_view.append(self.search_replace_all_view)
 
+        # Removing the tab view shortcuts from the toolbar and the siderbar so that we can get them
+        # to work on the content tab view instead
+        self.toolbar_tab_view.remove_shortcuts(Adw.TabViewShortcuts.ALL_SHORTCUTS)
+        self.sidebar_tab_view.remove_shortcuts(Adw.TabViewShortcuts.ALL_SHORTCUTS)
+
+        self.tab_view.set_menu_model(Gio.Menu())
+        self.tab_view.connect('setup-menu', self.setup_tab_menu)
+
         # Early instantiate the list items pool
         def instantiate_list_items_pool() -> None:
             from . import sheet_header_menu
@@ -187,6 +195,36 @@ class Window(Adw.ApplicationWindow):
 
         self.sidebar_home_view.repopulate_field_list()
 
+    def setup_tab_menu(self, tab_view: Adw.TabView, tab_page: Adw.TabPage) -> None:
+        if tab_page is None:
+            return
+
+        menu = tab_view.get_menu_model()
+        menu.remove_all()
+
+        tab_view = tab_page.get_child()
+        document_id = tab_view.document.document_id
+
+        section = Gio.Menu.new()
+        section.append(_('Move Tab to Start'), f"app.move-tab-to-start('{document_id}')")
+        section.append(_('Move Tab to End'), f"app.move-tab-to-end('{document_id}')")
+        menu.append_section(None, section)
+
+        section = Gio.Menu.new()
+        section.append(_('Close Tab'), f"app.close-tab('{document_id}')")
+        section.append(_('Close Other Tabs'), f"app.close-other-tabs('{document_id}')")
+        section.append(_('Close Tabs to Left'), f"app.close-tabs-to-left('{document_id}')")
+        section.append(_('Close Tabs to Right'), f"app.close-tabs-to-right('{document_id}')")
+        menu.append_section(None, section)
+
+        section = Gio.Menu.new()
+        if tab_page.get_pinned():
+            section.append(_('Unpin Tab'), f"app.unpin-tab('{document_id}')")
+        else:
+            section.append(_('Pin Tab'), f"app.pin-tab('{document_id}')")
+        section.append(_('Rename Tab'), f"app.rename-tab('{document_id}')")
+        menu.append_section(None, section)
+
     def get_current_active_view(self) -> SheetView:
         tab_page = self.tab_view.get_selected_page()
         if tab_page is None:
@@ -241,15 +279,15 @@ class Window(Adw.ApplicationWindow):
                                       event:   Gtk.EventControllerKey,
                                       keyval:  int,
                                       keycode: int,
-                                      state:   Gdk.ModifierType) -> None:
+                                      state:   Gdk.ModifierType) -> bool:
         if keyval == Gdk.KEY_Escape:
             self.close_inline_formula()
-            return
+            return True
 
         if keyval == Gdk.KEY_Return:
             if state == Gdk.ModifierType.ALT_MASK:
-                return # prevent from executing the inline formula
-                       # when pressing Return key with any modifier
+                return False # prevent from executing the inline formula
+                             # when pressing Return key with any modifier
 
             entry_buffer = self.inline_formula.get_buffer()
             start_iter = entry_buffer.get_start_iter()
@@ -258,12 +296,11 @@ class Window(Adw.ApplicationWindow):
 
             # Update the current cells
             if not self.execute_pending_formula(text):
-                # TODO: remove the trailing newline
-                return
+                return True
 
             self.close_inline_formula()
 
-            return
+            return True
 
     def on_inline_formula_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         sheet_view = self.get_current_active_view()
@@ -453,13 +490,13 @@ class Window(Adw.ApplicationWindow):
                                 event:   Gtk.EventControllerKey,
                                 keyval:  int,
                                 keycode: int,
-                                state:   Gdk.ModifierType) -> None:
+                                state:   Gdk.ModifierType) -> bool:
         # Pressing tab key will reset the input bar instead of activating
         # the input bar to prevent undesired behavior. I've seen other
         # applications don't do this, but I prefer this for consistency.
         if keyval == Gdk.KEY_Tab:
             self.reset_inputbar()
-            return
+            return True
 
         # Pressing escape key will reset the input bar and
         # return the focus to the main canvas back.
@@ -467,50 +504,52 @@ class Window(Adw.ApplicationWindow):
             self.reset_inputbar()
             sheet_view = self.get_current_active_view()
             if sheet_view is None:
-                return # name box should be insensitive when there's no active view,
-                       # but this is for completeness.
+                return False # name box should be insensitive when there's no active view,
+                             # but this is for completeness.
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
-            return
+            return True
 
     def on_formula_bar_key_pressed(self,
                                    event:   Gtk.EventControllerKey,
                                    keyval:  int,
                                    keycode: int,
-                                   state:   Gdk.ModifierType) -> None:
+                                   state:   Gdk.ModifierType) -> bool:
         # Pressing escape key will reset the input bar
         # and return the focus to the main canvas back.
         if keyval == Gdk.KEY_Escape:
             self.reset_inputbar()
             sheet_view = self.get_current_active_view()
             if sheet_view is None:
-                return # formula bar should be insensitive when there's no active view,
-                       # but this is for completeness.
+                return False # formula bar should be insensitive when there's no active view,
+                             # but this is for completeness.
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
-            return
+            return True
 
     def on_multiline_formula_bar_key_pressed(self,
                                              event:   Gtk.EventControllerKey,
                                              keyval:  int,
                                              keycode: int,
-                                             state:   Gdk.ModifierType) -> None:
+                                             state:   Gdk.ModifierType) -> bool:
         # Pressing escape key will reset the input bar
         # and return the focus to the main canvas back.
         if keyval == Gdk.KEY_Escape:
             self.reset_inputbar()
+
             sheet_view = self.get_current_active_view()
+
             if sheet_view is None:
-                return # formula bar should be insensitive when there's no active view,
-                       # but this is for completeness.
+                return False
+
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
-            return
+
+            return True
 
         if keyval == Gdk.KEY_Return:
             if state != Gdk.ModifierType.CONTROL_MASK:
-                return # prevent from executing the inline formula
-                       # when pressing Return key with any modifier
+                return False
 
             entry_buffer = self.multiline_formula_bar.get_buffer()
             start_iter = entry_buffer.get_start_iter()
@@ -519,10 +558,9 @@ class Window(Adw.ApplicationWindow):
 
             # Update the current cells
             if not self.execute_pending_formula(text):
-                # TODO: remove the trailing newline
-                return
+                return True
 
-            return
+            return True
 
     def on_selected_page_changed(self,
                                  tab_view: Adw.TabView,
@@ -579,10 +617,10 @@ class Window(Adw.ApplicationWindow):
     def on_page_closed(self,
                        tab_view: Adw.TabView,
                        tab_page: Adw.TabPage) -> None:
-        sheet_view = self.get_current_active_view()
+        sheet_view = tab_page.get_child()
 
         if sheet_view is None:
-            return # impossible to happen, but for safety
+            return
 
         # Close the inline formula box if it references the closed sheet
         if sheet_view.document.document_id == globals.current_document_id:
@@ -684,7 +722,7 @@ class Window(Adw.ApplicationWindow):
         # Position context menu
         rectangle = Gdk.Rectangle()
         rectangle.x = int(x + width / 2)
-        rectangle.y = y + height
+        rectangle.y = int(y + height)
         rectangle.height = 1
         rectangle.width = 1
         self.context_menu.set_pointing_to(rectangle)
@@ -753,7 +791,7 @@ class Window(Adw.ApplicationWindow):
         # Position context menu
         rectangle = Gdk.Rectangle()
         rectangle.x = int(x + width / 2)
-        rectangle.y = y + height
+        rectangle.y = int(y + height)
         rectangle.height = 1
         rectangle.width = 1
         self.context_menu.set_pointing_to(rectangle)
@@ -800,6 +838,17 @@ class Window(Adw.ApplicationWindow):
         self.formula_bar.set_sensitive(True)
         self.toolbar_tab_view.set_sensitive(True)
         self.sidebar_tab_view.set_sensitive(True)
+
+    def rename_sheet(self, tab_page: Adw.TabPage) -> None:
+        from .rename_sheet_dialog import RenameSheetDialog
+
+        def _rename_sheet(new_name: str) -> None:
+            tab_page.set_title(new_name)
+
+        old_name = tab_page.get_title()
+
+        dialog = RenameSheetDialog(old_name, _rename_sheet)
+        dialog.present(self)
 
     def reset_inputbar(self) -> None:
         sheet_document = self.get_current_active_document()

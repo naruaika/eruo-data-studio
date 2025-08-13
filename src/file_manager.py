@@ -32,8 +32,8 @@ class FileManager(GObject.Object):
     __gtype_name__ = 'FileManager'
 
     __gsignals__ = {
-        'file-opened': (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
-        'file-saved': (GObject.SIGNAL_RUN_FIRST, None, (str,)),
+        'file-opened' : (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
+        'file-saved'  : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
     }
 
     def read_file(self, file_path: str) -> polars.DataFrame:

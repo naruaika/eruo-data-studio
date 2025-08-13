@@ -43,28 +43,40 @@ class SheetDisplay(GObject.Object):
     scroll_y_position: int = 0
     scroll_x_position: int = 0
 
-    # Holds the visibility flags for each row and column. The row vflags includes
-    # the virtual row for the dataframe header.
-    row_visibility_flags: polars.Series = polars.Series(dtype=polars.Boolean)
-    column_visibility_flags: polars.Series = polars.Series(dtype=polars.Boolean)
+    row_visibility_flags: polars.Series
+    column_visibility_flags: polars.Series
 
-    # Holds the visible indices for each row and column, starts from 0. It should
-    # be less or equals to the length of the visibility flags.
-    row_visible_series: polars.Series = polars.Series(dtype=polars.UInt32)
-    column_visible_series: polars.Series = polars.Series(dtype=polars.UInt32)
+    row_visible_series: polars.Series
+    column_visible_series: polars.Series
 
-    # Holds the height and width of each row and column.
-    row_heights: polars.Series = polars.Series(dtype=polars.UInt32)
-    column_widths: polars.Series = polars.Series(dtype=polars.UInt32)
+    row_heights: polars.Series
+    column_widths: polars.Series
 
-    # Holds the cumulative height and width of each visible row and column.
-    cumulative_row_heights: polars.Series = polars.Series(dtype=polars.UInt32)
-    cumulative_column_widths: polars.Series = polars.Series(dtype=polars.UInt32)
+    cumulative_row_heights: polars.Series
+    cumulative_column_widths: polars.Series
 
     def __init__(self, document: SheetDocument) -> None:
         super().__init__()
 
         self.document = document
+
+        # Holds the visibility flags for each row and column. The row vflags includes
+        # the virtual row for the dataframe header.
+        self.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+        self.column_visibility_flags = polars.Series(dtype=polars.Boolean)
+
+        # Holds the visible indices for each row and column, starts from 0. It should
+        # be less or equals to the length of the visibility flags.
+        self.row_visible_series = polars.Series(dtype=polars.UInt32)
+        self.column_visible_series = polars.Series(dtype=polars.UInt32)
+
+        # Holds the height and width of each row and column.
+        self.row_heights = polars.Series(dtype=polars.UInt32)
+        self.column_widths = polars.Series(dtype=polars.UInt32)
+
+        # Holds the cumulative height and width of each visible row and column.
+        self.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
+        self.cumulative_column_widths = polars.Series(dtype=polars.UInt32)
 
     def get_vcolumn_from_column(self, column: int) -> int:
         """Get the logical column index from the visual column index."""

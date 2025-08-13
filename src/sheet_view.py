@@ -19,23 +19,26 @@
 
 
 from gi.repository import Gdk, GObject, Gtk
+import copy
 
 from . import globals
 from .sheet_document import SheetDocument
-from .sheet_selection import SheetCornerLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell
+from .sheet_selection import SheetCornerLocatorCell, \
+                             SheetTopLocatorCell, \
+                             SheetLeftLocatorCell
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/sheet-view.ui')
 class SheetView(Gtk.Box):
     __gtype_name__ = 'SheetView'
 
     __gsignals__ = {
-        'cancel-operation': (GObject.SIGNAL_RUN_FIRST, None, ()),
-        'select-by-keypress': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
-        'select-by-motion': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
-        'pointer-moved': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
-        'pointer-released': (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
-        'open-inline-formula': (GObject.SIGNAL_RUN_FIRST, None, (str,)),
-        'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
+        'cancel-operation'    : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'select-by-keypress'  : (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
+        'select-by-motion'    : (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
+        'pointer-moved'       : (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
+        'pointer-released'    : (GObject.SIGNAL_RUN_FIRST, None, (int, int)),
+        'open-inline-formula' : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
+        'open-context-menu'   : (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
     }
 
     horizontal_scrollbar = Gtk.Template.Child()
@@ -43,10 +46,20 @@ class SheetView(Gtk.Box):
 
     main_canvas = Gtk.Template.Child()
 
-    def __init__(self, document: SheetDocument, **kwargs) -> None:
+    configs = {
+        'ctrl-wheel-to-scroll': False,
+    }
+
+    def __init__(self,
+                 document: SheetDocument,
+                 configs:  dict = {},
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.document = document
+
+        self.configs = copy.deepcopy(self.configs)
+        self.configs.update(configs)
 
         scroll_event_controller = Gtk.EventControllerScroll()
         scroll_event_controller.set_flags(Gtk.EventControllerScrollFlags.BOTH_AXES)
@@ -101,10 +114,21 @@ class SheetView(Gtk.Box):
                                 event: Gtk.EventControllerScroll,
                                 dx:    float,
                                 dy:    float) -> bool:
+        current_event_state = event.get_current_event_state()
+
+        if self.configs['ctrl-wheel-to-scroll'] \
+                and current_event_state != (Gdk.ModifierType.CONTROL_MASK) \
+                and current_event_state != (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK) \
+                and current_event_state != (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK) \
+                and current_event_state != (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.ALT_MASK):
+            return False
+
         # Change direction of scroll based on shift key
-        if event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dy < 0 or 0 < dy):
+        shift_key_pressed = current_event_state == Gdk.ModifierType.SHIFT_MASK or \
+                            current_event_state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK)
+        if shift_key_pressed and (dy < 0 or 0 < dy):
             dx, dy = dy, 0
-        elif event.get_current_event_state() == Gdk.ModifierType.SHIFT_MASK and (dx < 0 or 0 < dx):
+        elif shift_key_pressed and (dx < 0 or 0 < dx):
             dy, dx = dx, 0
 
         # Convert to scroll unit (in pixels)

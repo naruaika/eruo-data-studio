@@ -402,7 +402,7 @@
     <section>
       <item>
         <attribute name="label" translatable="yes">New _Worksheet</attribute>
-        <attribute name="action">app.new-sheet</attribute>
+        <attribute name="action">app.new-worksheet</attribute>
       </item>
       <item>
         <attribute name="label" translatable="yes">New _Notebook</attribute>

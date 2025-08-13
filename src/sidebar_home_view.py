@@ -824,9 +824,11 @@ class SidebarHomeView(Adw.Bin):
             pstate = { 'findex': item_data.findex, }
             _, position = self.filter_list_store.find(item_data)
 
-            item_data.findex = dropdown.get_selected_item().cindex - 1
-            item_data.fdtype = dropdown.get_selected_item().dtype
-            item_data.field = dropdown.get_selected_item().cname
+            dropdown_item = dropdown.get_selected_item()
+
+            item_data.findex = dropdown_item.cindex - 1
+            item_data.fdtype = dropdown_item.dtype
+            item_data.field = dropdown_item.cname
 
             self.refresh_filter_list_item(position, pstate)
 

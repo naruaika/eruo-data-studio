@@ -23,7 +23,7 @@
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
-                <property name="title" translatable="yes" context="shortcut window">Toggle sidebar</property>
+                <property name="title" translatable="yes" context="shortcut window">Toggle Sidebar</property>
                 <property name="action-name">app.toggle-sidebar</property>
               </object>
             </child>
@@ -34,19 +34,19 @@
             <property name="title" translatable="yes" context="shortcut window">File</property>
             <child>
               <object class="GtkShortcutsShortcut">
-                <property name="title" translatable="yes" context="shortcut window">Open file</property>
+                <property name="title" translatable="yes" context="shortcut window">Open File</property>
                 <property name="action-name">app.open</property>
               </object>
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
-                <property name="title" translatable="yes" context="shortcut window">Save file</property>
+                <property name="title" translatable="yes" context="shortcut window">Save File</property>
                 <property name="action-name">app.save</property>
               </object>
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
-                <property name="title" translatable="yes" context="shortcut window">Save file as</property>
+                <property name="title" translatable="yes" context="shortcut window">Save File As</property>
                 <property name="action-name">app.save-as</property>
               </object>
             </child>
@@ -81,14 +81,20 @@
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
-                <property name="title" translatable="yes" context="shortcut window">New worksheet</property>
-                <property name="action-name">app.new-sheet</property>
+                <property name="title" translatable="yes" context="shortcut window">New Worksheet</property>
+                <property name="action-name">app.new-worksheet</property>
               </object>
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
-                <property name="title" translatable="yes" context="shortcut window">Close sheet</property>
-                <property name="action-name">app.close-sheet</property>
+                <property name="title" translatable="yes" context="shortcut window">New Notebook</property>
+                <property name="action-name">app.new-notebook</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="title" translatable="yes" context="shortcut window">Close Tab</property>
+                <property name="action-name">app.close-selected-tab</property>
               </object>
             </child>
           </object>

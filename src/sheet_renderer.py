@@ -54,7 +54,8 @@ class SheetRenderer(GObject.Object):
         selection = self.document.selection
         widgets = self.document.widgets
 
-        edit_mode_enabled = globals.is_editing_cells and globals.current_document_id != self.document.document_id
+        edit_mode_enabled = globals.is_editing_cells and \
+                            globals.current_document_id != self.document.document_id
 
         # We may not want to change the order of these calls as it can causes
         # unoptimal rendering results :)

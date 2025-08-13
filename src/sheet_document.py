@@ -35,28 +35,37 @@ class SheetDocument(GObject.Object):
     __gtype_name__ = 'SheetDocument'
 
     __gsignals__ = {
-        'cancel-operation': (GObject.SIGNAL_RUN_FIRST, None, ()),
-        'selection-changed': (GObject.SIGNAL_RUN_FIRST, None, ()),
-        'columns-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
-        'sorts-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
-        'filters-changed': (GObject.SIGNAL_RUN_FIRST, None, (int,)),
-        'open-context-menu': (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
+        'cancel-operation'  : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'selection-changed' : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'columns-changed'   : (GObject.SIGNAL_RUN_FIRST, None, (int,)),
+        'sorts-changed'     : (GObject.SIGNAL_RUN_FIRST, None, (int,)),
+        'filters-changed'   : (GObject.SIGNAL_RUN_FIRST, None, (int,)),
+        'open-context-menu' : (GObject.SIGNAL_RUN_FIRST, None, (int, int, str)),
     }
 
     document_id = GObject.Property(type=str, default='sheet_1')
     title = GObject.Property(type=str, default='Sheet 1')
 
+    configs = {
+        'show-auto-filters'    : True,
+        'ctrl-wheel-to-scroll' : False,
+    }
+
     def __init__(self,
-                 sheet_manager,
-                 document_id: str,
-                 title:       str,
-                 dataframe:   polars.DataFrame = None) -> None:
+                 sheet_manager      = None,
+                 document_id:   str = '',
+                 title:         str = '',
+                 dataframe:     polars.DataFrame = None,
+                 configs:       dict = {}) -> None:
         super().__init__()
 
         self.sheet_manager = sheet_manager
 
         self.document_id = document_id
         self.title = title
+
+        self.configs = copy.deepcopy(self.configs)
+        self.configs.update(configs)
 
         from .sheet_widget import SheetWidget
         self.widgets: list[SheetWidget] = []
@@ -74,7 +83,7 @@ class SheetDocument(GObject.Object):
         self.display = SheetDisplay(self)
         self.renderer = SheetRenderer(self)
         self.selection = SheetSelection(self)
-        self.view = SheetView(self)
+        self.view = SheetView(self, self.configs)
 
         self.hovered_widget: SheetWidget = None
         self.focused_widget: SheetWidget = None
@@ -106,6 +115,13 @@ class SheetDocument(GObject.Object):
 
         self.canvas_tick_callback: int = 0
 
+        self.setup_document()
+
+    #
+    # Setup
+    #
+
+    def setup_document(self) -> None:
         self.setup_main_canvas()
         self.setup_scrollbars()
 
@@ -115,10 +131,6 @@ class SheetDocument(GObject.Object):
         self.setup_document_history()
         self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
-
-    #
-    # Setup
-    #
 
     def setup_main_canvas(self) -> None:
         self.view.main_canvas.set_draw_func(self.renderer.render)
@@ -2728,6 +2740,9 @@ class SheetDocument(GObject.Object):
         self.widgets.append(column_resizer)
 
     def repopulate_auto_filter_widgets(self) -> None:
+        if not self.configs['show-auto-filters']:
+            return
+
         if len(self.data.dfs) == 0:
             return
 
@@ -2775,7 +2790,8 @@ class SheetDocument(GObject.Object):
         layout = PangoCairo.create_layout(context)
         layout.set_font_description(font_desc)
 
-        self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * self.data.dfs[0].width)
+        self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * self.data.dfs[0].width, dtype=polars.UInt32)
+
         for col_index, col_name in enumerate(self.data.dfs[0].columns):
             sample_data = sample_data.with_columns(polars.col(col_name).fill_null('[Blank]').cast(polars.Utf8))
             max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()

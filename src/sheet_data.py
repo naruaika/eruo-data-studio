@@ -181,10 +181,10 @@ class SheetCellMetadata(GObject.Object):
 class SheetData(GObject.Object):
     __gtype_name__ = 'SheetData'
 
-    bbs: list[SheetCellBoundingBox] = [] # visual bounding boxes
-    dfs: list[polars.DataFrame] = [] # dataframes
+    bbs: list[SheetCellBoundingBox] # visual bounding boxes
+    dfs: list[polars.DataFrame] # dataframes
 
-    has_main_dataframe: bool = False
+    has_main_dataframe: bool
 
     def __init__(self,
                  document:  SheetDocument,
@@ -195,14 +195,19 @@ class SheetData(GObject.Object):
 
         self.document = document
 
+        self.bbs = []
+        self.dfs = []
+
+        self.has_main_dataframe = False
+
         self.unique_caches = {}
 
         self.setup_main_dataframe(dataframe, column, row)
 
     def setup_main_dataframe(self,
                              dataframe: polars.DataFrame,
-                             column:    int,
-                             row:       int) -> None:
+                             column:    int = 1,
+                             row:       int = 1) -> None:
         if dataframe is None:
             return
 
@@ -233,6 +238,12 @@ class SheetData(GObject.Object):
         self.has_main_dataframe = True
 
         gc.collect()
+
+    def insert_blank_dataframe(self,
+                               column: int = 1,
+                               row:    int = 1) -> polars.DataFrame:
+        self.bbs.append(SheetCellBoundingBox(column, row, 0, 0))
+        self.dfs.append(polars.DataFrame())
 
     def get_cell_metadata_from_position(self,
                                         column: int,

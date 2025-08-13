@@ -74,9 +74,18 @@ class Application(Adw.Application):
         self.create_action('toggle-search-all', self.on_toggle_search_all_action, ['<primary><shift>f'])
         self.create_action('toggle-replace-all', self.on_toggle_replace_all_action, ['<primary><shift>h'])
         self.create_action('toggle-history', self.on_toggle_history_action)
-        self.create_action('new-sheet', self.on_new_sheet_action, ['<primary>t'])
+        self.create_action('new-worksheet', self.on_new_worksheet_action, ['<primary>t'])
         self.create_action('new-notebook', self.on_new_notebook_action, ['<primary>n'])
-        self.create_action('close-sheet', self.on_close_sheet_action, ['<primary>w'])
+        self.create_action('rename-tab', self.on_rename_tab_action, param_type=GLib.VariantType('s'))
+        self.create_action('pin-tab', self.on_pin_tab_action, param_type=GLib.VariantType('s'))
+        self.create_action('unpin-tab', self.on_unpin_tab_action, param_type=GLib.VariantType('s'))
+        self.create_action('move-tab-to-start', self.on_move_tab_to_start_action, param_type=GLib.VariantType('s'))
+        self.create_action('move-tab-to-end', self.on_move_tab_to_end_action, param_type=GLib.VariantType('s'))
+        self.create_action('close-tab', self.on_close_tab_action, param_type=GLib.VariantType('s'))
+        self.create_action('close-other-tabs', self.on_close_other_tabs_action, param_type=GLib.VariantType('s'))
+        self.create_action('close-tabs-to-left', self.on_close_tabs_to_left_action, param_type=GLib.VariantType('s'))
+        self.create_action('close-tabs-to-right', self.on_close_tabs_to_right_action, param_type=GLib.VariantType('s'))
+        self.create_action('close-selected-tab', self.on_close_selected_tab_action, ['<primary>w'])
         self.create_action('undo', self.on_undo_action, ['<primary>z'])
         self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
         self.create_action('cut', self.on_cut_action, ['<primary>x'])
@@ -250,7 +259,7 @@ class Application(Adw.Application):
     def on_file_saved(self, source: GObject.Object, file_path: str) -> None:
         pass # TODO: indicate the user when the file has been saved
 
-    def on_new_sheet_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_new_worksheet_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
         sheet_view = window.sheet_manager.create_sheet(None)
         window.add_new_tab(sheet_view)
@@ -260,7 +269,63 @@ class Application(Adw.Application):
         sheet_view = window.sheet_manager.create_sheet(None, stype='notebook')
         window.add_new_tab(sheet_view)
 
-    def on_close_sheet_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_rename_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        window.rename_sheet(tab_page)
+
+    def on_pin_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        window.tab_view.set_page_pinned(tab_page, True)
+
+    def on_unpin_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        window.tab_view.set_page_pinned(tab_page, False)
+
+    def on_move_tab_to_start_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        n_pinned_pages = window.tab_view.get_n_pinned_pages()
+        window.tab_view.reorder_page(tab_page, n_pinned_pages)
+
+    def on_move_tab_to_end_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        n_pages = window.tab_view.get_n_pages()
+        window.tab_view.reorder_page(tab_page, n_pages - 1)
+
+    def on_close_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        window.tab_view.close_page(tab_page)
+
+    def on_close_other_tabs_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        window.tab_view.close_other_pages(tab_page)
+
+    def on_close_tabs_to_left_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        window.tab_view.close_pages_before(tab_page)
+
+    def on_close_tabs_to_right_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        tab_page = self.get_current_tab_page(window, document_id)
+        window.tab_view.close_pages_after(tab_page)
+
+    def on_close_selected_tab_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
         tab_page = window.tab_view.get_selected_page()
         window.tab_view.close_page(tab_page)
@@ -489,6 +554,11 @@ class Application(Adw.Application):
     def get_current_active_document(self) -> SheetDocument:
         window = self.get_active_window()
         return window.get_current_active_document()
+
+    def get_current_tab_page(self, window: Window, document_id: str) -> SheetDocument:
+        sheet_document = window.sheet_manager.get_sheet(document_id)
+        sheet_view = sheet_document.view
+        return window.tab_view.get_page(sheet_view)
 
     def create_action(self,
                       name:       str,

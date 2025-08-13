@@ -19,6 +19,7 @@
 
 
 from gi.repository import GObject
+from typing import Any
 import polars
 import re
 
@@ -43,6 +44,9 @@ class SheetManager(GObject.Object):
 
     def get_sheet_names(self) -> list[str]:
         return [sheet.title for sheet in self.sheets.values()]
+
+    def get_sheet(self, document_id: str) -> Any:
+        return self.sheets.get(document_id, None)
 
     def create_sheet(self,
                      # The initial dataframe to display in the newly created sheet,
@@ -81,4 +85,4 @@ class SheetManager(GObject.Object):
         return sheet.view
 
     def delete_sheet(self, sheet_view: SheetView) -> None:
-        self.sheets.pop(sheet_view.document.document_id)
+        self.sheets.pop(sheet_view.document.document_id, None)
