@@ -44,6 +44,9 @@
             <child>
               <object class="GtkLabel">
                 <property name="label">Only Erbook supports all features</property>
+                <style>
+                  <class name="status-text"/>
+                </style>
               </object>
             </child>
             <child>
