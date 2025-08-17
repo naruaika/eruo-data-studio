@@ -144,6 +144,9 @@ class Application(Adw.Application):
     def on_quit_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
 
+        # TODO: check for unsaved changes over all sheets (selections don't count)
+        # TODO: show confirmation dialog if needed
+
         # We do cleanup the history of all sheets in the current window, mainly
         # to free up disk space from the temporary files, usually .ersnap files
         # created for example when multiple cells or even the entire row(s) or
@@ -174,7 +177,7 @@ class Application(Adw.Application):
         dialog.present(self.get_active_window())
 
     def on_preferences_action(self, action: Gio.SimpleAction, *args) -> None:
-        raise NotImplementedError
+        raise NotImplementedError # TODO
 
     def on_toggle_sidebar_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
@@ -239,7 +242,7 @@ class Application(Adw.Application):
         tab_view.toggle_replace_section()
 
     def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
-        pass
+        pass # TODO
 
     def on_file_opened(self,
                        source:    GObject.Object,
@@ -258,7 +261,8 @@ class Application(Adw.Application):
         no_linked_file = window.file is None
         no_opened_sheet = len(window.sheet_manager.sheets) == 0
         history_is_empty = globals.history is None or \
-                           len(globals.history.undo_stack) == 1
+                           (len(globals.history.undo_stack) <= 1 and \
+                            len(globals.history.redo_stack) == 0)
 
         # Reuse the current active window if the window references to no file
         # and there's not any sheet opened or the current active sheet has no
@@ -274,7 +278,7 @@ class Application(Adw.Application):
 
     def on_new_worksheet_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        sheet_view = window.sheet_manager.create_sheet(None)
+        sheet_view = window.sheet_manager.create_sheet(None, stype='worksheet')
         window.add_new_tab(sheet_view)
 
     def on_new_notebook_action(self, action: Gio.SimpleAction, *args) -> None:
@@ -322,31 +326,93 @@ class Application(Adw.Application):
     def on_close_tab_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
-        tab_page = self.get_current_tab_page(window, document_id)
-        window.tab_view.close_page(tab_page)
+
+        def close_selected_tabs() -> None:
+            tab_page = self.get_current_tab_page(window, document_id)
+            window.tab_view.close_page(tab_page)
+
+        if self.check_sheet_blanks(window, document_id):
+            close_selected_tabs()
+        else:
+            self.show_close_tabs_confirmation(window, close_selected_tabs)
 
     def on_close_other_tabs_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        document_id = args[0].get_string()
-        tab_page = self.get_current_tab_page(window, document_id)
-        window.tab_view.close_other_pages(tab_page)
+
+        def close_selected_tabs() -> None:
+            document_id = args[0].get_string()
+            tab_page = self.get_current_tab_page(window, document_id)
+            window.tab_view.close_other_pages(tab_page)
+
+        self.show_close_tabs_confirmation(window, close_selected_tabs)
 
     def on_close_tabs_to_left_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        document_id = args[0].get_string()
-        tab_page = self.get_current_tab_page(window, document_id)
-        window.tab_view.close_pages_before(tab_page)
+
+        def close_selected_tabs() -> None:
+            document_id = args[0].get_string()
+            tab_page = self.get_current_tab_page(window, document_id)
+            window.tab_view.close_pages_before(tab_page)
+
+        self.show_close_tabs_confirmation(window, close_selected_tabs)
 
     def on_close_tabs_to_right_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
-        document_id = args[0].get_string()
-        tab_page = self.get_current_tab_page(window, document_id)
-        window.tab_view.close_pages_after(tab_page)
+
+        def close_selected_tabs() -> None:
+            document_id = args[0].get_string()
+            tab_page = self.get_current_tab_page(window, document_id)
+            window.tab_view.close_pages_after(tab_page)
+
+        self.show_close_tabs_confirmation(window, close_selected_tabs)
 
     def on_close_selected_tab_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
         tab_page = window.tab_view.get_selected_page()
-        window.tab_view.close_page(tab_page)
+
+        sheet_view = tab_page.get_child()
+        sheet_document = sheet_view.document
+        document_id = sheet_document.document_id
+
+        def close_selected_tabs() -> None:
+            window.tab_view.close_page(tab_page)
+
+        if self.check_sheet_blanks(window, document_id):
+            close_selected_tabs()
+        else:
+            self.show_close_tabs_confirmation(window, close_selected_tabs)
+
+    def check_sheet_blanks(self,
+                           window:      Window,
+                           document_id: str) -> bool:
+        sheet_document = window.sheet_manager.get_sheet(document_id)
+        return len(sheet_document.history.undo_stack) <= 1 and \
+               len(sheet_document.history.redo_stack) == 0
+
+    def show_close_tabs_confirmation(self,
+                                     window:   Window,
+                                     callback: callable) -> None:
+        alert_dialog = Adw.AlertDialog()
+
+        alert_dialog.set_heading(_('Close Tabs?'))
+        alert_dialog.set_body(_('All data on the selected tabs will be lost permanently. '
+                                'This action cannot be undone.'))
+
+        alert_dialog.add_response('cancel', _('_Cancel'))
+        alert_dialog.add_response('close', _('_Close Tabs'))
+
+        alert_dialog.set_response_appearance('close', Adw.ResponseAppearance.DESTRUCTIVE)
+        alert_dialog.set_default_response('close')
+        alert_dialog.set_close_response('cancel')
+
+        def on_alert_dialog_dismissed(dialog: Adw.AlertDialog, result: Gio.Task) -> None:
+            if result.had_error():
+                return
+            if dialog.choose_finish(result) != 'close':
+                return
+            callback()
+
+        alert_dialog.choose(window, None, on_alert_dialog_dismissed)
 
     def on_undo_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()
@@ -619,7 +685,8 @@ class Application(Adw.Application):
 
         # Close the current tab
         tab_page = window.tab_view.get_selected_page()
-        window.tab_view.close_page(tab_page)
+        if tab_page is not None:
+            window.tab_view.close_page(tab_page)
 
         window.setup_new_document(file, dataframe)
 

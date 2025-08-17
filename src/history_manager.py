@@ -1074,6 +1074,30 @@ class UpdateColumnWidthState(State):
 
 
 
+class RenameSheetState(State):
+    __gtype_name__ = 'RenameSheetState'
+
+    before: str
+    after: str
+
+    def __init__(self,
+                 before: str,
+                 after:  str) -> None:
+        super().__init__()
+
+        self.before = before
+        self.after = after
+
+    def undo(self) -> None:
+        document = globals.history.document
+        document.title = self.before
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.title = self.after
+
+
+
 class HistoryManager(GObject.Object):
     __gtype_name__ = 'HistoryManager'
 

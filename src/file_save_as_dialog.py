@@ -41,7 +41,7 @@ class FileSaveAsDialog(Adw.Dialog):
     save_button = Gtk.Template.Child()
 
     def __init__(self,
-                 window: Window,
+                 window:   Window,
                  callback: callable,
                  **kwargs) -> None:
         super().__init__(**kwargs)

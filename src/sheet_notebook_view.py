@@ -161,6 +161,7 @@ class SheetNotebookView(Gtk.Box):
         sheet_document = SheetDocument(configs={'show-auto-filters'    : False,
                                                 'ctrl-wheel-to-scroll' : True})
 
+        sheet_document.view.set_vexpand(False)
         sheet_document.view.add_css_class('notebook-output')
         sheet_document.view.add_css_class('frame')
         sheet_document.view.set_visible(False)

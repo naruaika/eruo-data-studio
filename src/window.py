@@ -652,6 +652,8 @@ class Window(Adw.ApplicationWindow):
         if len(self.sheet_manager.sheets) == 0:
             self.name_box.set_sensitive(False)
             self.formula_bar.set_sensitive(False)
+            self.multiline_formula_bar.set_sensitive(False)
+            self.toggle_formula_bar.set_sensitive(False)
             self.toolbar_tab_view.set_sensitive(False)
             self.sidebar_tab_view.set_sensitive(False)
 
@@ -845,13 +847,17 @@ class Window(Adw.ApplicationWindow):
         # Switch to the new tab automatically
         self.tab_view.set_selected_page(tab_page)
 
-        # Reset the focus and input bar
-        sheet_view.main_canvas.set_focusable(True)
-        sheet_view.main_canvas.grab_focus()
+        # Re-enable the input bar
         self.name_box.set_sensitive(True)
         self.formula_bar.set_sensitive(True)
+        self.multiline_formula_bar.set_sensitive(True)
+        self.toggle_formula_bar.set_sensitive(True)
         self.toolbar_tab_view.set_sensitive(True)
         self.sidebar_tab_view.set_sensitive(True)
+
+        # Focus the main canvas
+        sheet_view.main_canvas.set_focusable(True)
+        sheet_view.main_canvas.grab_focus()
 
     def duplicate_sheet(self, document_id: str) -> None:
         sheet_view = self.sheet_manager.duplicate_sheet(document_id)
@@ -859,11 +865,17 @@ class Window(Adw.ApplicationWindow):
 
     def rename_sheet(self, tab_page: Adw.TabPage) -> None:
         from .rename_sheet_dialog import RenameSheetDialog
-
-        def _rename_sheet(new_name: str) -> None:
-            tab_page.set_title(new_name)
+        from .history_manager import RenameSheetState
 
         old_name = tab_page.get_title()
+
+        def _rename_sheet(new_name: str) -> None:
+            state = RenameSheetState(old_name, new_name)
+            globals.history.save(state)
+
+            tab_page.set_title(new_name)
+
+            # TODO: update any references?
 
         dialog = RenameSheetDialog(old_name, _rename_sheet)
         dialog.present(self)

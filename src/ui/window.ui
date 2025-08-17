@@ -284,9 +284,9 @@
                             <property name="vexpand">true</property>
                             <child>
                               <object class="AdwStatusPage">
-                                <property name="icon-name">accessories-calculator-symbolic</property>
-                                <property name="title">Workbook is Empty</property>
-                                <property name="description">Try add new sheet or open a file</property>
+                                <property name="icon-name">table-symbolic</property>
+                                <property name="title">Your Workbook is Empty</property>
+                                <property name="description">Try adding a new sheet to get started</property>
                               </object>
                             </child>
                             <child type="overlay">
