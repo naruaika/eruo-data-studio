@@ -55,11 +55,11 @@ class SheetDocument(GObject.Object):
     }
 
     def __init__(self,
-                 sheet_manager      = None,
-                 document_id:   str = '',
-                 title:         str = '',
-                 dataframe:     polars.DataFrame = None,
-                 configs:       dict = {}) -> None:
+                 sheet_manager     = None,
+                 document_id:  str = '',
+                 title:        str = '',
+                 dataframe:    polars.DataFrame = None,
+                 configs:      dict = {}) -> None:
         super().__init__()
 
         self.sheet_manager = sheet_manager
@@ -119,6 +119,7 @@ class SheetDocument(GObject.Object):
         self.canvas_tick_callback: int = 0
 
         self.setup_document()
+        self.setup_history()
 
     #
     # Setup
@@ -131,7 +132,6 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_column_widths()
         self.auto_adjust_scrollbars_by_scroll()
 
-        self.setup_document_history()
         self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 
@@ -155,7 +155,7 @@ class SheetDocument(GObject.Object):
         horizontal_adjustment.connect('value-changed', self.on_sheet_view_scrolled)
         self.view.horizontal_scrollbar.set_adjustment(horizontal_adjustment)
 
-    def setup_document_history(self) -> None:
+    def setup_history(self) -> None:
         globals.history = self.history
 
         # Initialize the selection
@@ -2499,8 +2499,6 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_selections_by_crud(0, 0, False)
         self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
-        self.renderer.render_caches = {}
-        self.view.main_canvas.queue_draw()
 
     def cut_from_current_selection(self, clipboard: ClipboardManager) -> None:
         self.copy_from_current_selection(clipboard)
@@ -2731,6 +2729,8 @@ class SheetDocument(GObject.Object):
                 self.toggle_column_visibility(vcolumn, False)
             else:
                 self.update_column_width(vcolumn, column_width)
+                self.renderer.render_caches = {}
+                self.view.main_canvas.queue_draw()
 
         x = 0
         y = 3

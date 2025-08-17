@@ -361,6 +361,8 @@ class SheetRenderer(GObject.Object):
         if 'content' not in self.render_caches:
             self.render_caches['content'] = {
                 'surface': cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height),
+                'width': width,
+                'height': height,
                 'x_pos': display.scroll_x_position,
                 'y_pos': display.scroll_y_position,
                 'x_trans': 0,
@@ -431,11 +433,13 @@ class SheetRenderer(GObject.Object):
                 ncontext.reset_clip()
                 ncontext.translate(-rcache['x_trans'], -rcache['y_trans'])
 
+                rcache['surface'] = nsurface
+                rcache['width'] = width
+                rcache['height'] = height
                 rcache['x_trans'] = 0
                 rcache['y_trans'] = 0
 
             ccontext = ncontext
-            rcache['surface'] = nsurface
             rcache['x_pos'] = display.scroll_x_position
             rcache['y_pos'] = display.scroll_y_position
 

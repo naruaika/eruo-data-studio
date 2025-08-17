@@ -25,7 +25,6 @@ from gi.repository import GObject
 from datetime import datetime
 from time import time
 import duckdb
-import gc
 import polars
 import re
 
@@ -230,7 +229,6 @@ class SheetData(GObject.Object):
         # Replace the main dataframe
         if self.has_main_dataframe:
             self.bbs[0] = SheetCellBoundingBox(column, row, width, height)
-            del self.dfs[0]
             self.dfs.insert(0, dataframe)
 
         # Set the first dataframe as the main dataframe
@@ -239,8 +237,6 @@ class SheetData(GObject.Object):
             self.dfs = [dataframe]
 
         self.has_main_dataframe = True
-
-        gc.collect()
 
     def insert_blank_dataframe(self,
                                column: int = 1,
@@ -498,9 +494,6 @@ class SheetData(GObject.Object):
         for counter, column in enumerate(range(column, column + dataframe.width)):
             self.dfs[dfi] = self.dfs[dfi].insert_column(column, dataframe[:, counter])
             self.bbs[dfi].column_span += 1
-
-        del dataframe
-        gc.collect()
 
         return True
 
@@ -901,9 +894,6 @@ class SheetData(GObject.Object):
             # Update the column name
             self.dfs[dfi] = self.dfs[dfi].rename({column_name: content.columns[content_index]})
 
-        del content
-        gc.collect()
-
         return True
 
     def update_cell_data_blocks_from_metadata(self,
@@ -923,9 +913,6 @@ class SheetData(GObject.Object):
                 self.dfs[dfi] = self.dfs[dfi].with_columns(self.dfs[dfi][0:row, column].extend(content[column_name])
                                                                                        .extend(self.dfs[dfi][row + row_span:, column])
                                                                                        .alias(column_name))
-
-        del content
-        gc.collect()
 
         return True
 

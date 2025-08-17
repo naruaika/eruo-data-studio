@@ -36,8 +36,8 @@ class SheetNotebook(GObject.Object):
 
     def __init__(self,
                  sheet_manager,
-                 document_id: str,
-                 title:       str) -> None:
+                 document_id:   str,
+                 title:         str) -> None:
         super().__init__()
 
         self.sheet_manager = sheet_manager
@@ -47,9 +47,6 @@ class SheetNotebook(GObject.Object):
 
         from .sheet_notebook_view import SheetNotebookView
         self.view = SheetNotebookView(self)
-
-        from .sheet_data import SheetData
-        self.data = SheetData(self, None)
 
         # See the explanation in SheetDocument
         self.is_searching_cells: bool = False
@@ -65,10 +62,12 @@ class SheetNotebook(GObject.Object):
         from .history_manager import HistoryManager
         self.history = HistoryManager(self)
 
+        from .sheet_data import SheetData
         from .sheet_display import SheetDisplay
         from .sheet_renderer import SheetRenderer
         from .sheet_selection import SheetSelection
 
+        self.data = SheetData(self, None)
         self.display = SheetDisplay(self)
         self.renderer = SheetRenderer(self)
         self.selection = SheetSelection(self)
@@ -88,9 +87,11 @@ class SheetNotebook(GObject.Object):
             dataframe = connection.sql(query).pl()
             connection.close()
             return dataframe
+
         except Exception as e:
             print(e)
             message = str(e)
+
         connection.close()
         return message
 

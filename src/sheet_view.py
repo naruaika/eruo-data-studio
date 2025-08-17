@@ -294,23 +294,27 @@ class SheetView(Gtk.Box):
         if isinstance(active, SheetLeftLocatorCell):
             active.width = width
 
-        self.document.auto_adjust_scrollbars_by_scroll()
-
         # Invalidate some parts of the render cache
-        if 'content' in self.document.renderer.render_caches and \
-                (self.main_canvas_width < width or self.main_canvas_height < height):
-            if (x_offset := width - self.main_canvas_width) != 0:
-                self.document.renderer.render_caches['content']['x_pos'] -= x_offset
-                self.document.renderer.render_caches['content']['x_trans'] = x_offset
+        if 'content' in self.document.renderer.render_caches:
+            cached_content = self.document.renderer.render_caches['content']
+            new_width_is_bigger_than_cached = width > cached_content['width']
+            new_height_is_bigger_than_cached = height > cached_content['height']
 
-            if (y_offset := height - self.main_canvas_height) != 0:
-                self.document.renderer.render_caches['content']['y_pos'] -= y_offset
-                self.document.renderer.render_caches['content']['y_trans'] = y_offset
+            if new_width_is_bigger_than_cached or new_height_is_bigger_than_cached:
+                if (x_offset := width - self.main_canvas_width) != 0:
+                    self.document.renderer.render_caches['content']['x_pos'] -= x_offset
+                    self.document.renderer.render_caches['content']['x_trans'] = x_offset
 
-            # We currently don't support resizing in diagonal axis,
-            # so we force clear the entire cache instead
-            if x_offset != 0 and y_offset != 0:
-                self.document.renderer.render_caches = {}
+                if (y_offset := height - self.main_canvas_height) != 0:
+                    self.document.renderer.render_caches['content']['y_pos'] -= y_offset
+                    self.document.renderer.render_caches['content']['y_trans'] = y_offset
+
+                # We currently don't support resizing in diagonal axis,
+                # so we force clear the entire cache instead
+                if x_offset != 0 and y_offset != 0:
+                    self.document.renderer.render_caches = {}
 
         self.main_canvas_width = width
         self.main_canvas_height = height
+
+        self.document.auto_adjust_scrollbars_by_scroll()

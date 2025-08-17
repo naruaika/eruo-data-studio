@@ -42,7 +42,7 @@
           </object>
         </child>
         <child>
-          <object class="GtkButton">
+          <object class="GtkButton" id="run_all_button">
             <child>
               <object class="AdwButtonContent">
                 <property name="icon-name">media-playback-start-symbolic</property>
@@ -72,32 +72,21 @@
         <property name="vexpand">true</property>
         <property name="hexpand">true</property>
         <child>
-          <object class="GtkBox">
+          <object class="GtkBox" id="list_view">
             <property name="orientation">vertical</property>
-            <property name="margin-top">10</property>
+            <property name="margin-top">30</property>
             <property name="margin-bottom">30</property>
-            <property name="margin-start">6</property>
-            <property name="margin-end">6</property>
+            <property name="margin-start">30</property>
+            <property name="margin-end">30</property>
             <property name="spacing">10</property>
             <property name="valign">fill</property>
             <property name="halign">fill</property>
             <property name="hexpand">true</property>
             <property name="vexpand">true</property>
-            <child>
-              <object class="GtkListView" id="list_view">
-                <property name="visible">false</property>
-                <property name="model">
-                  <object class="GtkNoSelection">
-                    <property name="model">
-                      <object class="GListStore" id="list_store"/>
-                    </property>
-                  </object>
-                </property>
-                <style>
-                  <class name="notebook-list-view"/>
-                </style>
-              </object>
-            </child>
+            <child></child>
+            <style>
+              <class name="notebook-list-view"/>
+            </style>
           </object>
         </child>
       </object>

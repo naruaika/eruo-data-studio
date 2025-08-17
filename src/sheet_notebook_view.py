@@ -21,38 +21,20 @@
 # SOFTWARE.
 
 
-from gi.repository import Gdk, GObject, Gtk, GtkSource
+from gi.repository import Gdk, GLib, GObject, Gtk, GtkSource
 import polars
+import threading
 
 from .sheet_notebook import SheetNotebook
-
-class CellListItem(GObject.Object):
-    __gtype_name__ = 'ListItem'
-
-    ctype = GObject.Property(type=str, default='sql')
-    query = GObject.Property(type=str, default='')
-    status = GObject.Property(type=str, default='')
-
-    def __init__(self,
-                 ctype:  str = '',
-                 query:  str = '',
-                 status: str = '') -> None:
-        super().__init__()
-
-        self.ctype = ctype
-        self.query = query
-        self.status = status
-
-
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/sheet-notebook-view.ui')
 class SheetNotebookView(Gtk.Box):
     __gtype_name__ = 'SheetNotebookView'
 
-    scrolled_window = Gtk.Template.Child()
+    run_all_button = Gtk.Template.Child()
 
+    scrolled_window = Gtk.Template.Child()
     list_view = Gtk.Template.Child()
-    list_store = Gtk.Template.Child()
 
     def __init__(self, document: SheetNotebook, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -62,29 +44,22 @@ class SheetNotebookView(Gtk.Box):
         # Disable scroll to focus behavior of the Gtk.Viewport
         self.scrolled_window.get_first_child().set_scroll_to_focus(False)
 
-        factory = Gtk.SignalListItemFactory()
-        factory.connect('setup', self.setup_factory)
-        factory.connect('bind', self.bind_factory)
-        factory.connect('teardown', self.teardown_factory)
-        self.list_view.set_factory(factory)
+        self.list_items: list[dict[str, GObject.Object]] = []
+
+        self.run_queue: list[int] = []
+        self.is_running_queue = False
 
         # We don't use all objects below, they're just placeholders
         # so that it doesn't break the current design. Let's flag
         # this as TODO.
 
         self.main_canvas = Gtk.DrawingArea()
-        self.horizontal_scrollbar = Gtk.Scrollbar(orientation=Gtk.Orientation.HORIZONTAL)
-        self.vertical_scrollbar = Gtk.Scrollbar(orientation=Gtk.Orientation.VERTICAL)
+        self.horizontal_scrollbar = Gtk.Scrollbar()
+        self.vertical_scrollbar = Gtk.Scrollbar()
 
-    def setup_factory(self,
-                      list_item_factory: Gtk.SignalListItemFactory,
-                      list_item:         Gtk.ListItem) -> None:
-        list_item.set_focusable(False)
-        list_item.set_activatable(False)
-
+    def add_new_sql_cell(self, query: str = None) -> None:
         main_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         main_container.set_spacing(6)
-        list_item.set_child(main_container)
 
         run_button = Gtk.Button()
         run_button.set_icon_name('media-playback-start-symbolic')
@@ -106,6 +81,13 @@ class SheetNotebookView(Gtk.Box):
         source_view.set_size_request(-1, 68)
         content_container.append(source_view)
 
+        if query is not None:
+            source_view.get_buffer().set_text(query)
+
+        output_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        output_container.set_spacing(6)
+        content_container.append(output_container)
+
         status_text = Gtk.TextView()
         status_text.set_halign(Gtk.Align.FILL)
         status_text.set_hexpand(True)
@@ -117,7 +99,7 @@ class SheetNotebookView(Gtk.Box):
         status_text.add_css_class('frame')
         status_text.remove_css_class('view')
         status_text.set_visible(False)
-        content_container.append(status_text)
+        output_container.append(status_text)
 
         from .sheet_document import SheetDocument
         sheet_document = SheetDocument(configs={'show-auto-filters'    : False,
@@ -126,66 +108,82 @@ class SheetNotebookView(Gtk.Box):
         sheet_document.view.add_css_class('notebook-output')
         sheet_document.view.add_css_class('frame')
         sheet_document.view.set_visible(False)
-        content_container.append(sheet_document.view)
+        output_container.append(sheet_document.view)
 
         delete_button = Gtk.Button()
-        delete_button.set_icon_name('user-trash-symbolic')
         delete_button.set_valign(Gtk.Align.START)
+        delete_button.set_icon_name('user-trash-symbolic')
         delete_button.add_css_class('flat')
         main_container.append(delete_button)
 
-        list_item.run_button = run_button
-        list_item.source_view = source_view
-        list_item.status_text = status_text
-        list_item.sheet_document = sheet_document
-        list_item.delete_button = delete_button
+        self.list_view.append(main_container)
 
-    def bind_factory(self,
-                     list_item_factory: Gtk.SignalListItemFactory,
-                     list_item:         Gtk.ListItem) -> None:
-        position = list_item.get_position()
-        item_data = list_item.get_item()
-
-        def auto_resize_sheet_view(sheet_view: Gtk.Widget, n_rows: int) -> None:
-            MAX_VIEW_HEIGHT = 600 + 16 + 2
-            new_view_height = (n_rows + 3) * 20 + 16 + 2
-            new_view_height = min(new_view_height, MAX_VIEW_HEIGHT)
-            sheet_view.set_size_request(-1, new_view_height)
+        position = len(self.list_items)
 
         def on_run_button_clicked(button: Gtk.Button) -> None:
-            result = self.document.run_sql_query(item_data.query)
+            status_text.get_buffer().set_text('Running...')
+            status_text.remove_css_class('error')
+            status_text.set_visible(True)
 
-            if not isinstance(result, polars.DataFrame):
-                list_item.sheet_document.view.set_visible(False)
+            sheet_document.view.set_visible(False)
 
-                list_item.status_text.get_buffer().set_text(result)
-                list_item.status_text.set_visible(True)
+            output_container.set_visible(True)
 
-                self.document.data.dfs[position] = polars.DataFrame()
+            button.set_sensitive(False)
 
-                item_data.status = result
+            # Remove the item from the queue
+            if self.is_running_queue \
+                    and self.run_queue[0] == position:
+                self.run_queue.pop(0)
 
-                return
+            def show_query_result(dataframe: polars.DataFrame) -> None:
+                MAX_VIEW_HEIGHT = 600 + 16 + 2
+                new_view_height = (dataframe.height + 3) * 20 + 16 + 2
+                new_view_height = min(new_view_height, MAX_VIEW_HEIGHT)
+                sheet_document.view.set_size_request(-1, new_view_height)
 
-            auto_resize_sheet_view(list_item.sheet_document.view, result.height)
+                sheet_document.view.set_visible(True)
+                status_text.set_visible(False)
 
-            list_item.sheet_document.view.set_visible(True)
-            list_item.status_text.set_visible(False)
+                sheet_document.data.setup_main_dataframe(dataframe)
+                sheet_document.setup_document()
+                sheet_document.renderer.render_caches = {}
 
-            list_item.sheet_document.data.setup_main_dataframe(result)
-            list_item.sheet_document.setup_document()
-            list_item.sheet_document.renderer.render_caches = {}
-            list_item.sheet_document.view.main_canvas.queue_draw()
+            def show_error_message(message: str) -> None:
+                status_text.get_buffer().set_text(message)
+                status_text.add_css_class('error')
+                status_text.set_visible(True)
 
-            self.document.data.dfs[position] = result
+                sheet_document.data.setup_main_dataframe(polars.DataFrame())
+                sheet_document.view.set_visible(False)
 
-            item_data.status = ''
+            def run_query_in_thread() -> None:
+                text_buffer = source_view.get_buffer()
+                start_iter = text_buffer.get_start_iter()
+                end_iter = text_buffer.get_end_iter()
+                query = text_buffer.get_text(start_iter, end_iter, True)
 
-        def on_source_view_changed(text_buffer: Gtk.TextBuffer) -> None:
-            start_iter = text_buffer.get_start_iter()
-            end_iter = text_buffer.get_end_iter()
-            text = text_buffer.get_text(start_iter, end_iter, True)
-            item_data.query = text
+                result = self.document.run_sql_query(query)
+                is_success = isinstance(result, polars.DataFrame)
+
+                if is_success:
+                    GLib.idle_add(show_query_result, result)
+                else:
+                    GLib.idle_add(show_error_message, result)
+
+                button.set_sensitive(True)
+
+                if self.is_running_queue:
+                    if is_success \
+                            and len(self.run_queue) > 0:
+                        # Trigger the next query in queue
+                        lidx = self.run_queue[0]
+                        list_item = self.list_items[lidx]
+                        list_item['run_button'].emit('clicked')
+                    else:
+                        self.run_all_finish()
+
+            threading.Thread(target=run_query_in_thread, daemon=True).start()
 
         def on_source_view_key_pressed(event_controller: Gtk.EventControllerKey,
                                        keyval:           int,
@@ -195,75 +193,66 @@ class SheetNotebookView(Gtk.Box):
             if keyval == Gdk.KEY_Return:
                 if state != Gdk.ModifierType.CONTROL_MASK:
                     return False
-                list_item.run_button.emit('clicked')
+                on_run_button_clicked(run_button)
                 return True
 
         def on_delete_button_clicked(button: Gtk.Button) -> None:
-            self.list_store.remove(position)
-            self.document.data.dfs.pop(position)
-            self.document.data.bbs.pop(position)
-            if self.list_store.get_n_items() == 0:
-                self.list_view.set_visible(False)
+            list_item = self.list_items[position]
+            list_item['main_container'].unparent()
+            self.list_items.pop(position)
 
-        dataframe = self.document.data.dfs[position]
-
-        auto_resize_sheet_view(list_item.sheet_document.view, dataframe.height)
-
-        list_item.sheet_document.view.set_visible(dataframe.width > 0 and
-                                                  dataframe.height > 0)
-
-        list_item.sheet_document.data.setup_main_dataframe(dataframe)
-        list_item.sheet_document.setup_document()
-        list_item.sheet_document.view.main_canvas.queue_draw()
-
-        list_item.status_text.get_buffer().set_text(item_data.status)
-        list_item.status_text.set_visible(item_data.status != '')
-
-        list_item.source_view.get_buffer().set_text(item_data.query)
-
-        list_item.run_button.connect('clicked', on_run_button_clicked)
-        list_item.source_view.get_buffer().connect('changed', on_source_view_changed)
-        list_item.delete_button.connect('clicked', on_delete_button_clicked)
+        run_button.connect('clicked', on_run_button_clicked)
+        delete_button.connect('clicked', on_delete_button_clicked)
 
         key_event_controller = Gtk.EventControllerKey()
         key_event_controller.connect('key-pressed', on_source_view_key_pressed)
-        list_item.source_view.add_controller(key_event_controller)
+        source_view.add_controller(key_event_controller)
 
-    def teardown_factory(self,
-                         list_item_factory: Gtk.SignalListItemFactory,
-                         list_item:         Gtk.ListItem) -> None:
-        # list_item.run_button = None
-        # list_item.source_view = None
-        # list_item.status_text = None
-        # list_item.sheet_document = None
-        # list_item.delete_button = None
-        pass
+        self.list_items.append({
+            'type'              : 'sql',
+            'sheet_document'    : sheet_document,
+            'main_container'    : main_container,
+            'content_container' : content_container,
+            'output_container'  : output_container,
+            'source_view'       : source_view,
+            'status_text'       : status_text,
+            'run_button'        : run_button,
+            'delete_button'     : delete_button,
+        })
 
     @Gtk.Template.Callback()
     def on_run_all_clicked(self, button: Gtk.Button) -> None:
-        # Try to execute all cells
-        for cindex in range(self.list_store.get_n_items()):
-            list_item = self.list_store.get_item(cindex)
-            result = self.document.run_sql_query(list_item.query)
-            if not isinstance(result, polars.DataFrame):
-                self.document.data.dfs[cindex] = polars.DataFrame()
-                list_item.status = result
-                break
-            self.document.data.dfs[cindex] = result
-            list_item.status = ''
+        self.is_running_queue = True
 
-        # Force the list view to re-bind the factory
-        old_model = self.list_view.get_model()
-        self.list_view.set_model(None)
-        self.list_view.set_model(old_model)
+        button.set_sensitive(False)
+
+        self.run_queue = []
+
+        for lidx, list_item in enumerate(self.list_items):
+            if list_item['type'] not in {'sql'}:
+                continue
+            list_item['output_container'].set_visible(False)
+            list_item['run_button'].set_sensitive(False)
+            self.run_queue.append(lidx)
+
+        # Trigger the first query execution
+        lidx = self.run_queue[0]
+        list_item = self.list_items[lidx]
+        list_item['run_button'].emit('clicked')
+
+    def run_all_finish(self) -> None:
+        self.is_running_queue = False
+
+        self.run_all_button.set_sensitive(True)
+
+        self.run_queue = []
+
+        for list_item in self.list_items:
+            list_item['run_button'].set_sensitive(True)
 
     @Gtk.Template.Callback()
     def on_add_sql_query_clicked(self, button: Gtk.Button) -> None:
-        self.document.data.insert_blank_dataframe()
-
-        list_item = CellListItem('sql')
-        self.list_store.append(list_item)
-        self.list_view.set_visible(True)
+        self.add_new_sql_cell()
 
     @Gtk.Template.Callback()
     def on_add_markdown_clicked(self, button: Gtk.Button) -> None:
