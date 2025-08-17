@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from gi.repository import Gdk, GLib, GObject, Gtk, GtkSource
+from gi.repository import Adw, Gdk, GLib, GObject, Gtk, GtkSource
 import polars
 import threading
 
@@ -57,18 +57,74 @@ class SheetNotebookView(Gtk.Box):
         self.horizontal_scrollbar = Gtk.Scrollbar()
         self.vertical_scrollbar = Gtk.Scrollbar()
 
-    def add_new_sql_cell(self, query: str = None) -> None:
+    def add_new_sql_cell(self,
+                         query:    str = None,
+                         position: int = -1) -> None:
         main_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         main_container.set_spacing(6)
 
         run_button = Gtk.Button()
-        run_button.set_icon_name('media-playback-start-symbolic')
+        run_button.set_margin_top(34)
         run_button.set_valign(Gtk.Align.START)
+        run_button.set_icon_name('media-playback-start-symbolic')
+        run_button.add_css_class('flat')
         main_container.append(run_button)
 
         content_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         content_container.set_spacing(6)
         main_container.append(content_container)
+
+        toolbar_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        toolbar_container.set_spacing(3)
+        toolbar_container.set_hexpand(True)
+        toolbar_container.set_halign(Gtk.Align.FILL)
+        toolbar_container.add_css_class('notebook-cell-toolbar')
+        content_container.append(toolbar_container)
+
+        run_above_button = Gtk.Button()
+        run_above_button.set_valign(Gtk.Align.START)
+        run_above_button.add_css_class('flat')
+        run_above_content_button = Adw.ButtonContent()
+        run_above_content_button.set_icon_name('media-playback-start-symbolic')
+        run_above_content_button.set_label('All Above Cells')
+        run_above_button.set_child(run_above_content_button)
+        toolbar_container.append(run_above_button)
+
+        run_below_button = Gtk.Button()
+        run_below_button.set_valign(Gtk.Align.START)
+        run_below_button.add_css_class('flat')
+        run_below_content_button = Adw.ButtonContent()
+        run_below_content_button.set_icon_name('media-playback-start-symbolic')
+        run_below_content_button.set_label('This and All Below Cells')
+        run_below_button.set_child(run_below_content_button)
+        toolbar_container.append(run_below_button)
+
+        add_sql_button = Gtk.Button()
+        add_sql_button.set_valign(Gtk.Align.START)
+        add_sql_button.add_css_class('flat')
+        add_sql_content_button = Adw.ButtonContent()
+        add_sql_content_button.set_icon_name('list-add-symbolic')
+        add_sql_content_button.set_label('SQL')
+        add_sql_button.set_child(add_sql_content_button)
+        toolbar_container.append(add_sql_button)
+
+        add_markdown_button = Gtk.Button()
+        add_markdown_button.set_valign(Gtk.Align.START)
+        add_markdown_button.add_css_class('flat')
+        add_markdown_content_button = Adw.ButtonContent()
+        add_markdown_content_button.set_icon_name('list-add-symbolic')
+        add_markdown_content_button.set_label('Markdown')
+        add_markdown_button.set_child(add_markdown_content_button)
+        toolbar_container.append(add_markdown_button)
+
+        delete_button = Gtk.Button()
+        delete_button.set_valign(Gtk.Align.START)
+        delete_button.add_css_class('flat')
+        delete_content_button = Adw.ButtonContent()
+        delete_content_button.set_icon_name('user-trash-symbolic')
+        delete_content_button.set_label('Delete')
+        delete_button.set_child(delete_content_button)
+        toolbar_container.append(delete_button)
 
         source_view = GtkSource.View()
         source_view.set_hexpand(True)
@@ -110,13 +166,11 @@ class SheetNotebookView(Gtk.Box):
         sheet_document.view.set_visible(False)
         output_container.append(sheet_document.view)
 
-        delete_button = Gtk.Button()
-        delete_button.set_valign(Gtk.Align.START)
-        delete_button.set_icon_name('user-trash-symbolic')
-        delete_button.add_css_class('flat')
-        main_container.append(delete_button)
-
-        self.list_view.append(main_container)
+        if position == -1:
+            self.list_view.append(main_container)
+        else:
+            target_list_item = self.list_items[position]['main_container']
+            self.list_view.insert_child_after(main_container, target_list_item)
 
         position = len(self.list_items)
 
@@ -157,11 +211,29 @@ class SheetNotebookView(Gtk.Box):
                 sheet_document.data.setup_main_dataframe(polars.DataFrame())
                 sheet_document.view.set_visible(False)
 
+            def run_next_query(is_success: bool) -> None:
+                if self.is_running_queue:
+                    if is_success \
+                            and len(self.run_queue) > 0:
+                        # Trigger the next query in queue
+                        lidx = self.run_queue[0]
+                        list_item = self.list_items[lidx]
+                        list_item['run_button'].emit('clicked')
+                    else:
+                        self.run_all_cells_finish()
+
             def run_query_in_thread() -> None:
                 text_buffer = source_view.get_buffer()
                 start_iter = text_buffer.get_start_iter()
                 end_iter = text_buffer.get_end_iter()
+
                 query = text_buffer.get_text(start_iter, end_iter, True)
+                query = query.strip()
+
+                if query == '':
+                    status_text.set_visible(False)
+                    run_next_query(True)
+                    return
 
                 result = self.document.run_sql_query(query)
                 is_success = isinstance(result, polars.DataFrame)
@@ -173,17 +245,26 @@ class SheetNotebookView(Gtk.Box):
 
                 button.set_sensitive(True)
 
-                if self.is_running_queue:
-                    if is_success \
-                            and len(self.run_queue) > 0:
-                        # Trigger the next query in queue
-                        lidx = self.run_queue[0]
-                        list_item = self.list_items[lidx]
-                        list_item['run_button'].emit('clicked')
-                    else:
-                        self.run_all_finish()
+                run_next_query(is_success)
 
             threading.Thread(target=run_query_in_thread, daemon=True).start()
+
+        def on_run_above_button_clicked(button: Gtk.Button) -> None:
+            self.run_all_cells(end=position)
+
+        def on_run_below_button_clicked(button: Gtk.Button) -> None:
+            self.run_all_cells(start=position)
+
+        def on_add_sql_button_clicked(button: Gtk.Button) -> None:
+            self.add_new_sql_cell(position=position - 1)
+
+        def on_add_markdown_button_clicked(button: Gtk.Button) -> None:
+            pass
+
+        def on_delete_button_clicked(button: Gtk.Button) -> None:
+            list_item = self.list_items[position]
+            list_item['main_container'].unparent()
+            self.list_items.pop(position)
 
         def on_source_view_key_pressed(event_controller: Gtk.EventControllerKey,
                                        keyval:           int,
@@ -196,12 +277,11 @@ class SheetNotebookView(Gtk.Box):
                 on_run_button_clicked(run_button)
                 return True
 
-        def on_delete_button_clicked(button: Gtk.Button) -> None:
-            list_item = self.list_items[position]
-            list_item['main_container'].unparent()
-            self.list_items.pop(position)
-
         run_button.connect('clicked', on_run_button_clicked)
+        run_above_button.connect('clicked', on_run_above_button_clicked)
+        run_below_button.connect('clicked', on_run_below_button_clicked)
+        add_sql_button.connect('clicked', on_add_sql_button_clicked)
+        add_markdown_button.connect('clicked', on_add_markdown_button_clicked)
         delete_button.connect('clicked', on_delete_button_clicked)
 
         key_event_controller = Gtk.EventControllerKey()
@@ -209,38 +289,60 @@ class SheetNotebookView(Gtk.Box):
         source_view.add_controller(key_event_controller)
 
         self.list_items.append({
-            'type'              : 'sql',
-            'sheet_document'    : sheet_document,
-            'main_container'    : main_container,
-            'content_container' : content_container,
-            'output_container'  : output_container,
-            'source_view'       : source_view,
-            'status_text'       : status_text,
-            'run_button'        : run_button,
-            'delete_button'     : delete_button,
+            'type'                : 'sql',
+            'sheet_document'      : sheet_document,
+            'main_container'      : main_container,
+            'toolbar_container'   : toolbar_container,
+            'content_container'   : content_container,
+            'output_container'    : output_container,
+            'source_view'         : source_view,
+            'status_text'         : status_text,
+            'run_button'          : run_button,
+            'run_above_button'    : run_above_button,
+            'run_below_button'    : run_below_button,
+            'add_sql_button'      : add_sql_button,
+            'add_markdown_button' : add_markdown_button,
+            'delete_button'       : delete_button,
         })
 
     @Gtk.Template.Callback()
     def on_run_all_clicked(self, button: Gtk.Button) -> None:
+        self.run_all_cells()
+
+    def run_all_cells(self,
+                      start: int = 0,
+                      end:   int = None) -> None:
+        if end is None:
+            end = len(self.list_items)
+
         self.is_running_queue = True
 
-        button.set_sensitive(False)
+        self.run_all_button.set_sensitive(False)
 
         self.run_queue = []
 
         for lidx, list_item in enumerate(self.list_items):
+            if lidx < start:
+                continue
+            if lidx >= end:
+                break
             if list_item['type'] not in {'sql'}:
                 continue
             list_item['output_container'].set_visible(False)
             list_item['run_button'].set_sensitive(False)
+
             self.run_queue.append(lidx)
+
+        if len(self.run_queue) == 0:
+            self.run_all_cells_finish()
+            return
 
         # Trigger the first query execution
         lidx = self.run_queue[0]
         list_item = self.list_items[lidx]
         list_item['run_button'].emit('clicked')
 
-    def run_all_finish(self) -> None:
+    def run_all_cells_finish(self) -> None:
         self.is_running_queue = False
 
         self.run_all_button.set_sensitive(True)

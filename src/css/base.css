@@ -178,10 +178,14 @@
 
 /* NOTEBOOK */
 
-.notebook-toolbar button {
+.notebook-toolbar button,
+.notebook-cell-toolbar button {
     padding: 2px 8px;
     font-size: 12px;
     -gtk-icon-size: 14px;
+}
+.notebook-cell-toolbar {
+    border-radius: 8px;
 }
 
 .notebook-list-view  {
