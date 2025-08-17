@@ -240,23 +240,32 @@ class Application(Adw.Application):
     def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
         pass
 
-    def on_file_opened(self, source: GObject.Object, file_path: str, in_place: bool) -> None:
+    def on_file_opened(self,
+                       source:    GObject.Object,
+                       file_path: str,
+                       in_place:  bool) -> None:
         if not file_path:
             return # shouldn't happen, but for completeness
 
         # Insert the file content to a new tab
         if in_place:
-            file = Gio.File.new_for_path(file_path)
-            dataframe = self.file_manager.read_file(file_path)
-
-            window = self.get_active_window()
-            window.setup_new_document(file, dataframe)
-
+            self.create_new_tab(file_path)
             return
 
-        # TODO: reuse the current active window if the window references to no file
-        #       and there's not any sheet opened or the current active sheet has no
-        #       editing history
+        window = self.get_active_window()
+
+        no_linked_file = window.file is None
+        no_opened_sheet = len(window.sheet_manager.sheets) == 0
+        history_is_empty = globals.history is None or \
+                           len(globals.history.undo_stack) == 1
+
+        # Reuse the current active window if the window references to no file
+        # and there's not any sheet opened or the current active sheet has no
+        # editing history
+        if no_linked_file and (no_opened_sheet or history_is_empty):
+            self.reuse_current_window(file_path)
+            return
+
         self.create_new_window(file_path)
 
     def on_file_saved(self, source: GObject.Object, file_path: str) -> None:
@@ -558,7 +567,9 @@ class Application(Adw.Application):
         window = self.get_active_window()
         return window.get_current_active_document()
 
-    def get_current_tab_page(self, window: Window, document_id: str) -> SheetDocument:
+    def get_current_tab_page(self,
+                             window:      Window,
+                             document_id: str) -> SheetDocument:
         sheet_document = window.sheet_manager.get_sheet(document_id)
         sheet_view = sheet_document.view
         return window.tab_view.get_page(sheet_view)
@@ -589,6 +600,33 @@ class Application(Adw.Application):
         window = Window(application=self)
         window.setup_new_document(file, dataframe)
         window.present()
+
+    def reuse_current_window(self, file_path: str = '') -> None:
+        file = None
+        dataframe = None
+
+        if file_path:
+            file = Gio.File.new_for_path(file_path)
+            dataframe = self.file_manager.read_file(file_path)
+
+        window = self.get_active_window()
+
+        # Close the current tab
+        tab_page = window.tab_view.get_selected_page()
+        window.tab_view.close_page(tab_page)
+
+        window.setup_new_document(file, dataframe)
+
+    def create_new_tab(self, file_path: str = '') -> None:
+        file = None
+        dataframe = None
+
+        if file_path:
+            file = Gio.File.new_for_path(file_path)
+            dataframe = self.file_manager.read_file(file_path)
+
+        window = self.get_active_window()
+        window.setup_new_document(file, dataframe)
 
 def main(version):
     """The application's entry point."""

@@ -175,7 +175,10 @@ class Window(Adw.ApplicationWindow):
         focus_event_controller.connect('enter', self.on_focus_received)
         self.add_controller(focus_event_controller)
 
+        # This is a signature file used to identify if the window
+        # is already linked to a document
         self.file = None
+
         self.context_menu = None
 
         self.inline_formula_box_x = 0
@@ -188,14 +191,17 @@ class Window(Adw.ApplicationWindow):
         if self.file is None:
             self.file = file
 
+        # Specify the sheet name
         sheet_name = 'Sheet 1'
         if file is not None:
             file_path = file.get_path()
             sheet_name = os.path.basename(file_path)
 
+        # Create a new sheet
         sheet_view = self.sheet_manager.create_sheet(dataframe, sheet_name)
         self.add_new_tab(sheet_view)
 
+        # Synchronize the sidebar
         self.sidebar_home_view.repopulate_field_list()
 
     def setup_tab_menu(self, tab_view: Adw.TabView, tab_page: Adw.TabPage) -> None:
@@ -647,8 +653,11 @@ class Window(Adw.ApplicationWindow):
             self.formula_bar.set_sensitive(False)
             self.toolbar_tab_view.set_sensitive(False)
             self.sidebar_tab_view.set_sensitive(False)
+
             self.update_inputbar()
             self.grab_focus()
+
+            globals.history = None
 
     def on_operation_cancelled(self, source: GObject.Object) -> None:
         self.close_inline_formula()
@@ -1056,15 +1065,12 @@ class Window(Adw.ApplicationWindow):
             self.add_new_tab(sheet_view)
 
             connection.close()
-
             return True
 
         except Exception as e:
             print(e)
-
             message = str(e)
             self.show_toast_message(message)
 
         connection.close()
-
         return False

@@ -118,6 +118,8 @@ class SheetDocument(GObject.Object):
 
         self.canvas_tick_callback: int = 0
 
+        self.setup_main_canvas()
+        self.setup_scrollbars()
         self.setup_document()
         self.setup_history()
 
@@ -126,12 +128,9 @@ class SheetDocument(GObject.Object):
     #
 
     def setup_document(self) -> None:
-        self.setup_main_canvas()
-        self.setup_scrollbars()
-
         self.auto_adjust_column_widths()
         self.auto_adjust_scrollbars_by_scroll()
-
+        self.auto_adjust_selections_by_crud(0, 0, False)
         self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 
