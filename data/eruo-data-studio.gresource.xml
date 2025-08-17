@@ -2,8 +2,8 @@
 <gresources>
   <gresource prefix="/com/macipra/eruo">
     <file preprocess="xml-stripblanks">gtk/help-overlay.ui</file>
-    <file preprocess="xml-stripblanks">ui/file-save-as-dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/file-save-as-csv-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/file-save-as-dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/file-save-as-json-view.ui</file>
     <file preprocess="xml-stripblanks">ui/file-save-as-parquet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/rename-sheet-dialog.ui</file>
@@ -13,43 +13,58 @@
     <file preprocess="xml-stripblanks">ui/sheet-notebook-view.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
     <file preprocess="xml-stripblanks">ui/sidebar-home-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/toolbar-data-view.ui</file>
+    <file preprocess="xml-stripblanks">ui/toolbar-formulas-view.ui</file>
     <file preprocess="xml-stripblanks">ui/toolbar-home-view.ui</file>
     <file preprocess="xml-stripblanks">ui/toolbar-insert-view.ui</file>
-    <file preprocess="xml-stripblanks">ui/toolbar-formulas-view.ui</file>
-    <file preprocess="xml-stripblanks">ui/toolbar-data-view.ui</file>
     <file preprocess="xml-stripblanks">ui/toolbar-view-view.ui</file>
     <file preprocess="xml-stripblanks">ui/window.ui</file>
+
+    <!-- Stylesheets -->
     <file alias="base.css">css/base.css</file>
     <file alias="style.css">css/style.css</file>
     <file alias="style-dark.css">css/style-dark.css</file>
   </gresource>
+
   <gresource prefix="/com/macipra/eruo/icons/scalable/actions/">
-    <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
+    <!-- GNOME UI Icons -->
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
     <file preprocess="xml-stripblanks">checkmark-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">edit-find-replace-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">edit-find-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">go-down-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">go-next-symbolic.svg</file>
     <file preprocess="xml-stripblanks">history-undo-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">regex-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">list-add-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">media-playback-start-symbolic.svg</file>
     <file preprocess="xml-stripblanks">notepad-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">object-select-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">open-menu-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">regex-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">sidebar-show-symbolic.svg</file>
     <file preprocess="xml-stripblanks">table-symbolic.svg</file>
     <file preprocess="xml-stripblanks">terminal-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">user-trash-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">view-fullscreen-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">view-more-horizontal-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">window-close-symbolic.svg</file>
 
     <!-- Carbon Design System -->
-    <file preprocess="xml-stripblanks">undo-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">redo-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">cut-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">copy-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">paste-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">row-insert-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">column-insert-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">row-delete-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">chevron-down-symbolic.svg</file>
     <file preprocess="xml-stripblanks">column-delete-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">column-insert-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">copy-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">cut-symbolic.svg</file>
     <file preprocess="xml-stripblanks">erase-symbolic.svg</file>
     <file preprocess="xml-stripblanks">filter-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">paste-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">redo-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">row-delete-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">row-insert-symbolic.svg</file>
     <file preprocess="xml-stripblanks">search-symbolic.svg</file>
-
-    <file preprocess="xml-stripblanks">table-shortcut-symbolic.svg</file>
     <file preprocess="xml-stripblanks">table-built-symbolic.svg</file>
-
-    <file preprocess="xml-stripblanks">chevron-down-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">table-shortcut-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">undo-symbolic.svg</file>
   </gresource>
 </gresources>
