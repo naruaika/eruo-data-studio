@@ -231,6 +231,7 @@ class Window(Adw.ApplicationWindow):
             section.append(_('Unpin Tab'), f"app.unpin-tab('{document_id}')")
         else:
             section.append(_('Pin Tab'), f"app.pin-tab('{document_id}')")
+        section.append(_('Duplicate Tab'), f"app.duplicate-tab('{document_id}')")
         section.append(_('Rename Tab'), f"app.rename-tab('{document_id}')")
         menu.append_section(None, section)
 
@@ -826,7 +827,8 @@ class Window(Adw.ApplicationWindow):
         #             .set_halign(Gtk.Align.START)
 
         # Setup proper handling of signals and bindings
-        tab_page.bind_property('title', sheet_view.document, 'title', GObject.BindingFlags.BIDIRECTIONAL)
+        tab_page.bind_property('title', sheet_view.document,
+                               'title', GObject.BindingFlags.BIDIRECTIONAL)
 
         from .sheet_document import SheetDocument
 
@@ -850,6 +852,10 @@ class Window(Adw.ApplicationWindow):
         self.formula_bar.set_sensitive(True)
         self.toolbar_tab_view.set_sensitive(True)
         self.sidebar_tab_view.set_sensitive(True)
+
+    def duplicate_sheet(self, document_id: str) -> None:
+        sheet_view = self.sheet_manager.duplicate_sheet(document_id)
+        self.add_new_tab(sheet_view)
 
     def rename_sheet(self, tab_page: Adw.TabPage) -> None:
         from .rename_sheet_dialog import RenameSheetDialog

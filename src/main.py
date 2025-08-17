@@ -79,6 +79,7 @@ class Application(Adw.Application):
         self.create_action('toggle-history', self.on_toggle_history_action)
         self.create_action('new-worksheet', self.on_new_worksheet_action, ['<primary>t'])
         self.create_action('new-notebook', self.on_new_notebook_action, ['<primary>n'])
+        self.create_action('duplicate-tab', self.on_duplicate_tab_action, param_type=GLib.VariantType('s'))
         self.create_action('rename-tab', self.on_rename_tab_action, param_type=GLib.VariantType('s'))
         self.create_action('pin-tab', self.on_pin_tab_action, param_type=GLib.VariantType('s'))
         self.create_action('unpin-tab', self.on_unpin_tab_action, param_type=GLib.VariantType('s'))
@@ -280,6 +281,11 @@ class Application(Adw.Application):
         window = self.get_active_window()
         sheet_view = window.sheet_manager.create_sheet(None, stype='notebook')
         window.add_new_tab(sheet_view)
+
+    def on_duplicate_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+        window = self.get_active_window()
+        document_id = args[0].get_string()
+        window.duplicate_sheet(document_id)
 
     def on_rename_tab_action(self, action: Gio.SimpleAction, *args) -> None:
         window = self.get_active_window()

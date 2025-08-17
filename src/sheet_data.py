@@ -184,7 +184,7 @@ class SheetData(GObject.Object):
     __gtype_name__ = 'SheetData'
 
     bbs: list[SheetCellBoundingBox] # visual bounding boxes
-    dfs: list[polars.DataFrame] # dataframes
+    dfs: list[polars.DataFrame]     # dataframes
 
     has_main_dataframe: bool
 
@@ -954,7 +954,6 @@ class SheetData(GObject.Object):
             for column_name in self.dfs[dfi].columns:
                 if match := re.match(new_name + r'_(\d+)', column_name):
                     column_number = max(column_number, int(match.group(1)) + 1)
-                column_name = self.dfs[dfi].columns[column]
 
             if not left:
                 column = column + column_span
