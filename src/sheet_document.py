@@ -50,8 +50,13 @@ class SheetDocument(GObject.Object):
     title = GObject.Property(type=str, default='Sheet 1')
 
     configs = {
-        'show-auto-filters'    : True,
-        'ctrl-wheel-to-scroll' : False,
+        'show-auto-filters'         : True,
+        'ctrl-wheel-to-scroll'      : False,
+
+        # Exclusive for setup_document()
+        'auto-adjust-column-widths' : True,
+        'auto-adjust-scrollbars'    : True,
+        'auto-adjust-selection'     : True,
     }
 
     def __init__(self,
@@ -128,9 +133,12 @@ class SheetDocument(GObject.Object):
     #
 
     def setup_document(self) -> None:
-        self.auto_adjust_column_widths()
-        self.auto_adjust_scrollbars_by_scroll()
-        self.auto_adjust_selections_by_crud(0, 0, False)
+        if self.configs['auto-adjust-column-widths']:
+            self.auto_adjust_column_widths()
+        if self.configs['auto-adjust-scrollbars']:
+            self.auto_adjust_scrollbars_by_scroll()
+        if self.configs['auto-adjust-selection']:
+            self.auto_adjust_selections_by_crud(0, 0, False)
         self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 

@@ -56,7 +56,8 @@ class SheetManager(GObject.Object):
                      # the remaining dataframe should be loaded progressively.
                      dataframe: polars.DataFrame,
                      title:     str = None,
-                     stype:     str = 'worksheet') -> SheetView:
+                     stype:     str = 'worksheet',
+                     configs:   dict = {}) -> SheetView:
 
         # Automatically generate the sheet title when not provided
         if title is None:
@@ -70,9 +71,9 @@ class SheetManager(GObject.Object):
         self.sheet_counter += 1
 
         if stype == 'notebook':
-            sheet = SheetNotebook(self, document_id, title)
+            sheet = SheetNotebook(self, document_id, title, configs)
         if stype == 'worksheet':
-            sheet = SheetDocument(self, document_id, title, dataframe)
+            sheet = SheetDocument(self, document_id, title, dataframe, configs)
 
         self.sheets[document_id] = sheet
         return sheet.view

@@ -35,9 +35,10 @@ class SheetNotebook(GObject.Object):
     title = GObject.Property(type=str, default='Sheet 1')
 
     def __init__(self,
-                 sheet_manager,
-                 document_id:   str,
-                 title:         str) -> None:
+                 sheet_manager       = None,
+                 document_id:   str  = '',
+                 title:         str  = '',
+                 configs:       dict = {}) -> None:
         super().__init__()
 
         self.sheet_manager = sheet_manager

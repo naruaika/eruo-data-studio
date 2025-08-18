@@ -215,7 +215,8 @@ class Window(Adw.ApplicationWindow):
             dataframe = schema['data']['dataframes'][0]
 
         # Create a new sheet
-        sheet_view = self.sheet_manager.create_sheet(dataframe, sheet_name, stype)
+        configs = {'auto-adjust-column-widths': False}
+        sheet_view = self.sheet_manager.create_sheet(dataframe, sheet_name, stype, configs)
         self.add_new_tab(sheet_view)
 
         # Update the document
