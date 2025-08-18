@@ -42,7 +42,7 @@ class SheetManager(GObject.Object):
         # each window with a unique id.
         self.sheet_id = str(int(time()))
 
-        self.sheets: dict[int, SheetDocument | SheetNotebook] = {}
+        self.sheets: dict[str, SheetDocument | SheetNotebook] = {}
         self.sheet_counter: int = 0
 
     def get_sheet_names(self) -> list[str]:

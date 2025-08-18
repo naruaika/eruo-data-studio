@@ -170,6 +170,7 @@ class Window(Adw.ApplicationWindow):
         self.inline_formula.add_controller(key_event_controller)
 
         self.tab_view.connect('notify::selected-page', self.on_selected_page_changed)
+        self.tab_view.connect('page-reordered', self.on_page_reordered)
         self.tab_view.connect('close-page', self.on_page_closed)
 
         focus_event_controller = Gtk.EventControllerFocus()
@@ -682,6 +683,20 @@ class Window(Adw.ApplicationWindow):
 
         # Reset the input bar to represent the current selection
         self.reset_inputbar()
+
+    def on_page_reordered(self,
+                          tab_view: Adw.TabView,
+                          tab_page: Adw.TabPage,
+                          position: int) -> None:
+        # Reorder the sheets in the sheet manager
+        new_sheets = {}
+        for page_index in range(self.tab_view.get_n_pages()):
+            tab_page = self.tab_view.get_nth_page(page_index)
+            sheet_view = tab_page.get_child()
+            sheet_document = sheet_view.document
+            document_id = sheet_document.document_id
+            new_sheets[document_id] = sheet_document
+        self.sheet_manager.sheets = new_sheets
 
     def on_page_closed(self,
                        tab_view: Adw.TabView,

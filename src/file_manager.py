@@ -203,7 +203,7 @@ class FileManager(GObject.Object):
 
                 all_dataframe_paths = []
 
-                # TODO: add support for notebook-type sheet
+                # TODO: save the tab pinned state
                 for sheet_document in window.sheet_manager.sheets.values():
                     if isinstance(sheet_document, SheetDocument):
                         stype = 'worksheet'

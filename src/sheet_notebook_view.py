@@ -169,10 +169,12 @@ class SheetNotebookView(Gtk.Box):
         sheet_document.view.set_visible(False)
         output_container.append(sheet_document.view)
 
+        if position == 0:
+            self.list_view.prepend(main_container)
         if position == -1:
             self.list_view.append(main_container)
-        else:
-            target_list_item = self.list_items[position]['main_container']
+        if position > 0:
+            target_list_item = self.list_items[position - 1]['main_container']
             self.list_view.insert_child_after(main_container, target_list_item)
 
         position = len(self.list_items)
@@ -261,7 +263,7 @@ class SheetNotebookView(Gtk.Box):
             self.run_all_cells(start=position)
 
         def on_add_sql_button_clicked(button: Gtk.Button) -> None:
-            self.add_new_sql_cell(position=position - 1)
+            self.add_new_sql_cell(position=position)
 
         def on_add_markdown_button_clicked(button: Gtk.Button) -> None:
             pass
