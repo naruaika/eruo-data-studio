@@ -1328,7 +1328,7 @@ class SheetDocument(GObject.Object):
         row_span = end_vrow - start_vrow + 1
 
         if arange.rtl:
-            mcolumn = mcolumn - arange.column_span + 1
+            mcolumn = mcolumn - column_span + 1
 
         if arange.btt:
             mrow = mrow - row_span + 1
@@ -2541,6 +2541,12 @@ class SheetDocument(GObject.Object):
         start_vrow = self.display.get_vrow_from_row(arange.row)
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
+
+        if arange.rtl:
+            mcolumn = mcolumn - column_span + 1
+
+        if arange.btt:
+            mrow = mrow - row_span + 1
 
         # Collect hidden column names
         hidden_column_names = []
