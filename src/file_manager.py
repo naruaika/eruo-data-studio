@@ -22,6 +22,7 @@
 
 
 from gi.repository import Adw, Gio, GLib, GObject, Gtk
+from typing import Any
 import os
 import pickle
 import polars
@@ -45,7 +46,7 @@ class FileManager(GObject.Object):
 
     def read_file(self,
                   application: Gtk.Application,
-                  file_path:   str) -> polars.DataFrame:
+                  file_path:   str) -> Any:
         file_format = file_path.split('.')[-1].lower()
 
         if file_format == 'erbook':
@@ -130,15 +131,10 @@ class FileManager(GObject.Object):
                             sheet['data']['dataframes'].append(loaded_dataframe)
                         del sheet['data']['dataframe-paths']
 
-        def load_user_workspace():
-            application.load_user_workspace(workspace_schema)
+        # Load the workspace
+        application.load_user_workspace(workspace_schema)
 
-        # We wait for 100 ms before loading the user workspace to make sure that
-        # the window is ready to receive the data. This approach likely introduces
-        # a race condition. Flag it as FIXME by now.
-        GLib.timeout_add(100, load_user_workspace)
-
-        return None
+        return 0 # special return value
 
     def write_file(self,
                    window:      Window,

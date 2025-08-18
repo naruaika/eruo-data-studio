@@ -69,7 +69,6 @@ class Application(Adw.Application):
 
         self.file_paths = [] # File paths to open,
                              # assigned from the command line
-        self.file_counter = 0
 
         self.create_action('about', self.on_about_action)
         self.create_action('apply-pending-table', self.on_apply_pending_table_action, param_type=GLib.VariantType('s'))
@@ -244,8 +243,6 @@ Options:
         sheets = list(window.sheet_manager.sheets.values())
         if len(sheets) == 0 or len(sheets[0].data.dfs) == 0:
             return
-
-        # TODO: prompt to save as .erbook file if needed
 
         self.file_manager.save_file(window)
 
@@ -854,6 +851,9 @@ Options:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(self, file_path)
 
+        if dataframe == 0:
+            return
+
         window = Window(application=self)
         window.setup_new_document(file, dataframe)
         window.present()
@@ -865,6 +865,9 @@ Options:
         if file_path:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(self, file_path)
+
+        if dataframe == 0:
+            return
 
         window = self.get_active_window()
 
@@ -883,12 +886,14 @@ Options:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(self, file_path)
 
+        if dataframe == 0:
+            return
+
         window = self.get_active_window()
         window.setup_new_document(file, dataframe)
 
     def load_user_workspace(self, workspace_schema: dict) -> None:
-        window = self.get_windows()[self.file_counter]
-        self.file_counter += 1
+        window = Window(application=self)
 
         # Close the first tab, it should be empty
         tab_page = window.tab_view.get_selected_page()
@@ -904,6 +909,8 @@ Options:
 
         # Select the first tab
         window.tab_view.set_selected_page(window.tab_view.get_nth_page(0))
+
+        window.present()
 
 def main(version):
     """The application's entry point."""
