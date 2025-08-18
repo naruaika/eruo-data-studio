@@ -6,6 +6,6 @@ Terminal=false
 Type=Application
 Categories=Utility;
 Keywords=business-intelligence;data-visualization;data-preparation;data-science;data-processing;data-pipeline;data-transformation;data-modeling;data-mining;data-analysis;
-MimeType=application/vnd.eruo-data-studio.erbook;text/csv;application/vnd.apache.parquet;text/plain;
+MimeType=application/vnd.eruo.erbook;text/csv;application/vnd.apache.parquet;text/plain;
 StartupNotify=true
 DBusActivatable=true

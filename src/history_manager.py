@@ -1208,12 +1208,6 @@ class HistoryManager(GObject.Object):
         self.document.renderer.render_caches = {}
         self.document.view.main_canvas.queue_draw()
 
-    def write_snapshot(self, dfi: int = 0) -> str:
-        with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
-            if self.file_manager.write_file(file_path.name, self.document.data, dfi):
-                return file_path
-        return None
-
     def delete_snapshot(self, file_path: str) -> None:
         self.file_manager.delete_file(file_path)
 

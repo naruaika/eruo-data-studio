@@ -29,6 +29,7 @@ import re
 import threading
 
 from . import globals
+from .sheet_data import SheetCellBoundingBox
 from .sheet_document import SheetDocument
 from .sheet_functions import register_sql_functions
 from .sheet_view import SheetView
@@ -175,7 +176,7 @@ class Window(Adw.ApplicationWindow):
         focus_event_controller.connect('enter', self.on_focus_received)
         self.add_controller(focus_event_controller)
 
-        # This is a signature file used to identify if the window
+        # This is a file signature used to identify if the window
         # is already linked to a document
         self.file = None
 
@@ -204,7 +205,69 @@ class Window(Adw.ApplicationWindow):
         # Synchronize the sidebar
         self.sidebar_home_view.repopulate_field_list()
 
-    def setup_tab_menu(self, tab_view: Adw.TabView, tab_page: Adw.TabPage) -> None:
+    def setup_loaded_document(self, schema: dict) -> None:
+        dataframe = None
+        stype = schema['stype']
+        sheet_name = schema['title']
+
+        if stype == 'worksheet':
+            dataframe = schema['data']['dataframes'][0]
+
+        # Create a new sheet
+        sheet_view = self.sheet_manager.create_sheet(dataframe, sheet_name, stype)
+        self.add_new_tab(sheet_view)
+
+        # Update the document
+        sheet_document = sheet_view.document
+
+        if stype == 'worksheet':
+            bounding_boxes = [
+                SheetCellBoundingBox(
+                    bbox['column'],
+                    bbox['row'],
+                    bbox['column-span'],
+                    bbox['row-span']
+                )
+                for bbox in schema['data']['bounding-boxes']
+            ]
+
+            sheet_document.data.bbs                        = bounding_boxes
+            sheet_document.data.dfs                        = schema['data']['dataframes']
+            sheet_document.data.has_main_dataframe         = schema['data']['has-main-dataframe']
+
+            sheet_document.current_sorts                   = schema['current-sorts']
+            sheet_document.current_filters                 = schema['current-filters']
+
+            sheet_document.display.row_visibility_flags    = polars.Series(schema['display']['row-visibility-flags'], dtype=polars.Boolean)
+            sheet_document.display.column_visibility_flags = polars.Series(schema['display']['column-visibility-flags'], dtype=polars.Boolean)
+            sheet_document.display.row_heights             = polars.Series(schema['display']['row-heights'], dtype=polars.UInt32)
+            sheet_document.display.column_widths           = polars.Series(schema['display']['column-widths'], dtype=polars.UInt32)
+
+            sheet_document.display.row_visible_series = sheet_document.display.row_visibility_flags.arg_true()
+            sheet_document.display.column_visible_series = sheet_document.display.column_visibility_flags.arg_true()
+
+            row_heights_visible_only = sheet_document.display.row_heights
+            if len(sheet_document.display.row_visibility_flags):
+                row_heights_visible_only = row_heights_visible_only.filter(sheet_document.display.row_visibility_flags)
+            sheet_document.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
+
+            column_widths_visible_only = sheet_document.display.column_widths
+            if len(sheet_document.display.column_visibility_flags):
+                column_widths_visible_only = column_widths_visible_only.filter(sheet_document.display.column_visibility_flags)
+            sheet_document.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+            sheet_document.setup_document()
+
+        if stype == 'notebook':
+            for list_item in schema['list-items']:
+                if list_item['ctype'] == 'sql':
+                    value = list_item['value']
+                    sheet_document.view.add_new_sql_cell(value)
+            # TODO: should we automatically run the notebook?
+
+    def setup_tab_menu(self,
+                       tab_view: Adw.TabView,
+                       tab_page: Adw.TabPage) -> None:
         if tab_page is None:
             return
 
@@ -1003,6 +1066,9 @@ class Window(Adw.ApplicationWindow):
         def on_dismissed(toast: Adw.Toast, action_data_id: str) -> None:
             if action_data_id in globals.pending_action_data:
                 del globals.pending_action_data[action_data_id]
+
+        # Replace line breaks with spaces
+        message = message.replace('\n', ' ')
 
         toast = Adw.Toast.new(message)
 

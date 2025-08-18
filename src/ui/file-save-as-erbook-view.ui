@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="FileSaveAsErbookView" parent="AdwPreferencesPage">
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwEntryRow" id="save_as">
+            <property name="title">Save As</property>
+            <property name="text">Book1</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow" id="save_to">
+            <property name="title">Save To</property>
+            <property name="subtitle">~/Documents</property>
+            <property name="activatable">true</property>
+            <signal name="activated" handler="on_save_to_activated" swapped="no"/>
+            <child>
+              <object class="GtkImage">
+                <property name="margin-start">8</property>
+                <property name="margin-end">8</property>
+                <property name="icon-name">go-next-symbolic</property>
+              </object>
+            </child>
+            <style>
+              <class name="property"/>
+            </style>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>

@@ -67,6 +67,10 @@ class Application(Adw.Application):
 
         self.clipboard = ClipboardManager()
 
+        self.file_paths = [] # File paths to open,
+                             # assigned from the command line
+        self.file_counter = 0
+
         self.create_action('about', self.on_about_action)
         self.create_action('apply-pending-table', self.on_apply_pending_table_action, param_type=GLib.VariantType('s'))
         self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
@@ -152,19 +156,17 @@ Options:
             )
             return 0
 
-        file_paths = []
-
         for arg in args:
             if not arg.startswith('--'):
                 try:
                     file = Gio.File.new_for_commandline_arg(arg)
                     if file_path := file.get_path():
-                        file_paths.append(file_path)
+                        self.file_paths.append(file_path)
                 except Exception as e:
                     print(e)
 
-        if file_paths:
-            for file_path in file_paths:
+        if self.file_paths:
+            for file_path in self.file_paths:
                 self.create_new_window(file_path)
             return 0
 
@@ -850,7 +852,7 @@ Options:
         # for opening the last session automatically.
         if file_path:
             file = Gio.File.new_for_path(file_path)
-            dataframe = self.file_manager.read_file(file_path)
+            dataframe = self.file_manager.read_file(self, file_path)
 
         window = Window(application=self)
         window.setup_new_document(file, dataframe)
@@ -862,7 +864,7 @@ Options:
 
         if file_path:
             file = Gio.File.new_for_path(file_path)
-            dataframe = self.file_manager.read_file(file_path)
+            dataframe = self.file_manager.read_file(self, file_path)
 
         window = self.get_active_window()
 
@@ -879,10 +881,29 @@ Options:
 
         if file_path:
             file = Gio.File.new_for_path(file_path)
-            dataframe = self.file_manager.read_file(file_path)
+            dataframe = self.file_manager.read_file(self, file_path)
 
         window = self.get_active_window()
         window.setup_new_document(file, dataframe)
+
+    def load_user_workspace(self, workspace_schema: dict) -> None:
+        window = self.get_windows()[self.file_counter]
+        self.file_counter += 1
+
+        # Close the first tab, it should be empty
+        tab_page = window.tab_view.get_selected_page()
+        if tab_page is not None:
+            window.tab_view.close_page(tab_page)
+
+        # Load all the sheets to separate tabs
+        for sheet in workspace_schema['sheets']:
+            window.setup_loaded_document(sheet)
+
+        # Set the file signature
+        window.file = Gio.File.new_for_path(workspace_schema['signature'])
+
+        # Select the first tab
+        window.tab_view.set_selected_page(window.tab_view.get_nth_page(0))
 
 def main(version):
     """The application's entry point."""

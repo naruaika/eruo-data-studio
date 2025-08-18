@@ -294,7 +294,7 @@ class SheetNotebookView(Gtk.Box):
         source_view.add_controller(key_event_controller)
 
         self.list_items.append({
-            'type'                : 'sql',
+            'ctype'               : 'sql',
             'sheet_document'      : sheet_document,
             'main_container'      : main_container,
             'toolbar_container'   : toolbar_container,
@@ -331,7 +331,7 @@ class SheetNotebookView(Gtk.Box):
                 continue
             if lidx >= end:
                 break
-            if list_item['type'] not in {'sql'}:
+            if list_item['ctype'] not in {'sql'}:
                 continue
             list_item['output_container'].set_visible(False)
             list_item['run_button'].set_sensitive(False)
@@ -359,7 +359,6 @@ class SheetNotebookView(Gtk.Box):
 
     @Gtk.Template.Callback()
     def on_add_sql_query_clicked(self, button: Gtk.Button) -> None:
-        # TODO: implement undo/redo signature?
         self.add_new_sql_cell()
 
     @Gtk.Template.Callback()

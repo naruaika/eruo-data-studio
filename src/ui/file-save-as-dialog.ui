@@ -12,7 +12,7 @@
         <child type="top">
           <object class="AdwHeaderBar">
             <property name="title-widget">
-              <object class="AdwInlineViewSwitcher" id="view_switcher">
+              <object class="AdwInlineViewSwitcher">
                 <property name="stack">view_stack</property>
                 <style>
                   <class name="round"/>
@@ -29,6 +29,7 @@
                 <property name="revealed">false</property>
                 <property name="title">Only Erbook supports all features</property>
                 <property name="button-label">Switch</property>
+                <signal name="button-clicked" handler="on_warning_banner_button_clicked" swapped="no"/>
               </object>
             </child>
             <child>
@@ -41,14 +42,6 @@
             <property name="orientation">horizontal</property>
             <property name="margin-start">6</property>
             <property name="margin-end">6</property>
-            <property name="start-widget">
-              <object class="GtkLabel">
-                <property name="label">Only Erbook supports all features</property>
-                <style>
-                  <class name="status-text"/>
-                </style>
-              </object>
-            </property>
             <property name="end-widget">
               <object class="GtkButton" id="save_button">
                 <property name="label">Save</property>

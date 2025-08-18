@@ -108,19 +108,17 @@ class SheetManager(GObject.Object):
 
             new_sheet = SheetDocument(self, document_id, title, dataframe, configs)
 
-            new_sheet.is_searching_cells      = target_sheet.is_searching_cells
-            new_sheet.search_range_performer  = target_sheet.search_range_performer
-            new_sheet.current_dfi             = target_sheet.current_dfi
-            new_sheet.pending_sorts           = target_sheet.pending_sorts
-            new_sheet.current_sorts           = target_sheet.current_sorts
-            new_sheet.pending_filters         = target_sheet.pending_filters
-            new_sheet.current_filters         = target_sheet.current_filters
+            new_sheet.is_searching_cells               = target_sheet.is_searching_cells
+            new_sheet.search_range_performer           = target_sheet.search_range_performer
+            new_sheet.current_dfi                      = target_sheet.current_dfi
+            new_sheet.current_sorts                    = target_sheet.current_sorts
+            new_sheet.current_filters                  = target_sheet.current_filters
 
-            new_sheet.data.bbs                = target_sheet.data.bbs
-            new_sheet.data.dfs                = target_sheet.data.dfs
-            new_sheet.data.has_main_dataframe = target_sheet.data.has_main_dataframe
+            new_sheet.data.bbs                         = target_sheet.data.bbs
+            new_sheet.data.dfs                         = target_sheet.data.dfs
+            new_sheet.data.has_main_dataframe          = target_sheet.data.has_main_dataframe
 
-            new_sheet.renderer.render_caches  = target_sheet.renderer.render_caches
+            new_sheet.renderer.render_caches           = target_sheet.renderer.render_caches
 
             new_sheet.display.left_locator_width       = target_sheet.display.left_locator_width
             new_sheet.display.top_locator_height       = target_sheet.display.top_locator_height
@@ -141,7 +139,6 @@ class SheetManager(GObject.Object):
             new_sheet.selection.cell_data              = target_sheet.selection.cell_data
             new_sheet.selection.cell_dtype             = target_sheet.selection.cell_dtype
             new_sheet.selection.current_active_range   = target_sheet.selection.current_active_range
-            new_sheet.selection.previous_active_range  = target_sheet.selection.previous_active_range
             new_sheet.selection.current_active_cell    = target_sheet.selection.current_active_cell
             new_sheet.selection.current_cursor_cell    = target_sheet.selection.current_cursor_cell
             new_sheet.selection.current_search_range   = target_sheet.selection.current_search_range

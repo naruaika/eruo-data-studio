@@ -26,6 +26,7 @@ from pathlib import Path
 import os
 
 from .file_save_as_csv_view import FileSaveAsCsvView
+from .file_save_as_erbook_view import FileSaveAsErbookView
 from .file_save_as_json_view import FileSaveAsJsonView
 from .file_save_as_parquet_view import FileSaveAsParquetView
 from .window import Window
@@ -34,7 +35,6 @@ from .window import Window
 class FileSaveAsDialog(Adw.Dialog):
     __gtype_name__ = 'FileSaveAsDialog'
 
-    view_switcher = Gtk.Template.Child()
     view_stack = Gtk.Template.Child()
 
     warning_banner = Gtk.Template.Child()
@@ -56,6 +56,9 @@ class FileSaveAsDialog(Adw.Dialog):
             file_path = window.file.get_path()
             file_name = os.path.basename(file_path).split('.')[0]
             folder_path = os.path.dirname(file_path)
+
+        view = FileSaveAsErbookView(file_name, folder_path)
+        self.view_stack.add_titled(view, 'erbook', 'Erbook')
 
         view = FileSaveAsCsvView(file_name, folder_path)
         self.view_stack.add_titled(view, 'csv', 'CSV')
@@ -83,12 +86,21 @@ class FileSaveAsDialog(Adw.Dialog):
 
         self.visible_view = view
 
+        self.warning_banner.set_revealed(not isinstance(view, FileSaveAsErbookView))
+
+    @Gtk.Template.Callback()
+    def on_warning_banner_button_clicked(self, button: Gtk.Button) -> None:
+        self.view_stack.set_visible_child_name('erbook')
+        self.warning_banner.set_revealed(False)
+
     @Gtk.Template.Callback()
     def on_save_button_clicked(self, button: Gtk.Button) -> None:
         view = self.view_stack.get_visible_child()
 
         file_format = ''
         match view:
+            case FileSaveAsErbookView():
+                file_format = '.erbook'
             case FileSaveAsCsvView():
                 file_format = '.csv'
             case FileSaveAsJsonView():
@@ -106,12 +118,20 @@ class FileSaveAsDialog(Adw.Dialog):
             return
 
         match view:
+            case FileSaveAsErbookView():
+                self.save_as_erbook(view)
             case FileSaveAsCsvView():
                 self.save_as_csv(view)
             case FileSaveAsJsonView():
                 self.save_as_json(view)
             case FileSaveAsParquetView():
                 self.save_as_parquet(view)
+
+    def save_as_erbook(self, view: FileSaveAsErbookView) -> None:
+        file_name = view.save_as.get_text()
+        folder_path = view.save_to.get_subtitle()
+        file_path = f'{folder_path}/{file_name}.erbook'
+        self.write_file(file_path)
 
     def save_as_csv(self, view: FileSaveAsCsvView) -> None:
         file_name = view.save_as.get_text()
@@ -211,6 +231,8 @@ class FileSaveAsDialog(Adw.Dialog):
         view = self.view_stack.get_visible_child()
 
         match view:
+            case FileSaveAsErbookView():
+                self.save_as_erbook(view)
             case FileSaveAsCsvView():
                 self.save_as_csv(view)
             case FileSaveAsJsonView():

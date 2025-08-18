@@ -21,14 +21,18 @@
 # SOFTWARE.
 
 
-from gi.repository import Gio, GLib, GObject, Gtk
+from gi.repository import Adw, Gio, GLib, GObject, Gtk
 import os
+import pickle
 import polars
+import tempfile
 import threading
+import zipfile
 
 from . import globals
 from .file_save_as_dialog import FileSaveAsDialog
-from .sheet_data import SheetData
+from .sheet_document import SheetDocument
+from .sheet_notebook import SheetNotebook
 from .window import Window
 
 class FileManager(GObject.Object):
@@ -39,7 +43,14 @@ class FileManager(GObject.Object):
         'file-saved'  : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
     }
 
-    def read_file(self, file_path: str) -> polars.DataFrame:
+    def read_file(self,
+                  application: Gtk.Application,
+                  file_path:   str) -> polars.DataFrame:
+        file_format = file_path.split('.')[-1].lower()
+
+        if file_format == 'erbook':
+            return self.read_erbook(application, file_path)
+
         # We usually call this function whenever the user wants to open
         # a file to work with. Or when the user for example enable the
         # "open last file" feature everytime the application starts for
@@ -47,11 +58,10 @@ class FileManager(GObject.Object):
         # parameters in case the file uses no ordinary format or it's
         # just a TSV file maybe which is should be read as a CSV file
         # with a different separator.
-        file_format = file_path.split('.')[-1]
         read_methods = {
-            'json':    polars.read_json,
-            'parquet': polars.read_parquet,
-            'csv':     polars.read_csv,
+            'json'    : polars.read_json,
+            'parquet' : polars.read_parquet,
+            'csv'     : polars.read_csv,
         }
 
         # If it's a text file, we might want to try to read it as CSV?
@@ -83,7 +93,7 @@ class FileManager(GObject.Object):
                 callback = getattr(globals, 'send_notification', None)
                 callback(f'Cannot parse file: {file_path}')
 
-            # We wait for 1 second before sending the notification to make sure that
+            # We wait for a second before sending the notification to make sure that
             # we send the notification to the newly opened window if any.
             GLib.timeout_add(1000, send_parse_error_notification)
 
@@ -102,32 +112,67 @@ class FileManager(GObject.Object):
         globals.send_notification(f'Cannot read file: {file_path}')
         return None
 
+    def read_erbook(self,
+                    application: Gtk.Application,
+                    file_path:   str) -> polars.DataFrame:
+        with zipfile.ZipFile(file_path, 'r') as zip_file:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                zip_file.extractall(temp_dir)
+
+                with open(os.path.join(temp_dir, 'workspace_schema'), 'rb') as pickle_file:
+                    workspace_schema = pickle.load(pickle_file)
+
+                for sheet in workspace_schema['sheets']:
+                    if sheet['stype'] == 'worksheet':
+                        sheet['data']['dataframes'] = []
+                        for dataframe_path in sheet['data']['dataframe-paths']:
+                            loaded_dataframe = polars.read_parquet(os.path.join(temp_dir, dataframe_path))
+                            sheet['data']['dataframes'].append(loaded_dataframe)
+                        del sheet['data']['dataframe-paths']
+
+        def load_user_workspace():
+            application.load_user_workspace(workspace_schema)
+
+        # We wait for 100 ms before loading the user workspace to make sure that
+        # the window is ready to receive the data. This approach likely introduces
+        # a race condition. Flag it as FIXME by now.
+        GLib.timeout_add(100, load_user_workspace)
+
+        return None
+
     def write_file(self,
+                   window:      Window,
                    file_path:   str,
-                   sheet_data:  SheetData,
-                   dfi:         int = 0,
                    **kwargs) -> bool:
+        file_format = file_path.split('.')[-1].lower()
+
+        if file_format == 'erbook':
+            return self.write_erbook(window, file_path)
+
         has_backup = False
 
-        # Make a backup of the original file
-        # TODO: make this behaviour customizable
+        # Make a backup of the original file (non-erbook files only)
+        # TODO: this behaviour should be customizable
         if os.path.exists(file_path):
-            os.rename(file_path, file_path + '.backup')
+            os.rename(file_path, file_path + '.erbak')
             has_backup = True
+
+        sheet_document = window.get_current_active_document()
+        dataframe = sheet_document.data.dfs[0]
+
+        write_methods = {
+            'csv'     : dataframe.write_csv,
+            'json'    : dataframe.write_json,
+            'parquet' : dataframe.write_parquet,
+        }
 
         # This function can be called whenever the users want to save their work
         # or they just want to save the file in a different format.
         try:
-
-            file_format = file_path.split('.')[-1]
-            write_methods = {
-                'json':    sheet_data.dfs[dfi].write_json,
-                'parquet': sheet_data.dfs[dfi].write_parquet,
-                'csv':     sheet_data.dfs[dfi].write_csv,
-            }
-
             if file_format in write_methods:
                 write_methods[file_format](file_path, **kwargs)
+                window.file = Gio.File.new_for_path(file_path)
+                # We keep, if exists, the backup file intentionally
                 return True
 
             globals.send_notification(f'Unsupported file format: {file_format}')
@@ -139,6 +184,102 @@ class FileManager(GObject.Object):
             # Restore the original file
             if has_backup:
                 os.rename(file_path + '.backup', file_path)
+
+        globals.send_notification(f'Cannot write file: {file_path}')
+        return False
+
+    def write_erbook(self,
+                     window:    Window,
+                     file_path: str) -> bool:
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                workspace_schema = {
+                    'signature': file_path,
+                    'sheets': [],
+                }
+
+                all_dataframe_paths = []
+
+                # TODO: add support for notebook-type sheet
+                for sheet_document in window.sheet_manager.sheets.values():
+                    if isinstance(sheet_document, SheetDocument):
+                        stype = 'worksheet'
+
+                        bounding_boxes = [{
+                            'column'      : bbox.column,
+                            'row'         : bbox.row,
+                            'column-span' : bbox.column_span,
+                            'row-span'    : bbox.row_span,
+                        } for bbox in sheet_document.data.bbs]
+
+                        dataframe_paths = [
+                            f'{sheet_document.document_id}_{dfi}.ersnap'
+                            for dfi in range(len(sheet_document.data.dfs))
+                        ]
+                        all_dataframe_paths.extend(dataframe_paths)
+
+                        workspace_schema['sheets'].append({
+                            'stype'                       : stype,
+                            'title'                       : sheet_document.title,
+                            'data': {
+                                'bounding-boxes'          : bounding_boxes,
+                                'dataframe-paths'         : dataframe_paths,
+                                'has-main-dataframe'      : sheet_document.data.has_main_dataframe,
+                            },
+                            'display': {
+                                'row-visibility-flags'    : sheet_document.display.row_visibility_flags.to_list(),
+                                'column-visibility-flags' : sheet_document.display.column_visibility_flags.to_list(),
+                                'row-heights'             : sheet_document.display.row_heights.to_list(),
+                                'column-widths'           : sheet_document.display.column_widths.to_list(),
+                            },
+                            'current-sorts'               : sheet_document.current_sorts,
+                            'current-filters'             : sheet_document.current_filters,
+                        })
+
+                        for dfi, dataframe in enumerate(sheet_document.data.dfs):
+                            dataframe_path = os.path.join(temp_dir, dataframe_paths[dfi])
+                            dataframe.write_parquet(dataframe_path, compression='uncompressed', statistics=False)
+
+                    if isinstance(sheet_document, SheetNotebook):
+                        stype = 'notebook'
+
+                        list_items = []
+
+                        for list_item in sheet_document.view.list_items:
+                            ctype = list_item['ctype']
+
+                            text_buffer = list_item['source_view'].get_buffer()
+                            start_iter = text_buffer.get_start_iter()
+                            end_iter = text_buffer.get_end_iter()
+
+                            value = text_buffer.get_text(start_iter, end_iter, True)
+                            value = value.strip()
+
+                            list_items.append({
+                                'ctype': ctype,
+                                'value': value,
+                            })
+
+                        workspace_schema['sheets'].append({
+                            'stype'      : stype,
+                            'title'      : sheet_document.title,
+                            'list-items' : list_items,
+                        })
+
+                workspace_schema_bytes = pickle.dumps(workspace_schema)
+
+                with zipfile.ZipFile(file_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    zip_file.writestr('workspace_schema', workspace_schema_bytes)
+                    for dataframe_path in all_dataframe_paths:
+                        zip_file.write(os.path.join(temp_dir, dataframe_path), dataframe_path)
+
+                # Update the file signature
+                window.file = Gio.File.new_for_path(file_path)
+
+                return True
+
+        except Exception as e:
+            print(e)
 
         globals.send_notification(f'Cannot write file: {file_path}')
         return False
@@ -159,7 +300,9 @@ class FileManager(GObject.Object):
         globals.send_notification(f'Cannot delete file: {file_path}')
         return False
 
-    def open_file(self, window: Window, in_place: bool = False) -> None:
+    def open_file(self,
+                  window:   Window,
+                  in_place: bool = False) -> None:
         # This function is intended to open the file dialog and let the user
         # select a file to open. Then we call the `read_file` function to read
         # the actual file content.
@@ -182,6 +325,11 @@ class FileManager(GObject.Object):
         FILTER_PARQUET.set_name('Parquet')
         FILTER_PARQUET.add_pattern('*.parquet')
         FILTER_PARQUET.add_mime_type('application/vnd.apache.parquet')
+
+        FILTER_ERBOOK = Gtk.FileFilter()
+        FILTER_ERBOOK.set_name('Eruo Workbook')
+        FILTER_ERBOOK.add_pattern('*.erbook')
+        FILTER_ERBOOK.add_mime_type('application/vnd.eruo.erbook')
 
         # This option is not intended to be used by the users to force
         # opening unsupported files. Instead, it can be used for example
@@ -229,30 +377,64 @@ class FileManager(GObject.Object):
             self.save_as_file(window)
             return
 
-        if not file_path:
+        if save_as_is := not file_path:
             file_path = file.get_path()
 
-        # TODO: we are supposed to handle saving multiple sheets here
-        # The original file is always stored in the first sheet. If the users
-        # have a working file that is not in a proprietary format, we want to
-        # always ask them if they want to save all the changed that only supported
-        # by the proprietary format, otherwise we just overwrite the original file
-        # and discard any unsupported changes, like formatting and formulas. I'm
-        # wondering if we can also save the changes to a kind of sidecar file when
-        # the users want to keep the original format?
-        sheets = list(window.sheet_manager.sheets.values())
-        sheet_data = sheets[0].data
+        # If the user wants to save the file in the original format (not .erbook),
+        # we show a confirmation dialog to the user so that the user awares that
+        # any incompatible changes will be lost.
+        file_format = file_path.split('.')[-1].lower()
+        if save_as_is and file_format != 'erbook':
+            def proceed_to_save() -> None:
+                self.save_file(window, file_path, **kwargs)
+            self.show_save_as_is_confirmation(window, proceed_to_save)
+            return
 
         # A successful write will trigger the `file-saved` signal so that the users
         # can be notified that their work has been saved. Otherwise, the `write_file`
         # function will send an in-app notification to the user.
         def write_file() -> None:
-            if self.write_file(file_path, sheet_data, **kwargs):
+            if self.write_file(window, file_path, **kwargs):
                 GLib.idle_add(self.emit, 'file-saved', file_path)
 
         # FIXME: Using a thread to write the file to avoid blocking the main thread,
         #        but potentially it can introduce to some race conditions.
         threading.Thread(target=write_file, daemon=True).start()
+
+    def show_save_as_is_confirmation(self,
+                                     window:   Window,
+                                     callback: callable) -> None:
+        alert_dialog = Adw.AlertDialog()
+
+        alert_dialog.set_heading(_('Keep This Format?'))
+        alert_dialog.set_body(_('Saving in the original file format will leave '
+                                'any incompatible features.'))
+
+        alert_dialog.add_response('cancel', _('_Cancel'))
+        alert_dialog.add_response('save-as', _('_Choose Format...'))
+        alert_dialog.add_response('save', _('_Keep This Format'))
+
+        alert_dialog.set_response_appearance('save', Adw.ResponseAppearance.DESTRUCTIVE)
+
+        alert_dialog.set_default_response('save')
+        alert_dialog.set_close_response('cancel')
+
+        def on_alert_dialog_dismissed(dialog: Adw.AlertDialog,
+                                      result: Gio.Task) -> None:
+            if result.had_error():
+                return
+
+            response = dialog.choose_finish(result)
+
+            if response == 'save-as':
+                self.save_as_file(window)
+                return
+
+            if response == 'save':
+                callback()
+                return
+
+        alert_dialog.choose(window, None, on_alert_dialog_dismissed)
 
     def save_as_file(self, window: Window) -> None:
         # In here, we just open a file save-as dialog to let the users
