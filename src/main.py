@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 
+from typing import Any
 import gi
 import os
 import polars
@@ -321,19 +322,7 @@ Options:
             self.create_new_tab(file_path)
             return
 
-        window = self.get_active_window()
-
-        no_linked_file = window.file is None
-        no_opened_sheet = len(window.sheet_manager.sheets) == 0
-        history_is_empty = globals.history is None or \
-                           (len(globals.history.undo_stack) <= 1 and \
-                            len(globals.history.redo_stack) == 0)
-
-        # Reuse the current active window if the window references to no file
-        # and there's not any sheet opened or the current active sheet has no
-        # editing history
-        if no_linked_file and (no_opened_sheet or history_is_empty):
-            self.reuse_current_window(file_path)
+        if self.reuse_current_window(file_path):
             return
 
         self.create_new_window(file_path)
@@ -839,7 +828,7 @@ Options:
         if shortcuts:
             self.set_accels_for_action(f'app.{name}', shortcuts)
 
-    def create_new_window(self, file_path: str = '') -> None:
+    def create_new_window(self, file_path: str = '') -> bool:
         file = None
         dataframe = None
 
@@ -852,13 +841,32 @@ Options:
             dataframe = self.file_manager.read_file(self, file_path)
 
         if dataframe == 0:
-            return
+            return False
 
         window = Window(application=self)
         window.setup_new_document(file, dataframe)
         window.present()
 
-    def reuse_current_window(self, file_path: str = '') -> None:
+        return True
+
+    def reuse_current_window(self, file_path: str = '') -> Any:
+        window = self.get_active_window()
+
+        if not window:
+            return False
+
+        no_linked_file = window.file is None
+        no_opened_sheet = len(window.sheet_manager.sheets) == 0
+        history_is_empty = globals.history is None or \
+                           (len(globals.history.undo_stack) <= 1 and \
+                            len(globals.history.redo_stack) == 0)
+
+        # Reuse the current active window if the window references to no file
+        # and there's not any sheet opened or the current active sheet has no
+        # editing history
+        if not (no_linked_file and (no_opened_sheet or history_is_empty)):
+            return False
+
         file = None
         dataframe = None
 
@@ -867,7 +875,7 @@ Options:
             dataframe = self.file_manager.read_file(self, file_path)
 
         if dataframe == 0:
-            return
+            return True
 
         window = self.get_active_window()
 
@@ -878,7 +886,9 @@ Options:
 
         window.setup_new_document(file, dataframe)
 
-    def create_new_tab(self, file_path: str = '') -> None:
+        return window
+
+    def create_new_tab(self, file_path: str = '') -> bool:
         file = None
         dataframe = None
 
@@ -887,15 +897,21 @@ Options:
             dataframe = self.file_manager.read_file(self, file_path)
 
         if dataframe == 0:
-            return
+            return False
 
         window = self.get_active_window()
         window.setup_new_document(file, dataframe)
 
-    def load_user_workspace(self, workspace_schema: dict) -> None:
-        window = Window(application=self)
+        return True
 
-        # Close the first tab, it should be empty
+    def load_user_workspace(self, workspace_schema: dict) -> None:
+        window = self.reuse_current_window()
+
+        # Create a new window if needed
+        if not window:
+            window = Window(application=self)
+
+        # Close the first tab if exists
         tab_page = window.tab_view.get_selected_page()
         if tab_page is not None:
             window.tab_view.close_page(tab_page)

@@ -116,25 +116,32 @@ class FileManager(GObject.Object):
     def read_erbook(self,
                     application: Gtk.Application,
                     file_path:   str) -> polars.DataFrame:
-        with zipfile.ZipFile(file_path, 'r') as zip_file:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                zip_file.extractall(temp_dir)
+        try:
+            with zipfile.ZipFile(file_path, 'r') as zip_file:
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    zip_file.extractall(temp_dir)
 
-                with open(os.path.join(temp_dir, 'workspace_schema'), 'rb') as pickle_file:
-                    workspace_schema = pickle.load(pickle_file)
+                    with open(os.path.join(temp_dir, 'workspace_schema'), 'rb') as pickle_file:
+                        workspace_schema = pickle.load(pickle_file)
 
-                for sheet in workspace_schema['sheets']:
-                    if sheet['stype'] == 'worksheet':
-                        sheet['data']['dataframes'] = []
-                        for dataframe_path in sheet['data']['dataframe-paths']:
-                            loaded_dataframe = polars.read_parquet(os.path.join(temp_dir, dataframe_path))
-                            sheet['data']['dataframes'].append(loaded_dataframe)
-                        del sheet['data']['dataframe-paths']
+                    for sheet in workspace_schema['sheets']:
+                        if sheet['stype'] == 'worksheet':
+                            sheet['data']['dataframes'] = []
+                            for dataframe_path in sheet['data']['dataframe-paths']:
+                                loaded_dataframe = polars.read_parquet(os.path.join(temp_dir, dataframe_path))
+                                sheet['data']['dataframes'].append(loaded_dataframe)
+                            del sheet['data']['dataframe-paths']
 
-        # Load the workspace
-        application.load_user_workspace(workspace_schema)
+            # Load the workspace
+            application.load_user_workspace(workspace_schema)
 
-        return 0 # special return value
+            return 0 # special return value
+
+        except Exception as e:
+            print(e)
+
+        globals.send_notification(f'Cannot read file: {file_path}')
+        return None
 
     def write_file(self,
                    window:      Window,
