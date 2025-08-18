@@ -96,6 +96,7 @@ The result? Data analysts frequently switch back and forth between applications:
 
 The following are some of the resources that have informed our decision-making and development planning, highlighting common challenges and insights within the data analysis community:
 
+- [Where does most of your data time actually go?](https://www.reddit.com/r/dataanalysis/comments/1mnfoj6/where_does_most_of_your_data_time_actually_go/)
 - [Heated debate with leadership because of Excel ](https://www.reddit.com/r/datascience/comments/16tujyf/heated_debate_with_leadership_because_of_excel/)
 - [What is Tableau's purpose?](https://www.reddit.com/r/tableau/comments/1lsyb4u/what_is_tableaus_purpose/)
 - [Do you guys find that a lot of senior execs really dislike Tableau dashboard visualizations for reporting and monitoring?](https://www.reddit.com/r/tableau/comments/ew8jyd/do_you_guys_find_that_a_lot_of_senior_execs/)
