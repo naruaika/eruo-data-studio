@@ -37,28 +37,19 @@
           </object>
         </property>
         <child type="bottom">
-          <object class="GtkBox">
+          <object class="GtkCenterBox">
             <property name="orientation">horizontal</property>
             <property name="margin-start">6</property>
             <property name="margin-end">6</property>
-            <child>
+            <property name="start-widget">
               <object class="GtkLabel">
                 <property name="label">Only Erbook supports all features</property>
                 <style>
                   <class name="status-text"/>
                 </style>
               </object>
-            </child>
-            <child>
-              <object class="GtkSeparator">
-                <property name="orientation">vertical</property>
-                <property name="hexpand">true</property>
-                <style>
-                  <class name="spacer"/>
-                </style>
-              </object>
-            </child>
-            <child>
+            </property>
+            <property name="end-widget">
               <object class="GtkButton" id="save_button">
                 <property name="label">Save</property>
                 <signal name="clicked" handler="on_save_button_clicked" swapped="no"/>
@@ -66,7 +57,7 @@
                   <class name="suggested-action"/>
                 </style>
               </object>
-            </child>
+            </property>
             <style>
               <class name="toolbar"/>
             </style>

@@ -41,12 +41,12 @@ class Window(Adw.ApplicationWindow):
     split_view = Gtk.Template.Child()
     window_title = Gtk.Template.Child()
 
-    toggle_sidebar = Gtk.Template.Child()
+    sidebar_toggle_button = Gtk.Template.Child()
 
     sidebar_tab_view = Gtk.Template.Child()
 
-    toggle_search_all = Gtk.Template.Child()
-    toggle_history = Gtk.Template.Child()
+    search_all_toggle_button = Gtk.Template.Child()
+    history_toggle_button = Gtk.Template.Child()
 
     toolbar_tab_view = Gtk.Template.Child()
     toolbar_tab_bar = Gtk.Template.Child()
@@ -64,7 +64,7 @@ class Window(Adw.ApplicationWindow):
 
     multiline_formula_bar_box = Gtk.Template.Child()
     multiline_formula_bar = Gtk.Template.Child()
-    toggle_formula_bar = Gtk.Template.Child()
+    formula_bar_toggle_button = Gtk.Template.Child()
 
     inline_formula_box = Gtk.Template.Child()
     inline_formula = Gtk.Template.Child()
@@ -653,7 +653,7 @@ class Window(Adw.ApplicationWindow):
             self.name_box.set_sensitive(False)
             self.formula_bar.set_sensitive(False)
             self.multiline_formula_bar.set_sensitive(False)
-            self.toggle_formula_bar.set_sensitive(False)
+            self.formula_bar_toggle_button.set_sensitive(False)
             self.toolbar_tab_view.set_sensitive(False)
             self.sidebar_tab_view.set_sensitive(False)
 
@@ -851,7 +851,7 @@ class Window(Adw.ApplicationWindow):
         self.name_box.set_sensitive(True)
         self.formula_bar.set_sensitive(True)
         self.multiline_formula_bar.set_sensitive(True)
-        self.toggle_formula_bar.set_sensitive(True)
+        self.formula_bar_toggle_button.set_sensitive(True)
         self.toolbar_tab_view.set_sensitive(True)
         self.sidebar_tab_view.set_sensitive(True)
 
@@ -912,7 +912,7 @@ class Window(Adw.ApplicationWindow):
         self.formula_bar_dtype.set_text(sel_dtype)
         self.formula_bar_dtype.set_visible(True)
 
-        if not self.toggle_formula_bar.get_active():
+        if not self.formula_bar_toggle_button.get_active():
             self.formula_bar_dtype.set_visible(sel_dtype is not None)
 
     def open_inline_formula(self, sel_value: str = None) -> None:
@@ -966,12 +966,12 @@ class Window(Adw.ApplicationWindow):
 
         del globals.pending_action_data[action_data_id]
 
-    def do_toggle_sidebar(self) -> None:
+    def toggle_sidebar(self) -> None:
         sheet_document = self.get_current_active_document()
 
         # Close the sidebar when it's already open
-        if self.toggle_sidebar.get_active():
-            self.toggle_sidebar.set_active(False)
+        if self.sidebar_toggle_button.get_active():
+            self.sidebar_toggle_button.set_active(False)
             self.split_view.set_collapsed(True)
 
             if sheet_document is None:
@@ -985,7 +985,7 @@ class Window(Adw.ApplicationWindow):
             return
 
         # Open the sidebar
-        self.toggle_sidebar.set_active(True)
+        self.sidebar_toggle_button.set_active(True)
         self.split_view.set_collapsed(False)
 
         if sheet_document is None:

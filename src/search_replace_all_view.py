@@ -68,7 +68,7 @@ class SearchReplaceAllView(Gtk.Box):
     search_within_selection = Gtk.Template.Child()
     search_use_regexp = Gtk.Template.Child()
 
-    toggle_replace = Gtk.Template.Child()
+    replace_toggle_button = Gtk.Template.Child()
     replace_section = Gtk.Template.Child()
     replace_entry = Gtk.Template.Child()
 
@@ -205,8 +205,8 @@ class SearchReplaceAllView(Gtk.Box):
 
     def open_search_view(self) -> None:
         self.window.split_view.set_collapsed(False)
-        self.window.toggle_search_all.set_active(True)
-        self.window.toggle_sidebar.set_active(True)
+        self.window.search_all_toggle_button.set_active(True)
+        self.window.sidebar_toggle_button.set_active(True)
 
         if self.search_results_length == 0:
             self.search_status.set_visible(False)
@@ -242,7 +242,7 @@ class SearchReplaceAllView(Gtk.Box):
                 and replace_section_visible \
                 and view_is_in_focus \
                 and search_entry_in_focus:
-            self.toggle_replace.set_icon_name('go-down-symbolic')
+            self.replace_toggle_button.set_icon_name('go-down-symbolic')
             self.replace_section.set_visible(True)
 
             # Selects all text on the replace entry
@@ -257,14 +257,14 @@ class SearchReplaceAllView(Gtk.Box):
         elif view_is_visible \
                 and replace_section_visible \
                 and view_is_in_focus:
-            self.toggle_replace.set_icon_name('go-next-symbolic')
+            self.replace_toggle_button.set_icon_name('go-next-symbolic')
             self.replace_section.set_visible(False)
 
             self.search_entry.grab_focus()
 
         # Show and grab focus on the replace entry
         else:
-            self.toggle_replace.set_icon_name('go-down-symbolic')
+            self.replace_toggle_button.set_icon_name('go-down-symbolic')
             self.replace_section.set_visible(True)
 
             # Selects all text on the replace entry
@@ -305,7 +305,7 @@ class SearchReplaceAllView(Gtk.Box):
         self.search_status.set_visible(False)
 
     def close_search_view(self) -> None:
-        self.window.toggle_search_all.set_active(False)
+        self.window.search_all_toggle_button.set_active(False)
 
         sheet_document = self.window.get_current_active_document()
 

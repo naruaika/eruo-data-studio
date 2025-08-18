@@ -21,7 +21,7 @@
                 <child type="top">
                   <object class="AdwHeaderBar">
                     <child type="start">
-                      <object class="GtkToggleButton" id="toggle_search_all">
+                      <object class="GtkToggleButton" id="search_all_toggle_button">
                         <property name="icon-name">edit-find-symbolic</property>
                         <property name="tooltip-text" translatable="yes">Search (Shift+Ctrl+F)</property>
                         <property name="action-name">app.toggle-search-all</property>
@@ -37,7 +37,7 @@
                       </object>
                     </property>
                     <child type="end">
-                      <object class="GtkToggleButton" id="toggle_history">
+                      <object class="GtkToggleButton" id="history_toggle_button">
                         <property name="icon-name">history-undo-symbolic</property>
                         <property name="tooltip-text" translatable="yes">History</property>
                         <property name="action-name">app.toggle-history</property>
@@ -70,7 +70,7 @@
                         <property name="orientation">horizontal</property>
                         <property name="spacing">10</property>
                         <child>
-                          <object class="GtkToggleButton" id="toggle_sidebar">
+                          <object class="GtkToggleButton" id="sidebar_toggle_button">
                             <property name="icon-name">sidebar-show-symbolic</property>
                             <property name="tooltip-text" translatable="yes">Toggle Sidebar</property>
                             <property name="action-name">app.toggle-sidebar</property>
@@ -243,7 +243,7 @@
                                       </object>
                                     </child>
                                     <child>
-                                      <object class="GtkToggleButton" id="toggle_formula_bar">
+                                      <object class="GtkToggleButton" id="formula_bar_toggle_button">
                                         <property name="icon-name">view-fullscreen-symbolic</property>
                                         <property name="tooltip-text" translatable="yes">Toggle Formula Bar</property>
                                         <property name="valign">start</property>

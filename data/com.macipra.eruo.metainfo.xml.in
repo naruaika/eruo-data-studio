@@ -2,12 +2,12 @@
 <component type="desktop-application">
   <id>com.macipra.eruo</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-3.0-or-later</project_license>
+  <project_license>MIT</project_license>
 
   <name>Eruo Data Studio</name>
-  <summary>Keep the summary shorter, between 10 and 35 characters</summary>
+  <summary>A powerful, intuitive, and integrated data platform for data analysts.</summary>
   <description>
-    <p>No description</p>
+    <p>Eruo Data Studio is an innovative, free, and open-source application designed to power your end-to-end data workflow.</p>
   </description>
 
   <developer id="tld.vendor">
@@ -17,9 +17,9 @@
   <!-- Required: Should be a link to the upstream homepage for the component -->
   <url type="homepage">https://example.org/</url>
   <!-- Recommended: It is highly recommended for open-source projects to display the source code repository -->
-  <url type="vcs-browser">https://example.org/repository</url>
+  <url type="vcs-browser">https://github.com/naruaika/eruo-data-studio</url>
   <!-- Should point to the software's bug tracking system, for users to report new bugs -->
-  <url type="bugtracker">https://example.org/issues</url>
+  <url type="bugtracker">https://github.com/naruaika/eruo-data-studio/issues</url>
   <!-- Should link a FAQ page for this software, to answer some of the most-asked questions in detail -->
   <!-- URLs of this type should point to a webpage where users can submit or modify translations of the upstream project -->
   <url type="translate">https://example.org/translate</url>
@@ -48,18 +48,14 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://example.org/example1.png</image>
-      <caption>A caption</caption>
-    </screenshot>
-    <screenshot>
-      <image>https://example.org/example2.png</image>
-      <caption>A caption</caption>
+      <image>https://raw.githubusercontent.com/naruaika/eruo-data-studio/refs/heads/master/docs/screenshot.png</image>
+      <caption>Eruo Data Studio</caption>
     </screenshot>
   </screenshots>
 
   <releases>
-    <release version="1.0.1" date="2024-01-18">
-      <url type="details">https://example.org/changelog.html#version_1.0.1</url>
+    <release version="0.1.0" date="2025-12-31">
+      <url type="details">https://example.org/changelog.html#version_0.1.0</url>
       <description translate="no">
         <p>Release description</p>
         <ul>

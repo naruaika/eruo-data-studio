@@ -42,7 +42,7 @@ class SearchReplaceOverlay(Adw.Bin):
     search_within_selection = Gtk.Template.Child()
     search_use_regexp = Gtk.Template.Child()
 
-    replace_toggler = Gtk.Template.Child()
+    replace_toggle_button = Gtk.Template.Child()
     replace_section = Gtk.Template.Child()
     replace_entry = Gtk.Template.Child()
     replace_button = Gtk.Template.Child()
@@ -277,7 +277,7 @@ class SearchReplaceOverlay(Adw.Bin):
                 and replace_section_visible \
                 and overlay_in_focus \
                 and search_entry_in_focus:
-            self.replace_toggler.set_icon_name('go-down-symbolic')
+            self.replace_toggle_button.set_icon_name('go-down-symbolic')
             self.replace_section.set_visible(True)
 
             # Selects all text on the replace entry
@@ -290,14 +290,14 @@ class SearchReplaceOverlay(Adw.Bin):
 
         # Hide the replace section and grab focus on the search entry
         elif overlay_visible and replace_section_visible and overlay_in_focus:
-            self.replace_toggler.set_icon_name('go-next-symbolic')
+            self.replace_toggle_button.set_icon_name('go-next-symbolic')
             self.replace_section.set_visible(False)
 
             self.search_entry.grab_focus()
 
         # Show and grab focus on the replace entry
         else:
-            self.replace_toggler.set_icon_name('go-down-symbolic')
+            self.replace_toggle_button.set_icon_name('go-down-symbolic')
             self.replace_section.set_visible(True)
 
             # Selects all text on the replace entry
@@ -314,7 +314,7 @@ class SearchReplaceOverlay(Adw.Bin):
         GLib.timeout_add(200, self.search_box.remove_css_class, 'slide-down-dialog')
 
         # Hide the replace section
-        self.replace_toggler.set_icon_name('go-next-symbolic')
+        self.replace_toggle_button.set_icon_name('go-next-symbolic')
         self.replace_section.set_visible(False)
 
         sheet_view = self.window.get_current_active_view()

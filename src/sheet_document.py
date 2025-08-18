@@ -2664,7 +2664,9 @@ class SheetDocument(GObject.Object):
                     current_cell_attr == previous_cell_attr and
                     current_cell_data == previous_cell_data)
 
-    def check_selection_contains_point(self, x: int, y: int) -> bool:
+    def check_selection_contains_point(self,
+                                       x: int,
+                                       y: int) -> bool:
         arange = self.selection.current_active_range
         return arange.x <= x <= arange.x + arange.width and \
                arange.y <= y <= arange.y + arange.height
@@ -2673,7 +2675,10 @@ class SheetDocument(GObject.Object):
     # Signals
     #
 
-    def notify_selection_changed(self, column: int, row: int, metadata) -> None:
+    def notify_selection_changed(self,
+                                 column: int,
+                                 row:    int,
+                                 metadata) -> None:
         vcolumn = self.display.get_vcolumn_from_column(column)
         vrow = self.display.get_vrow_from_row(row)
 

@@ -1,0 +1,59 @@
+{
+    "id" : "com.macipra.eruo",
+    "runtime" : "org.gnome.Platform",
+    "runtime-version" : "48",
+    "sdk" : "org.gnome.Sdk",
+    "command" : "run.sh",
+    "finish-args" : [
+        "--verbose",
+        "--device=dri",
+        "--share=network",
+        "--share=ipc",
+        "--socket=fallback-x11",
+        "--socket=wayland",
+        "--filesystem=host",
+        "--env=RUST_BACKTRACE=full",
+        "--env=GTK_DEBUG=interactive",
+        "--env=EDS_DEBUG=2"
+    ],
+    "cleanup" : [
+        "/include",
+        "/lib/pkgconfig",
+        "/man",
+        "/share/doc",
+        "/share/gtk-doc",
+        "/share/man",
+        "/share/pkgconfig",
+        "*.la",
+        "*.a"
+    ],
+    "modules" : [
+        "python3-debugpy.json",
+        "python3-pytest.json",
+        "python3-python-dateutil.json",
+        "python3-pyarrow-x86_64.json",
+        "python3-pyarrow-aarch64.json",
+        "python3-numpy-x86_64.json",
+        "python3-numpy-aarch64.json",
+        "python3-polars-x86_64.json",
+        "python3-polars-aarch64.json",
+        "python3-duckdb-x86_64.json",
+        "python3-duckdb-aarch64.json",
+        {
+            "name" : "eruo-data-studio",
+            "buildsystem" : "meson",
+            "sources" : [
+                {
+                    "type" : "git",
+                    "url" : "https://github.com/naruaika/eruo-data-studio"
+                }
+            ],
+            "config-opts" : [
+                "--libdir=lib"
+            ],
+            "post-install" : [
+                "install -m 755 -D build-aux/run.sh /app/bin/run.sh"
+            ]
+        }
+    ]
+}

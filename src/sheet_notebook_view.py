@@ -36,7 +36,9 @@ class SheetNotebookView(Gtk.Box):
     scrolled_window = Gtk.Template.Child()
     list_view = Gtk.Template.Child()
 
-    def __init__(self, document: SheetNotebook, **kwargs) -> None:
+    def __init__(self,
+                 document: SheetNotebook,
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         self.document = document
@@ -176,6 +178,8 @@ class SheetNotebookView(Gtk.Box):
         position = len(self.list_items)
 
         def on_run_button_clicked(button: Gtk.Button) -> None:
+            # TODO: implement undo/redo?
+
             status_text.get_buffer().set_text('Running...')
             status_text.remove_css_class('error')
             status_text.set_visible(True)
@@ -355,8 +359,9 @@ class SheetNotebookView(Gtk.Box):
 
     @Gtk.Template.Callback()
     def on_add_sql_query_clicked(self, button: Gtk.Button) -> None:
+        # TODO: implement undo/redo signature?
         self.add_new_sql_cell()
 
     @Gtk.Template.Callback()
     def on_add_markdown_clicked(self, button: Gtk.Button) -> None:
-        pass
+        pass # TODO

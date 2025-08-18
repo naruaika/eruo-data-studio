@@ -1,0 +1,17 @@
+{
+    "name": "python3-polars",
+    "buildsystem": "simple",
+    "build-commands": [
+        "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"polars\" --no-build-isolation"
+    ],
+    "sources": [
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/ec/14/ee34ebe3eb842c83ca1d2d3af6ee02b08377e056ffad156c9a2b15a6d05c/polars-1.32.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "sha256": "a711a750cfc19f1f883d2b46895dd698abf4d446ca41c3bf510ced0ff1178057"
+        }
+    ],
+    "only-arches": [
+        "x86_64"
+    ]
+}

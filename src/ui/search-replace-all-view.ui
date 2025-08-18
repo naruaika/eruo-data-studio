@@ -11,7 +11,7 @@
         <property name="margin-end">6</property>
         <property name="spacing">6</property>
         <child>
-          <object class="GtkToggleButton" id="toggle_replace">
+          <object class="GtkToggleButton" id="replace_toggle_button">
             <property name="valign">start</property>
             <property name="icon-name">go-next-symbolic</property>
             <property name="tooltip-text" translatable="yes">Toggle Replace</property>

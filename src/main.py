@@ -30,7 +30,10 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 gi.require_version('GtkSource', '5')
 
-if (debug_mode := int(os.environ.get('EDS_DEBUG', '0'))) > 0:
+# 0: Disable debug mode entirely
+# 1: Don't wait for the debugger
+# 2: Should wait for the debugger
+if (debug_mode := int(os.environ.get('EDS_DEBUG', '0') or '0')) > 0:
     try:
         import debugpy
         debugpy.listen(('127.0.0.1', 5678))
@@ -52,7 +55,7 @@ class Application(Adw.Application):
 
     def __init__(self) -> None:
         super().__init__(application_id='com.macipra.eruo',
-                         flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
+                         flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
                          resource_base_path='/com/macipra/eruo')
         # Register the GtkSource.View to be used in the GtkBuilder
         # See https://stackoverflow.com/a/10528052/8791891
@@ -64,76 +67,109 @@ class Application(Adw.Application):
 
         self.clipboard = ClipboardManager()
 
-        self.create_action('quit', self.on_quit_action, ['<primary>q'])
         self.create_action('about', self.on_about_action)
-        self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
-        self.create_action('toggle-sidebar', self.on_toggle_sidebar_action, ['<primary>b'])
-        self.create_action('open', self.on_open_file_action, ['<primary>o'])
-        self.create_action('save', self.on_save_file_action, ['<primary>s'])
-        self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
-        self.create_action('open-search', self.on_open_search_action, ['<primary>f'])
-        self.create_action('open-sort-filter', self.on_open_sort_filter_action)
-        self.create_action('toggle-replace', self.on_toggle_replace_action, ['<primary>h'])
-        self.create_action('toggle-search-all', self.on_toggle_search_all_action, ['<primary><shift>f'])
-        self.create_action('toggle-replace-all', self.on_toggle_replace_all_action, ['<primary><shift>h'])
-        self.create_action('toggle-history', self.on_toggle_history_action)
-        self.create_action('new-worksheet', self.on_new_worksheet_action, ['<primary>t'])
-        self.create_action('new-notebook', self.on_new_notebook_action, ['<primary>n'])
-        self.create_action('duplicate-tab', self.on_duplicate_tab_action, param_type=GLib.VariantType('s'))
-        self.create_action('rename-tab', self.on_rename_tab_action, param_type=GLib.VariantType('s'))
-        self.create_action('pin-tab', self.on_pin_tab_action, param_type=GLib.VariantType('s'))
-        self.create_action('unpin-tab', self.on_unpin_tab_action, param_type=GLib.VariantType('s'))
-        self.create_action('move-tab-to-start', self.on_move_tab_to_start_action, param_type=GLib.VariantType('s'))
-        self.create_action('move-tab-to-end', self.on_move_tab_to_end_action, param_type=GLib.VariantType('s'))
-        self.create_action('close-tab', self.on_close_tab_action, param_type=GLib.VariantType('s'))
+        self.create_action('apply-pending-table', self.on_apply_pending_table_action, param_type=GLib.VariantType('s'))
+        self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
         self.create_action('close-other-tabs', self.on_close_other_tabs_action, param_type=GLib.VariantType('s'))
+        self.create_action('close-selected-tab', self.on_close_selected_tab_action, ['<primary>w'])
+        self.create_action('close-tab', self.on_close_tab_action, param_type=GLib.VariantType('s'))
         self.create_action('close-tabs-to-left', self.on_close_tabs_to_left_action, param_type=GLib.VariantType('s'))
         self.create_action('close-tabs-to-right', self.on_close_tabs_to_right_action, param_type=GLib.VariantType('s'))
-        self.create_action('close-selected-tab', self.on_close_selected_tab_action, ['<primary>w'])
-        self.create_action('undo', self.on_undo_action, ['<primary>z'])
-        self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
-        self.create_action('cut', self.on_cut_action, ['<primary>x'])
+        self.create_action('convert-to-boolean', self.on_convert_to_boolean_action)
+        self.create_action('convert-to-categorical', self.on_convert_to_categorical_action)
+        self.create_action('convert-to-date', self.on_convert_to_date_action)
+        self.create_action('convert-to-datetime', self.on_convert_to_datetime_action)
+        self.create_action('convert-to-decimal', self.on_convert_to_decimal_action)
+        self.create_action('convert-to-float32', self.on_convert_to_float32_action)
+        self.create_action('convert-to-float64', self.on_convert_to_float64_action)
+        self.create_action('convert-to-int16', self.on_convert_to_int16_action)
+        self.create_action('convert-to-int32', self.on_convert_to_int32_action)
+        self.create_action('convert-to-int64', self.on_convert_to_int64_action)
+        self.create_action('convert-to-int8', self.on_convert_to_int8_action)
+        self.create_action('convert-to-text', self.on_convert_to_text_action)
+        self.create_action('convert-to-time', self.on_convert_to_time_action)
+        self.create_action('convert-to-uint16', self.on_convert_to_uint16_action)
+        self.create_action('convert-to-uint32', self.on_convert_to_uint32_action)
+        self.create_action('convert-to-uint64', self.on_convert_to_uint64_action)
+        self.create_action('convert-to-uint8', self.on_convert_to_uint8_action)
         self.create_action('copy', self.on_copy_action, ['<primary>c'])
-        self.create_action('paste', self.on_paste_action, ['<primary>v'])
-        self.create_action('insert-row-above', self.on_insert_row_above_action)
-        self.create_action('insert-row-below', self.on_insert_row_below_action)
-        self.create_action('insert-column-left', self.on_insert_column_left_action)
-        self.create_action('insert-column-right', self.on_insert_column_right_action)
+        self.create_action('cut', self.on_cut_action, ['<primary>x'])
+        self.create_action('delete-column', self.on_delete_column_action)
+        self.create_action('delete-row', self.on_delete_row_action)
+        self.create_action('duplicate-tab', self.on_duplicate_tab_action, param_type=GLib.VariantType('s'))
         self.create_action('duplicate-to-above', self.on_duplicate_to_above_action)
         self.create_action('duplicate-to-below', self.on_duplicate_to_below_action)
         self.create_action('duplicate-to-left', self.on_duplicate_to_left_action)
         self.create_action('duplicate-to-right', self.on_duplicate_to_right_action)
-        self.create_action('delete-row', self.on_delete_row_action)
-        self.create_action('delete-column', self.on_delete_column_action)
-        self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
-        self.create_action('import-table', self.on_import_table_action)
-        self.create_action('hide-column', self.on_hide_column_action)
-        self.create_action('unhide-column', self.on_unhide_column_action)
-        self.create_action('unhide-all-columns', self.on_unhide_all_columns_action)
         self.create_action('filter-cell-value', self.on_filter_cell_value_action)
         self.create_action('filter-cell-values', self.on_filter_cell_values_action)
-        self.create_action('reset-all-filters', self.on_reset_all_filters_action)
-        self.create_action('sort-smallest-to-largest', self.on_sort_smallest_to_largest_action)
-        self.create_action('sort-largest-to-smallest', self.on_sort_largest_to_smallest_action)
-        self.create_action('convert-to-int8', self.on_convert_to_int8_action)
-        self.create_action('convert-to-int16', self.on_convert_to_int16_action)
-        self.create_action('convert-to-int32', self.on_convert_to_int32_action)
-        self.create_action('convert-to-int64', self.on_convert_to_int64_action)
-        self.create_action('convert-to-uint8', self.on_convert_to_uint8_action)
-        self.create_action('convert-to-uint16', self.on_convert_to_uint16_action)
-        self.create_action('convert-to-uint32', self.on_convert_to_uint32_action)
-        self.create_action('convert-to-uint64', self.on_convert_to_uint64_action)
-        self.create_action('convert-to-float32', self.on_convert_to_float32_action)
-        self.create_action('convert-to-float64', self.on_convert_to_float64_action)
-        self.create_action('convert-to-decimal', self.on_convert_to_decimal_action)
-        self.create_action('convert-to-date', self.on_convert_to_date_action)
-        self.create_action('convert-to-time', self.on_convert_to_time_action)
-        self.create_action('convert-to-datetime', self.on_convert_to_datetime_action)
-        self.create_action('convert-to-categorical', self.on_convert_to_categorical_action)
-        self.create_action('convert-to-boolean', self.on_convert_to_boolean_action)
-        self.create_action('convert-to-text', self.on_convert_to_text_action)
+        self.create_action('hide-column', self.on_hide_column_action)
+        self.create_action('import-table', self.on_import_table_action)
+        self.create_action('insert-column-left', self.on_insert_column_left_action)
+        self.create_action('insert-column-right', self.on_insert_column_right_action)
+        self.create_action('insert-row-above', self.on_insert_row_above_action)
+        self.create_action('insert-row-below', self.on_insert_row_below_action)
+        self.create_action('move-tab-to-end', self.on_move_tab_to_end_action, param_type=GLib.VariantType('s'))
+        self.create_action('move-tab-to-start', self.on_move_tab_to_start_action, param_type=GLib.VariantType('s'))
+        self.create_action('new-notebook', self.on_new_notebook_action, ['<primary>n'])
+        self.create_action('new-worksheet', self.on_new_worksheet_action, ['<primary>t'])
         self.create_action('open-inline-formula', self.on_open_inline_formula_action, ['F2'])
-        self.create_action('apply-pending-table', self.on_apply_pending_table_action, param_type=GLib.VariantType('s'))
+        self.create_action('open-search', self.on_open_search_action, ['<primary>f'])
+        self.create_action('open-sort-filter', self.on_open_sort_filter_action)
+        self.create_action('open', self.on_open_file_action, ['<primary>o'])
+        self.create_action('paste', self.on_paste_action, ['<primary>v'])
+        self.create_action('pin-tab', self.on_pin_tab_action, param_type=GLib.VariantType('s'))
+        self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
+        self.create_action('quit', self.on_quit_action, ['<primary>q'])
+        self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
+        self.create_action('rename-tab', self.on_rename_tab_action, param_type=GLib.VariantType('s'))
+        self.create_action('reset-all-filters', self.on_reset_all_filters_action)
+        self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
+        self.create_action('save', self.on_save_file_action, ['<primary>s'])
+        self.create_action('sort-largest-to-smallest', self.on_sort_largest_to_smallest_action)
+        self.create_action('sort-smallest-to-largest', self.on_sort_smallest_to_largest_action)
+        self.create_action('toggle-history', self.on_toggle_history_action)
+        self.create_action('toggle-replace-all', self.on_toggle_replace_all_action, ['<primary><shift>h'])
+        self.create_action('toggle-replace', self.on_toggle_replace_action, ['<primary>h'])
+        self.create_action('toggle-search-all', self.on_toggle_search_all_action, ['<primary><shift>f'])
+        self.create_action('toggle-sidebar', self.on_toggle_sidebar_action, ['<primary>b'])
+        self.create_action('undo', self.on_undo_action, ['<primary>z'])
+        self.create_action('unhide-all-columns', self.on_unhide_all_columns_action)
+        self.create_action('unhide-column', self.on_unhide_column_action)
+        self.create_action('unpin-tab', self.on_unpin_tab_action, param_type=GLib.VariantType('s'))
+
+    def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
+        args = command_line.get_arguments()[1:]
+
+        if '--h' in args or '--help' in args:
+            print(
+"""
+Usage: eruo-data-studio [options] [paths...]
+
+Options:
+  -h, --help            show this help message and exit
+"""
+            )
+            return 0
+
+        file_paths = []
+
+        for arg in args:
+            if not arg.startswith('--'):
+                try:
+                    file = Gio.File.new_for_commandline_arg(arg)
+                    if file_path := file.get_path():
+                        file_paths.append(file_path)
+                except Exception as e:
+                    print(e)
+
+        if file_paths:
+            for file_path in file_paths:
+                self.create_new_window(file_path)
+            return 0
+
+        self.activate()
+        return 0
 
     def do_activate(self) -> None:
         if window := self.get_active_window():
@@ -141,7 +177,9 @@ class Application(Adw.Application):
             return
         self.create_new_window()
 
-    def on_quit_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_quit_action(self,
+                       action: Gio.SimpleAction,
+                       *args) -> None:
         window = self.get_active_window()
 
         # TODO: check for unsaved changes over all sheets (selections don't count)
@@ -154,7 +192,7 @@ class Application(Adw.Application):
         # At the moment, any previous states will be stored as a file on a disk,
         # not in memory to reduce the memory footprint. It's purely to support
         # handling of big datasets more possible.
-        for page_index in range (window.tab_view.get_n_pages()):
+        for page_index in range(window.tab_view.get_n_pages()):
             tab_page = window.tab_view.get_nth_page(page_index)
             sheet_view = tab_page.get_child()
             sheet_view.document.history.cleanup_all()
@@ -164,7 +202,9 @@ class Application(Adw.Application):
         # closed automatically by itself.
         window.close()
 
-    def on_about_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_about_action(self,
+                        action: Gio.SimpleAction,
+                        *args) -> None:
         dialog = Adw.AboutDialog(application_name='Data Studio',
                                  application_icon='com.macipra.eruo',
                                  developer_name='Naufan Rusyda Faikar',
@@ -176,18 +216,26 @@ class Application(Adw.Application):
         dialog.set_translator_credits(_('translator-credits'))
         dialog.present(self.get_active_window())
 
-    def on_preferences_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_preferences_action(self,
+                              action: Gio.SimpleAction,
+                              *args) -> None:
         raise NotImplementedError # TODO
 
-    def on_toggle_sidebar_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_toggle_sidebar_action(self,
+                                 action: Gio.SimpleAction,
+                                 *args) -> None:
         window = self.get_active_window()
-        window.do_toggle_sidebar()
+        window.toggle_sidebar()
 
-    def on_open_file_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_open_file_action(self,
+                            action: Gio.SimpleAction,
+                            *args) -> None:
         window = self.get_active_window()
         self.file_manager.open_file(window)
 
-    def on_save_file_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_save_file_action(self,
+                            action: Gio.SimpleAction,
+                            *args) -> None:
         window = self.get_active_window()
 
         # Pre-check if there is any data to save
@@ -195,9 +243,13 @@ class Application(Adw.Application):
         if len(sheets) == 0 or len(sheets[0].data.dfs) == 0:
             return
 
+        # TODO: prompt to save as .erbook file if needed
+
         self.file_manager.save_file(window)
 
-    def on_save_as_file_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_save_as_file_action(self,
+                               action: Gio.SimpleAction,
+                               *args) -> None:
         window = self.get_active_window()
 
         # Pre-check if there is any data to save
@@ -207,11 +259,15 @@ class Application(Adw.Application):
 
         self.file_manager.save_as_file(window)
 
-    def on_open_search_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_open_search_action(self,
+                              action: Gio.SimpleAction,
+                              *args) -> None:
         window = self.get_active_window()
         window.search_replace_overlay.open_search_box()
 
-    def on_open_sort_filter_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_open_sort_filter_action(self,
+                                   action: Gio.SimpleAction,
+                                   *args) -> None:
         window = self.get_active_window()
 
         # Close all possible views on the sidebar to reveal the home view
@@ -220,28 +276,38 @@ class Application(Adw.Application):
         # Open the home view
         window.sidebar_home_view.open_home_view()
 
-    def on_toggle_replace_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_toggle_replace_action(self,
+                                 action: Gio.SimpleAction,
+                                 *args) -> None:
         window = self.get_active_window()
         window.search_replace_overlay.toggle_replace_section()
 
-    def on_toggle_search_all_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_toggle_search_all_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         window = self.get_active_window()
 
         tab_page = window.search_replace_all_page
         tab_view = window.search_replace_all_view
 
-        if window.sidebar_tab_view.get_selected_page() == tab_page:
+        selected_page = window.sidebar_tab_view.get_selected_page()
+
+        if selected_page == tab_page:
             tab_view.close_search_view()
             window.sidebar_home_view.open_home_view()
         else:
             tab_view.open_search_view()
 
-    def on_toggle_replace_all_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_toggle_replace_all_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         window = self.get_active_window()
         tab_view = window.search_replace_all_view
         tab_view.toggle_replace_section()
 
-    def on_toggle_history_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_toggle_history_action(self,
+                                 action: Gio.SimpleAction,
+                                 *args) -> None:
         pass # TODO
 
     def on_file_opened(self,
@@ -273,57 +339,77 @@ class Application(Adw.Application):
 
         self.create_new_window(file_path)
 
-    def on_file_saved(self, source: GObject.Object, file_path: str) -> None:
+    def on_file_saved(self,
+                      source:    GObject.Object,
+                      file_path: str) -> None:
         pass # TODO: indicate the user when the file has been saved
 
-    def on_new_worksheet_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_new_worksheet_action(self,
+                                action: Gio.SimpleAction,
+                                *args) -> None:
         window = self.get_active_window()
         sheet_view = window.sheet_manager.create_sheet(None, stype='worksheet')
         window.add_new_tab(sheet_view)
 
-    def on_new_notebook_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_new_notebook_action(self,
+                               action: Gio.SimpleAction,
+                               *args) -> None:
         window = self.get_active_window()
         sheet_view = window.sheet_manager.create_sheet(None, stype='notebook')
         window.add_new_tab(sheet_view)
 
-    def on_duplicate_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_duplicate_tab_action(self,
+                                action: Gio.SimpleAction,
+                                *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
         window.duplicate_sheet(document_id)
 
-    def on_rename_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_rename_tab_action(self,
+                             action: Gio.SimpleAction,
+                             *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
         tab_page = self.get_current_tab_page(window, document_id)
         window.rename_sheet(tab_page)
 
-    def on_pin_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_pin_tab_action(self,
+                          action: Gio.SimpleAction,
+                          *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
         tab_page = self.get_current_tab_page(window, document_id)
         window.tab_view.set_page_pinned(tab_page, True)
 
-    def on_unpin_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_unpin_tab_action(self,
+                            action: Gio.SimpleAction,
+                            *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
         tab_page = self.get_current_tab_page(window, document_id)
         window.tab_view.set_page_pinned(tab_page, False)
 
-    def on_move_tab_to_start_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_move_tab_to_start_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
         tab_page = self.get_current_tab_page(window, document_id)
         n_pinned_pages = window.tab_view.get_n_pinned_pages()
         window.tab_view.reorder_page(tab_page, n_pinned_pages)
 
-    def on_move_tab_to_end_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_move_tab_to_end_action(self,
+                                  action: Gio.SimpleAction,
+                                  *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
         tab_page = self.get_current_tab_page(window, document_id)
         n_pages = window.tab_view.get_n_pages()
         window.tab_view.reorder_page(tab_page, n_pages - 1)
 
-    def on_close_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_close_tab_action(self,
+                            action: Gio.SimpleAction,
+                            *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
 
@@ -336,7 +422,9 @@ class Application(Adw.Application):
         else:
             self.show_close_tabs_confirmation(window, close_selected_tabs)
 
-    def on_close_other_tabs_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_close_other_tabs_action(self,
+                                   action: Gio.SimpleAction,
+                                   *args) -> None:
         window = self.get_active_window()
 
         def close_selected_tabs() -> None:
@@ -346,7 +434,9 @@ class Application(Adw.Application):
 
         self.show_close_tabs_confirmation(window, close_selected_tabs)
 
-    def on_close_tabs_to_left_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_close_tabs_to_left_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         window = self.get_active_window()
 
         def close_selected_tabs() -> None:
@@ -356,7 +446,9 @@ class Application(Adw.Application):
 
         self.show_close_tabs_confirmation(window, close_selected_tabs)
 
-    def on_close_tabs_to_right_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_close_tabs_to_right_action(self,
+                                      action: Gio.SimpleAction,
+                                      *args) -> None:
         window = self.get_active_window()
 
         def close_selected_tabs() -> None:
@@ -366,7 +458,9 @@ class Application(Adw.Application):
 
         self.show_close_tabs_confirmation(window, close_selected_tabs)
 
-    def on_close_selected_tab_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_close_selected_tab_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         window = self.get_active_window()
         tab_page = window.tab_view.get_selected_page()
 
@@ -405,7 +499,8 @@ class Application(Adw.Application):
         alert_dialog.set_default_response('close')
         alert_dialog.set_close_response('cancel')
 
-        def on_alert_dialog_dismissed(dialog: Adw.AlertDialog, result: Gio.Task) -> None:
+        def on_alert_dialog_dismissed(dialog: Adw.AlertDialog,
+                                      result: Gio.Task) -> None:
             if result.had_error():
                 return
             if dialog.choose_finish(result) != 'close':
@@ -414,7 +509,9 @@ class Application(Adw.Application):
 
         alert_dialog.choose(window, None, on_alert_dialog_dismissed)
 
-    def on_undo_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_undo_action(self,
+                       action: Gio.SimpleAction,
+                       *args) -> None:
         window = self.get_active_window()
         focused_widget = window.get_focus()
 
@@ -426,7 +523,9 @@ class Application(Adw.Application):
 
         globals.history.undo()
 
-    def on_redo_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_redo_action(self,
+                       action: Gio.SimpleAction,
+                       *args) -> None:
         window = self.get_active_window()
         focused_widget = window.get_focus()
 
@@ -438,7 +537,9 @@ class Application(Adw.Application):
 
         globals.history.redo()
 
-    def on_cut_action(self, action: Gio.SimpleAction, *args) -> bool:
+    def on_cut_action(self,
+                      action: Gio.SimpleAction,
+                      *args) -> bool:
         window = self.get_active_window()
 
         # Prevent from colliding with the cut action of editable widgets
@@ -453,7 +554,9 @@ class Application(Adw.Application):
 
         return True
 
-    def on_copy_action(self, action: Gio.SimpleAction, *args) -> bool:
+    def on_copy_action(self,
+                       action: Gio.SimpleAction,
+                       *args) -> bool:
         window = self.get_active_window()
 
         # Prevent from colliding with the copy action of editable widgets
@@ -468,7 +571,9 @@ class Application(Adw.Application):
 
         return True
 
-    def on_paste_action(self, action: Gio.SimpleAction, *args) -> bool:
+    def on_paste_action(self,
+                        action: Gio.SimpleAction,
+                        *args) -> bool:
         window = self.get_active_window()
 
         # Prevent from colliding with the paste action of editable widgets
@@ -478,7 +583,8 @@ class Application(Adw.Application):
             focused_widget.activate_action('clipboard.paste', None)
             return True
 
-        def on_clipboard_text_received(clipboard: Gdk.Clipboard, result: Gio.Task) -> None:
+        def on_clipboard_text_received(clipboard: Gdk.Clipboard,
+                                       result: Gio.Task) -> None:
             if result.had_error():
                 document.paste_into_current_selection(self.clipboard, None)
                 return False
@@ -491,146 +597,223 @@ class Application(Adw.Application):
 
         return True
 
-    def on_insert_row_above_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_insert_row_above_action(self,
+                                   action: Gio.SimpleAction,
+                                   *args) -> None:
         document = self.get_current_active_document()
         document.insert_blank_from_current_rows(above=True)
 
-    def on_insert_row_below_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_insert_row_below_action(self,
+                                   action: Gio.SimpleAction,
+                                   *args) -> None:
         document = self.get_current_active_document()
         document.insert_blank_from_current_rows(above=False)
 
-    def on_insert_column_left_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_insert_column_left_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         document = self.get_current_active_document()
         document.insert_blank_from_current_columns(left=True)
 
-    def on_insert_column_right_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_insert_column_right_action(self,
+                                      action: Gio.SimpleAction,
+                                      *args) -> None:
         document = self.get_current_active_document()
         document.insert_blank_from_current_columns(left=False)
 
-    def on_duplicate_to_above_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_duplicate_to_above_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         document = self.get_current_active_document()
         document.duplicate_from_current_rows(above=True)
 
-    def on_duplicate_to_below_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_duplicate_to_below_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         document = self.get_current_active_document()
         document.duplicate_from_current_rows(above=False)
 
-    def on_duplicate_to_left_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_duplicate_to_left_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         document = self.get_current_active_document()
         document.duplicate_from_current_columns(left=True)
 
-    def on_duplicate_to_right_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_duplicate_to_right_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         document = self.get_current_active_document()
         document.duplicate_from_current_columns(left=False)
 
-    def on_delete_row_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_delete_row_action(self,
+                             action: Gio.SimpleAction,
+                             *args) -> None:
         document = self.get_current_active_document()
         document.delete_current_rows()
 
-    def on_delete_column_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_delete_column_action(self,
+                                action: Gio.SimpleAction,
+                                *args) -> None:
         document = self.get_current_active_document()
         document.delete_current_columns()
 
-    def on_clear_contents_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_clear_contents_action(self,
+                                 action: Gio.SimpleAction,
+                                 *args) -> None:
         document = self.get_current_active_document()
         document.update_current_cells('')
 
-    def on_import_table_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_import_table_action(self,
+                               action: Gio.SimpleAction,
+                               *args) -> None:
         window = self.get_active_window()
         self.file_manager.open_file(window, in_place=True)
 
-    def on_hide_column_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_hide_column_action(self,
+                              action: Gio.SimpleAction,
+                              *args) -> None:
         document = self.get_current_active_document()
         document.hide_current_columns()
 
-    def on_unhide_column_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_unhide_column_action(self,
+                                action: Gio.SimpleAction,
+                                *args) -> None:
         document = self.get_current_active_document()
         document.unhide_current_columns()
 
-    def on_unhide_all_columns_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_unhide_all_columns_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         document = self.get_current_active_document()
         document.unhide_all_columns()
 
-    def on_filter_cell_value_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_filter_cell_value_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         document = self.get_current_active_document()
         document.filter_current_rows()
 
-    def on_filter_cell_values_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_filter_cell_values_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         document = self.get_current_active_document()
         document.filter_current_rows(multiple=True)
 
-    def on_reset_all_filters_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_reset_all_filters_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         document = self.get_current_active_document()
         document.reset_all_filters()
 
-    def on_sort_smallest_to_largest_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_sort_smallest_to_largest_action(self,
+                                           action: Gio.SimpleAction,
+                                           *args) -> None:
         document = self.get_current_active_document()
         document.sort_current_rows(descending=False)
 
-    def on_sort_largest_to_smallest_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_sort_largest_to_smallest_action(self, action: Gio.SimpleAction,
+    *args) -> None:
         document = self.get_current_active_document()
         document.sort_current_rows(descending=True)
 
-    def on_convert_to_categorical_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_categorical_action(self,
+                                         action: Gio.SimpleAction,
+                                         *args) -> None:
         self.convert_to(polars.Categorical)
 
-    def on_convert_to_int8_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_int8_action(self,
+                                  action: Gio.SimpleAction,
+                                  *args) -> None:
         self.convert_to(polars.Int8)
 
-    def on_convert_to_int16_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_int16_action(self,
+                                   action: Gio.SimpleAction,
+                                   *args) -> None:
         self.convert_to(polars.Int16)
 
-    def on_convert_to_int32_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_int32_action(self,
+                                   action: Gio.SimpleAction,
+                                   *args) -> None:
         self.convert_to(polars.Int32)
 
-    def on_convert_to_int64_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_int64_action(self,
+                                   action: Gio.SimpleAction,
+                                   *args) -> None:
         self.convert_to(polars.Int64)
 
-    def on_convert_to_uint8_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_uint8_action(self,
+                                   action: Gio.SimpleAction,
+                                   *args) -> None:
         self.convert_to(polars.UInt8)
 
-    def on_convert_to_uint16_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_uint16_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         self.convert_to(polars.UInt16)
 
-    def on_convert_to_uint32_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_uint32_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         self.convert_to(polars.UInt32)
 
-    def on_convert_to_uint64_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_uint64_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         self.convert_to(polars.UInt64)
 
-    def on_convert_to_float32_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_float32_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         self.convert_to(polars.Float32)
 
-    def on_convert_to_float64_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_float64_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         self.convert_to(polars.Float64)
 
-    def on_convert_to_decimal_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_decimal_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         self.convert_to(polars.Decimal)
 
-    def on_convert_to_date_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_date_action(self,
+                                  action: Gio.SimpleAction,
+                                  *args) -> None:
         self.convert_to(polars.Date)
 
-    def on_convert_to_time_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_time_action(self,
+                                  action: Gio.SimpleAction,
+                                  *args) -> None:
         self.convert_to(polars.Time)
 
-    def on_convert_to_datetime_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_datetime_action(self,
+                                      action: Gio.SimpleAction,
+                                      *args) -> None:
         self.convert_to(polars.Datetime)
 
-    def on_convert_to_boolean_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_boolean_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         self.convert_to(polars.Boolean)
 
-    def on_convert_to_text_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_convert_to_text_action(self,
+                                  action: Gio.SimpleAction,
+                                  *args) -> None:
         self.convert_to(polars.Utf8)
 
     def convert_to(self, dtype: polars.DataType) -> None:
         document = self.get_current_active_document()
         document.convert_current_columns_dtype(dtype)
 
-    def on_open_inline_formula_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_open_inline_formula_action(self,
+                                      action: Gio.SimpleAction,
+                                      *args) -> None:
         window = self.get_active_window()
         window.open_inline_formula()
 
-    def on_apply_pending_table_action(self, action: Gio.SimpleAction, *args) -> None:
+    def on_apply_pending_table_action(self,
+                                      action: Gio.SimpleAction,
+                                      *args) -> None:
         action_data_id = args[0].get_string()
         window = self.get_active_window()
         window.apply_pending_table(action_data_id)

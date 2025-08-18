@@ -136,7 +136,10 @@ class SheetNotebook(GObject.Object):
                                           use_regexp: bool) -> None:
         pass
 
-    def notify_selection_changed(self, column: int, row: int, metadata) -> None:
+    def notify_selection_changed(self,
+                                 column: int,
+                                 row:    int,
+                                 metadata) -> None:
         pass
 
     def notify_selected_table_changed(self, force: bool = False) -> None:

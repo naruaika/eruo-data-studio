@@ -1443,7 +1443,7 @@ class SidebarHomeView(Adw.Bin):
 
     def open_home_view(self) -> None:
         self.window.split_view.set_collapsed(False)
-        self.window.toggle_sidebar.set_active(True)
+        self.window.sidebar_toggle_button.set_active(True)
 
         tab_page = self.window.sidebar_home_page
         self.window.sidebar_tab_view.set_selected_page(tab_page)

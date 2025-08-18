@@ -1,0 +1,17 @@
+{
+    "name": "python3-numpy",
+    "buildsystem": "simple",
+    "build-commands": [
+        "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"numpy\" --no-build-isolation"
+    ],
+    "sources": [
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/91/ba/f4ebf257f08affa464fe6036e13f2bf9d4642a40228781dc1235da81be9f/numpy-2.3.2-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl",
+            "sha256": "572d5512df5470f50ada8d1972c5f1082d9a0b7aa5944db8084077570cf98370"
+        }
+    ],
+    "only-arches": [
+        "aarch64"
+    ]
+}
