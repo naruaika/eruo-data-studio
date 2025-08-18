@@ -9,32 +9,27 @@
         <property name="hscrollbar-policy">external</property>
         <property name="hexpand">true</property>
         <child>
-          <object class="GtkBox" id="sheet_1_section">
+          <object class="GtkBox">
             <property name="orientation">horizontal</property>
             <child>
-              <object class="GtkBox">
-                <property name="orientation">horizontal</property>
-                <child>
-                  <object class="GtkButton">
-                    <property name="icon-name">table-shortcut-symbolic</property>
-                    <property name="tooltip-text">Import Table</property>
-                    <property name="action-name">app.import-table</property>
-                    <style>
-                      <class name="flat"/>
-                    </style>
-                  </object>
-                </child>
-                <child>
-                  <object class="GtkButton">
-                    <property name="icon-name">table-built-symbolic</property>
-                    <property name="tooltip-text">Insert Blank Table</property>
-                    <property name="action-name">app.insert-table</property>
-                    <property name="visible">false</property>
-                    <style>
-                      <class name="flat"/>
-                    </style>
-                  </object>
-                </child>
+              <object class="GtkButton">
+                <property name="icon-name">table-shortcut-symbolic</property>
+                <property name="tooltip-text">Import Table</property>
+                <property name="action-name">app.import-table</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="icon-name">table-built-symbolic</property>
+                <property name="tooltip-text">Insert Blank Table</property>
+                <property name="action-name">app.insert-table</property>
+                <property name="visible">false</property>
+                <style>
+                  <class name="flat"/>
+                </style>
               </object>
             </child>
           </object>

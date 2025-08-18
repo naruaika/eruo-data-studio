@@ -840,7 +840,8 @@ Options:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(self, file_path)
 
-        if dataframe == 0:
+        # Check for special return values
+        if not isinstance(dataframe, polars.DataFrame) and dataframe == 0:
             return False
 
         window = Window(application=self)
@@ -874,7 +875,8 @@ Options:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(self, file_path)
 
-        if dataframe == 0:
+        # Check for special return values
+        if not isinstance(dataframe, polars.DataFrame) and dataframe == 0:
             return True
 
         window = self.get_active_window()
@@ -896,7 +898,8 @@ Options:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(self, file_path)
 
-        if dataframe == 0:
+        # Check for special return values
+        if not isinstance(dataframe, polars.DataFrame) and dataframe == 0:
             return False
 
         window = self.get_active_window()

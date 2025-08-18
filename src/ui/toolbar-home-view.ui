@@ -71,7 +71,7 @@
               </object>
             </child>
             <child>
-              <object class="GtkBox" id="sheet_1_section">
+              <object class="GtkBox" id="worksheet_1_section">
                 <property name="orientation">horizontal</property>
                 <child>
                   <object class="GtkSeparator">
@@ -172,7 +172,7 @@
               </object>
             </child>
             <child>
-              <object class="GtkBox" id="sheet_2_section">
+              <object class="GtkBox" id="worksheet_2_section">
                 <property name="orientation">horizontal</property>
                 <child>
                   <object class="GtkButton">

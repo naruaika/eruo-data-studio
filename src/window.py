@@ -644,10 +644,8 @@ class Window(Adw.ApplicationWindow):
             return
 
         if isinstance(sheet_view, SheetView):
-            self.toolbar_home_view.sheet_1_section.set_visible(True)
-            self.toolbar_home_view.sheet_2_section.set_visible(True)
-
-            self.toolbar_insert_view.sheet_1_section.set_visible(True)
+            self.toolbar_home_view.worksheet_1_section.set_visible(True)
+            self.toolbar_home_view.worksheet_2_section.set_visible(True)
 
             self.formulas_toggle_button.set_visible(True)
             self.data_toggle_button.set_visible(True)
@@ -659,10 +657,8 @@ class Window(Adw.ApplicationWindow):
             self.sidebar_home_view.filters_section.set_visible(True)
 
         if isinstance(sheet_view, SheetNotebookView):
-            self.toolbar_home_view.sheet_1_section.set_visible(False)
-            self.toolbar_home_view.sheet_2_section.set_visible(False)
-
-            self.toolbar_insert_view.sheet_1_section.set_visible(False)
+            self.toolbar_home_view.worksheet_1_section.set_visible(False)
+            self.toolbar_home_view.worksheet_2_section.set_visible(False)
 
             self.formulas_toggle_button.set_visible(False)
             self.data_toggle_button.set_visible(False)
