@@ -32,6 +32,7 @@ import time
 from . import globals
 from .sheet_document import SheetDocument
 from .sheet_selection import SheetCell
+from .window import Window
 
 class State(GObject.Object):
     __gtype_name__ = 'State'
@@ -1077,13 +1078,18 @@ class UpdateColumnWidthState(State):
 class RenameSheetState(State):
     __gtype_name__ = 'RenameSheetState'
 
+    window: Window
+
     before: str
     after: str
 
     def __init__(self,
+                 window: Window,
                  before: str,
                  after:  str) -> None:
         super().__init__()
+
+        self.window = window
 
         self.before = before
         self.after = after
@@ -1092,9 +1098,13 @@ class RenameSheetState(State):
         document = globals.history.document
         document.title = self.before
 
+        self.window.emit('update-connection-list')
+
     def redo(self) -> None:
         document = globals.history.document
         document.title = self.after
+
+        self.window.emit('update-connection-list')
 
 
 

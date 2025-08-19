@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="eruo-data-studio">
 	<schema id="com.macipra.eruo" path="/com/macipra/eruo/">
+		<key name="connection-list" type="s">
+			<default>'[]'</default>
+			<summary>Opened connections</summary>
+			<description>
+				The list of recently opened connections.
+			</description>
+		</key>
 	</schema>
 </schemalist>

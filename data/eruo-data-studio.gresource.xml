@@ -2,6 +2,8 @@
 <gresources>
   <gresource prefix="/com/macipra/eruo">
     <file preprocess="xml-stripblanks">gtk/help-overlay.ui</file>
+    <file preprocess="xml-stripblanks">ui/database-add-connection-dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/database-add-connection-sqlite-view.ui</file>
     <file preprocess="xml-stripblanks">ui/file-save-as-csv-view.ui</file>
     <file preprocess="xml-stripblanks">ui/file-save-as-dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/file-save-as-erbook-view.ui</file>
@@ -32,6 +34,7 @@
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
     <file preprocess="xml-stripblanks">checkmark-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">edit-copy-symbolic.svg</file>
     <file preprocess="xml-stripblanks">edit-find-replace-symbolic.svg</file>
     <file preprocess="xml-stripblanks">edit-find-symbolic.svg</file>
     <file preprocess="xml-stripblanks">go-down-symbolic.svg</file>

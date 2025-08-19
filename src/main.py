@@ -22,7 +22,9 @@
 
 
 from typing import Any
+import duckdb
 import gi
+import json
 import os
 import polars
 import sys
@@ -61,6 +63,15 @@ class Application(Adw.Application):
         # Register the GtkSource.View to be used in the GtkBuilder
         # See https://stackoverflow.com/a/10528052/8791891
         GObject.type_register(GtkSource.View)
+
+        globals.register_connection = self.register_connection
+
+        self.settings = Gio.Settings.new('com.macipra.eruo')
+
+        # Load the recently opened connection list
+        saved_connection_list = self.settings.get_string('connection-list')
+        deserialized_connection_list = json.loads(saved_connection_list)
+        self.connection_list: list[dict] = deserialized_connection_list
 
         self.file_manager = FileManager()
         self.file_manager.connect('file-opened', self.on_file_opened)
@@ -179,25 +190,22 @@ Options:
             return
         self.create_new_window()
 
+    def do_shutdown(self) -> None:
+        for window in self.get_windows():
+            window.close()
+
+        serialized_connection_list = json.dumps(self.connection_list)
+        self.settings.set_string('connection-list', serialized_connection_list)
+
+        Gio.Application.do_shutdown(self)
+
     def on_quit_action(self,
                        action: Gio.SimpleAction,
                        *args) -> None:
         window = self.get_active_window()
 
-        # TODO: check for unsaved changes over all sheets (selections don't count)
-        # TODO: show confirmation dialog if needed
-
-        # We do cleanup the history of all sheets in the current window, mainly
-        # to free up disk space from the temporary files, usually .ersnap files
-        # created for example when multiple cells or even the entire row(s) or
-        # column(s) are edited so that the user can perform undo/redo operations.
-        # At the moment, any previous states will be stored as a file on a disk,
-        # not in memory to reduce the memory footprint. It's purely to support
-        # handling of big datasets more possible.
-        for page_index in range(window.tab_view.get_n_pages()):
-            tab_page = window.tab_view.get_nth_page(page_index)
-            sheet_view = tab_page.get_child()
-            sheet_view.document.history.cleanup_all()
+        if window is None:
+            return
 
         # Instead of closing the whole application at once, we just close the current
         # window one by one until no more windows are open and the application will be
@@ -699,8 +707,9 @@ Options:
         document = self.get_current_active_document()
         document.sort_current_rows(descending=False)
 
-    def on_sort_largest_to_smallest_action(self, action: Gio.SimpleAction,
-    *args) -> None:
+    def on_sort_largest_to_smallest_action(self,
+                                           action: Gio.SimpleAction,
+                                           *args) -> None:
         document = self.get_current_active_document()
         document.sort_current_rows(descending=True)
 
@@ -806,6 +815,79 @@ Options:
         window = self.get_active_window()
         window.apply_pending_table(action_data_id)
 
+    def on_add_new_connection(self, source: GObject.Object) -> None:
+        window = self.get_active_window()
+
+        from .database_add_connection_dialog import DatabaseAddConnectionDialog
+
+        def _connect_to_source(connection_schema: dict) -> None:
+            self.connection_list.append(connection_schema)
+            self.on_update_connection_list(window)
+
+        dialog = DatabaseAddConnectionDialog(window, _connect_to_source)
+        dialog.present(window)
+
+    def on_update_connection_list(self, source: GObject.Object) -> None:
+        connection_list = []
+
+        for connection in self.connection_list:
+            connection_list.append({
+                'ctype'     : connection['ctype'],
+                'cname'     : connection['cname'],
+                'removable' : True,
+            })
+
+        for window in self.get_windows():
+            if window.file is None:
+                continue
+
+            file_path = window.file.get_path()
+            file_path = os.path.basename(file_path)
+            file_name = os.path.splitext(file_path)[0]
+            view_prefix = f'{file_name}:'
+
+            for sheet in window.sheet_manager.sheets.values():
+                if sheet.data.has_main_dataframe:
+                    view_name = f'{view_prefix}{sheet.title}'
+                    connection_list.append({
+                        'ctype'     : 'Dataframe',
+                        'cname'     : view_name,
+                        'removable' : False,
+                    })
+
+        # Update connection list view in all the windows
+        for window in self.get_windows():
+            window.sidebar_home_view.repopulate_connection_list(connection_list)
+
+    def register_connection(self, connection: duckdb.DuckDBPyConnection) -> list[str]:
+        # With the assumption that the connection is always from the active window
+        # so that all the available connections in the current active window won't
+        # get any prefixes.
+        active_window = self.get_active_window()
+
+        for window in self.get_windows():
+            # Define the view name prefix if necessary
+            view_prefix = ''
+            if window is not active_window:
+                file_path = window.file.get_path()
+                file_path = os.path.basename(file_path)
+                file_name = os.path.splitext(file_path)[0]
+                view_prefix = f'{file_name}:'
+
+            # Register all the main dataframe from all the sheets
+            for sheet in window.sheet_manager.sheets.values():
+                if sheet.data.has_main_dataframe:
+                    view_name = f'{view_prefix}{sheet.title}'
+                    connection.register(view_name, sheet.data.dfs[0])
+
+                    # Register with `self` prefix too for convenience
+                    if window is active_window:
+                        view_name = f'self:{sheet.title}'
+                        connection.register(view_name, sheet.data.dfs[0])
+
+        active_connections = [connection['curl'] for connection in self.connection_list]
+        return ';'.join(active_connections)
+
     def get_current_active_document(self) -> SheetDocument:
         window = self.get_active_window()
         return window.get_current_active_document()
@@ -828,7 +910,9 @@ Options:
         if shortcuts:
             self.set_accels_for_action(f'app.{name}', shortcuts)
 
-    def create_new_window(self, file_path: str = '') -> bool:
+    def create_new_window(self,
+                          file_path:  str = '',
+                          skip_setup: bool = False) -> Window:
         file = None
         dataframe = None
 
@@ -836,19 +920,23 @@ Options:
         # But later on, we can add support for file manager integration
         # as well as a command line interface. Maybe even adding support
         # for opening the last session automatically.
-        if file_path:
+        if not skip_setup and file_path:
             file = Gio.File.new_for_path(file_path)
             dataframe = self.file_manager.read_file(self, file_path)
 
         # Check for special return values
         if not isinstance(dataframe, polars.DataFrame) and dataframe == 0:
-            return False
+            return None
 
         window = Window(application=self)
-        window.setup_new_document(file, dataframe)
+        window.connect('add-new-connection', self.on_add_new_connection)
+        window.connect('update-connection-list', self.on_update_connection_list)
         window.present()
 
-        return True
+        if not skip_setup:
+            window.setup_new_document(file, dataframe)
+
+        return window
 
     def reuse_current_window(self, file_path: str = '') -> Any:
         window = self.get_active_window()
@@ -912,7 +1000,7 @@ Options:
 
         # Create a new window if needed
         if not window:
-            window = Window(application=self)
+            window = self.create_new_window(skip_setup=True)
 
         # Close the first tab if exists
         tab_page = window.tab_view.get_selected_page()
@@ -937,6 +1025,8 @@ Options:
         pinned_tabs = workspace_schema.get('pinned-tabs', [])
         for tab_index in pinned_tabs:
             window.tab_view.get_nth_page(tab_index).set_pinned(True)
+
+        window.emit('update-connection-list')
 
         window.present()
 

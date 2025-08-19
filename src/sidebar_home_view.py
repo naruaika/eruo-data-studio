@@ -21,12 +21,32 @@
 # SOFTWARE.
 
 
-from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 from datetime import datetime, timedelta
+import os
 import polars
 
 from . import utils
 from .window import Window
+
+class ConnectionListItem(GObject.Object):
+    __gtype_name__ = 'ConnectionListItem'
+
+    ctype = GObject.Property(type=str, default='Dataframe')
+    cname = GObject.Property(type=str, default='New Connection')
+    removable = GObject.Property(type=bool, default=False)
+
+    def __init__(self,
+                 ctype:     str,
+                 cname:     str,
+                 removable: bool) -> None:
+        super().__init__()
+
+        self.ctype = ctype
+        self.cname = cname
+        self.removable = removable
+
+
 
 class FieldListItem(GObject.Object):
     __gtype_name__ = 'FieldListItem'
@@ -431,26 +451,34 @@ def get_filter_basic_expression(item_data: FilterListItem,
 class SidebarHomeView(Adw.Bin):
     __gtype_name__ = 'SidebarHomeView'
 
+    connections_section = Gtk.Template.Child()
     fields_section = Gtk.Template.Child()
     sorts_section = Gtk.Template.Child()
     filters_section = Gtk.Template.Child()
+
+    connection_list_status = Gtk.Template.Child()
+    connection_list_status_label = Gtk.Template.Child()
+    connection_list_status_add_button = Gtk.Template.Child()
+    connection_list_view_box = Gtk.Template.Child()
+    connection_list_view = Gtk.Template.Child()
+    connection_list_store = Gtk.Template.Child()
 
     field_list_status = Gtk.Template.Child()
     field_list_view = Gtk.Template.Child()
     field_list_store = Gtk.Template.Child()
 
-    sort_list_view_box = Gtk.Template.Child()
     sort_list_status = Gtk.Template.Child()
-    sort_list_view = Gtk.Template.Child()
     sort_list_status_label = Gtk.Template.Child()
     sort_list_status_add_button = Gtk.Template.Child()
+    sort_list_view_box = Gtk.Template.Child()
+    sort_list_view = Gtk.Template.Child()
     sort_list_store = Gtk.Template.Child()
 
-    filter_list_view_box = Gtk.Template.Child()
     filter_list_status = Gtk.Template.Child()
-    filter_list_view = Gtk.Template.Child()
     filter_list_status_label = Gtk.Template.Child()
     filter_list_status_add_button = Gtk.Template.Child()
+    filter_list_view_box = Gtk.Template.Child()
+    filter_list_view = Gtk.Template.Child()
     filter_list_store = Gtk.Template.Child()
 
     def __init__(self,
@@ -460,10 +488,21 @@ class SidebarHomeView(Adw.Bin):
 
         self.window = window
 
+        # Setup the connection section
+        self.connection_list_view_box.get_parent().set_activatable(False)
+        self.connection_list_view_box.get_parent().set_visible(False)
+        self.connection_list_status.get_parent().set_activatable(False)
+
+        factory = Gtk.SignalListItemFactory()
+        factory.connect('setup', self.setup_factory_connection)
+        factory.connect('bind', self.bind_factory_connection)
+        factory.connect('teardown', self.teardown_factory_connection)
+        self.connection_list_view.set_factory(factory)
+
         # Setup the field section
-        self.field_list_status.get_parent().set_activatable(False)
         self.field_list_view.get_parent().set_activatable(False)
         self.field_list_view.get_parent().set_visible(False)
+        self.field_list_status.get_parent().set_activatable(False)
 
         factory = Gtk.SignalListItemFactory()
         factory.connect('setup', self.setup_factory_field)
@@ -502,6 +541,131 @@ class SidebarHomeView(Adw.Bin):
         self.filter_list_view.set_factory(factory)
 
     #
+    # Connection section
+    #
+
+    def setup_factory_connection(self,
+                                 list_item_factory: Gtk.SignalListItemFactory,
+                                 list_item:         Gtk.ListItem) -> None:
+        container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        container.set_spacing(3)
+        list_item.set_child(container)
+
+        main_button = Gtk.Button()
+        main_button.add_css_class('flat')
+        container.append(main_button)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        box.set_margin_top(3)
+        box.set_margin_bottom(3)
+        box.set_margin_start(5)
+        box.set_margin_end(5)
+        box.set_spacing(9)
+        main_button.set_child(box)
+
+        copy_image = Gtk.Image()
+        copy_image.set_from_icon_name('edit-copy-symbolic')
+        box.append(copy_image)
+
+        subbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        subbox.set_hexpand(True)
+        box.append(subbox)
+
+        label_name = Gtk.Label()
+        label_name.set_halign(Gtk.Align.START)
+        label_name.set_ellipsize(Pango.EllipsizeMode.END)
+        subbox.append(label_name)
+
+        label_type = Gtk.Label()
+        label_type.set_halign(Gtk.Align.START)
+        label_type.add_css_class('subtitle')
+        subbox.append(label_type)
+
+        menu_button = Gtk.MenuButton()
+        menu_button.set_icon_name('view-more-horizontal-symbolic')
+        menu_button.set_tooltip_text('More Options')
+        menu_button.add_css_class('flat')
+        container.append(menu_button)
+
+        list_item.main_button = main_button
+        list_item.label_name = label_name
+        list_item.label_type = label_type
+        list_item.menu_button = menu_button
+
+    def bind_factory_connection(self,
+                                list_item_factory: Gtk.SignalListItemFactory,
+                                list_item:         Gtk.ListItem) -> None:
+
+        def copy_connection_name(button:    Gtk.Button,
+                                 item_data: FieldListItem) -> None:
+            display = Gdk.Display.get_default()
+            clipboard = display.get_clipboard()
+            clipboard.set(GObject.Value(str, item_data.cname))
+
+        item_data = list_item.get_item()
+
+        list_item.main_button.set_tooltip_text(item_data.cname)
+        list_item.label_name.set_label(item_data.cname)
+        list_item.label_type.set_label(item_data.ctype)
+
+        list_item.main_button.connect('clicked', copy_connection_name, item_data)
+
+        if item_data.ctype == 'Dataframe':
+            list_item.menu_button.set_visible(False)
+        else:
+            main_menu = Gio.Menu.new()
+            main_menu.append(_('Rename Connection'), f"sidebar.edit-connection('{item_data.cname}')")
+            main_menu.append(_('Delete Connection'), f"sidebar.delete-connection('{item_data.cname}')")
+            list_item.menu_button.set_menu_model(main_menu)
+
+    def teardown_factory_connection(self,
+                                    list_item_factory: Gtk.SignalListItemFactory,
+                                    list_item:         Gtk.ListItem) -> None:
+        list_item.main_button = None
+        list_item.label_name = None
+        list_item.label_type = None
+        list_item.menu_button = None
+
+    @Gtk.Template.Callback()
+    def on_add_connection_button_clicked(self, button: Gtk.Button) -> None:
+        self.window.emit('add-new-connection')
+
+    def repopulate_connection_list(self, connection_list: list[dict]) -> None:
+        # This function should not be called directly. Instead, emit a signal
+        # from a window named `update-connection-list` to update the list.
+        self.connection_list_store.remove_all()
+
+        # Get the file signature name
+        if self.window.file is not None:
+            file_path = self.window.file.get_path()
+            file_path = os.path.basename(file_path)
+            file_name = os.path.splitext(file_path)[0]
+
+        self_counter = 0
+
+        for connection in connection_list:
+            cname = connection['cname']
+            self_claimed = self.window.file is not None and \
+                           cname.startswith(f'{file_name}:')
+
+            if self_claimed:
+                cname = cname[len(file_name)+1:]
+
+            list_item = ConnectionListItem(connection['ctype'],
+                                           cname,
+                                           connection['removable'])
+
+            if self_claimed:
+                self.connection_list_store.insert(self_counter, list_item)
+                self_counter += 1
+            else:
+                self.connection_list_store.append(list_item)
+
+        is_empty = self.connection_list_store.get_n_items() == 0
+        self.connection_list_view_box.get_parent().set_visible(not is_empty)
+        self.connection_list_status.get_parent().set_visible(is_empty)
+
+    #
     # Field section
     #
 
@@ -512,18 +676,18 @@ class SidebarHomeView(Adw.Bin):
         list_item.set_child(check_button)
 
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        check_button.set_child(box)
+
         label_name = Gtk.Label()
         label_name.set_halign(Gtk.Align.START)
         label_name.set_hexpand(True)
         label_name.set_ellipsize(Pango.EllipsizeMode.END)
+        box.append(label_name)
 
         label_type = Gtk.Label()
         label_type.set_halign(Gtk.Align.END)
         label_type.add_css_class('sidebar-list-item-badge')
-
-        box.append(label_name)
         box.append(label_type)
-        check_button.set_child(box)
 
         list_item.check_button = check_button
         list_item.label_name = label_name
@@ -533,8 +697,10 @@ class SidebarHomeView(Adw.Bin):
                            list_item_factory: Gtk.SignalListItemFactory,
                            list_item:         Gtk.ListItem) -> None:
         item_data = list_item.get_item()
+
         list_item.check_button.set_active(item_data.active)
         list_item.label_name.set_label(item_data.cname)
+        list_item.label_name.set_tooltip_text(item_data.cname)
         list_item.label_type.set_label(item_data.dtype)
 
         def on_check_button_toggled(button:    Gtk.Button,
@@ -641,7 +807,7 @@ class SidebarHomeView(Adw.Bin):
 
         subbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         subbox.set_homogeneous(True)
-        subbox.add_css_class('linked')
+        subbox.set_spacing(3)
         box.append(subbox)
 
         field_dropdown = self.create_field_dropdown()
@@ -698,13 +864,12 @@ class SidebarHomeView(Adw.Bin):
                                       button: Gtk.Button,
                                       position: int) -> None:
         self.sort_list_store.remove(position)
+        self.apply_pending_sort()
 
         if self.sort_list_store.get_n_items() == 0:
             self.sort_list_view_box.get_parent().set_visible(False)
             self.sort_list_status.get_parent().set_visible(True)
             self.sort_list_status_label.set_text('No sorts found')
-
-            self.apply_pending_sort() # force apply sort
 
     @Gtk.Template.Callback()
     def on_add_sort_button_clicked(self, button: Gtk.Button) -> None:
@@ -726,12 +891,11 @@ class SidebarHomeView(Adw.Bin):
     @Gtk.Template.Callback()
     def on_delete_all_sort_button_clicked(self, button: Gtk.Button) -> None:
         self.sort_list_store.remove_all()
+        self.apply_pending_sort()
 
         self.sort_list_view_box.get_parent().set_visible(False)
         self.sort_list_status.get_parent().set_visible(True)
         self.sort_list_status_label.set_text('No sorts found')
-
-        self.apply_pending_sort() # force apply sort
 
     @Gtk.Template.Callback()
     def on_apply_sort_button_clicked(self, button: Gtk.Button) -> None:
@@ -933,13 +1097,12 @@ class SidebarHomeView(Adw.Bin):
                                         button:   Gtk.Button,
                                         position: int) -> None:
         self.filter_list_store.remove(position)
+        self.apply_pending_filter()
 
         if self.filter_list_store.get_n_items() == 0:
             self.filter_list_view_box.get_parent().set_visible(False)
             self.filter_list_status.get_parent().set_visible(True)
             self.filter_list_status_label.set_text('No filters found')
-
-            self.apply_pending_filter() # force apply filter
 
     @Gtk.Template.Callback()
     def on_add_filter_button_clicked(self, button: Gtk.Button) -> None:
@@ -964,12 +1127,11 @@ class SidebarHomeView(Adw.Bin):
     @Gtk.Template.Callback()
     def on_delete_all_filter_button_clicked(self, button: Gtk.Button) -> None:
         self.filter_list_store.remove_all()
+        self.apply_pending_filter()
 
         self.filter_list_view_box.get_parent().set_visible(False)
         self.filter_list_status.get_parent().set_visible(True)
         self.filter_list_status_label.set_text('No filters found')
-
-        self.apply_pending_filter() # force apply filter
 
     @Gtk.Template.Callback()
     def on_apply_filter_button_clicked(self, button: Gtk.Button) -> None:
@@ -1416,20 +1578,14 @@ class SidebarHomeView(Adw.Bin):
     def create_general_text_view(self, text: str = '') -> Gtk.TextView:
         text_view = Gtk.TextView()
         text_view.set_hexpand(True)
+        text_view.set_vexpand(False)
         text_view.set_size_request(-1, 68)
 
         buffer = Gtk.TextBuffer()
         buffer.set_text(text)
         text_view.set_buffer(buffer)
 
-        def on_text_view_focus_received(event: Gtk.EventControllerFocus) -> None:
-            # I actually want it to wrap words when it's created,
-            # but unfortunately it seems to always glitch much.
-            event.get_widget().set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
-
-        focus_event_controller = Gtk.EventControllerFocus()
-        focus_event_controller.connect('enter', on_text_view_focus_received)
-        text_view.add_controller(focus_event_controller)
+        text_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
 
         return text_view
 

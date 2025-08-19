@@ -2,8 +2,8 @@
 <interface>
   <requires lib="gtk" version="4.0"/>
   <requires lib="Adw" version="1.0"/>
-  <template class="FileSaveAsDialog" parent="AdwDialog">
-    <property name="title">Save As</property>
+  <template class="DatabaseAddConnectionDialog" parent="AdwDialog">
+    <property name="title">Add New Connection</property>
     <property name="can-close">true</property>
     <property name="content-height">600</property>
     <property name="content-width">400</property>
@@ -22,20 +22,7 @@
           </object>
         </child>
         <property name="content">
-          <object class="GtkBox">
-            <property name="orientation">vertical</property>
-            <child>
-              <object class="AdwBanner" id="warning_banner">
-                <property name="revealed">false</property>
-                <property name="title">Only Erbook supports all features</property>
-                <property name="button-label">Switch</property>
-                <signal name="button-clicked" handler="on_warning_banner_button_clicked" swapped="no"/>
-              </object>
-            </child>
-            <child>
-              <object class="AdwViewStack" id="view_stack"/>
-            </child>
-          </object>
+          <object class="AdwViewStack" id="view_stack"/>
         </property>
         <child type="bottom">
           <object class="GtkCenterBox">
@@ -44,8 +31,8 @@
             <property name="margin-end">6</property>
             <property name="end-widget">
               <object class="GtkButton">
-                <property name="label">Save</property>
-                <signal name="clicked" handler="on_save_button_clicked" swapped="no"/>
+                <property name="label">Connect</property>
+                <signal name="clicked" handler="on_connect_button_clicked" swapped="no"/>
                 <style>
                   <class name="suggested-action"/>
                 </style>

@@ -1177,12 +1177,10 @@ class SheetDocument(GObject.Object):
         connection = duckdb.connect()
 
         # Register all the main dataframes
-        # FIXME: this process takes 0.2-0.3 seconds
         if self.data.has_main_dataframe:
             connection.register('self', self.data.dfs[0])
-        for sheet in self.sheet_manager.sheets.values():
-            if sheet.data.has_main_dataframe:
-                connection.register(sheet.title, sheet.data.dfs[0])
+        connection_strings = globals.register_connection(connection)
+        nquery = connection_strings + nquery
 
         register_sql_functions(connection)
 

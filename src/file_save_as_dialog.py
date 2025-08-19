@@ -38,7 +38,6 @@ class FileSaveAsDialog(Adw.Dialog):
     view_stack = Gtk.Template.Child()
 
     warning_banner = Gtk.Template.Child()
-    save_button = Gtk.Template.Child()
 
     def __init__(self,
                  window:   Window,

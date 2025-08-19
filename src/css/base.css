@@ -50,7 +50,6 @@
 }
 .multiline-formula-bar {
     padding: 8px 0;
-    font-family: monospace;
 }
 .multiline-formula-bar,
 .multiline-formula-bar border,
@@ -202,7 +201,6 @@
 .notebook-source-view {
     padding: 8px 0;
     border-radius: 8px;
-    font-family: monospace;
 }
 .notebook-source-view,
 .notebook-source-view border,

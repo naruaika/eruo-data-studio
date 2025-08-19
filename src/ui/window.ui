@@ -9,166 +9,166 @@
     <property name="default-height">900</property>
     <property name="focusable">true</property>
     <property name="content">
-      <object class="AdwNavigationSplitView" id="split_view">
-        <property name="collapsed">true</property>
-        <property name="show-content">true</property>
-        <property name="min-sidebar-width">280sp</property>
-        <property name="sidebar">
-          <object class="AdwNavigationPage">
-            <property name="title">Data Studio</property>
-            <property name="child">
-              <object class="AdwToolbarView">
-                <child type="top">
-                  <object class="AdwHeaderBar">
-                    <child type="start">
-                      <object class="GtkToggleButton" id="search_all_toggle_button">
-                        <property name="icon-name">edit-find-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">Search (Shift+Ctrl+F)</property>
-                        <property name="action-name">app.toggle-search-all</property>
+      <object class="AdwToastOverlay" id="toast_overlay">
+        <child>
+          <object class="AdwNavigationSplitView" id="split_view">
+            <property name="collapsed">true</property>
+            <property name="show-content">true</property>
+            <property name="min-sidebar-width">280sp</property>
+            <property name="sidebar">
+              <object class="AdwNavigationPage">
+                <property name="title">Data Studio</property>
+                <property name="child">
+                  <object class="AdwToolbarView">
+                    <child type="top">
+                      <object class="AdwHeaderBar">
+                        <child type="start">
+                          <object class="GtkToggleButton" id="search_all_toggle_button">
+                            <property name="icon-name">edit-find-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Search (Shift+Ctrl+F)</property>
+                            <property name="action-name">app.toggle-search-all</property>
+                          </object>
+                        </child>
+                        <property name="title-widget">
+                          <object class="GtkLabel" id="window_title">
+                            <property name="label">Data Studio</property>
+                            <property name="visible">true</property>
+                            <style>
+                              <class name="title"/>
+                            </style>
+                          </object>
+                        </property>
+                        <child type="end">
+                          <object class="GtkToggleButton" id="history_toggle_button">
+                            <property name="icon-name">history-undo-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">History</property>
+                            <property name="action-name">app.toggle-history</property>
+                          </object>
+                        </child>
                       </object>
                     </child>
-                    <property name="title-widget">
-                      <object class="GtkLabel" id="window_title">
-                        <property name="label">Data Studio</property>
-                        <property name="visible">true</property>
-                        <style>
-                          <class name="title"/>
-                        </style>
+                    <property name="content">
+                      <object class="AdwTabView" id="sidebar_tab_view">
+                        <property name="valign">fill</property>
+                        <property name="halign">fill</property>
+                        <property name="hexpand">true</property>
+                        <property name="vexpand">true</property>
                       </object>
                     </property>
-                    <child type="end">
-                      <object class="GtkToggleButton" id="history_toggle_button">
-                        <property name="icon-name">history-undo-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">History</property>
-                        <property name="action-name">app.toggle-history</property>
-                      </object>
-                    </child>
-                  </object>
-                </child>
-                <property name="content">
-                  <object class="AdwTabView" id="sidebar_tab_view">
-                    <property name="valign">fill</property>
-                    <property name="halign">fill</property>
-                    <property name="hexpand">true</property>
-                    <property name="vexpand">true</property>
                   </object>
                 </property>
               </object>
             </property>
-          </object>
-        </property>
-        <property name="content">
-          <object class="AdwNavigationPage">
-            <property name="can-pop">false</property>
-            <property name="title" translatable="yes">Workspace</property>
-            <property name="child">
-              <object class="AdwToolbarView">
-                <child type="top">
-                  <object class="AdwHeaderBar">
-                    <child type="start">
-                      <object class="GtkBox">
-                        <property name="orientation">horizontal</property>
-                        <property name="spacing">10</property>
-                        <child>
-                          <object class="GtkToggleButton" id="sidebar_toggle_button">
-                            <property name="icon-name">sidebar-show-symbolic</property>
-                            <property name="tooltip-text" translatable="yes">Toggle Sidebar</property>
-                            <property name="action-name">app.toggle-sidebar</property>
-                          </object>
-                        </child>
-                        <child>
-                          <object class="GtkBox" id="toolbar_tab_bar">
+            <property name="content">
+              <object class="AdwNavigationPage">
+                <property name="can-pop">false</property>
+                <property name="title" translatable="yes">Workspace</property>
+                <property name="child">
+                  <object class="AdwToolbarView">
+                    <child type="top">
+                      <object class="AdwHeaderBar">
+                        <child type="start">
+                          <object class="GtkBox">
                             <property name="orientation">horizontal</property>
-                            <property name="valign">center</property>
-                            <property name="spacing">3</property>
+                            <property name="spacing">10</property>
                             <child>
-                              <object class="GtkToggleButton" id="home_toggle_button">
-                                <property name="label">Home</property>
-                                <property name="active">true</property>
-                                <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
+                              <object class="GtkToggleButton" id="sidebar_toggle_button">
+                                <property name="icon-name">sidebar-show-symbolic</property>
+                                <property name="tooltip-text" translatable="yes">Toggle Sidebar</property>
+                                <property name="action-name">app.toggle-sidebar</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox" id="toolbar_tab_bar">
+                                <property name="orientation">horizontal</property>
+                                <property name="valign">center</property>
+                                <property name="spacing">3</property>
+                                <child>
+                                  <object class="GtkToggleButton" id="home_toggle_button">
+                                    <property name="label">Home</property>
+                                    <property name="active">true</property>
+                                    <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
+                                    <style>
+                                      <class name="flat"/>
+                                    </style>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkToggleButton" id="insert_toggle_button">
+                                    <property name="label">Insert</property>
+                                    <property name="group">home_toggle_button</property>
+                                    <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
+                                    <style>
+                                      <class name="flat"/>
+                                    </style>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkToggleButton" id="formulas_toggle_button">
+                                    <property name="label">Formulas</property>
+                                    <property name="group">home_toggle_button</property>
+                                    <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
+                                    <style>
+                                      <class name="flat"/>
+                                    </style>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkToggleButton" id="data_toggle_button">
+                                    <property name="label">Data</property>
+                                    <property name="group">home_toggle_button</property>
+                                    <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
+                                    <style>
+                                      <class name="flat"/>
+                                    </style>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkToggleButton" id="view_toggle_button">
+                                    <property name="label">View</property>
+                                    <property name="group">home_toggle_button</property>
+                                    <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
+                                    <style>
+                                      <class name="flat"/>
+                                    </style>
+                                  </object>
+                                </child>
                                 <style>
-                                  <class name="flat"/>
+                                  <class name="toolbar-tab"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <property name="show-title">false</property>
+                        <child type="end">
+                          <object class="GtkBox">
+                            <property name="orientation">horizontal</property>
+                            <property name="spacing">10</property>
+                            <child>
+                              <object class="GtkEntry" id="search_command_entry">
+                                <property name="valign">center</property>
+                                <property name="placeholder-text">Search</property>
+                                <property name="primary-icon-name">edit-find-symbolic</property>
+                                <property name="visible">false</property>
+                                <style>
+                                  <class name="search-command-entry"/>
                                 </style>
                               </object>
                             </child>
                             <child>
-                              <object class="GtkToggleButton" id="insert_toggle_button">
-                                <property name="label">Insert</property>
-                                <property name="group">home_toggle_button</property>
-                                <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
-                                <style>
-                                  <class name="flat"/>
-                                </style>
+                              <object class="GtkMenuButton">
+                                <property name="primary">true</property>
+                                <property name="icon-name">open-menu-symbolic</property>
+                                <property name="tooltip-text" translatable="yes">Main Menu</property>
+                                <property name="menu-model">primary_menu</property>
                               </object>
                             </child>
-                            <child>
-                              <object class="GtkToggleButton" id="formulas_toggle_button">
-                                <property name="label">Formulas</property>
-                                <property name="group">home_toggle_button</property>
-                                <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
-                                <style>
-                                  <class name="flat"/>
-                                </style>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkToggleButton" id="data_toggle_button">
-                                <property name="label">Data</property>
-                                <property name="group">home_toggle_button</property>
-                                <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
-                                <style>
-                                  <class name="flat"/>
-                                </style>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkToggleButton" id="view_toggle_button">
-                                <property name="label">View</property>
-                                <property name="group">home_toggle_button</property>
-                                <signal name="toggled" handler="on_toolbar_tab_button_toggled" swapped="no" />
-                                <style>
-                                  <class name="flat"/>
-                                </style>
-                              </object>
-                            </child>
-                            <style>
-                              <class name="toolbar-tab"/>
-                            </style>
                           </object>
                         </child>
                       </object>
                     </child>
-                    <property name="show-title">false</property>
-                    <child type="end">
-                      <object class="GtkBox">
-                        <property name="orientation">horizontal</property>
-                        <property name="spacing">10</property>
-                        <child>
-                          <object class="GtkEntry" id="search_command_entry">
-                            <property name="valign">center</property>
-                            <property name="placeholder-text">Search</property>
-                            <property name="primary-icon-name">edit-find-symbolic</property>
-                            <property name="visible">false</property>
-                            <style>
-                              <class name="search-command-entry"/>
-                            </style>
-                          </object>
-                        </child>
-                        <child>
-                          <object class="GtkMenuButton">
-                            <property name="primary">true</property>
-                            <property name="icon-name">open-menu-symbolic</property>
-                            <property name="tooltip-text" translatable="yes">Main Menu</property>
-                            <property name="menu-model">primary_menu</property>
-                          </object>
-                        </child>
-                      </object>
-                    </child>
-                  </object>
-                </child>
-                <property name="content">
-                  <object class="AdwToastOverlay" id="toast_overlay">
-                    <child>
+                    <property name="content">
                       <object class="GtkBox">
                         <property name="orientation">vertical</property>
                         <child>
@@ -349,16 +349,16 @@
                           </object>
                         </child>
                       </object>
-                    </child>
+                    </property>
                   </object>
                 </property>
+                <style>
+                  <class name="view"/>
+                </style>
               </object>
             </property>
-            <style>
-              <class name="view"/>
-            </style>
           </object>
-        </property>
+        </child>
       </object>
     </property>
   </template>

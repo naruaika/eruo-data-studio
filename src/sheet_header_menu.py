@@ -87,7 +87,6 @@ class SheetHeaderMenu(Gtk.PopoverMenu):
         sheet_document = self.window.get_current_active_document()
 
         column_name = sheet_document.data.dfs[dfi].columns[self.column]
-        column_dtype = sheet_document.data.dfs[self.dfi].schema[column_name]
 
         self.cvalues_to_show: list[str] = ['$all']
         self.cvalues_to_hide: list[str] = []

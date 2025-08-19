@@ -357,11 +357,11 @@ class FileManager(GObject.Object):
         FILTER_ALL.add_pattern('*')
 
         filters = Gio.ListStore.new(Gtk.FileFilter)
-        filters.append(FILTER_ERBOOK)
-        filters.append(FILTER_TXT)
-        filters.append(FILTER_JSON)
-        filters.append(FILTER_PARQUET)
         filters.append(FILTER_ALL)
+        filters.append(FILTER_ERBOOK)
+        filters.append(FILTER_PARQUET)
+        filters.append(FILTER_JSON)
+        filters.append(FILTER_TXT)
 
         dialog = Gtk.FileDialog()
         dialog.set_title('Open')

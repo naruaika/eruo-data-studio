@@ -53,3 +53,10 @@ current_document_id: str = ''
 # be useful especially when asking in a community forum.
 send_notification: callable = lambda *_: None
 pending_action_data: dict = {}
+
+
+# The purpose is to register all the connections for target DuckDB connection
+# to the dataframes across all windows and sheets as well as getting all the
+# active connection strings to the supported databases by DuckDB, which are:
+# MySQL, PostgreSQL, and SQLite.
+register_connection: callable = lambda *_: None

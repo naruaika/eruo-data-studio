@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from gi.repository import Adw, Gdk, Gio, GObject, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk
 import duckdb
 import os
 import polars
@@ -38,6 +38,11 @@ from .sheet_notebook_view import SheetNotebookView
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/window.ui')
 class Window(Adw.ApplicationWindow):
     __gtype_name__ = 'Window'
+
+    __gsignals__ = {
+        'add-new-connection'     : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'update-connection-list' : (GObject.SIGNAL_RUN_FIRST, None, ()),
+    }
 
     split_view = Gtk.Template.Child()
     window_title = Gtk.Template.Child()
@@ -170,8 +175,10 @@ class Window(Adw.ApplicationWindow):
         self.inline_formula.add_controller(key_event_controller)
 
         self.tab_view.connect('notify::selected-page', self.on_selected_page_changed)
+        self.tab_view.connect('page-attached', self.on_page_attached)
+        self.tab_view.connect('page-detached', self.on_page_detached)
         self.tab_view.connect('page-reordered', self.on_page_reordered)
-        self.tab_view.connect('close-page', self.on_page_closed)
+        self.tab_view.connect('close-page', self.on_before_page_closed)
 
         focus_event_controller = Gtk.EventControllerFocus()
         focus_event_controller.connect('enter', self.on_focus_received)
@@ -205,6 +212,7 @@ class Window(Adw.ApplicationWindow):
 
         # Synchronize the sidebar
         self.sidebar_home_view.repopulate_field_list()
+        self.emit('update-connection-list')
 
     def setup_loaded_document(self, schema: dict) -> None:
         dataframe = None
@@ -321,6 +329,8 @@ class Window(Adw.ApplicationWindow):
                 and sheet_view.main_canvas.has_focus():
             return False
 
+        self.grab_focus()
+
         # Otherwise, let the default behavior happen. Usually,
         # cycling focus between widgets, excluding the main canvas,
         # because the main canvas shouldn't receive the focus when
@@ -328,10 +338,11 @@ class Window(Adw.ApplicationWindow):
         return Gtk.Window.do_focus(self, direction)
 
     def on_focus_received(self, event: Gtk.EventControllerFocus) -> None:
-        sheet_document = self.get_current_active_document()
-
-        if sheet_document is None:
-            return
+        # I'd prefer that we can also have system-level notification for any
+        # background operations. I assume this approach will show notifications
+        # from other windows on the current active window which can be misleading
+        # for the user. We can add a verification to avoid that though.
+        globals.send_notification = self.show_toast_message
 
         # We use a global state to reference to the current history
         # manager and some other things too. This may be an indication
@@ -342,13 +353,28 @@ class Window(Adw.ApplicationWindow):
         # mechanisms, but in my personal experience, it's not easy to manage
         # them especially for a very depth nested hierarchy; often times they
         # can be hard to track and debug. TODO: is there any better/safer way?
-        globals.history = sheet_document.history
+        if sheet_document := self.get_current_active_document():
+            globals.history = sheet_document.history
 
-        # I'd prefer that we can also have system-level notification for any
-        # background operations. I assume this approach will show notifications
-        # from other windows on the current active window which can be misleading
-        # for the user. We can add a verification to avoid that though.
-        globals.send_notification = self.show_toast_message
+    def do_close_request(self) -> bool:
+        # TODO: check for unsaved changes and show confirmation dialog if needed
+
+        # We do cleanup the history of all sheets in the current window, mainly
+        # to free up disk space from the temporary files, usually .ersnap files
+        # created for example when multiple cells or even the entire row(s) or
+        # column(s) are edited so that the user can perform undo/redo operations.
+        # At the moment, any previous states will be stored as a file on a disk,
+        # not in memory to reduce the memory footprint. It's purely to support
+        # handling of big datasets more possible.
+        for page_index in range(self.tab_view.get_n_pages()):
+            tab_page = self.tab_view.get_nth_page(page_index)
+            sheet_view = tab_page.get_child()
+            sheet_view.document.history.cleanup_all()
+
+        # Force an update of the connection list for other windows
+        GLib.timeout_add(200, self.emit, 'update-connection-list')
+
+        return False
 
     def on_inline_formula_key_pressed(self,
                                       event:   Gtk.EventControllerKey,
@@ -685,6 +711,18 @@ class Window(Adw.ApplicationWindow):
         # Reset the input bar to represent the current selection
         self.reset_inputbar()
 
+    def on_page_attached(self,
+                         tab_view: Adw.TabView,
+                         tab_page: Adw.TabPage,
+                         position: int) -> None:
+        self.emit('update-connection-list')
+
+    def on_page_detached(self,
+                         tab_view: Adw.TabView,
+                         tab_page: Adw.TabPage,
+                         position: int) -> None:
+        self.emit('update-connection-list')
+
     def on_page_reordered(self,
                           tab_view: Adw.TabView,
                           tab_page: Adw.TabPage,
@@ -699,9 +737,12 @@ class Window(Adw.ApplicationWindow):
             new_sheets[document_id] = sheet_document
         self.sheet_manager.sheets = new_sheets
 
-    def on_page_closed(self,
-                       tab_view: Adw.TabView,
-                       tab_page: Adw.TabPage) -> bool:
+        # Repopulate the connection list
+        self.emit('update-connection-list')
+
+    def on_before_page_closed(self,
+                              tab_view: Adw.TabView,
+                              tab_page: Adw.TabPage) -> bool:
         sheet_view = tab_page.get_child()
 
         if sheet_view is None:
@@ -722,13 +763,14 @@ class Window(Adw.ApplicationWindow):
 
         self.sheet_manager.delete_sheet(sheet_view)
 
-        # Disable the input bar when no sheet is open
-        # just to add more emphasize.
+        # Disable some UIs when no sheet remains
         if len(self.sheet_manager.sheets) == 0:
             self.name_box.set_sensitive(False)
             self.formula_bar.set_sensitive(False)
             self.multiline_formula_bar.set_sensitive(False)
             self.formula_bar_toggle_button.set_sensitive(False)
+
+            # TODO: connection list section shouldn't be disabled
             self.toolbar_tab_view.set_sensitive(False)
             self.sidebar_tab_view.set_sensitive(False)
 
@@ -949,12 +991,12 @@ class Window(Adw.ApplicationWindow):
         old_name = tab_page.get_title()
 
         def _rename_sheet(new_name: str) -> None:
-            state = RenameSheetState(old_name, new_name)
+            state = RenameSheetState(self, old_name, new_name)
             globals.history.save(state)
 
             tab_page.set_title(new_name)
 
-            # TODO: update any references?
+            self.emit('update-connection-list')
 
         dialog = RenameSheetDialog(old_name, _rename_sheet)
         dialog.present(self)
@@ -989,7 +1031,9 @@ class Window(Adw.ApplicationWindow):
             return
 
         self.formula_bar_dtype.set_text(sel_dtype)
-        self.formula_bar_dtype.set_visible(True)
+
+        if self.formula_bar.get_visible():
+            self.formula_bar_dtype.set_visible(True)
 
         if not self.formula_bar_toggle_button.get_active():
             self.formula_bar_dtype.set_visible(sel_dtype is not None)
@@ -1042,6 +1086,7 @@ class Window(Adw.ApplicationWindow):
         self.add_new_tab(sheet_view)
 
         self.sidebar_home_view.repopulate_field_list()
+        self.emit('update-connection-list')
 
         del globals.pending_action_data[action_data_id]
 
@@ -1150,12 +1195,10 @@ class Window(Adw.ApplicationWindow):
         connection = duckdb.connect()
 
         # Register all the main dataframes
-        # FIXME: this process takes 0.2-0.3 seconds
         if sheet_document.data.has_main_dataframe:
             connection.register('self', sheet_document.data.dfs[0])
-        for sheet in self.sheet_manager.sheets.values():
-            if sheet.data.has_main_dataframe:
-                connection.register(sheet.title, sheet.data.dfs[0])
+        connection_strings = globals.register_connection(connection)
+        query = connection_strings + query
 
         register_sql_functions(connection)
 

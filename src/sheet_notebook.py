@@ -25,6 +25,7 @@ from gi.repository import GObject
 from typing import Any
 import duckdb
 
+from . import globals
 from .clipboard_manager import ClipboardManager
 from .sheet_functions import register_sql_functions
 
@@ -77,10 +78,8 @@ class SheetNotebook(GObject.Object):
         connection = duckdb.connect()
 
         # Register all the main dataframes
-        # FIXME: this process takes 0.2-0.3 seconds
-        for sheet in self.sheet_manager.sheets.values():
-            if sheet.data.has_main_dataframe:
-                connection.register(sheet.title, sheet.data.dfs[0])
+        connection_strings = globals.register_connection(connection)
+        query = connection_strings + query
 
         register_sql_functions(connection)
 

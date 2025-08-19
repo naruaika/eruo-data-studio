@@ -14,6 +14,86 @@
             <property name="margin-bottom">6</property>
             <property name="spacing">10</property>
             <child>
+              <object class="AdwPreferencesGroup" id="connections_section">
+                <child>
+                  <object class="AdwExpanderRow">
+                    <property name="title">Connections</property>
+                    <property name="subtitle">Manage data source connections</property>
+                    <child>
+                      <object class="GtkBox" id="connection_list_status">
+                        <property name="orientation">horizontal</property>
+                        <property name="margin-top">3</property>
+                        <property name="margin-bottom">3</property>
+                        <property name="margin-start">12</property>
+                        <property name="margin-end">6</property>
+                        <child>
+                          <object class="GtkLabel" id="connection_list_status_label">
+                            <property name="halign">start</property>
+                            <property name="hexpand">true</property>
+                            <property name="label">No active connection</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="connection_list_status_add_button">
+                            <property name="margin-end">1</property>
+                            <property name="icon-name">list-add-symbolic</property>
+                            <property name="tooltip-text">Add connection</property>
+                            <signal name="clicked" handler="on_add_connection_button_clicked" swapped="no"/>
+                          </object>
+                        </child>
+                        <style>
+                          <class name="status-text"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox" id="connection_list_view_box">
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="GtkListView" id="connection_list_view">
+                            <property name="single-click-activate">true</property>
+                            <property name="model">
+                              <object class="GtkSingleSelection">
+                                <property name="model">
+                                  <object class="GListStore" id="connection_list_store"/>
+                                </property>
+                              </object>
+                            </property>
+                            <style>
+                              <class name="sidebar-list-view-box"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">horizontal</property>
+                            <property name="margin-top">3</property>
+                            <property name="margin-bottom">3</property>
+                            <property name="margin-start">3</property>
+                            <property name="spacing">3</property>
+                            <property name="margin-end">3</property>
+                            <child>
+                              <object class="GtkButton">
+                                <property name="icon-name">list-add-symbolic</property>
+                                <property name="tooltip-text">Add connection</property>
+                                <signal name="clicked" handler="on_add_connection_button_clicked" swapped="no"/>
+                                <style>
+                                  <class name="row-button"/>
+                                </style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <style>
+                      <class name="sidebar-expander-row"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
               <object class="AdwPreferencesGroup" id="fields_section">
                 <child>
                   <object class="AdwExpanderRow">
@@ -110,7 +190,7 @@
                         <child>
                           <object class="GtkBox">
                             <property name="orientation">horizontal</property>
-                            <property name="margin-top">3</property>
+                            <property name="margin-top">0</property>
                             <property name="margin-bottom">3</property>
                             <property name="margin-start">3</property>
                             <property name="spacing">3</property>
