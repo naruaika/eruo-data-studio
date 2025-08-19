@@ -194,16 +194,30 @@ class FileManager(GObject.Object):
     def write_erbook(self,
                      window:    Window,
                      file_path: str) -> bool:
+        # Read the UI states
+        sidebar_collapsed = window.split_view.get_collapsed()
+
+        selected_page = window.tab_view.get_selected_page()
+        current_active_tab = window.tab_view.get_page_position(selected_page)
+
+        pinned_tabs = []
+        for page_index in range(window.tab_view.get_n_pages()):
+            tab_page = window.tab_view.get_nth_page(page_index)
+            if tab_page.get_pinned():
+                pinned_tabs.append(page_index)
+
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 workspace_schema = {
-                    'signature': file_path,
-                    'sheets': [],
+                    'signature'          : file_path,
+                    'sheets'             : [],
+                    'sidebar-collapsed'  : sidebar_collapsed,
+                    'current-active-tab' : current_active_tab,
+                    'pinned-tabs'        : pinned_tabs,
                 }
 
                 all_dataframe_paths = []
 
-                # TODO: save the tab pinned state
                 for sheet_document in window.sheet_manager.sheets.values():
                     if isinstance(sheet_document, SheetDocument):
                         stype = 'worksheet'

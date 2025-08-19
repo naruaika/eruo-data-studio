@@ -701,11 +701,11 @@ class Window(Adw.ApplicationWindow):
 
     def on_page_closed(self,
                        tab_view: Adw.TabView,
-                       tab_page: Adw.TabPage) -> None:
+                       tab_page: Adw.TabPage) -> bool:
         sheet_view = tab_page.get_child()
 
         if sheet_view is None:
-            return
+            return True
 
         # Close the inline formula box if it references the closed sheet
         if sheet_view.document.document_id == globals.current_document_id:
@@ -736,6 +736,10 @@ class Window(Adw.ApplicationWindow):
             self.grab_focus()
 
             globals.history = None
+
+        # FIXME: clicking on the tab close button should trigger
+        #        the confirmation dialog as well
+        return False
 
     def on_operation_cancelled(self, source: GObject.Object) -> None:
         self.close_inline_formula()
@@ -1106,6 +1110,7 @@ class Window(Adw.ApplicationWindow):
             return self.create_table_from_sql(formula)
 
         # Check if the input is an SQL-like syntax
+        # TODO: add support for UPDATE statement
         query_pattern = r"(\r\n|\r|\n|\s)*=(\r\n|\r|\n|\s)*" \
                         r"[SELECT|WITH](\r\n|\r|\n|.)*"
         if re.fullmatch(query_pattern, formula, re.IGNORECASE):

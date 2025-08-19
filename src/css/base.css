@@ -11,6 +11,10 @@
     border-radius: 8px;
     -gtk-icon-size: 20px;
 }
+.toolbar-view button label {
+    font-size: 13px;
+    font-weight: normal;
+}
 .toolbar-view separator.vertical {
     background-color: transparent;
 }

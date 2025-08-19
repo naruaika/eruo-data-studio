@@ -13,9 +13,13 @@
             <property name="orientation">horizontal</property>
             <child>
               <object class="GtkButton">
-                <property name="icon-name">table-shortcut-symbolic</property>
-                <property name="tooltip-text">Import Table</property>
                 <property name="action-name">app.import-table</property>
+                <child>
+                  <object class="AdwButtonContent">
+                    <property name="icon-name">table-shortcut-symbolic</property>
+                    <property name="label" translatable="yes">Import Table</property>
+                  </object>
+                </child>
                 <style>
                   <class name="flat"/>
                 </style>
@@ -23,10 +27,14 @@
             </child>
             <child>
               <object class="GtkButton">
-                <property name="icon-name">table-built-symbolic</property>
-                <property name="tooltip-text">Insert Blank Table</property>
                 <property name="action-name">app.insert-table</property>
                 <property name="visible">false</property>
+                <child>
+                  <object class="AdwButtonContent">
+                    <property name="icon-name">table-built-symbolic</property>
+                    <property name="label" translatable="yes">Insert Table</property>
+                  </object>
+                </child>
                 <style>
                   <class name="flat"/>
                 </style>

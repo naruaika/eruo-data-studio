@@ -926,8 +926,17 @@ Options:
         # Set the file signature
         window.file = Gio.File.new_for_path(workspace_schema['signature'])
 
-        # Select the first tab
-        window.tab_view.set_selected_page(window.tab_view.get_nth_page(0))
+        # Restore the UI states
+        sidebar_collapsed = workspace_schema.get('sidebar-collapsed', True)
+        window.split_view.set_collapsed(sidebar_collapsed)
+
+        current_active_tab = workspace_schema.get('current-active-tab', 0)
+        selected_page = window.tab_view.get_nth_page(current_active_tab)
+        window.tab_view.set_selected_page(selected_page)
+
+        pinned_tabs = workspace_schema.get('pinned-tabs', [])
+        for tab_index in pinned_tabs:
+            window.tab_view.get_nth_page(tab_index).set_pinned(True)
 
         window.present()
 
