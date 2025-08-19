@@ -51,6 +51,10 @@ class SheetNotebookView(Gtk.Box):
         self.run_queue: list[int] = []
         self.is_running_queue = False
 
+        settings = Gtk.Settings.get_default()
+        settings.connect('notify::gtk-application-prefer-dark-theme',
+                         self.on_prefer_dark_theme_changed)
+
         # We don't use all objects below, they're just placeholders
         # so that it doesn't break the current design. Let's flag
         # this as TODO.
@@ -58,6 +62,20 @@ class SheetNotebookView(Gtk.Box):
         self.main_canvas = Gtk.DrawingArea()
         self.horizontal_scrollbar = Gtk.Scrollbar()
         self.vertical_scrollbar = Gtk.Scrollbar()
+
+    def on_prefer_dark_theme_changed(self,
+                                     settings:     Gtk.Settings,
+                                     gparamstring: str) -> None:
+        scheme_manager = GtkSource.StyleSchemeManager.get_default()
+        prefers_dark = Adw.StyleManager().get_dark()
+        color_scheme = 'Adwaita-dark' if prefers_dark else 'Adwaita'
+        style_scheme = scheme_manager.get_scheme(color_scheme)
+
+        for list_item in self.list_items:
+            if 'source_view' not in list_item:
+                continue
+            source_buffer = list_item['source_view'].get_buffer()
+            source_buffer.set_style_scheme(style_scheme)
 
     def add_new_sql_cell(self,
                          query:    str = None,
@@ -128,7 +146,21 @@ class SheetNotebookView(Gtk.Box):
         delete_button.set_child(delete_content_button)
         toolbar_container.append(delete_button)
 
-        source_view = GtkSource.View()
+        source_buffer = GtkSource.Buffer()
+        source_buffer.set_highlight_syntax(True)
+
+        language_manager = GtkSource.LanguageManager.get_default()
+        sql_language = language_manager.get_language('sql')
+        source_buffer.set_language(sql_language)
+
+        scheme_manager = GtkSource.StyleSchemeManager.get_default()
+        prefers_dark = Adw.StyleManager().get_dark()
+        color_scheme = 'Adwaita-dark' if prefers_dark else 'Adwaita'
+        style_scheme = scheme_manager.get_scheme(color_scheme)
+        source_buffer.set_style_scheme(style_scheme)
+
+        source_view = GtkSource.View.new_with_buffer(source_buffer)
+
         source_view.set_hexpand(True)
         source_view.set_show_line_numbers(True)
         source_view.set_auto_indent(True)
