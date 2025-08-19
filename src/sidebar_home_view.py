@@ -558,18 +558,18 @@ class SidebarHomeView(Adw.Bin):
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         box.set_margin_top(3)
         box.set_margin_bottom(3)
-        box.set_margin_start(5)
+        box.set_margin_start(8)
         box.set_margin_end(5)
         box.set_spacing(9)
         main_button.set_child(box)
 
-        copy_image = Gtk.Image()
-        copy_image.set_from_icon_name('edit-copy-symbolic')
-        box.append(copy_image)
-
         subbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         subbox.set_hexpand(True)
         box.append(subbox)
+
+        copy_image = Gtk.Image()
+        copy_image.set_from_icon_name('edit-copy-symbolic')
+        box.append(copy_image)
 
         label_name = Gtk.Label()
         label_name.set_halign(Gtk.Align.START)

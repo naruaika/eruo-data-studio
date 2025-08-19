@@ -143,6 +143,9 @@
 .sidebar-list-view-box > row:selected {
     background-color: transparent;
 }
+.sidebar-list-view-box > row button {
+    font-weight: normal;
+}
 .sidebar-list-view-box popover row {
     padding: 4px 8px;
     border-radius: 12px;
