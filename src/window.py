@@ -985,7 +985,7 @@ class Window(Adw.ApplicationWindow):
         self.add_new_tab(sheet_view)
 
     def rename_sheet(self, tab_page: Adw.TabPage) -> None:
-        from .rename_sheet_dialog import RenameSheetDialog
+        from .sheet_rename_dialog import SheetRenameDialog
         from .history_manager import RenameSheetState
 
         old_name = tab_page.get_title()
@@ -998,7 +998,7 @@ class Window(Adw.ApplicationWindow):
 
             self.emit('update-connection-list')
 
-        dialog = RenameSheetDialog(old_name, _rename_sheet)
+        dialog = SheetRenameDialog(old_name, _rename_sheet)
         dialog.present(self)
 
     def reset_inputbar(self) -> None:

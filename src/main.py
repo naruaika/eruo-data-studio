@@ -110,6 +110,7 @@ class Application(Adw.Application):
         self.create_action('copy', self.on_copy_action, ['<primary>c'])
         self.create_action('cut', self.on_cut_action, ['<primary>x'])
         self.create_action('delete-column', self.on_delete_column_action)
+        self.create_action('delete-connection', self.on_delete_connection_action, param_type=GLib.VariantType('s'))
         self.create_action('delete-row', self.on_delete_row_action)
         self.create_action('duplicate-tab', self.on_duplicate_tab_action, param_type=GLib.VariantType('s'))
         self.create_action('duplicate-to-above', self.on_duplicate_to_above_action)
@@ -137,6 +138,7 @@ class Application(Adw.Application):
         self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
         self.create_action('quit', self.on_quit_action, ['<primary>q'])
         self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
+        self.create_action('rename-connection', self.on_rename_connection_action, param_type=GLib.VariantType('s'))
         self.create_action('rename-tab', self.on_rename_tab_action, param_type=GLib.VariantType('s'))
         self.create_action('reset-all-filters', self.on_reset_all_filters_action)
         self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
@@ -826,6 +828,35 @@ Options:
 
         dialog = DatabaseAddConnectionDialog(window, _connect_to_source)
         dialog.present(window)
+
+    def on_rename_connection_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
+        from .database_rename_connection_dialog import DatabaseRenameConnectionDialog
+
+        window = self.get_active_window()
+        old_cname = args[0].get_string()
+
+        def _rename_connection(new_cname: str) -> None:
+            for connection in self.connection_list:
+                if connection['cname'] == old_cname:
+                    connection['cname'] = new_cname
+                    break
+
+            self.on_update_connection_list(window)
+
+        dialog = DatabaseRenameConnectionDialog(old_cname, _rename_connection)
+        dialog.present(window)
+
+    def on_delete_connection_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
+        cname = args[0].get_string()
+        self.connection_list = [connection for connection in self.connection_list
+                                if connection['cname'] != cname]
+
+        window = self.get_active_window()
+        self.on_update_connection_list(window)
 
     def on_update_connection_list(self, source: GObject.Object) -> None:
         connection_list = []

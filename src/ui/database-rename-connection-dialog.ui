@@ -2,8 +2,8 @@
 <interface>
   <requires lib="gtk" version="4.0"/>
   <requires lib="Adw" version="1.0"/>
-  <template class="RenameSheetDialog" parent="AdwDialog">
-    <property name="title">Rename Sheet</property>
+  <template class="DatabaseRenameConnectionDialog" parent="AdwDialog">
+    <property name="title">Rename Connection</property>
     <property name="can-close">true</property>
     <child>
       <object class="AdwToolbarView">

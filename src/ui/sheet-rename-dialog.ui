@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="SheetRenameDialog" parent="AdwDialog">
+    <property name="title">Rename Sheet</property>
+    <property name="can-close">true</property>
+    <child>
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar"/>
+        </child>
+        <property name="content">
+          <object class="GtkBox">
+            <property name="margin-top">10</property>
+            <property name="margin-bottom">10</property>
+            <property name="margin-start">10</property>
+            <property name="margin-end">10</property>
+            <child>
+              <object class="GtkEntry" id="entry">
+                <property name="hexpand">true</property>
+                <signal name="activate" handler="on_entry_activated" swapped="no"/>
+              </object>
+            </child>
+          </object>
+        </property>
+      </object>
+    </child>
+  </template>
+</interface>

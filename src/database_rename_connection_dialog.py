@@ -1,4 +1,4 @@
-# rename_sheet_dialog.py
+# database_rename_connection_dialog.py
 #
 # Copyright (c) 2025 Naufan Rusyda Faikar
 #
@@ -23,9 +23,9 @@
 
 from gi.repository import Adw, Gtk
 
-@Gtk.Template(resource_path='/com/macipra/eruo/ui/rename-sheet-dialog.ui')
-class RenameSheetDialog(Adw.Dialog):
-    __gtype_name__ = 'RenameSheetDialog'
+@Gtk.Template(resource_path='/com/macipra/eruo/ui/database-rename-connection-dialog.ui')
+class DatabaseRenameConnectionDialog(Adw.Dialog):
+    __gtype_name__ = 'DatabaseRenameConnectionDialog'
 
     entry = Gtk.Template.Child()
 
