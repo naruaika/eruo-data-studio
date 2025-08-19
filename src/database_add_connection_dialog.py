@@ -52,7 +52,7 @@ class DatabaseAddConnectionDialog(Adw.Dialog):
         try:
             match view:
                 case DatabaseAddConnectionSqliteView():
-                    cname = view.open_as.get_text()
+                    cname = view.connect_as.get_text()
                     curl = view.connect_to.get_subtitle()
                     import sqlite3
                     sqlite3.connect(curl)

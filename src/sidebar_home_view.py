@@ -614,8 +614,8 @@ class SidebarHomeView(Adw.Bin):
             list_item.menu_button.set_visible(False)
         else:
             main_menu = Gio.Menu.new()
-            main_menu.append(_('Rename Connection'), f"sidebar.edit-connection('{item_data.cname}')")
-            main_menu.append(_('Delete Connection'), f"sidebar.delete-connection('{item_data.cname}')")
+            main_menu.append(_('Rename Connection'), f"app.edit-connection('{item_data.cname}')")
+            main_menu.append(_('Delete Connection'), f"app.delete-connection('{item_data.cname}')")
             list_item.menu_button.set_menu_model(main_menu)
 
     def teardown_factory_connection(self,
