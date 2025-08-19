@@ -11,7 +11,7 @@
             <property name="orientation">vertical</property>
             <property name="margin-start">6</property>
             <property name="margin-end">6</property>
-            <property name="margin-bottom">6</property>
+            <property name="margin-bottom">20</property>
             <property name="spacing">10</property>
             <child>
               <object class="AdwPreferencesGroup" id="connections_section">
