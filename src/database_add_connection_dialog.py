@@ -59,7 +59,7 @@ class DatabaseAddConnectionDialog(Adw.Dialog):
                     connection_schema = {
                         'ctype' : 'SQLite',
                         'cname' : cname,
-                        'curl'  : f"ATTACH '{curl}' AS {cname} (TYPE sqlite);",
+                        'curl'  : f"ATTACH '{curl}' AS \"{cname}\" (TYPE sqlite);",
                     }
 
         except Exception as e:

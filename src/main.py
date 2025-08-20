@@ -27,6 +27,7 @@ import gi
 import json
 import os
 import polars
+import re
 import sys
 
 gi.require_version('Gtk', '4.0')
@@ -822,7 +823,27 @@ Options:
 
         from .database_add_connection_dialog import DatabaseAddConnectionDialog
 
+        existing_cnames = [connection['cname'] for connection in self.connection_list]
+
+        def generate_connection_name(cname: str) -> str:
+            # Remove the number suffix if present
+            cname = re.sub(r'\s+(\d+)$', '', cname)
+
+            cnumber = 1
+            for cname in existing_cnames:
+                if match := re.match(cname + r'\s+(\d+)', cname):
+                    cnumber = max(cnumber, int(match.group(1)) + 1)
+
+            return f'{cname} {cnumber}'
+
         def _connect_to_source(connection_schema: dict) -> None:
+            # Rename connection if it already exists
+            incoming_cname = connection_schema['cname']
+            if incoming_cname in existing_cnames:
+                new_cname = generate_connection_name(incoming_cname)
+                new_curl = connection_schema['curl'].replace(incoming_cname, new_cname)
+                connection_schema.update({'cname': new_cname, 'curl': new_curl})
+
             self.connection_list.append(connection_schema)
             self.on_update_connection_list(window)
 
@@ -840,7 +861,8 @@ Options:
         def _rename_connection(new_cname: str) -> None:
             for connection in self.connection_list:
                 if connection['cname'] == old_cname:
-                    connection['cname'] = new_cname
+                    new_curl = connection['curl'].replace(old_cname, new_cname)
+                    connection.update({'cname': new_cname, 'curl': new_curl})
                     break
 
             self.on_update_connection_list(window)
@@ -1047,7 +1069,8 @@ Options:
 
         # Restore the UI states
         sidebar_collapsed = workspace_schema.get('sidebar-collapsed', True)
-        window.split_view.set_collapsed(sidebar_collapsed)
+        if not sidebar_collapsed:
+            window.toggle_sidebar() # it's collapsed by default
 
         current_active_tab = workspace_schema.get('current-active-tab', 0)
         selected_page = window.tab_view.get_nth_page(current_active_tab)

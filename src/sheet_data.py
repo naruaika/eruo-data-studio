@@ -654,7 +654,7 @@ class SheetData(GObject.Object):
             # Remove leading '$' to prevent collision from internal column names
             replace_with = new_value.lstrip('$')
 
-            def generate_next_column_name(column_name: str) -> str:
+            def generate_column_name(column_name: str) -> str:
                 cnumber = 1
                 for cname in self.dfs[dfi].columns:
                     if match := re.match(column_name + r'_(\d+)', cname):
@@ -663,11 +663,11 @@ class SheetData(GObject.Object):
 
             # Generate a new column name if needed
             if replace_with in ['', None]:
-                replace_with = generate_next_column_name('column')
+                replace_with = generate_column_name('column')
             else:
                 replace_with = str(replace_with)
                 if replace_with in self.dfs[dfi].columns:
-                    replace_with = generate_next_column_name(replace_with)
+                    replace_with = generate_column_name(replace_with)
 
             # Update the column name
             self.dfs[dfi] = self.dfs[dfi].rename({column_name: replace_with})
@@ -826,7 +826,7 @@ class SheetData(GObject.Object):
             # Remove leading '$' to prevent collision from internal column names
             t_new_col_name = t_first_row.lstrip('$')
 
-            def generate_next_column_name(column_name: str) -> str:
+            def generate_column_name(column_name: str) -> str:
                 cnumber = 1
                 for cname in self.dfs[t_dfi].columns:
                     if match := re.match(column_name + r'_(\d+)', cname):
@@ -835,11 +835,11 @@ class SheetData(GObject.Object):
 
             # Generate a new column name if needed
             if t_new_col_name in ['', None]:
-                t_new_col_name = generate_next_column_name('column')
+                t_new_col_name = generate_column_name('column')
             else:
                 t_new_col_name = str(t_new_col_name)
                 if t_new_col_name in self.dfs[t_dfi].columns:
-                    t_new_col_name = generate_next_column_name(t_new_col_name)
+                    t_new_col_name = generate_column_name(t_new_col_name)
 
             # Update the column name
             self.dfs[t_dfi] = self.dfs[t_dfi].rename({t_column_name: t_new_col_name})
@@ -947,6 +947,8 @@ class SheetData(GObject.Object):
 
         for _ in range(column_span):
             target_name = self.dfs[dfi].columns[column]
+
+            # Remove the number suffix if present
             new_name = re.sub(r'_(\d+)$', '', target_name)
 
             # Determine a new column name
@@ -954,13 +956,13 @@ class SheetData(GObject.Object):
             for column_name in self.dfs[dfi].columns:
                 if match := re.match(new_name + r'_(\d+)', column_name):
                     column_number = max(column_number, int(match.group(1)) + 1)
+            new_name = f'{new_name}_{column_number}'
 
             if not left:
                 column = column + column_span
             else:
                 column = column - column_span + 1
 
-            new_name = f'{new_name}_{column_number}'
             self.dfs[dfi] = self.dfs[dfi].insert_column(column, polars.col(target_name).alias(new_name))
             self.bbs[dfi].column_span += 1
 
