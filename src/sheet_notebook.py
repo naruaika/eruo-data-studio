@@ -96,7 +96,7 @@ class SheetNotebook(GObject.Object):
 
         except Exception as e:
             print(e)
-            message = str(e)
+            message = str(e).strip('\n')
 
         connection.close()
         return message

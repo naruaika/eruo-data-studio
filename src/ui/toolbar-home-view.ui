@@ -32,6 +32,16 @@
               </object>
             </child>
             <child>
+              <object class="GtkButton">
+                <property name="icon-name">save-symbolic</property>
+                <property name="tooltip-text">Save (Ctrl+S)</property>
+                <property name="action-name">app.save</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+            </child>
+            <child>
               <object class="GtkSeparator">
                 <property name="orientation">vertical</property>
                 <property name="margin-top">6</property>

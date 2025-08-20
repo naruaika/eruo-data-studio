@@ -58,6 +58,7 @@
     <file preprocess="xml-stripblanks">window-close-symbolic.svg</file>
 
     <!-- Carbon Design System -->
+    <file preprocess="xml-stripblanks">app-connectivity-symbolic.svg</file>
     <file preprocess="xml-stripblanks">chevron-down-symbolic.svg</file>
     <file preprocess="xml-stripblanks">column-delete-symbolic.svg</file>
     <file preprocess="xml-stripblanks">column-insert-symbolic.svg</file>
@@ -69,6 +70,7 @@
     <file preprocess="xml-stripblanks">redo-symbolic.svg</file>
     <file preprocess="xml-stripblanks">row-delete-symbolic.svg</file>
     <file preprocess="xml-stripblanks">row-insert-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">save-symbolic.svg</file>
     <file preprocess="xml-stripblanks">search-symbolic.svg</file>
     <file preprocess="xml-stripblanks">table-built-symbolic.svg</file>
     <file preprocess="xml-stripblanks">table-shortcut-symbolic.svg</file>

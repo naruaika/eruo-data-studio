@@ -84,6 +84,7 @@ class Application(Adw.Application):
                              # assigned from the command line
 
         self.create_action('about', self.on_about_action)
+        self.create_action('add-connection', self.on_add_new_connection_action)
         self.create_action('apply-pending-table', self.on_apply_pending_table_action, param_type=GLib.VariantType('s'))
         self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
         self.create_action('close-other-tabs', self.on_close_other_tabs_action, param_type=GLib.VariantType('s'))
@@ -817,6 +818,12 @@ Options:
         action_data_id = args[0].get_string()
         window = self.get_active_window()
         window.apply_pending_table(action_data_id)
+
+    def on_add_new_connection_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
+        window = self.get_active_window()
+        window.emit('add-new-connection')
 
     def on_add_new_connection(self, source: GObject.Object) -> None:
         window = self.get_active_window()

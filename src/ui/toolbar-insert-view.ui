@@ -27,6 +27,20 @@
             </child>
             <child>
               <object class="GtkButton">
+                <property name="action-name">app.add-connection</property>
+                <child>
+                  <object class="AdwButtonContent">
+                    <property name="icon-name">app-connectivity-symbolic</property>
+                    <property name="label" translatable="yes">Add Connection</property>
+                  </object>
+                </child>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
                 <property name="action-name">app.insert-table</property>
                 <property name="visible">false</property>
                 <child>
