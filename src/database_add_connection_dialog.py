@@ -21,9 +21,11 @@
 # SOFTWARE.
 
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gio, Gtk
+import duckdb
+import re
 
-from . import globals
+from .database_add_connection_mysql_view import DatabaseAddConnectionMysqlView
 from .database_add_connection_sqlite_view import DatabaseAddConnectionSqliteView
 from .window import Window
 
@@ -42,6 +44,9 @@ class DatabaseAddConnectionDialog(Adw.Dialog):
         self.window = window
         self.callback = callback
 
+        view = DatabaseAddConnectionMysqlView(window)
+        self.view_stack.add_titled(view, 'mysql', 'MySQL')
+
         view = DatabaseAddConnectionSqliteView(window)
         self.view_stack.add_titled(view, 'sqlite', 'SQLite')
 
@@ -49,26 +54,79 @@ class DatabaseAddConnectionDialog(Adw.Dialog):
     def on_connect_button_clicked(self, button: Gtk.Button) -> None:
         view = self.view_stack.get_visible_child()
 
+        connection = duckdb.connect()
+
         try:
             match view:
-                case DatabaseAddConnectionSqliteView():
-                    cname = view.connect_as.get_text()
-                    curl = view.connect_to.get_subtitle()
-                    import sqlite3
-                    sqlite3.connect(curl)
-                    connection_schema = {
-                        'ctype' : 'SQLite',
+                case DatabaseAddConnectionMysqlView():
+                    cname = view.name.get_text() or 'New Connection'
+                    chost = view.host.get_text() or 'localhost'
+                    cport = view.port.get_text() or '3306'
+                    database = view.database.get_text() or 'NULL'
+                    username = view.username.get_text() or 'root'
+                    password = view.password.get_text() or 'NULL'
+                    curl = f"ATTACH 'host={chost} port={cport} " \
+                           f"user={username} passwd={password} " \
+                           f"db={database}' AS \"{cname}\" " \
+                           f"(TYPE mysql);"
+                    cschema = {
+                        'ctype' : 'MySQL',
                         'cname' : cname,
-                        'curl'  : f"ATTACH '{curl}' AS \"{cname}\" (TYPE sqlite);",
+                        'curl'  : curl,
                     }
 
+                case DatabaseAddConnectionSqliteView():
+                    cname = view.name.get_text() or 'New Connection'
+                    database = view.database.get_subtitle() or '~/sample.db'
+                    cschema = {
+                        'ctype' : 'SQLite',
+                        'cname' : cname,
+                        'curl'  : f"ATTACH '{database}' AS \"{cname}\" (TYPE sqlite);",
+                    }
+                    import sqlite3
+                    sqlite3.connect(database)
+
+            # Remove all parameters that are NULL
+            cschema['curl'] = re.sub(r'\s+\w+=NULL', '', cschema['curl'])
+
+            connection.execute(cschema['curl'])
+
         except Exception as e:
-            print(e)
+            message = str(e)
+            print(message)
 
-            message = str(e).capitalize()
-            globals.send_notification(message)
+            if message.startswith('unable'):
+                message = message.capitalize()
+            if 'Access denied for user' in message:
+                message = 'Access' + message.split('Access')[1]
+            if "Can't connect to MySQL server" in message:
+                message = "Can't" + message.split("Can't")[1]
 
+            alert_dialog = Adw.AlertDialog()
+
+            alert_dialog.set_heading(_('Connection Failed'))
+            alert_dialog.set_body(message)
+
+            alert_dialog.add_response('retry', _('_Retry'))
+            alert_dialog.add_response('ok', _('_OK'))
+
+            alert_dialog.set_default_response('retry')
+            alert_dialog.set_close_response('ok')
+
+            def on_alert_dialog_dismissed(dialog: Adw.AlertDialog,
+                                          result: Gio.Task) -> None:
+                if result.had_error():
+                    return
+                response = dialog.choose_finish(result)
+                if response != 'retry':
+                    return
+                self.on_connect_button_clicked(button)
+
+            alert_dialog.choose(self.window, None, on_alert_dialog_dismissed)
+
+            connection.close()
             return
 
-        self.callback(connection_schema)
+        connection.close()
+        self.callback(cschema)
         self.close()

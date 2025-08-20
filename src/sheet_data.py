@@ -560,7 +560,7 @@ class SheetData(GObject.Object):
             if message.startswith('unable to add a column of length '):
                 message = 'Column length mismatch. Create a new table?'
 
-                action_data_id = str(int(time()))
+                action_data_id = utils.generate_ulid()
                 action_name = f"app.apply-pending-table('{action_data_id}')"
                 action = ('Create', action_name, action_data_id)
 

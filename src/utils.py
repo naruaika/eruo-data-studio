@@ -218,3 +218,10 @@ def cast_to_boolean(string: str) -> bool:
     if string.lower() in ['true', '1']:
         return True
     return False
+
+
+
+import time
+
+def generate_ulid():
+    return int(time.time() * 1000)

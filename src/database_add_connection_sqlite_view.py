@@ -30,8 +30,8 @@ from .window import Window
 class DatabaseAddConnectionSqliteView(Adw.PreferencesPage):
     __gtype_name__ = 'DatabaseAddConnectionSqliteView'
 
-    connect_as = Gtk.Template.Child()
-    connect_to = Gtk.Template.Child()
+    name = Gtk.Template.Child()
+    database = Gtk.Template.Child()
 
     def __init__(self,
                  window: Window,
@@ -41,7 +41,7 @@ class DatabaseAddConnectionSqliteView(Adw.PreferencesPage):
         self.window = window
 
     @Gtk.Template.Callback()
-    def on_connect_to_activated(self, button: Gtk.Button) -> None:
+    def on_database_activated(self, button: Gtk.Button) -> None:
         FILTER_SQLITE = Gtk.FileFilter()
         FILTER_SQLITE.set_name('SQLite Database')
         FILTER_SQLITE.add_pattern('*.sqlite')
@@ -67,11 +67,11 @@ class DatabaseAddConnectionSqliteView(Adw.PreferencesPage):
                 return
 
             file = dialog.open_finish(result)
-            self.connect_to.set_subtitle(file.get_path())
+            self.database.set_subtitle(file.get_path())
 
-            if self.connect_as.get_text() == 'New Connection':
+            if self.name.get_text() == 'New Connection':
                 basename = os.path.basename(file.get_path())
                 filename = os.path.splitext(basename)[0]
-                self.connect_as.set_text(filename)
+                self.name.set_text(filename)
 
         dialog.open(self.window, None, on_open_file_dialog_dismissed)

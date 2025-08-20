@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="DatabaseAddConnectionMysqlView" parent="AdwPreferencesPage">
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwEntryRow" id="name">
+            <property name="title">Name</property>
+            <property name="text">New Connection</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title">Server</property>
+        <child>
+          <object class="AdwEntryRow" id="host">
+            <property name="title">Host</property>
+            <property name="text">localhost</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwEntryRow" id="port">
+            <property name="title">Port</property>
+            <property name="text">3306</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwEntryRow" id="database">
+            <property name="title">Database</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title">Authentication</property>
+        <child>
+          <object class="AdwEntryRow" id="username">
+            <property name="title">Username</property>
+            <property name="text">root</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPasswordEntryRow" id="password">
+            <property name="title">Password</property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>

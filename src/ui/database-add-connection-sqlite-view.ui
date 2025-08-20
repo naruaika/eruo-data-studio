@@ -6,17 +6,17 @@
     <child>
       <object class="AdwPreferencesGroup">
         <child>
-          <object class="AdwEntryRow" id="connect_as">
-            <property name="title">Connect As</property>
+          <object class="AdwEntryRow" id="name">
+            <property name="title">Name</property>
             <property name="text">New Connection</property>
           </object>
         </child>
         <child>
-          <object class="AdwActionRow" id="connect_to">
-            <property name="title">Connect To</property>
+          <object class="AdwActionRow" id="database">
+            <property name="title">Database</property>
             <property name="subtitle">~/sample.db</property>
             <property name="activatable">true</property>
-            <signal name="activated" handler="on_connect_to_activated" swapped="no"/>
+            <signal name="activated" handler="on_database_activated" swapped="no"/>
             <child>
               <object class="GtkImage">
                 <property name="margin-start">8</property>

@@ -25,6 +25,7 @@ from gi.repository import Adw, Gdk, GLib, GObject, Gtk, GtkSource
 import polars
 import threading
 
+from . import utils
 from .sheet_notebook import SheetNotebook
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/sheet-notebook-view.ui')
@@ -209,7 +210,7 @@ class SheetNotebookView(Gtk.Box):
             target_list_item = self.list_items[position - 1]['main_container']
             self.list_view.insert_child_after(main_container, target_list_item)
 
-        position = len(self.list_items)
+        cell_id = utils.generate_ulid()
 
         def on_run_button_clicked(button: Gtk.Button) -> None:
             # TODO: implement undo/redo?
@@ -225,8 +226,7 @@ class SheetNotebookView(Gtk.Box):
             button.set_sensitive(False)
 
             # Remove the item from the queue
-            if self.is_running_queue \
-                    and self.run_queue[0] == position:
+            if self.is_running_queue:
                 self.run_queue.pop(0)
 
             def show_query_result(dataframe: polars.DataFrame) -> None:
@@ -252,14 +252,18 @@ class SheetNotebookView(Gtk.Box):
 
             def run_next_query(is_success: bool) -> None:
                 if self.is_running_queue:
-                    if is_success \
-                            and len(self.run_queue) > 0:
-                        # Trigger the next query in queue
-                        lidx = self.run_queue[0]
-                        list_item = self.list_items[lidx]
-                        list_item['run_button'].emit('clicked')
-                    else:
+                    if not is_success:
                         self.run_all_cells_finish()
+                        return
+
+                    if len(self.run_queue) == 0:
+                        self.run_all_cells_finish()
+                        return
+
+                    # Trigger the next query in queue
+                    lidx = self.run_queue[0]
+                    list_item = self.list_items[lidx]
+                    list_item['run_button'].emit('clicked')
 
             def run_query_in_thread() -> None:
                 text_buffer = source_view.get_buffer()
@@ -289,18 +293,22 @@ class SheetNotebookView(Gtk.Box):
             threading.Thread(target=run_query_in_thread, daemon=True).start()
 
         def on_run_above_button_clicked(button: Gtk.Button) -> None:
+            position = self.get_cell_position_by_id(cell_id)
             self.run_all_cells(end=position)
 
         def on_run_below_button_clicked(button: Gtk.Button) -> None:
+            position = self.get_cell_position_by_id(cell_id)
             self.run_all_cells(start=position)
 
         def on_add_sql_button_clicked(button: Gtk.Button) -> None:
+            position = self.get_cell_position_by_id(cell_id)
             self.add_new_sql_cell(position=position)
 
         def on_add_markdown_button_clicked(button: Gtk.Button) -> None:
             pass
 
         def on_delete_button_clicked(button: Gtk.Button) -> None:
+            position = self.get_cell_position_by_id(cell_id)
             list_item = self.list_items[position]
             list_item['main_container'].unparent()
             self.list_items.pop(position)
@@ -328,6 +336,7 @@ class SheetNotebookView(Gtk.Box):
         source_view.add_controller(key_event_controller)
 
         self.list_items.append({
+            'cell_id'             : cell_id,
             'ctype'               : 'sql',
             'sheet_document'      : sheet_document,
             'main_container'      : main_container,
@@ -367,6 +376,7 @@ class SheetNotebookView(Gtk.Box):
                 break
             if list_item['ctype'] not in {'sql'}:
                 continue
+
             list_item['output_container'].set_visible(False)
             list_item['run_button'].set_sensitive(False)
 
@@ -398,3 +408,9 @@ class SheetNotebookView(Gtk.Box):
     @Gtk.Template.Callback()
     def on_add_markdown_clicked(self, button: Gtk.Button) -> None:
         pass # TODO
+
+    def get_cell_position_by_id(self, cell_id: int) -> int:
+        for lidx, list_item in enumerate(self.list_items):
+            if list_item['cell_id'] == cell_id:
+                return lidx
+        return -1

@@ -26,6 +26,7 @@ from typing import Any
 import polars
 import re
 
+from . import utils
 from .sheet_document import SheetDocument
 from .sheet_notebook import SheetNotebook
 from .sheet_view import SheetView
@@ -40,7 +41,7 @@ class SheetManager(GObject.Object):
         # SheetManager is highly coupled to the main window. Because we can
         # have multiple instances of the main window, we need to identify
         # each window with a unique id.
-        self.sheet_id = str(int(time()))
+        self.sheet_id = utils.generate_ulid()
 
         self.sheets: dict[str, SheetDocument | SheetNotebook] = {}
         self.sheet_counter: int = 0
