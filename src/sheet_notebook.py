@@ -85,10 +85,14 @@ class SheetNotebook(GObject.Object):
 
         try:
             result = connection.sql(query)
-            connection.close()
+
             if result is not None:
-                return result.pl()
-            return 'Query executed successfully'
+                result = result.pl()
+            else:
+                result = 'Query executed successfully'
+
+            connection.close()
+            return result
 
         except Exception as e:
             print(e)

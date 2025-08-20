@@ -204,11 +204,11 @@ class SheetNotebookView(Gtk.Box):
 
         if position == 0:
             self.list_view.prepend(main_container)
-        if position == -1:
-            self.list_view.append(main_container)
         if position > 0:
             target_list_item = self.list_items[position - 1]['main_container']
             self.list_view.insert_child_after(main_container, target_list_item)
+        if position == -1:
+            self.list_view.append(main_container)
 
         cell_id = utils.generate_ulid()
 
@@ -340,6 +340,8 @@ class SheetNotebookView(Gtk.Box):
         key_event_controller.connect('key-pressed', on_source_view_key_pressed)
         source_view.add_controller(key_event_controller)
 
+        if position == -1:
+            position = len(self.list_items)
         self.list_items.insert(position, {
             'cell_id'             : cell_id,
             'ctype'               : 'sql',
