@@ -140,8 +140,17 @@
     padding: 2px;
     background-color: transparent;
 }
-.sidebar-list-view-box > row:selected {
+.sidebar-list-view-box > row:not(.activatable):selected {
     background-color: transparent;
+}
+.sidebar-list-view-box.navigation-sidebar {
+    padding: 0;
+}
+.sidebar-list-view-box.navigation-sidebar > row {
+    margin: 3px;
+    padding-left: 2px;
+    padding-right: 0;
+    border-radius: 8px;
 }
 .sidebar-list-view-box > row button {
     font-weight: normal;
@@ -151,7 +160,9 @@
     border-radius: 12px;
 }
 
+.sidebar-list-view-box check,
 .sidebar-list-view check {
+    margin-right: 1px;
     background-color: transparent;
 }
 .sidebar-list-view-box dropdown .toggle {

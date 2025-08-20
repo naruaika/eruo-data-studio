@@ -40,8 +40,9 @@ class Window(Adw.ApplicationWindow):
     __gtype_name__ = 'Window'
 
     __gsignals__ = {
-        'add-new-connection'     : (GObject.SIGNAL_RUN_FIRST, None, ()),
-        'update-connection-list' : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'add-new-connection'       : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'update-connection-list'   : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'toggle-connection-active' : (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
     }
 
     split_view = Gtk.Template.Child()

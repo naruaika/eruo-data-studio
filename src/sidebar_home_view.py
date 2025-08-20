@@ -34,16 +34,19 @@ class ConnectionListItem(GObject.Object):
 
     ctype = GObject.Property(type=str, default='Dataframe')
     cname = GObject.Property(type=str, default='New Connection')
+    connected = GObject.Property(type=bool, default=True)
     removable = GObject.Property(type=bool, default=False)
 
     def __init__(self,
                  ctype:     str,
                  cname:     str,
+                 connected: bool,
                  removable: bool) -> None:
         super().__init__()
 
         self.ctype = ctype
         self.cname = cname
+        self.connected = connected
         self.removable = removable
 
 
@@ -551,25 +554,16 @@ class SidebarHomeView(Adw.Bin):
         container.set_spacing(3)
         list_item.set_child(container)
 
-        main_button = Gtk.Button()
-        main_button.add_css_class('flat')
-        container.append(main_button)
+        check_button = Gtk.CheckButton()
+        check_button.set_hexpand(True)
+        container.append(check_button)
 
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        box.set_margin_top(3)
-        box.set_margin_bottom(3)
-        box.set_margin_start(8)
-        box.set_margin_end(5)
-        box.set_spacing(9)
-        main_button.set_child(box)
+        check_button.set_child(box)
 
         subbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         subbox.set_hexpand(True)
         box.append(subbox)
-
-        copy_image = Gtk.Image()
-        copy_image.set_from_icon_name('edit-copy-symbolic')
-        box.append(copy_image)
 
         label_name = Gtk.Label()
         label_name.set_halign(Gtk.Align.START)
@@ -587,9 +581,16 @@ class SidebarHomeView(Adw.Bin):
         menu_button.add_css_class('flat')
         container.append(menu_button)
 
-        list_item.main_button = main_button
+        copy_button = Gtk.Button()
+        copy_button.set_icon_name('edit-copy-symbolic')
+        copy_button.set_tooltip_text('Copy Connection Name')
+        copy_button.add_css_class('flat')
+        container.append(copy_button)
+
+        list_item.check_button = check_button
         list_item.label_name = label_name
         list_item.label_type = label_type
+        list_item.copy_button = copy_button
         list_item.menu_button = menu_button
 
     def bind_factory_connection(self,
@@ -597,18 +598,32 @@ class SidebarHomeView(Adw.Bin):
                                 list_item:         Gtk.ListItem) -> None:
 
         def copy_connection_name(button:    Gtk.Button,
-                                 item_data: FieldListItem) -> None:
+                                 item_data: ConnectionListItem) -> None:
             display = Gdk.Display.get_default()
             clipboard = display.get_clipboard()
             clipboard.set(GObject.Value(str, item_data.cname))
 
+        def toggle_connection_status(button:    Gtk.CheckButton,
+                                     item_data: ConnectionListItem) -> None:
+            connected = button.get_active()
+
+            # Prevent the user from disconnecting any dataframes
+            if item_data.ctype == 'Dataframe':
+                button.set_active(True)
+                return
+
+            item_data.connected = connected
+            self.window.emit('toggle-connection-active', item_data.cname, connected)
+
         item_data = list_item.get_item()
 
-        list_item.main_button.set_tooltip_text(item_data.cname)
+        list_item.check_button.set_tooltip_text(item_data.cname)
+        list_item.check_button.set_active(item_data.connected)
         list_item.label_name.set_label(item_data.cname)
         list_item.label_type.set_label(item_data.ctype)
 
-        list_item.main_button.connect('clicked', copy_connection_name, item_data)
+        list_item.check_button.connect('toggled', toggle_connection_status, item_data)
+        list_item.copy_button.connect('clicked', copy_connection_name, item_data)
 
         if item_data.ctype == 'Dataframe':
             list_item.menu_button.set_visible(False)
@@ -621,9 +636,10 @@ class SidebarHomeView(Adw.Bin):
     def teardown_factory_connection(self,
                                     list_item_factory: Gtk.SignalListItemFactory,
                                     list_item:         Gtk.ListItem) -> None:
-        list_item.main_button = None
+        list_item.check_button = None
         list_item.label_name = None
         list_item.label_type = None
+        list_item.copy_button = None
         list_item.menu_button = None
 
     @Gtk.Template.Callback()
@@ -653,6 +669,7 @@ class SidebarHomeView(Adw.Bin):
 
             list_item = ConnectionListItem(connection['ctype'],
                                            cname,
+                                           connection['connected'],
                                            connection['removable'])
 
             if self_claimed:

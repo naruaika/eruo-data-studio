@@ -823,7 +823,7 @@ Options:
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         window = self.get_active_window()
-        window.emit('add-new-connection')
+        self.on_update_connection_list(window)
 
     def on_add_new_connection(self, source: GObject.Object) -> None:
         window = self.get_active_window()
@@ -843,7 +843,7 @@ Options:
 
             return f'{cname} {cnumber}'
 
-        def _connect_to_source(connection_schema: dict) -> None:
+        def _add_new_connection(connection_schema: dict) -> None:
             # Rename connection if it already exists
             incoming_cname = connection_schema['cname']
             if incoming_cname in existing_cnames:
@@ -851,10 +851,13 @@ Options:
                 new_curl = connection_schema['curl'].replace(incoming_cname, new_cname)
                 connection_schema.update({'cname': new_cname, 'curl': new_curl})
 
+            # Set the connected flag to true
+            connection_schema['connected'] = True
+
             self.connection_list.append(connection_schema)
             self.on_update_connection_list(window)
 
-        dialog = DatabaseAddConnectionDialog(window, _connect_to_source)
+        dialog = DatabaseAddConnectionDialog(window, _add_new_connection)
         dialog.present(window)
 
     def on_rename_connection_action(self,
@@ -887,13 +890,31 @@ Options:
         window = self.get_active_window()
         self.on_update_connection_list(window)
 
-    def on_update_connection_list(self, source: GObject.Object) -> None:
+    def on_toggle_connection_active(self,
+                                    source:    GObject.Object,
+                                    cname:     str,
+                                    connected: bool) -> None:
+        for connection in self.connection_list:
+            if connection['cname'] == cname:
+                connection['connected'] = connected
+                break
+
+        self.on_update_connection_list(source, skip_emitter=True)
+
+    def on_update_connection_list(self,
+                                  emitter: GObject.Object,
+                                  skip_emitter: bool = False) -> None:
         connection_list = []
 
         for connection in self.connection_list:
+            # Introduce a new connected flag
+            if 'connected' not in connection:
+                connection['connected'] = True
+
             connection_list.append({
                 'ctype'     : connection['ctype'],
                 'cname'     : connection['cname'],
+                'connected' : connection['connected'],
                 'removable' : True,
             })
 
@@ -912,11 +933,14 @@ Options:
                     connection_list.append({
                         'ctype'     : 'Dataframe',
                         'cname'     : view_name,
+                        'connected' : True,
                         'removable' : False,
                     })
 
         # Update connection list view in all the windows
         for window in self.get_windows():
+            if window == emitter and skip_emitter:
+                continue
             window.sidebar_home_view.repopulate_connection_list(connection_list)
 
     def register_connection(self, connection: duckdb.DuckDBPyConnection) -> list[str]:
@@ -945,7 +969,8 @@ Options:
                         view_name = f'self:{sheet.title}'
                         connection.register(view_name, sheet.data.dfs[0])
 
-        active_connections = [connection['curl'] for connection in self.connection_list]
+        active_connections = [connection['curl'] for connection in self.connection_list
+                                                 if connection['connected']]
         return ';'.join(active_connections)
 
     def get_current_active_document(self) -> SheetDocument:
@@ -991,6 +1016,7 @@ Options:
         window = Window(application=self)
         window.connect('add-new-connection', self.on_add_new_connection)
         window.connect('update-connection-list', self.on_update_connection_list)
+        window.connect('toggle-connection-active', self.on_toggle_connection_active)
         window.present()
 
         if not skip_setup:
@@ -1088,7 +1114,7 @@ Options:
             tab_page = window.tab_view.get_nth_page(tab_index)
             window.tab_view.set_page_pinned(tab_page, True)
 
-        window.emit('update-connection-list')
+        self.on_update_connection_list(window)
 
         window.present()
 

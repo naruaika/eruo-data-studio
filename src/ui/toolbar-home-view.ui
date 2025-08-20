@@ -151,6 +151,15 @@
                   </object>
                 </child>
                 <child>
+                  <object class="GtkSeparator">
+                    <property name="orientation">vertical</property>
+                    <property name="margin-top">6</property>
+                    <property name="margin-bottom">6</property>
+                    <property name="margin-start">6</property>
+                    <property name="margin-end">6</property>
+                  </object>
+                </child>
+                <child>
                   <object class="GtkButton">
                     <property name="icon-name">row-delete-symbolic</property>
                     <property name="tooltip-text">Delete Row(s)</property>
