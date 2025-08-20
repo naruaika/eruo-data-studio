@@ -242,9 +242,14 @@ class SheetNotebookView(Gtk.Box):
                 sheet_document.setup_document()
                 sheet_document.renderer.render_caches = {}
 
-            def show_error_message(message: str) -> None:
+            def show_output_message(message: str) -> None:
                 status_text.get_buffer().set_text(message)
-                status_text.add_css_class('error')
+                if message == 'Query executed successfully':
+                    status_text.add_css_class('success')
+                    status_text.remove_css_class('error')
+                else:
+                    status_text.add_css_class('error')
+                    status_text.remove_css_class('success')
                 status_text.set_visible(True)
 
                 sheet_document.data.setup_main_dataframe(polars.DataFrame())
@@ -284,7 +289,7 @@ class SheetNotebookView(Gtk.Box):
                 if is_success:
                     GLib.idle_add(show_query_result, result)
                 else:
-                    GLib.idle_add(show_error_message, result)
+                    GLib.idle_add(show_output_message, result)
 
                 button.set_sensitive(True)
 
@@ -335,7 +340,7 @@ class SheetNotebookView(Gtk.Box):
         key_event_controller.connect('key-pressed', on_source_view_key_pressed)
         source_view.add_controller(key_event_controller)
 
-        self.list_items.append({
+        self.list_items.insert(position, {
             'cell_id'             : cell_id,
             'ctype'               : 'sql',
             'sheet_document'      : sheet_document,

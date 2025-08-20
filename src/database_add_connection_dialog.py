@@ -26,6 +26,7 @@ import duckdb
 import re
 
 from .database_add_connection_mysql_view import DatabaseAddConnectionMysqlView
+from .database_add_connection_postgresql_view import DatabaseAddConnectionPostgresqlView
 from .database_add_connection_sqlite_view import DatabaseAddConnectionSqliteView
 from .window import Window
 
@@ -46,6 +47,9 @@ class DatabaseAddConnectionDialog(Adw.Dialog):
 
         view = DatabaseAddConnectionMysqlView(window)
         self.view_stack.add_titled(view, 'mysql', 'MySQL')
+
+        view = DatabaseAddConnectionPostgresqlView(window)
+        self.view_stack.add_titled(view, 'postgresql', 'PostgreSQL')
 
         view = DatabaseAddConnectionSqliteView(window)
         self.view_stack.add_titled(view, 'sqlite', 'SQLite')
@@ -71,6 +75,23 @@ class DatabaseAddConnectionDialog(Adw.Dialog):
                            f"(TYPE mysql);"
                     cschema = {
                         'ctype' : 'MySQL',
+                        'cname' : cname,
+                        'curl'  : curl,
+                    }
+
+                case DatabaseAddConnectionPostgresqlView():
+                    cname = view.name.get_text() or 'New Connection'
+                    chost = view.host.get_text() or 'localhost'
+                    cport = view.port.get_text() or '5432'
+                    database = view.database.get_text() or 'NULL'
+                    username = view.username.get_text() or 'root'
+                    password = view.password.get_text() or 'NULL'
+                    curl = f"ATTACH 'host={chost} port={cport} " \
+                           f"user={username} password={password} " \
+                           f"dbname={database}' AS \"{cname}\" " \
+                           f"(TYPE postgres);"
+                    cschema = {
+                        'ctype' : 'PostgreSQL',
                         'cname' : cname,
                         'curl'  : curl,
                     }

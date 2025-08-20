@@ -1194,7 +1194,7 @@ class Window(Adw.ApplicationWindow):
 
         connection = duckdb.connect()
 
-        # Register all the main dataframes
+        # Register all the data sources
         if sheet_document.data.has_main_dataframe:
             connection.register('self', sheet_document.data.dfs[0])
         connection_strings = globals.register_connection(connection)

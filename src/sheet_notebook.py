@@ -77,16 +77,18 @@ class SheetNotebook(GObject.Object):
     def run_sql_query(self, query: str) -> Any:
         connection = duckdb.connect()
 
-        # Register all the main dataframes
+        # Register all the data sources
         connection_strings = globals.register_connection(connection)
         query = connection_strings + query
 
         register_sql_functions(connection)
 
         try:
-            dataframe = connection.sql(query).pl()
+            result = connection.sql(query)
             connection.close()
-            return dataframe
+            if result is not None:
+                return result.pl()
+            return 'Query executed successfully'
 
         except Exception as e:
             print(e)

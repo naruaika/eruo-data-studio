@@ -1176,7 +1176,7 @@ class SheetDocument(GObject.Object):
 
         connection = duckdb.connect()
 
-        # Register all the main dataframes
+        # Register all the data sources
         if self.data.has_main_dataframe:
             connection.register('self', self.data.dfs[0])
         connection_strings = globals.register_connection(connection)
@@ -2812,14 +2812,18 @@ class SheetDocument(GObject.Object):
         self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * self.data.dfs[0].width, dtype=polars.UInt32)
 
         for col_index, col_name in enumerate(self.data.dfs[0].columns):
+            if self.data.dfs[0].height == 0:
+                continue
             sample_data = sample_data.with_columns(polars.col(col_name).fill_null('[Blank]').cast(polars.Utf8))
             max_length = sample_data.select(polars.col(col_name).str.len_chars().max()).item()
             try:
-                sample_text = sample_data.with_columns(polars.when(polars.col(col_name).str.len_chars() == max_length)
-                                                             .then(polars.col(col_name))
-                                                             .otherwise(None)
-                                                             .alias('sample_text')) \
-                                         .drop_nulls('sample_text').sample(1).item(0, 'sample_text')
+                expr = polars.when(polars.col(col_name).str.len_chars() == max_length) \
+                             .then(polars.col(col_name)) \
+                             .otherwise(None) \
+                             .alias('sample_text')
+                sample_text = sample_data.with_columns(expr) \
+                                         .drop_nulls('sample_text') \
+                                         .sample(1).item(0, 'sample_text')
             except Exception:
                 continue
             layout.set_text(str(sample_text), -1)
