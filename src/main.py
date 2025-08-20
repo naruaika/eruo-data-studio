@@ -1078,7 +1078,8 @@ Options:
 
         pinned_tabs = workspace_schema.get('pinned-tabs', [])
         for tab_index in pinned_tabs:
-            window.tab_view.get_nth_page(tab_index).set_pinned(True)
+            tab_page = window.tab_view.get_nth_page(tab_index)
+            window.tab_view.set_page_pinned(tab_page, True)
 
         window.emit('update-connection-list')
 
