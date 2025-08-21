@@ -31,9 +31,10 @@ import threading
 from . import globals
 from .sheet_data import SheetCellBoundingBox
 from .sheet_document import SheetDocument
+from .sheet_notebook import SheetNotebook
 from .sheet_functions import register_sql_functions
-from .sheet_view import SheetView
 from .sheet_notebook_view import SheetNotebookView
+from .sheet_view import SheetView
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/window.ui')
 class Window(Adw.ApplicationWindow):
@@ -701,6 +702,14 @@ class Window(Adw.ApplicationWindow):
         self.home_toggle_button.set_active(True)
 
         sheet_document = sheet_view.document
+
+        if isinstance(sheet_document, SheetDocument):
+            sheet_document.view.main_canvas.set_focusable(True)
+            sheet_document.view.main_canvas.grab_focus()
+
+        if isinstance(sheet_document, SheetNotebook) \
+                and len(sheet_document.view.list_items) > 0:
+            sheet_document.view.list_items[0]['source_view'].grab_focus()
 
         # Force the sidebar to update its content based on the current
         # active selection

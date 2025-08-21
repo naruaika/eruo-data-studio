@@ -67,7 +67,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
         main_menu.append_section(None, cut_copy_paste_section)
 
     def create_insert_duplicate_delete_section(self,
-                                               main_menu: Gio.Menu,
+                                               main_menu:    Gio.Menu,
                                                start_column: str,       start_row: str,
                                                end_column:   str,       end_row:   str,
                                                column_span:  int,       row_span:  int,

@@ -45,7 +45,8 @@ class SheetNotebookView(Gtk.Box):
         self.document = document
 
         # Disable scroll to focus behavior of the Gtk.Viewport
-        self.scrolled_window.get_first_child().set_scroll_to_focus(False)
+        viewport = self.scrolled_window.get_first_child()
+        viewport.set_scroll_to_focus(False)
 
         self.list_items: list[dict[str, GObject.Object]] = []
 
@@ -79,8 +80,9 @@ class SheetNotebookView(Gtk.Box):
             source_buffer.set_style_scheme(style_scheme)
 
     def add_new_sql_cell(self,
-                         query:    str = None,
-                         position: int = -1) -> None:
+                         query:     str = None,
+                         position:  int = -1,
+                         autofocus: bool = False) -> None:
         main_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         main_container.set_spacing(6)
 
@@ -92,7 +94,7 @@ class SheetNotebookView(Gtk.Box):
         main_container.append(run_button)
 
         content_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        content_container.set_spacing(6)
+        content_container.set_spacing(10)
         main_container.append(content_container)
 
         toolbar_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -182,8 +184,8 @@ class SheetNotebookView(Gtk.Box):
         status_text = Gtk.TextView()
         status_text.set_halign(Gtk.Align.FILL)
         status_text.set_hexpand(True)
+        status_text.set_vexpand(False)
         status_text.set_editable(False)
-        status_text.set_cursor_visible(False)
         status_text.set_wrap_mode(Gtk.WrapMode.WORD)
         status_text.add_css_class('notebook-status')
         status_text.add_css_class('error')
@@ -220,8 +222,6 @@ class SheetNotebookView(Gtk.Box):
             status_text.set_visible(True)
 
             sheet_document.view.set_visible(False)
-
-            output_container.set_visible(True)
 
             button.set_sensitive(False)
 
@@ -291,6 +291,9 @@ class SheetNotebookView(Gtk.Box):
                 else:
                     GLib.idle_add(show_output_message, result)
 
+                viewport = self.scrolled_window.get_first_child()
+                GLib.timeout_add(50, viewport.scroll_to, output_container, None)
+
                 button.set_sensitive(True)
 
                 run_next_query(is_success)
@@ -342,6 +345,7 @@ class SheetNotebookView(Gtk.Box):
 
         if position == -1:
             position = len(self.list_items)
+
         self.list_items.insert(position, {
             'cell_id'             : cell_id,
             'ctype'               : 'sql',
@@ -359,6 +363,12 @@ class SheetNotebookView(Gtk.Box):
             'add_markdown_button' : add_markdown_button,
             'delete_button'       : delete_button,
         })
+
+        if autofocus:
+            viewport = self.scrolled_window.get_first_child()
+            GLib.timeout_add(50, viewport.scroll_to, main_container, None)
+            source_view.grab_focus() # calling this in the default main loop
+                                     # causes flickering, just to be cautious
 
     @Gtk.Template.Callback()
     def on_run_all_clicked(self, button: Gtk.Button) -> None:
@@ -410,7 +420,7 @@ class SheetNotebookView(Gtk.Box):
 
     @Gtk.Template.Callback()
     def on_add_sql_query_clicked(self, button: Gtk.Button) -> None:
-        self.add_new_sql_cell()
+        self.add_new_sql_cell(autofocus=True)
 
     @Gtk.Template.Callback()
     def on_add_markdown_clicked(self, button: Gtk.Button) -> None:

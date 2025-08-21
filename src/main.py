@@ -52,6 +52,7 @@ from . import globals
 from .clipboard_manager import ClipboardManager
 from .file_manager import FileManager
 from .sheet_document import SheetDocument
+from .sheet_notebook import SheetNotebook
 from .window import Window
 
 class Application(Adw.Application):
@@ -1105,10 +1106,22 @@ Options:
         if not sidebar_collapsed:
             window.toggle_sidebar() # it's collapsed by default
 
+        # Set the current active tab
         current_active_tab = workspace_schema.get('current-active-tab', 0)
         selected_page = window.tab_view.get_nth_page(current_active_tab)
         window.tab_view.set_selected_page(selected_page)
 
+        # Set the focus to specific widgets
+        sheet_view = selected_page.get_child()
+        sheet_document = sheet_view.document
+        if isinstance(sheet_document, SheetDocument):
+            sheet_document.view.main_canvas.set_focusable(True)
+            sheet_document.view.main_canvas.grab_focus()
+        if isinstance(sheet_document, SheetNotebook) \
+                and len(sheet_document.view.list_items) > 0:
+            sheet_document.view.list_items[0]['source_view'].grab_focus()
+
+        # Set the pinned tabs
         pinned_tabs = workspace_schema.get('pinned-tabs', [])
         for tab_index in pinned_tabs:
             tab_page = window.tab_view.get_nth_page(tab_index)

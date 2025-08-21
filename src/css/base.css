@@ -223,6 +223,9 @@
     background-color: transparent;
 }
 
+.notebook-output {
+    margin-bottom: 10px;
+}
 .notebook-output,
 .notebook-status {
     padding: 8px;

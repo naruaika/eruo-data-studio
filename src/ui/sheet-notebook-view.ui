@@ -78,7 +78,6 @@
             <property name="margin-bottom">30</property>
             <property name="margin-start">6</property>
             <property name="margin-end">20</property>
-            <property name="spacing">10</property>
             <property name="valign">fill</property>
             <property name="halign">fill</property>
             <property name="hexpand">true</property>
