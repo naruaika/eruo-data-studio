@@ -75,6 +75,7 @@ class SheetView(Gtk.Box):
 
         motion_event_controller = Gtk.EventControllerMotion()
         motion_event_controller.connect('motion', self.on_main_canvas_motion)
+        motion_event_controller.connect('leave', self.on_main_canvas_left)
         self.main_canvas.add_controller(motion_event_controller)
 
         focus_event_controller = Gtk.EventControllerFocus()
@@ -170,6 +171,10 @@ class SheetView(Gtk.Box):
                               x:     float,
                               y:     float) -> None:
         self.emit('pointer-moved', x, y)
+
+    def on_main_canvas_left(self, event: Gtk.EventControllerMotion) -> None:
+        self.emit('pointer-moved', -1, -1) # to hide the column resizer widget
+                                           # or other non-relevant widgets
 
     def on_main_canvas_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         self.main_canvas.set_focusable(False)
