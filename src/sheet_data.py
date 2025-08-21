@@ -1034,6 +1034,32 @@ class SheetData(GObject.Object):
         return polars.concat([polars.Series([True]), # for header row
                               self.dfs[dfi].with_columns(expression.alias('$vrow'))['$vrow']])
 
+    def materialize_view(self,
+                         filters:      list,
+                         column_names: list[str]) -> bool:
+        if len(self.dfs) == 0:
+            return False
+
+        if not self.has_main_dataframe:
+            return False
+
+        expression = polars.lit(True)
+
+        for index, afilter in enumerate(filters):
+            if index == 0:
+                expression = afilter['expression']
+                continue
+
+            if afilter['operator'] == 'and':
+                expression &= afilter['expression']
+            else:
+                expression |= afilter['expression']
+
+        self.dfs = [self.dfs[0].filter(expression).select(column_names)]
+        self.bbs = [self.bbs[0]]
+
+        return True
+
     def sort_rows_from_metadata(self,
                                 sorts: dict,
                                 dfi:   int) -> bool:

@@ -11,6 +11,20 @@
         <child>
           <object class="GtkBox">
             <property name="orientation">horizontal</property>
+            <child>
+              <object class="GtkButton">
+                <property name="action-name">app.add-connection</property>
+                <child>
+                  <object class="AdwButtonContent">
+                    <property name="icon-name">transform-instructions-symbolic</property>
+                    <property name="label" translatable="yes">Save filtered</property>
+                  </object>
+                </child>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+            </child>
           </object>
         </child>
       </object>

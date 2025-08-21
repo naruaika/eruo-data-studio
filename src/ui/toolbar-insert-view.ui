@@ -13,6 +13,73 @@
             <property name="orientation">horizontal</property>
             <child>
               <object class="GtkButton">
+                <property name="icon-name">document-multiple-01-symbolic</property>
+                <property name="tooltip-text">Duplicate Sheet</property>
+                <property name="action-name">app.duplicate-selected-tab</property>
+                <style>
+                  <class name="flat"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkBox">
+                <property name="orientation">horizontal</property>
+                <child>
+                  <object class="GtkButton">
+                    <property name="icon-name">document-add-symbolic</property>
+                    <property name="tooltip-text">New Sheet</property>
+                    <property name="action-name">app.new-worksheet</property>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkMenuButton">
+                    <property name="icon-name">chevron-down-symbolic</property>
+                    <property name="tooltip-text" translatable="yes">More Options</property>
+                    <property name="menu-model">new_sheet_menu</property>
+                    <style>
+                      <class name="flat"/>
+                      <class name="arrow"/>
+                    </style>
+                  </object>
+                </child>
+                <style>
+                  <class name="linked"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkBox" id="worksheet_1_section">
+                <property name="orientation">horizontal</property>
+                <child>
+                  <object class="GtkButton">
+                    <property name="action-name">app.new-worksheet-from-view</property>
+                    <child>
+                      <object class="AdwButtonContent">
+                        <property name="icon-name">document-add-symbolic</property>
+                        <property name="label" translatable="yes">From View</property>
+                      </object>
+                    </child>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="GtkSeparator">
+                <property name="orientation">vertical</property>
+                <property name="margin-top">6</property>
+                <property name="margin-bottom">6</property>
+                <property name="margin-start">6</property>
+                <property name="margin-end">6</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
                 <property name="action-name">app.import-table</property>
                 <child>
                   <object class="AdwButtonContent">
@@ -59,4 +126,16 @@
       </object>
     </child>
   </template>
+  <menu id="new_sheet_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">New _Worksheet</attribute>
+        <attribute name="action">app.new-worksheet</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">New _Notebook</attribute>
+        <attribute name="action">app.new-notebook</attribute>
+      </item>
+    </section>
+  </menu>
 </interface>

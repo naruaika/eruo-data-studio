@@ -65,6 +65,8 @@
     <file preprocess="xml-stripblanks">column-insert-symbolic.svg</file>
     <file preprocess="xml-stripblanks">copy-symbolic.svg</file>
     <file preprocess="xml-stripblanks">cut-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">document-add-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">document-multiple-01-symbolic.svg</file>
     <file preprocess="xml-stripblanks">erase-symbolic.svg</file>
     <file preprocess="xml-stripblanks">filter-symbolic.svg</file>
     <file preprocess="xml-stripblanks">paste-symbolic.svg</file>

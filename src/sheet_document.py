@@ -2140,7 +2140,6 @@ class SheetDocument(GObject.Object):
             self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
         self.auto_adjust_selections_by_crud(0, 0, False)
-        self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 
         self.renderer.render_caches = {}
@@ -2186,6 +2185,46 @@ class SheetDocument(GObject.Object):
             return True
 
         return False
+
+    def materialize_view(self) -> None:
+        if len(self.data.dfs) == 0:
+            return
+
+        if not self.data.has_main_dataframe:
+            return
+
+        # Collect hidden column names
+        visible_column_names = []
+        for col_index, is_visible in enumerate(self.display.column_visibility_flags):
+            if is_visible:
+                visible_column_names.append(self.data.dfs[0].columns[col_index])
+
+        # Discards all dataframes but the main one
+        self.data.materialize_view(self.current_filters, visible_column_names)
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_auto_filter_widgets()
+
+        # Update column widths and visibility flags
+        if len(self.display.column_visibility_flags):
+            if len(self.display.column_widths):
+                self.display.column_widths = self.display.column_widths.filter(self.display.column_visibility_flags)
+            self.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
+            self.display.column_visible_series = polars.Series(dtype=polars.UInt32)
+
+        # Update row heights and visibility flags
+        if len(self.display.row_visibility_flags):
+            if len(self.display.row_heights):
+                self.display.row_heights = self.display.row_heights.filter(self.display.row_visibility_flags)
+            self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+            self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        # Reset these as they're no longer relevant
+        self.current_sorts = []
+        self.current_filters = []
 
     def find_in_current_cells(self,
                               text_value:       str,

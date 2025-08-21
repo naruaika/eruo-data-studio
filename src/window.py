@@ -110,6 +110,14 @@ class Window(Adw.ApplicationWindow):
         self.toolbar_view_view = ToolbarViewView(self)
         self.toolbar_view_page = self.toolbar_tab_view.append(self.toolbar_view_view)
 
+        self.toolbar_buttons = [
+            self.home_toggle_button,
+            self.insert_toggle_button,
+            self.formulas_toggle_button,
+            self.data_toggle_button,
+            self.view_toggle_button,
+        ]
+
         from .search_replace_overlay import SearchReplaceOverlay
         self.search_replace_overlay = SearchReplaceOverlay(self)
         self.content_overlay.add_overlay(self.search_replace_overlay)
@@ -259,12 +267,12 @@ class Window(Adw.ApplicationWindow):
             sheet_document.display.column_visible_series = sheet_document.display.column_visibility_flags.arg_true()
 
             row_heights_visible_only = sheet_document.display.row_heights
-            if len(sheet_document.display.row_visibility_flags):
+            if len(sheet_document.display.row_heights) and len(sheet_document.display.row_visibility_flags):
                 row_heights_visible_only = row_heights_visible_only.filter(sheet_document.display.row_visibility_flags)
             sheet_document.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
             column_widths_visible_only = sheet_document.display.column_widths
-            if len(sheet_document.display.column_visibility_flags):
+            if len(sheet_document.display.column_widths) and len(sheet_document.display.column_visibility_flags):
                 column_widths_visible_only = column_widths_visible_only.filter(sheet_document.display.column_visibility_flags)
             sheet_document.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
@@ -676,6 +684,7 @@ class Window(Adw.ApplicationWindow):
         if isinstance(sheet_view, SheetView):
             self.toolbar_home_view.worksheet_1_section.set_visible(True)
             self.toolbar_home_view.worksheet_2_section.set_visible(True)
+            self.toolbar_insert_view.worksheet_1_section.set_visible(True)
 
             self.formulas_toggle_button.set_visible(True)
             self.data_toggle_button.set_visible(True)
@@ -689,6 +698,7 @@ class Window(Adw.ApplicationWindow):
         if isinstance(sheet_view, SheetNotebookView):
             self.toolbar_home_view.worksheet_1_section.set_visible(False)
             self.toolbar_home_view.worksheet_2_section.set_visible(False)
+            self.toolbar_insert_view.worksheet_1_section.set_visible(False)
 
             self.formulas_toggle_button.set_visible(False)
             self.data_toggle_button.set_visible(False)
@@ -699,7 +709,14 @@ class Window(Adw.ApplicationWindow):
             self.sidebar_home_view.sorts_section.set_visible(False)
             self.sidebar_home_view.filters_section.set_visible(False)
 
-        self.home_toggle_button.set_active(True)
+        # Reset the active toolbar tab if needed
+        active_toolbar_tab_button = None
+        for button in self.toolbar_buttons:
+            if button.get_active():
+                active_toolbar_tab_button = button
+                break
+        if not active_toolbar_tab_button.get_visible():
+            self.home_toggle_button.set_active(True)
 
         sheet_document = sheet_view.document
 
@@ -990,8 +1007,15 @@ class Window(Adw.ApplicationWindow):
         sheet_view.main_canvas.set_focusable(True)
         sheet_view.main_canvas.grab_focus()
 
-    def duplicate_sheet(self, document_id: str) -> None:
+    def duplicate_sheet(self,
+                        document_id: str,
+                        materialize: bool = False) -> None:
         sheet_view = self.sheet_manager.duplicate_sheet(document_id)
+
+        if materialize:
+            sheet_document = sheet_view.document
+            sheet_document.materialize_view()
+
         self.add_new_tab(sheet_view)
 
     def rename_sheet(self, tab_page: Adw.TabPage) -> None:

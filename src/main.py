@@ -116,6 +116,7 @@ class Application(Adw.Application):
         self.create_action('delete-connection', self.on_delete_connection_action, param_type=GLib.VariantType('s'))
         self.create_action('delete-row', self.on_delete_row_action)
         self.create_action('duplicate-tab', self.on_duplicate_tab_action, param_type=GLib.VariantType('s'))
+        self.create_action('duplicate-selected-tab', self.on_duplicate_selected_tab_action)
         self.create_action('duplicate-to-above', self.on_duplicate_to_above_action)
         self.create_action('duplicate-to-below', self.on_duplicate_to_below_action)
         self.create_action('duplicate-to-left', self.on_duplicate_to_left_action)
@@ -132,6 +133,7 @@ class Application(Adw.Application):
         self.create_action('move-tab-to-start', self.on_move_tab_to_start_action, param_type=GLib.VariantType('s'))
         self.create_action('new-notebook', self.on_new_notebook_action, ['<primary>n'])
         self.create_action('new-worksheet', self.on_new_worksheet_action, ['<primary>t'])
+        self.create_action('new-worksheet-from-view', self.on_new_worksheet_from_view_action, ['<primary>t'])
         self.create_action('open-inline-formula', self.on_open_inline_formula_action, ['F2'])
         self.create_action('open-search', self.on_open_search_action, ['<primary>f'])
         self.create_action('open-sort-filter', self.on_open_sort_filter_action)
@@ -345,13 +347,6 @@ Options:
                       file_path: str) -> None:
         pass # TODO: indicate the user when the file has been saved
 
-    def on_new_worksheet_action(self,
-                                action: Gio.SimpleAction,
-                                *args) -> None:
-        window = self.get_active_window()
-        sheet_view = window.sheet_manager.create_sheet(None, stype='worksheet')
-        window.add_new_tab(sheet_view)
-
     def on_new_notebook_action(self,
                                action: Gio.SimpleAction,
                                *args) -> None:
@@ -359,12 +354,33 @@ Options:
         sheet_view = window.sheet_manager.create_sheet(None, stype='notebook')
         window.add_new_tab(sheet_view)
 
+    def on_new_worksheet_action(self,
+                                action: Gio.SimpleAction,
+                                *args) -> None:
+        window = self.get_active_window()
+        sheet_view = window.sheet_manager.create_sheet(None, stype='worksheet')
+        window.add_new_tab(sheet_view)
+
+    def on_new_worksheet_from_view_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        window = self.get_active_window()
+        document = window.get_current_active_document()
+        window.duplicate_sheet(document.document_id, materialize=True)
+
     def on_duplicate_tab_action(self,
                                 action: Gio.SimpleAction,
                                 *args) -> None:
         window = self.get_active_window()
         document_id = args[0].get_string()
         window.duplicate_sheet(document_id)
+
+    def on_duplicate_selected_tab_action(self,
+                                         action: Gio.SimpleAction,
+                                         *args) -> None:
+        window = self.get_active_window()
+        document = window.get_current_active_document()
+        window.duplicate_sheet(document.document_id)
 
     def on_rename_tab_action(self,
                              action: Gio.SimpleAction,
@@ -463,16 +479,14 @@ Options:
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         window = self.get_active_window()
-        tab_page = window.tab_view.get_selected_page()
 
-        sheet_view = tab_page.get_child()
-        sheet_document = sheet_view.document
-        document_id = sheet_document.document_id
+        tab_page = window.tab_view.get_selected_page()
+        document = window.get_current_active_document()
 
         def close_selected_tabs() -> None:
             window.tab_view.close_page(tab_page)
 
-        if self.check_sheet_blanks(window, document_id):
+        if self.check_sheet_blanks(window, document.document_id):
             close_selected_tabs()
         else:
             self.show_close_tabs_confirmation(window, close_selected_tabs)
