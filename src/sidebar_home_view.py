@@ -752,6 +752,24 @@ class SidebarHomeView(Adw.Bin):
             paintable.set_widget(list_item_widget)
             drag_source.set_icon(paintable, 0, 0)
 
+            self.current_field_list_items = []
+            for iidx in range(self.field_list_store.get_n_items()):
+                current_item = self.field_list_store.get_item(iidx)
+                self.current_field_list_items.append(current_item)
+
+        def on_drag_end(drag_source: Gtk.DragSource,
+                        drag:        Gdk.Drag,
+                        delete_data: bool) -> None:
+            # Repopulate the list if the action was failed
+            if not delete_data:
+                list_store = Gio.ListStore()
+                for item in self.current_field_list_items:
+                    list_store.append(item)
+                self.field_list_store = list_store
+                self.field_selection.set_model(list_store)
+
+            self.current_field_list_items = []
+
         def on_drop_enter(drop_target: Gtk.DropTarget,
                           x:           float,
                           y:           float,
@@ -801,6 +819,8 @@ class SidebarHomeView(Adw.Bin):
             sheet_document = self.window.get_current_active_document()
             sheet_document.reorder_current_columns(columns)
 
+            return True
+
         item_data = list_item.get_item()
 
         list_item.check_button.set_active(item_data.active)
@@ -813,7 +833,8 @@ class SidebarHomeView(Adw.Bin):
         drag_source = Gtk.DragSource()
         drag_source.set_actions(Gdk.DragAction.MOVE)
         drag_source.connect('prepare', on_drag_prepare, item_data)
-        drag_source.connect('begin', on_drag_begin)
+        drag_source.connect('drag-begin', on_drag_begin)
+        drag_source.connect('drag-end', on_drag_end)
         list_item.drag_handle.add_controller(drag_source)
 
         drop_target = Gtk.DropTarget.new(FieldListItem, Gdk.DragAction.MOVE)
