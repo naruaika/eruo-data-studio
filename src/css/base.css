@@ -105,14 +105,12 @@
 /* SIDEBAR */
 
 .sidebar-expander-row,
-.sidebar-expander-row > row {
+.sidebar-expander-row > row,
+.sidebar-expander-row .sidebar-list-view > row {
     padding: 0;
 }
 .sidebar-expander-row .sidebar-list-view {
     padding: 4px;
-}
-.sidebar-expander-row .sidebar-list-view > row {
-    padding: 1px 2px;
 }
 .sidebar-expander-row listview > header {
     padding: 1px 3px;

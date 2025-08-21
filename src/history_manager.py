@@ -886,6 +886,34 @@ class SortRowState(State):
 
 
 
+class ReorderColumnState(State):
+    __gtype_name__ = 'ReorderColumnState'
+
+    before: list[str]
+    after: list[str]
+
+    def __init__(self,
+                 before: list[str],
+                 after:  list[str]) -> None:
+        super().__init__()
+
+        self.save_selection()
+
+        self.before = before
+        self.after = after
+
+    def undo(self) -> None:
+        document = globals.history.document
+        document.reorder_current_columns(self.before)
+
+        self.restore_selection()
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.reorder_current_columns(self.after)
+
+
+
 class ConvertColumnDataTypeState(State):
     __gtype_name__ = 'ConvertColumnDataTypeState'
 

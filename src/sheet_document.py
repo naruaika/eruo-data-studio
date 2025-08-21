@@ -2044,7 +2044,7 @@ class SheetDocument(GObject.Object):
         mcolumn = active.metadata.column
 
         if mdfi < 0 or len(self.data.dfs) <= mdfi:
-            return False
+            return
 
         # FIXME: this approach will also sort hidden rows which is different from other applications,
         # I haven't made up my mind yet if we should follow other applications behavior, because I think
@@ -2066,8 +2066,6 @@ class SheetDocument(GObject.Object):
             column_name = self.data.dfs[mdfi].columns[mcolumn]
             self.current_sorts = {column_name: {'descending': descending}}
         self.pending_sorts = {}
-
-        success = False
 
         # Sorting is expensive; we can see double in memory usage. Anything we can do? I think, no :(
         self.data.sort_rows_from_metadata(self.current_sorts, mdfi)
@@ -2108,7 +2106,48 @@ class SheetDocument(GObject.Object):
         if not self.is_refreshing_uis:
             self.emit('sorts-changed', mdfi)
 
-        return success
+    def reorder_current_columns(self, columns: list[str]) -> None:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        old_columns = self.data.dfs[mdfi].columns
+
+        self.data.reorder_columns_from_metadata(columns, mdfi)
+
+        new_columns = self.data.dfs[mdfi].columns
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import ReorderColumnState
+            globals.history.save(ReorderColumnState(old_columns, new_columns))
+
+        new_column_indices = [old_columns.index(column) for column in new_columns]
+        new_column_indices = polars.Series(new_column_indices)
+
+        # Update column visibility flags
+        if len(self.display.column_visibility_flags):
+            # With the assumption that there's only one dataframe. Now let's flag it
+            # as a TODO in case we want to support multiple dataframes in the future.
+            self.display.column_visibility_flags = self.display.column_visibility_flags.gather(new_column_indices)
+            self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
+
+        # Update column widths
+        if len(self.display.column_widths):
+            self.display.column_widths = self.display.column_widths.gather(new_column_indices)
+            column_widths_visible_only = self.display.column_widths
+            if len(self.display.column_visibility_flags):
+                column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
+            self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_column_resizer_widgets()
+        self.repopulate_auto_filter_widgets()
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        if globals.is_changing_state:
+            self.emit('columns-changed', mdfi)
 
     def convert_current_columns_dtype(self, dtype: polars.DataType) -> bool:
         arange = self.selection.current_active_range

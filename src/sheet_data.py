@@ -1053,6 +1053,16 @@ class SheetData(GObject.Object):
 
         return True
 
+    def reorder_columns_from_metadata(self,
+                                      columns: list,
+                                      dfi:     int) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        self.dfs[dfi] = self.dfs[dfi].select(columns)
+
+        return True
+
     def convert_columns_dtype_from_metadata(self,
                                             column:      int,
                                             column_span: int,

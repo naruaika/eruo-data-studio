@@ -468,6 +468,7 @@ class SidebarHomeView(Adw.Bin):
 
     field_list_status = Gtk.Template.Child()
     field_list_view = Gtk.Template.Child()
+    field_selection = Gtk.Template.Child()
     field_list_store = Gtk.Template.Child()
 
     sort_list_status = Gtk.Template.Child()
@@ -689,23 +690,37 @@ class SidebarHomeView(Adw.Bin):
     def setup_factory_field(self,
                             list_item_factory: Gtk.SignalListItemFactory,
                             list_item:         Gtk.ListItem) -> None:
-        check_button = Gtk.CheckButton()
-        list_item.set_child(check_button)
-
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        check_button.set_child(box)
+        box.set_margin_top(1)
+        box.set_margin_bottom(1)
+        box.set_margin_start(1)
+        box.set_margin_end(1)
+        list_item.set_child(box)
+
+        drag_handle = Gtk.Image()
+        drag_handle.set_margin_start(4)
+        drag_handle.set_from_icon_name('list-drag-handle-symbolic')
+        box.append(drag_handle)
+
+        check_button = Gtk.CheckButton()
+        check_button.set_hexpand(True)
+        box.append(check_button)
+
+        subbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        check_button.set_child(subbox)
 
         label_name = Gtk.Label()
         label_name.set_halign(Gtk.Align.START)
         label_name.set_hexpand(True)
         label_name.set_ellipsize(Pango.EllipsizeMode.END)
-        box.append(label_name)
+        subbox.append(label_name)
 
         label_type = Gtk.Label()
         label_type.set_halign(Gtk.Align.END)
         label_type.add_css_class('sidebar-list-item-badge')
-        box.append(label_type)
+        subbox.append(label_type)
 
+        list_item.drag_handle = drag_handle
         list_item.check_button = check_button
         list_item.label_name = label_name
         list_item.label_type = label_type
@@ -713,12 +728,6 @@ class SidebarHomeView(Adw.Bin):
     def bind_factory_field(self,
                            list_item_factory: Gtk.SignalListItemFactory,
                            list_item:         Gtk.ListItem) -> None:
-        item_data = list_item.get_item()
-
-        list_item.check_button.set_active(item_data.active)
-        list_item.label_name.set_label(item_data.cname)
-        list_item.label_name.set_tooltip_text(item_data.cname)
-        list_item.label_type.set_label(item_data.dtype)
 
         def on_check_button_toggled(button:    Gtk.Button,
                                     item_data: FieldListItem) -> None:
@@ -729,11 +738,94 @@ class SidebarHomeView(Adw.Bin):
             sheet_document.toggle_column_visibility(item_data.cindex, item_data.active)
             sheet_document.is_refreshing_uis = False
 
+        def on_drag_prepare(drag_source: Gtk.DragSource,
+                            x:           float,
+                            y:           float,
+                            item_data:   FieldListItem) -> Gdk.ContentProvider:
+            return Gdk.ContentProvider.new_for_value(item_data)
+
+        def on_drag_begin(drag_source: Gtk.DragSource,
+                          drag:        Gdk.Drag) -> None:
+            box = list_item.get_child()
+            list_item_widget = box.get_parent()
+            paintable = Gtk.WidgetPaintable()
+            paintable.set_widget(list_item_widget)
+            drag_source.set_icon(paintable, 0, 0)
+
+        def on_drop_enter(drop_target: Gtk.DropTarget,
+                          x:           float,
+                          y:           float,
+                          target_item: FieldListItem) -> Gdk.DragAction:
+            source_item = drop_target.get_value()
+
+            if target_item == source_item:
+                return Gdk.DragAction.MOVE
+
+            old_list_store = self.field_selection.get_model()
+            new_list_store = Gio.ListStore()
+
+            _, source_position = old_list_store.find(source_item)
+            _, target_position = old_list_store.find(target_item)
+
+            for iidx in range(old_list_store.get_n_items()):
+                current_item = old_list_store.get_item(iidx)
+                if current_item in {source_item, target_item}:
+                    continue
+                new_list_store.append(current_item)
+
+            if source_position < target_position:
+                new_list_store.insert(source_position, target_item)
+                new_list_store.insert(target_position, source_item)
+            if target_position < source_position:
+                new_list_store.insert(target_position, source_item)
+                new_list_store.insert(source_position, target_item)
+
+            for iidx in range(new_list_store.get_n_items()):
+                current_item = new_list_store.get_item(iidx)
+                current_item.cindex = iidx + 1
+
+            self.field_list_store = new_list_store
+            self.field_selection.set_model(new_list_store)
+
+            return Gdk.DragAction.MOVE
+
+        def on_drop_drop(drop_target: Gtk.DropTarget,
+                         value:       FieldListItem,
+                         x:           float,
+                         y:           float) -> Gdk.DragAction:
+            columns = []
+            for iidx in range(self.field_list_store.get_n_items()):
+                current_item = self.field_list_store.get_item(iidx)
+                columns.append(current_item.cname)
+
+            sheet_document = self.window.get_current_active_document()
+            sheet_document.reorder_current_columns(columns)
+
+        item_data = list_item.get_item()
+
+        list_item.check_button.set_active(item_data.active)
+        list_item.label_name.set_label(item_data.cname)
+        list_item.label_name.set_tooltip_text(item_data.cname)
+        list_item.label_type.set_label(item_data.dtype)
+
         list_item.check_button.connect('toggled', on_check_button_toggled, item_data)
+
+        drag_source = Gtk.DragSource()
+        drag_source.set_actions(Gdk.DragAction.MOVE)
+        drag_source.connect('prepare', on_drag_prepare, item_data)
+        drag_source.connect('begin', on_drag_begin)
+        list_item.drag_handle.add_controller(drag_source)
+
+        drop_target = Gtk.DropTarget.new(FieldListItem, Gdk.DragAction.MOVE)
+        drop_target.set_preload(True)
+        drop_target.connect('enter', on_drop_enter, item_data)
+        drop_target.connect('drop', on_drop_drop)
+        list_item.get_child().add_controller(drop_target)
 
     def teardown_factory_field(self,
                                list_item_factory: Gtk.SignalListItemFactory,
                                list_item:         Gtk.ListItem) -> None:
+        list_item.drag_handle = None
         list_item.check_button = None
         list_item.label_name = None
         list_item.label_type = None
