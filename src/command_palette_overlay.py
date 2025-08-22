@@ -22,6 +22,7 @@
 
 
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
+import html
 
 from .window import Window
 
@@ -30,17 +31,24 @@ class CommandListItem(GObject.Object):
 
     action_name = GObject.Property(type=str, default='')
     title = GObject.Property(type=str, default='Command')
+    label = GObject.Property(type=str, default='Command')
+
     shortcuts: list[str] = []
+    steal_focus: bool = False
 
     def __init__(self,
                  action_name: str,
                  title:       str,
-                 shortcuts:   list[str]) -> None:
+                 shortcuts:   list[str],
+                 steal_focus: bool) -> None:
         super().__init__()
 
         self.action_name = action_name
         self.title = title
+        self.label = title
+
         self.shortcuts = shortcuts or []
+        self.steal_focus = steal_focus
 
 
 
@@ -97,7 +105,8 @@ class CommandPaletteOverlay(Adw.Bin):
         for command in commands:
             list_item = CommandListItem(command['action-name'],
                                         command['title'],
-                                        command['shortcuts'])
+                                        command['shortcuts'],
+                                        command['steal-focus'])
             self.command_titles.append(list_item.title)
             self.list_store.append(list_item)
 
@@ -109,10 +118,11 @@ class CommandPaletteOverlay(Adw.Bin):
         box = Gtk.CenterBox(orientation=Gtk.Orientation.HORIZONTAL)
         list_item.set_child(box)
 
-        ctitle = Gtk.Label()
-        ctitle.set_halign(Gtk.Align.START)
-        ctitle.set_ellipsize(Pango.EllipsizeMode.END)
-        box.set_start_widget(ctitle)
+        clabel = Gtk.Label()
+        clabel.set_halign(Gtk.Align.START)
+        clabel.set_ellipsize(Pango.EllipsizeMode.END)
+        clabel.set_use_markup(True)
+        box.set_start_widget(clabel)
 
         shortcut = Gtk.Label()
         shortcut.set_halign(Gtk.Align.END)
@@ -120,7 +130,7 @@ class CommandPaletteOverlay(Adw.Bin):
         shortcut.add_css_class('dimmed')
         box.set_end_widget(shortcut)
 
-        list_item.ctitle = ctitle
+        list_item.clabel = clabel
         list_item.shortcut = shortcut
 
     def bind_factory(self,
@@ -128,8 +138,11 @@ class CommandPaletteOverlay(Adw.Bin):
                      list_item:         Gtk.ListItem) -> None:
         item_data = list_item.get_item()
 
-        list_item.ctitle.set_label(item_data.title)
+        list_item.clabel.set_label(item_data.label)
         list_item.shortcut.set_visible(False)
+
+        item_data.bind_property('label', list_item.clabel,
+                                'label', GObject.BindingFlags.SYNC_CREATE)
 
         if len(item_data.shortcuts) > 0:
             shortcut_string = item_data.shortcuts[0]
@@ -143,7 +156,7 @@ class CommandPaletteOverlay(Adw.Bin):
     def teardown_factory(self,
                          list_item_factory: Gtk.SignalListItemFactory,
                          list_item:         Gtk.ListItem) -> None:
-        list_item.ctitle = None
+        list_item.clabel = None
         list_item.shortcut = None
 
     def on_command_entry_deleted(self,
@@ -155,8 +168,13 @@ class CommandPaletteOverlay(Adw.Bin):
     def on_command_entry_changed(self, entry: Gtk.Entry) -> None:
         query = entry.get_text()
 
-        # Show all items if the query is empty
         if query == '':
+            # Reset all the labels
+            for iidx in range(self.list_store.get_n_items()):
+                current_item = self.list_store.get_item(iidx)
+                current_item.label = current_item.title
+
+            # Show all items if the query is empty
             self.selection.set_model(self.list_store)
             self.list_view.scroll_to(0, Gtk.ListScrollFlags.SELECT, None)
             return
@@ -166,7 +184,14 @@ class CommandPaletteOverlay(Adw.Bin):
         # Get all the items that match the query
         for iidx in range(self.list_store.get_n_items()):
             current_item = self.list_store.get_item(iidx)
-            if self.is_subsequence(query, current_item.title):
+
+            # Get the highlighted string for the current item
+            highlighted_title = self.get_highlighted_string(query, current_item.title)
+
+            # If a match was found, update the item with the highlighted title
+            # and append it to the new list store.
+            if highlighted_title is not None:
+                current_item.label = highlighted_title
                 new_list_store.append(current_item)
 
         self.selection.set_model(new_list_store)
@@ -178,9 +203,10 @@ class CommandPaletteOverlay(Adw.Bin):
         self.list_view.scroll_to(0, Gtk.ListScrollFlags.SELECT, None)
 
     def on_command_entry_activated(self, entry: Gtk.Entry) -> None:
-        action_name = self.selection.get_selected_item().action_name
+        selected_item = self.selection.get_selected_item()
+        action_name = selected_item.action_name
         self.window.get_application().activate_action(action_name, None)
-        self.close_command_overlay()
+        self.close_command_overlay(selected_item.steal_focus)
 
     def on_list_view_activated(self,
                                list_view: Gtk.ListView,
@@ -210,6 +236,7 @@ class CommandPaletteOverlay(Adw.Bin):
 
             # Prevent the mouse cursor from interrupting the selection,
             # it'll be enabled back when the user moves the mouse again
+            # FIXME: still happens when the user cycles through too fast
             self.list_view.set_single_click_activate(False)
 
             self.list_view.scroll_to(position, Gtk.ListScrollFlags.SELECT, None)
@@ -245,10 +272,13 @@ class CommandPaletteOverlay(Adw.Bin):
         GLib.timeout_add(200, self.command_overlay.remove_css_class, 'slide-up-dialog')
         GLib.timeout_add(200, stop_animating_uis)
 
-    def close_command_overlay(self) -> None:
+    def close_command_overlay(self, steal_focus: bool = False) -> None:
         self.command_overlay.add_css_class('slide-down-dialog')
         GLib.timeout_add(200, self.set_visible, False)
         GLib.timeout_add(200, self.command_overlay.remove_css_class, 'slide-down-dialog')
+
+        if steal_focus:
+            return
 
         sheet_view = self.window.get_current_active_view()
 
@@ -259,19 +289,81 @@ class CommandPaletteOverlay(Adw.Bin):
         sheet_view.main_canvas.set_focusable(True)
         sheet_view.main_canvas.grab_focus()
 
-    def is_subsequence(self,
-                       query:  str,
-                       target: str) -> bool:
-        query = query.lower()
-        target = target.lower()
+    def find_subsequence_indices(self,
+                                 query:  str,
+                                 target: str) -> list[int]:
+        """
+        Finds the indices of the characters in `target` that form the `query` subsequence.
 
-        qidx = 0
-        tidx = 0
+        Returns a list of indices if found, otherwise None.
+        """
+        qlower = query.lower()
+        tlower = target.lower()
 
-        while qidx < len(query) and \
-              tidx < len(target):
-            if query[qidx] == target[tidx]:
-                qidx += 1
-            tidx += 1
+        query_index = 0
+        target_index = 0
+        matched_indices = []
 
-        return qidx == len(query)
+        while query_index < len(qlower) and target_index < len(tlower):
+            if qlower[query_index] == tlower[target_index]:
+                matched_indices.append(target_index)
+                query_index += 1
+            target_index += 1
+
+        # If we matched every character in the query, return the indices
+        if query_index == len(qlower):
+            return matched_indices
+        return None
+
+    def get_highlighted_string(self,
+                               query:  str,
+                               target: str) -> str:
+        """
+        Generates an HTML string with `<b>` tags around the matched subsequence.
+
+        Returns the highlighted string if a match is found, otherwise None.
+        """
+        # Unescape the target string for the subsequence search
+        plain_target = html.unescape(target)
+        matched_indices = self.find_subsequence_indices(query, plain_target)
+
+        if matched_indices is None:
+            return None
+
+        is_matched_at_index = {idx for idx in matched_indices}
+
+        parts = []
+        orig_target_cursor = 0
+        plain_cursor = 0
+
+        # Iterate through the original target string
+        while orig_target_cursor < len(target):
+            is_bold = plain_cursor in is_matched_at_index
+
+            # Determine if we need to start a new bold tag
+            if is_bold and (plain_cursor == 0 or
+                            plain_cursor - 1 not in is_matched_at_index):
+                parts.append('<u>')
+
+            # Check for HTML entities in the original string
+            if target[orig_target_cursor] == '&':
+                end_entity_index = target.find(';', orig_target_cursor)
+                if end_entity_index != -1:
+                    entity_str = target[orig_target_cursor:end_entity_index + 1]
+                    parts.append(entity_str)
+                    orig_target_cursor = end_entity_index + 1
+                else: # Malformed entity, treat '&' as a regular character
+                    parts.append('&')
+                    orig_target_cursor += 1
+            else:
+                # Handle regular characters
+                parts.append(target[orig_target_cursor])
+                orig_target_cursor += 1
+
+            # Determine if we need to close the bold tag
+            if is_bold and (plain_cursor + 1 not in is_matched_at_index):
+                parts.append('</u>')
+
+            plain_cursor += 1
+
+        return ''.join(parts)
