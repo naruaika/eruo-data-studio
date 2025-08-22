@@ -167,7 +167,7 @@ class Application(Adw.Application):
                                                        param_type=GLib.VariantType('s'))
         self.create_action('open-command-palette',     callback=self.on_open_command_palette_action,
                                                        is_command=False,
-                                                       shortcuts=['<shift><control>p'])
+                                                       shortcuts=['F1', '<shift><control>p'])
         self.create_action('pin-tab',                  callback=self.on_pin_tab_action,
                                                        is_command=False,
                                                        param_type=GLib.VariantType('s'))
@@ -193,7 +193,7 @@ class Application(Adw.Application):
                                                        shortcuts=['<control>v'])
         self.create_action('redo',                     'Redo',
                                                        self.on_redo_action,
-                                                       shortcuts=['<shift><control>z'])
+                                                       shortcuts=['<shift><control>z', '<control>y'])
         self.create_action('undo',                     'Undo',
                                                        self.on_undo_action,
                                                        shortcuts=['<control>z'])

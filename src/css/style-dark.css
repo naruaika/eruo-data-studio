@@ -12,19 +12,17 @@
 }
 
 .formula-bar-dtype,
-.command-shortcut,
 .sidebar-list-item-badge {
     background: var(--view-bg-color);
 }
 
+.sidebar-expander-row textview,
 .sidebar-list-view > row:selected {
     background-color: rgb(68, 68, 71);
 }
 
-.sidebar-expander-row textview,
-.sidebar-expander-row .sidebar-list-view > row:selected,
 .command-overlay listview > row:selected {
-    background-color: rgb(68, 68, 71);
+    background-color: rgb(78, 78, 81);
 }
 
 .main-canvas {

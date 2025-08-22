@@ -117,6 +117,7 @@ class CommandPaletteOverlay(Adw.Bin):
         shortcut = Gtk.Label()
         shortcut.set_halign(Gtk.Align.END)
         shortcut.add_css_class('command-shortcut')
+        shortcut.add_css_class('dimmed')
         box.set_end_widget(shortcut)
 
         list_item.ctitle = ctitle
@@ -136,7 +137,6 @@ class CommandPaletteOverlay(Adw.Bin):
 
             if is_parsed:
                 label = Gtk.accelerator_get_label(accel_key, accel_mods)
-                label = label.replace('+', ' + ')
                 list_item.shortcut.set_label(label)
                 list_item.shortcut.set_visible(True)
 

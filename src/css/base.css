@@ -236,10 +236,6 @@ popover listview row {
     box-shadow: 0 0 40px var(--popover-shade-color);
     border-radius: 12px;
 }
-.command-overlay entry {
-    min-height: 28px;
-    padding: 0 8px;
-}
 .command-overlay listview {
     background-color: transparent;
 }
@@ -249,9 +245,7 @@ popover listview row {
 }
 
 .command-shortcut {
-    padding: 2px 6px;
     border-radius: 4px;
-    font-size: 13px;
 }
 
 .search-command-entry {
@@ -282,7 +276,7 @@ popover listview row {
     animation: slide-up-animation 0.2s ease-out forwards;
 }
 .slide-down-dialog {
-    animation: slide-down-animation 0.25s ease-out forwards;
+    animation: slide-down-animation 0.2s ease-out forwards;
 }
 @keyframes slide-up-animation {
     from {
@@ -301,33 +295,6 @@ popover listview row {
     }
     to {
         transform: translateY(50px);
-        opacity: 0;
-    }
-}
-
-.zoom-in-dialog {
-    animation: zoom-in-animation 0.2s ease-out forwards;
-}
-.zoom-out-dialog {
-    animation: zoom-out-animation 0.2s ease-out forwards;
-}
-@keyframes zoom-in-animation {
-    0% {
-        transform: scale(0.85);
-        opacity: 0;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-@keyframes zoom-out-animation {
-    from {
-        transform: scale(1);
-        opacity: 1;
-    }
-    to {
-        transform: scale(0.85);
         opacity: 0;
     }
 }

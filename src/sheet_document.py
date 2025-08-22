@@ -1108,7 +1108,7 @@ class SheetDocument(GObject.Object):
             # Update column widths
             if len(self.display.column_widths):
                 self.display.column_widths = polars.concat([self.display.column_widths,
-                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH])])
+                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH], dtype=polars.UInt32)])
                 column_widths_visible_only = self.display.column_widths
                 if len(self.display.column_visibility_flags):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)

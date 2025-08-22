@@ -6,7 +6,7 @@
     <property name="valign">center</property>
     <property name="halign">center</property>
     <property name="width-request">600</property>
-    <property name="height-request">490</property>
+    <property name="height-request">494</property>
     <property name="margin-top">30</property>
     <property name="margin-bottom">30</property>
     <property name="margin-start">30</property>
