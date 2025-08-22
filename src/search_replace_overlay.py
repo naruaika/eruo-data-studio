@@ -30,7 +30,7 @@ from .window import Window
 class SearchReplaceOverlay(Adw.Bin):
     __gtype_name__ = 'SearchReplaceOverlay'
 
-    search_box = Gtk.Template.Child()
+    search_overlay = Gtk.Template.Child()
 
     search_entry = Gtk.Template.Child()
     search_status = Gtk.Template.Child()
@@ -77,7 +77,7 @@ class SearchReplaceOverlay(Adw.Bin):
                        keycode: int,
                        state:   Gdk.ModifierType) -> None:
         if keyval == Gdk.KEY_Escape:
-            self.close_search_box()
+            self.close_search_overlay()
             return
 
     def on_search_entry_key_pressed(self,
@@ -223,7 +223,7 @@ class SearchReplaceOverlay(Adw.Bin):
         self.window.search_replace_all_view.search_within_selection.set_active(within_selection)
         self.window.search_replace_all_view.search_use_regexp.set_active(use_regexp)
 
-        self.close_search_box()
+        self.close_search_overlay()
 
         GLib.timeout_add(200, self.window.search_replace_all_view.open_search_view)
 
@@ -236,9 +236,9 @@ class SearchReplaceOverlay(Adw.Bin):
 
     @Gtk.Template.Callback()
     def on_search_close_clicked(self, button: Gtk.Button) -> None:
-        self.close_search_box()
+        self.close_search_overlay()
 
-    def open_search_box(self) -> None:
+    def open_search_overlay(self) -> None:
         if self.get_visible():
             self.search_entry.grab_focus()
             return
@@ -248,8 +248,8 @@ class SearchReplaceOverlay(Adw.Bin):
 
         self.set_visible(True)
 
-        self.search_box.add_css_class('slide-up-dialog')
-        GLib.timeout_add(200, self.search_box.remove_css_class, 'slide-up-dialog')
+        self.search_overlay.add_css_class('slide-up-dialog')
+        GLib.timeout_add(200, self.search_overlay.remove_css_class, 'slide-up-dialog')
 
         # Selects all text on the search entry
         search_text = self.search_entry.get_text()
@@ -270,7 +270,7 @@ class SearchReplaceOverlay(Adw.Bin):
 
         # Open the search overlay
         if not overlay_visible:
-            self.open_search_box()
+            self.open_search_overlay()
 
         # In case the user wants to jump between the search and replace entry
         if overlay_visible \
@@ -308,10 +308,10 @@ class SearchReplaceOverlay(Adw.Bin):
 
             self.replace_entry.grab_focus()
 
-    def close_search_box(self) -> None:
-        self.search_box.add_css_class('slide-down-dialog')
+    def close_search_overlay(self) -> None:
+        self.search_overlay.add_css_class('slide-down-dialog')
         GLib.timeout_add(200, self.set_visible, False)
-        GLib.timeout_add(200, self.search_box.remove_css_class, 'slide-down-dialog')
+        GLib.timeout_add(200, self.search_overlay.remove_css_class, 'slide-down-dialog')
 
         # Hide the replace section
         self.replace_toggle_button.set_icon_name('go-next-symbolic')

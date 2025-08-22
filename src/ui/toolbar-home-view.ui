@@ -218,7 +218,7 @@
             <child>
               <object class="GtkButton">
                 <property name="icon-name">search-symbolic</property>
-                <property name="tooltip-text">Open Search</property>
+                <property name="tooltip-text">Open Quick Search</property>
                 <property name="action-name">app.open-search</property>
                 <style>
                   <class name="flat"/>

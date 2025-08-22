@@ -44,3 +44,7 @@ class SheetRenameDialog(Adw.Dialog):
     def on_entry_activated(self, entry: Gtk.Entry) -> None:
         self.callback(entry.get_text())
         self.close()
+
+    @Gtk.Template.Callback()
+    def on_rename_button_clicked(self, button: Gtk.Button) -> None:
+        self.on_entry_activated(self.entry)

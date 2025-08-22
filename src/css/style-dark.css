@@ -1,17 +1,29 @@
 @import url('resource://com/macipra/eruo/base.css');
 
-.toolbar-view {
+.toolbar-view,
+.multiline-formula-bar-box,
+.notebook-source-view {
     background-color: rgb(52, 52, 54);
 }
-.multiline-formula-bar-box {
-    background-color: rgb(52, 52, 54);
-}
+
 .multiline-formula-bar {
     color: #fff;
     caret-color: #fff;
 }
 
-.sidebar-expander-row textview {
+.formula-bar-dtype,
+.command-shortcut,
+.sidebar-list-item-badge {
+    background: var(--view-bg-color);
+}
+
+.sidebar-list-view > row:selected {
+    background-color: rgb(68, 68, 71);
+}
+
+.sidebar-expander-row textview,
+.sidebar-expander-row .sidebar-list-view > row:selected,
+.command-overlay listview > row:selected {
     background-color: rgb(68, 68, 71);
 }
 
@@ -26,7 +38,6 @@
 .notebook-source-view {
     color: #fff;
     caret-color: #fff;
-    background-color: rgb(52, 52, 54);
 }
 
 check {

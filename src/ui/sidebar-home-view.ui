@@ -4,11 +4,12 @@
   <requires lib="Adw" version="1.0"/>
   <template class="SidebarHomeView" parent="AdwBin">
     <child>
-      <object class="GtkScrolledWindow">
+      <object class="GtkScrolledWindow" id="scrolled_window">
         <property name="vexpand">true</property>
         <child>
           <object class="GtkBox">
             <property name="orientation">vertical</property>
+            <property name="margin-top">1</property>
             <property name="margin-start">6</property>
             <property name="margin-end">6</property>
             <property name="margin-bottom">20</property>
@@ -142,7 +143,7 @@
             <child>
               <object class="AdwPreferencesGroup" id="sorts_section">
                 <child>
-                  <object class="AdwExpanderRow">
+                  <object class="AdwExpanderRow" id="sorts_expander">
                     <property name="title">Sorts</property>
                     <property name="subtitle">Manage how row data is sorted</property>
                     <property name="activatable">false</property>
@@ -264,7 +265,7 @@
             <child>
               <object class="AdwPreferencesGroup" id="filters_section">
                 <child>
-                  <object class="AdwExpanderRow">
+                  <object class="AdwExpanderRow" id="filters_expander">
                     <property name="title">Filters</property>
                     <property name="subtitle">Manage how row data is filtered</property>
                     <property name="activatable">false</property>

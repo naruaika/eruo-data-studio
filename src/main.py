@@ -81,84 +81,206 @@ class Application(Adw.Application):
 
         self.clipboard = ClipboardManager()
 
-        self.file_paths = [] # File paths to open,
-                             # assigned from the command line
+        self.application_commands = []
 
-        self.create_action('about', self.on_about_action)
-        self.create_action('add-connection', self.on_add_new_connection_action)
-        self.create_action('apply-pending-table', self.on_apply_pending_table_action, param_type=GLib.VariantType('s'))
-        self.create_action('clear-contents', self.on_clear_contents_action, ['Delete'])
-        self.create_action('close-other-tabs', self.on_close_other_tabs_action, param_type=GLib.VariantType('s'))
-        self.create_action('close-selected-tab', self.on_close_selected_tab_action, ['<primary>w'])
-        self.create_action('close-tab', self.on_close_tab_action, param_type=GLib.VariantType('s'))
-        self.create_action('close-tabs-to-left', self.on_close_tabs_to_left_action, param_type=GLib.VariantType('s'))
-        self.create_action('close-tabs-to-right', self.on_close_tabs_to_right_action, param_type=GLib.VariantType('s'))
-        self.create_action('convert-to-boolean', self.on_convert_to_boolean_action)
-        self.create_action('convert-to-categorical', self.on_convert_to_categorical_action)
-        self.create_action('convert-to-date', self.on_convert_to_date_action)
-        self.create_action('convert-to-datetime', self.on_convert_to_datetime_action)
-        self.create_action('convert-to-decimal', self.on_convert_to_decimal_action)
-        self.create_action('convert-to-float32', self.on_convert_to_float32_action)
-        self.create_action('convert-to-float64', self.on_convert_to_float64_action)
-        self.create_action('convert-to-int16', self.on_convert_to_int16_action)
-        self.create_action('convert-to-int32', self.on_convert_to_int32_action)
-        self.create_action('convert-to-int64', self.on_convert_to_int64_action)
-        self.create_action('convert-to-int8', self.on_convert_to_int8_action)
-        self.create_action('convert-to-text', self.on_convert_to_text_action)
-        self.create_action('convert-to-time', self.on_convert_to_time_action)
-        self.create_action('convert-to-uint16', self.on_convert_to_uint16_action)
-        self.create_action('convert-to-uint32', self.on_convert_to_uint32_action)
-        self.create_action('convert-to-uint64', self.on_convert_to_uint64_action)
-        self.create_action('convert-to-uint8', self.on_convert_to_uint8_action)
-        self.create_action('copy', self.on_copy_action, ['<primary>c'])
-        self.create_action('cut', self.on_cut_action, ['<primary>x'])
-        self.create_action('delete-column', self.on_delete_column_action)
-        self.create_action('delete-connection', self.on_delete_connection_action, param_type=GLib.VariantType('s'))
-        self.create_action('delete-row', self.on_delete_row_action)
-        self.create_action('duplicate-tab', self.on_duplicate_tab_action, param_type=GLib.VariantType('s'))
-        self.create_action('duplicate-selected-tab', self.on_duplicate_selected_tab_action)
-        self.create_action('duplicate-to-above', self.on_duplicate_to_above_action)
-        self.create_action('duplicate-to-below', self.on_duplicate_to_below_action)
-        self.create_action('duplicate-to-left', self.on_duplicate_to_left_action)
-        self.create_action('duplicate-to-right', self.on_duplicate_to_right_action)
-        self.create_action('filter-cell-value', self.on_filter_cell_value_action)
-        self.create_action('filter-cell-values', self.on_filter_cell_values_action)
-        self.create_action('hide-column', self.on_hide_column_action)
-        self.create_action('import-table', self.on_import_table_action)
-        self.create_action('insert-column-left', self.on_insert_column_left_action)
-        self.create_action('insert-column-right', self.on_insert_column_right_action)
-        self.create_action('insert-row-above', self.on_insert_row_above_action)
-        self.create_action('insert-row-below', self.on_insert_row_below_action)
-        self.create_action('move-tab-to-end', self.on_move_tab_to_end_action, param_type=GLib.VariantType('s'))
-        self.create_action('move-tab-to-start', self.on_move_tab_to_start_action, param_type=GLib.VariantType('s'))
-        self.create_action('new-notebook', self.on_new_notebook_action, ['<primary>n'])
-        self.create_action('new-worksheet', self.on_new_worksheet_action, ['<primary>t'])
-        self.create_action('new-worksheet-from-view', self.on_new_worksheet_from_view_action, ['<primary>t'])
-        self.create_action('open-inline-formula', self.on_open_inline_formula_action, ['F2'])
-        self.create_action('open-search', self.on_open_search_action, ['<primary>f'])
-        self.create_action('open-sort-filter', self.on_open_sort_filter_action)
-        self.create_action('open', self.on_open_file_action, ['<primary>o'])
-        self.create_action('paste', self.on_paste_action, ['<primary>v'])
-        self.create_action('pin-tab', self.on_pin_tab_action, param_type=GLib.VariantType('s'))
-        self.create_action('preferences', self.on_preferences_action, ['<primary>comma'])
-        self.create_action('quit', self.on_quit_action, ['<primary>q'])
-        self.create_action('redo', self.on_redo_action, ['<shift><primary>z'])
-        self.create_action('rename-connection', self.on_rename_connection_action, param_type=GLib.VariantType('s'))
-        self.create_action('rename-tab', self.on_rename_tab_action, param_type=GLib.VariantType('s'))
-        self.create_action('reset-all-filters', self.on_reset_all_filters_action)
-        self.create_action('save-as', self.on_save_as_file_action, ['<shift><primary>s'])
-        self.create_action('save', self.on_save_file_action, ['<primary>s'])
-        self.create_action('sort-largest-to-smallest', self.on_sort_largest_to_smallest_action)
-        self.create_action('sort-smallest-to-largest', self.on_sort_smallest_to_largest_action)
-        self.create_action('toggle-history', self.on_toggle_history_action)
-        self.create_action('toggle-replace-all', self.on_toggle_replace_all_action, ['<primary><shift>h'])
-        self.create_action('toggle-replace', self.on_toggle_replace_action, ['<primary>h'])
-        self.create_action('toggle-search-all', self.on_toggle_search_all_action, ['<primary><shift>f'])
-        self.create_action('toggle-sidebar', self.on_toggle_sidebar_action, ['<primary>b'])
-        self.create_action('undo', self.on_undo_action, ['<primary>z'])
-        self.create_action('unhide-all-columns', self.on_unhide_all_columns_action)
-        self.create_action('unhide-column', self.on_unhide_column_action)
-        self.create_action('unpin-tab', self.on_unpin_tab_action, param_type=GLib.VariantType('s'))
+        # Register general actions
+        self.create_action('about',                    'About',
+                                                       self.on_about_action)
+        self.create_action('add-connection',           'Add New Connection',
+                                                       self.on_add_new_connection_action)
+        self.create_action('close-selected-tab',       'Close Tab',
+                                                       self.on_close_selected_tab_action,
+                                                       shortcuts=['<control>w'])
+        self.create_action('duplicate-selected-tab',   'Duplicate Tab',
+                                                       self.on_duplicate_selected_tab_action)
+        self.create_action('import-table',             'Import Table Into New Worksheet',
+                                                       self.on_import_table_action)
+        self.create_action('new-notebook',             'Create New Notebook',
+                                                       self.on_new_notebook_action,
+                                                       shortcuts=['<control>n'])
+        self.create_action('new-worksheet',            'Create New Worksheet',
+                                                       self.on_new_worksheet_action,
+                                                       shortcuts=['<control>t'])
+        self.create_action('new-worksheet-from-view',  'Create Worksheet From View',
+                                                       self.on_new_worksheet_from_view_action,
+                                                       shortcuts=['<control>t'])
+        self.create_action('open-search',              'Quick Search',
+                                                       self.on_open_search_action,
+                                                       shortcuts=['<control>f'])
+        self.create_action('open-file',                'Open File...',
+                                                       self.on_open_file_action,
+                                                       shortcuts=['<control>o'])
+        self.create_action('preferences',              'Open Settings',
+                                                       self.on_preferences_action,
+                                                       shortcuts=['<control>comma'])
+        self.create_action('quit',                     'Close Window',
+                                                       self.on_quit_action,
+                                                       shortcuts=['<control>q'])
+        self.create_action('save-as',                  'Save As...',
+                                                       self.on_save_as_file_action,
+                                                       shortcuts=['<shift><control>s'])
+        self.create_action('save',                     'Save',
+                                                       self.on_save_file_action,
+                                                       shortcuts=['<control>s'])
+        self.create_action('toggle-history',           'Toggle History',
+                                                       self.on_toggle_history_action)
+        self.create_action('toggle-replace-all',       'Replace All',
+                                                       self.on_toggle_replace_all_action,
+                                                       shortcuts=['<control><shift>h'])
+        self.create_action('toggle-replace',           'Quick Replace',
+                                                       self.on_toggle_replace_action,
+                                                       shortcuts=['<control>h'])
+        self.create_action('toggle-search-all',        'Search All',
+                                                       self.on_toggle_search_all_action,
+                                                       shortcuts=['<control><shift>f'])
+        self.create_action('toggle-sidebar',           'Toggle Sidebar',
+                                                       self.on_toggle_sidebar_action,
+                                                       shortcuts=['<control>b'])
+
+        # Register general actions, which are not commands.
+        self.create_action('apply-pending-table',      callback=self.on_apply_pending_table_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('close-other-tabs',         callback=self.on_close_other_tabs_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('close-tab',                callback=self.on_close_tab_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('close-tabs-to-left',       callback=self.on_close_tabs_to_left_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('close-tabs-to-right',      callback=self.on_close_tabs_to_right_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('delete-connection',        callback=self.on_delete_connection_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('duplicate-tab',            callback=self.on_duplicate_tab_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('move-tab-to-end',          callback=self.on_move_tab_to_end_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('move-tab-to-start',        callback=self.on_move_tab_to_start_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('open-command-palette',     callback=self.on_open_command_palette_action,
+                                                       is_command=False,
+                                                       shortcuts=['<shift><control>p'])
+        self.create_action('pin-tab',                  callback=self.on_pin_tab_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('rename-connection',        callback=self.on_rename_connection_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('rename-tab',               callback=self.on_rename_tab_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+        self.create_action('unpin-tab',                callback=self.on_unpin_tab_action,
+                                                       is_command=False,
+                                                       param_type=GLib.VariantType('s'))
+
+        # Register sheet actions
+        self.create_action('copy',                     'Copy',
+                                                       self.on_copy_action,
+                                                       shortcuts=['<control>c'])
+        self.create_action('cut',                      'Cut',
+                                                       self.on_cut_action,
+                                                       shortcuts=['<control>x'])
+        self.create_action('paste',                    'Paste',
+                                                       self.on_paste_action,
+                                                       shortcuts=['<control>v'])
+        self.create_action('redo',                     'Redo',
+                                                       self.on_redo_action,
+                                                       shortcuts=['<shift><control>z'])
+        self.create_action('undo',                     'Undo',
+                                                       self.on_undo_action,
+                                                       shortcuts=['<control>z'])
+
+        # Register worksheet actions
+        self.create_action('clear-contents',           'Clear Cell Contents',
+                                                       self.on_clear_contents_action,
+                                                       shortcuts=['Delete'])
+        self.create_action('convert-to-boolean',       'Convert Columns to Boolean',
+                                                       self.on_convert_to_boolean_action)
+        self.create_action('convert-to-categorical',   'Convert Columns to Categorical',
+                                                       self.on_convert_to_categorical_action)
+        self.create_action('convert-to-date',          'Convert Columns to Date',
+                                                       self.on_convert_to_date_action)
+        self.create_action('convert-to-datetime',      'Convert Columns to Datetime',
+                                                       self.on_convert_to_datetime_action)
+        self.create_action('convert-to-decimal',       'Convert Columns to Decimal Number',
+                                                       self.on_convert_to_decimal_action)
+        self.create_action('convert-to-float32',       'Convert Columns to Float (32-Bit)',
+                                                       self.on_convert_to_float32_action)
+        self.create_action('convert-to-float64',       'Convert Columns to Float (64-Bit)',
+                                                       self.on_convert_to_float64_action)
+        self.create_action('convert-to-int16',         'Convert Columns to Integer (16-Bit)',
+                                                       self.on_convert_to_int16_action)
+        self.create_action('convert-to-int32',         'Convert Columns to Integer (32-Bit)',
+                                                       self.on_convert_to_int32_action)
+        self.create_action('convert-to-int64',         'Convert Columns to Integer (64-Bit)',
+                                                       self.on_convert_to_int64_action)
+        self.create_action('convert-to-int8',          'Convert Columns to Integer (8-Bit)',
+                                                       self.on_convert_to_int8_action)
+        self.create_action('convert-to-text',          'Convert Columns to Text',
+                                                       self.on_convert_to_text_action)
+        self.create_action('convert-to-time',          'Convert Columns to Time',
+                                                       self.on_convert_to_time_action)
+        self.create_action('convert-to-uint16',        'Convert Columns to Unsigned Integer (16-Bit)',
+                                                       self.on_convert_to_uint16_action)
+        self.create_action('convert-to-uint32',        'Convert Columns to Unsigned Integer (32-Bit)',
+                                                       self.on_convert_to_uint32_action)
+        self.create_action('convert-to-uint64',        'Convert Columns to Unsigned Integer (64-Bit)',
+                                                       self.on_convert_to_uint64_action)
+        self.create_action('convert-to-uint8',         'Convert Columns to Unsigned Integer (8-Bit)',
+                                                       self.on_convert_to_uint8_action)
+        self.create_action('convert-to-whole-number',  'Convert Columns to Whole Number',
+                                                       self.on_convert_to_int64_action)
+        self.create_action('delete-column',            'Delete Columns',
+                                                       self.on_delete_column_action)
+        self.create_action('delete-row',               'Delete Rows',
+                                                       self.on_delete_row_action)
+        self.create_action('duplicate-to-above',       'Duplicate Rows to Above',
+                                                       self.on_duplicate_to_above_action)
+        self.create_action('duplicate-to-below',       'Duplicate Rows to Below',
+                                                       self.on_duplicate_to_below_action)
+        self.create_action('duplicate-to-left',        'Duplicate Columns to Left',
+                                                       self.on_duplicate_to_left_action)
+        self.create_action('duplicate-to-right',       'Duplicate Columns to Right',
+                                                       self.on_duplicate_to_right_action)
+        self.create_action('filter-cell-value',        'Filter Rows by Cell Value',
+                                                       self.on_filter_cell_value_action)
+        self.create_action('hide-column',              'Hide Columns',
+                                                       self.on_hide_column_action)
+        self.create_action('insert-column-left',       'Insert Column to the Left',
+                                                       self.on_insert_column_left_action)
+        self.create_action('insert-column-right',      'Insert Column to the Right',
+                                                       self.on_insert_column_right_action)
+        self.create_action('insert-row-above',         'Insert Rows Above',
+                                                       self.on_insert_row_above_action)
+        self.create_action('insert-row-below',         'Insert Rows Below',
+                                                       self.on_insert_row_below_action)
+        self.create_action('open-inline-formula',      'Open Inline Cell Editor',
+                                                       self.on_open_inline_formula_action,
+                                                       shortcuts=['F2'])
+        self.create_action('open-sort-filter',         'Open Sort & Filter',
+                                                       self.on_open_sort_filter_action)
+        self.create_action('reset-all-filters',        'Clear All Rows Filters',
+                                                       self.on_reset_all_filters_action)
+        self.create_action('sort-by-ascending',        'Sort Rows by Ascending',
+                                                       self.on_sort_by_ascending_action)
+        self.create_action('sort-by-descending',       'Sort Rows by Descending',
+                                                       self.on_sort_by_descending_action)
+        self.create_action('unhide-all-columns',       'Unhide All Columns',
+                                                       self.on_unhide_all_columns_action)
+        self.create_action('unhide-column',            'Unhide Columns',
+                                                       self.on_unhide_column_action)
+
+        # Register worksheet actions, which are not commands.
+        self.create_action('filter-cell-values',       callback=self.on_filter_cell_values_action,
+                                                       is_command=False)
 
     def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
         args = command_line.get_arguments()[1:]
@@ -174,17 +296,19 @@ Options:
             )
             return 0
 
+        file_paths = [] # file paths to open
+
         for arg in args:
             if not arg.startswith('--'):
                 try:
                     file = Gio.File.new_for_commandline_arg(arg)
                     if file_path := file.get_path():
-                        self.file_paths.append(file_path)
+                        file_paths.append(file_path)
                 except Exception as e:
                     print(e)
 
-        if self.file_paths:
-            for file_path in self.file_paths:
+        if file_paths:
+            for file_path in file_paths:
                 self.create_new_window(file_path)
             return 0
 
@@ -238,47 +362,63 @@ Options:
                               *args) -> None:
         raise NotImplementedError # TODO
 
-    def on_toggle_sidebar_action(self,
-                                 action: Gio.SimpleAction,
-                                 *args) -> None:
-        window = self.get_active_window()
-        window.toggle_sidebar()
-
     def on_open_file_action(self,
                             action: Gio.SimpleAction,
                             *args) -> None:
         window = self.get_active_window()
         self.file_manager.open_file(window)
 
+    def on_file_opened(self,
+                       source:    GObject.Object,
+                       file_path: str,
+                       in_place:  bool) -> None:
+        if not file_path:
+            return # shouldn't happen, but for completeness
+
+        # Insert the file content to a new tab
+        if in_place:
+            self.create_new_tab(file_path)
+            return
+
+        if self.reuse_current_window(file_path):
+            return
+
+        self.create_new_window(file_path)
+
+    def on_file_saved(self,
+                      source:    GObject.Object,
+                      file_path: str) -> None:
+        pass # TODO: indicate the user when the file has been saved
+
     def on_save_file_action(self,
                             action: Gio.SimpleAction,
                             *args) -> None:
         window = self.get_active_window()
-
-        # Pre-check if there is any data to save
-        sheets = list(window.sheet_manager.sheets.values())
-        if len(sheets) == 0 or len(sheets[0].data.dfs) == 0:
-            return
-
         self.file_manager.save_file(window)
 
     def on_save_as_file_action(self,
                                action: Gio.SimpleAction,
                                *args) -> None:
         window = self.get_active_window()
-
-        # Pre-check if there is any data to save
-        sheets = list(window.sheet_manager.sheets.values())
-        if len(sheets) == 0 or len(sheets[0].data.dfs) == 0:
-            return
-
         self.file_manager.save_as_file(window)
+
+    def on_open_command_palette_action(self,
+                                       action: Gio.SimpleAction,
+                                       *args) -> None:
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay()
+
+    def on_toggle_sidebar_action(self,
+                                 action: Gio.SimpleAction,
+                                 *args) -> None:
+        window = self.get_active_window()
+        window.toggle_sidebar()
 
     def on_open_search_action(self,
                               action: Gio.SimpleAction,
                               *args) -> None:
         window = self.get_active_window()
-        window.search_replace_overlay.open_search_box()
+        window.search_replace_overlay.open_search_overlay()
 
     def on_open_sort_filter_action(self,
                                    action: Gio.SimpleAction,
@@ -290,6 +430,7 @@ Options:
 
         # Open the home view
         window.sidebar_home_view.open_home_view()
+        window.sidebar_home_view.open_sort_filter_sections()
 
     def on_toggle_replace_action(self,
                                  action: Gio.SimpleAction,
@@ -324,28 +465,6 @@ Options:
                                  action: Gio.SimpleAction,
                                  *args) -> None:
         pass # TODO
-
-    def on_file_opened(self,
-                       source:    GObject.Object,
-                       file_path: str,
-                       in_place:  bool) -> None:
-        if not file_path:
-            return # shouldn't happen, but for completeness
-
-        # Insert the file content to a new tab
-        if in_place:
-            self.create_new_tab(file_path)
-            return
-
-        if self.reuse_current_window(file_path):
-            return
-
-        self.create_new_window(file_path)
-
-    def on_file_saved(self,
-                      source:    GObject.Object,
-                      file_path: str) -> None:
-        pass # TODO: indicate the user when the file has been saved
 
     def on_new_notebook_action(self,
                                action: Gio.SimpleAction,
@@ -496,7 +615,11 @@ Options:
                            document_id: str) -> bool:
         sheet_document = window.sheet_manager.get_sheet(document_id)
         return len(sheet_document.history.undo_stack) <= 1 and \
-               len(sheet_document.history.redo_stack) == 0
+               len(sheet_document.history.redo_stack) == 0 and \
+               not (isinstance(sheet_document, SheetDocument) and
+                    sheet_document.data.has_main_dataframe) and \
+               not (isinstance(sheet_document, SheetNotebook) and
+                    len(sheet_document.view.list_items) > 0)
 
     def show_close_tabs_confirmation(self,
                                      window:   Window,
@@ -720,15 +843,15 @@ Options:
         document = self.get_current_active_document()
         document.reset_all_filters()
 
-    def on_sort_smallest_to_largest_action(self,
-                                           action: Gio.SimpleAction,
-                                           *args) -> None:
+    def on_sort_by_ascending_action(self,
+                                    action: Gio.SimpleAction,
+                                    *args) -> None:
         document = self.get_current_active_document()
         document.sort_current_rows(descending=False)
 
-    def on_sort_largest_to_smallest_action(self,
-                                           action: Gio.SimpleAction,
-                                           *args) -> None:
+    def on_sort_by_descending_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
         document = self.get_current_active_document()
         document.sort_current_rows(descending=True)
 
@@ -837,10 +960,6 @@ Options:
     def on_add_new_connection_action(self,
                                      action: Gio.SimpleAction,
                                      *args) -> None:
-        window = self.get_active_window()
-        self.on_update_connection_list(window)
-
-    def on_add_new_connection(self, source: GObject.Object) -> None:
         window = self.get_active_window()
 
         from .database_add_connection_dialog import DatabaseAddConnectionDialog
@@ -1000,15 +1119,26 @@ Options:
         return window.tab_view.get_page(sheet_view)
 
     def create_action(self,
-                      name:       str,
-                      callback:   callable,
-                      shortcuts:  list = None,
-                      param_type: GLib.VariantType = None) -> None:
+                      name:        str,
+                      title:       str = '',
+                      callback:    callable = None,
+                      is_command:  bool = True,
+                      shortcuts:   list = None,
+                      param_type:  GLib.VariantType = None) -> None:
         action = Gio.SimpleAction.new(name, param_type)
         action.connect('activate', callback)
         self.add_action(action)
+
         if shortcuts:
             self.set_accels_for_action(f'app.{name}', shortcuts)
+
+        if is_command:
+            self.application_commands.append({
+                'action-name' : name,
+                'title'       : title,
+                'shortcuts'   : shortcuts,
+            })
+            self.application_commands.sort(key=lambda command: command['title'])
 
     def create_new_window(self,
                           file_path:  str = '',
@@ -1028,8 +1158,7 @@ Options:
         if not isinstance(dataframe, polars.DataFrame) and dataframe == 0:
             return None
 
-        window = Window(application=self)
-        window.connect('add-new-connection', self.on_add_new_connection)
+        window = Window(self.application_commands, application=self)
         window.connect('update-connection-list', self.on_update_connection_list)
         window.connect('toggle-connection-active', self.on_toggle_connection_active)
         window.present()

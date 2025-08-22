@@ -226,12 +226,6 @@ class SheetView(Gtk.Box):
             self.document.select_element_from_point(x, y)
             self.main_canvas.queue_draw()
 
-        cell_x = self.document.display.get_cell_x_from_point(x)
-        cell_y = self.document.display.get_cell_y_from_point(y)
-
-        if cell_x == 0 and cell_y == 0:
-            return # no applicable context menu for corner locator
-
         self.emit('pointer-released', x, y)
         self.emit('open-context-menu', x, y, 'cell')
 

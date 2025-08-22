@@ -197,6 +197,7 @@ class SheetRenderer(GObject.Object):
             context.reset_clip()
             context.rectangle(display.left_locator_width, range_y, width, display.top_locator_height)
             context.rectangle(range_x, display.top_locator_height, display.left_locator_width, range_height)
+            context.rectangle(0, 0, display.left_locator_width, display.top_locator_height)
             context.fill()
 
         # Bold highlight the selected column(s) header
@@ -433,13 +434,13 @@ class SheetRenderer(GObject.Object):
                 ncontext.reset_clip()
                 ncontext.translate(-rcache['x_trans'], -rcache['y_trans'])
 
-                rcache['surface'] = nsurface
                 rcache['width'] = width
                 rcache['height'] = height
                 rcache['x_trans'] = 0
                 rcache['y_trans'] = 0
 
             ccontext = ncontext
+            rcache['surface'] = nsurface
             rcache['x_pos'] = display.scroll_x_position
             rcache['y_pos'] = display.scroll_y_position
 
@@ -602,7 +603,7 @@ class SheetRenderer(GObject.Object):
             if display.check_cell_visibility_from_position(vrow_index - 1, -1):
                 prow_index = vrow_index
 
-        while y < width:
+        while y < height:
             vrow_index = display.get_vrow_from_row(nrow_index)
             hidden_row_exists = prow_index != vrow_index
 

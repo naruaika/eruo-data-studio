@@ -22,7 +22,7 @@
 
 from gi.repository import Gio, Gtk
 
-from .sheet_selection import SheetCell, SheetTopLocatorCell, SheetLeftLocatorCell
+from .sheet_selection import SheetCell, SheetCornerLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell
 
 class SheetCellMenu(Gtk.PopoverMenu):
     __gtype_name__ = 'SheetCellMenu'
@@ -37,10 +37,6 @@ class SheetCellMenu(Gtk.PopoverMenu):
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
-        # self.set_flags(Gtk.PopoverMenuFlags.NESTED)
-        # self.set_has_arrow(False)
-        self.add_css_class('context-menu')
-
         main_menu = Gio.Menu.new()
 
         self.create_cut_copy_paste_section(main_menu)
@@ -54,7 +50,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
                                          n_hidden_columns,
                                          n_all_hidden_columns,
                                          ctype)
-        self.create_filter_sort_section(main_menu)
+        self.create_filter_sort_section(main_menu, ctype)
         self.create_convert_section(main_menu, ctype)
 
         self.set_menu_model(main_menu)
@@ -82,7 +78,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
 
         insert_duplicate_delete_section = Gio.Menu.new()
 
-        if ctype not in [SheetTopLocatorCell, SheetLeftLocatorCell]:
+        if ctype not in [SheetCornerLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell]:
             # Insert Section
             insert_menu = Gio.Menu.new()
 
@@ -208,32 +204,38 @@ class SheetCellMenu(Gtk.PopoverMenu):
         if 0 < n_all_hidden_columns:
             main_menu.append(_('Unhide All Columns'), 'app.unhide-all-columns')
 
+    def create_filter_sort_section(self,
+                                   main_menu: Gio.Menu,
+                                   ctype:     SheetCell) -> None:
+        if ctype in [SheetCornerLocatorCell, SheetTopLocatorCell, SheetLeftLocatorCell]:
+            return
 
-    def create_filter_sort_section(self, main_menu: Gio.Menu) -> None:
+        filter_sort_section = Gio.Menu.new()
+        main_menu.append_section(None, filter_sort_section)
+
         filter_menu = Gio.Menu.new()
-        filter_menu.append(_('Cell _Value'), 'app.filter-cell-value')
-        filter_menu.append(_('Cell _Color'), 'app.filter-cell-color')
-        filter_menu.append(_('_Font Color'), 'app.filter-font-color')
+        filter_menu.append(_('By Cell _Value'), 'app.filter-cell-value')
+        filter_menu.append(_('By Cell _Color'), 'app.filter-cell-color')
+        filter_menu.append(_('By _Font Color'), 'app.filter-font-color')
 
         filter_menu_item = Gio.MenuItem.new(_('_Filter'), None)
         filter_menu_item.set_submenu(filter_menu)
+        filter_sort_section.append_item(filter_menu_item)
 
         sort_menu = Gio.Menu.new()
-        sort_menu.append(_('Smallest to Largest'), 'app.sort-smallest-to-largest')
-        sort_menu.append(_('Largest to Smallest'), 'app.sort-largest-to-smallest')
+        sort_menu.append(_('By Ascending'), 'app.sort-by-ascending')
+        sort_menu.append(_('By Descending'), 'app.sort-by-descending')
 
         sort_menu_item = Gio.MenuItem.new(_('_Sort'), None)
         sort_menu_item.set_submenu(sort_menu)
-
-        filter_sort_section = Gio.Menu.new()
-        filter_sort_section.append_item(filter_menu_item)
         filter_sort_section.append_item(sort_menu_item)
-
-        main_menu.append_section(None, filter_sort_section)
 
     def create_convert_section(self,
                                main_menu: Gio.Menu,
                                ctype:     SheetCell) -> None:
+        if ctype in [SheetCornerLocatorCell, SheetLeftLocatorCell]:
+            return
+
         convert_section = Gio.Menu.new()
 
         # TODO: wondering that we need to simplify this to fewer options as possible?

@@ -17,14 +17,20 @@
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
-                <property name="title" translatable="yes" context="shortcut window">Quit</property>
-                <property name="action-name">app.quit</property>
+                <property name="title" translatable="yes" context="shortcut window">Command Palette</property>
+                <property name="action-name">app.open-command-palette</property>
               </object>
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
                 <property name="title" translatable="yes" context="shortcut window">Toggle Sidebar</property>
                 <property name="action-name">app.toggle-sidebar</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="title" translatable="yes" context="shortcut window">Quit</property>
+                <property name="action-name">app.quit</property>
               </object>
             </child>
           </object>
@@ -35,7 +41,7 @@
             <child>
               <object class="GtkShortcutsShortcut">
                 <property name="title" translatable="yes" context="shortcut window">Open File</property>
-                <property name="action-name">app.open</property>
+                <property name="action-name">app.open-file</property>
               </object>
             </child>
             <child>
@@ -46,7 +52,7 @@
             </child>
             <child>
               <object class="GtkShortcutsShortcut">
-                <property name="title" translatable="yes" context="shortcut window">Save File As</property>
+                <property name="title" translatable="yes" context="shortcut window">Save As</property>
                 <property name="action-name">app.save-as</property>
               </object>
             </child>
@@ -54,7 +60,25 @@
         </child>
         <child>
           <object class="GtkShortcutsGroup">
-            <property name="title" translatable="yes" context="shortcut window">Workspace</property>
+            <property name="title" translatable="yes" context="shortcut window">Worksheet</property>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="title" translatable="yes" context="shortcut window">Cut</property>
+                <property name="action-name">app.cut</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="title" translatable="yes" context="shortcut window">Copy</property>
+                <property name="action-name">app.copy</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="title" translatable="yes" context="shortcut window">Paste</property>
+                <property name="action-name">app.paste</property>
+              </object>
+            </child>
             <child>
               <object class="GtkShortcutsShortcut">
                 <property name="title" translatable="yes" context="shortcut window">Undo</property>
@@ -79,6 +103,23 @@
                 <property name="action-name">app.toggle-replace</property>
               </object>
             </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="title" translatable="yes" context="shortcut window">Find All</property>
+                <property name="action-name">app.toggle-search-all</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="title" translatable="yes" context="shortcut window">Replace All</property>
+                <property name="action-name">app.toggle-replace-all</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcutsGroup">
+            <property name="title" translatable="yes" context="shortcut window">Workspace</property>
             <child>
               <object class="GtkShortcutsShortcut">
                 <property name="title" translatable="yes" context="shortcut window">New Worksheet</property>

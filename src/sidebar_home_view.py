@@ -454,10 +454,14 @@ def get_filter_basic_expression(item_data: FilterListItem,
 class SidebarHomeView(Adw.Bin):
     __gtype_name__ = 'SidebarHomeView'
 
+    scrolled_window = Gtk.Template.Child()
+
     connections_section = Gtk.Template.Child()
     fields_section = Gtk.Template.Child()
     sorts_section = Gtk.Template.Child()
+    sorts_expander = Gtk.Template.Child()
     filters_section = Gtk.Template.Child()
+    filters_expander = Gtk.Template.Child()
 
     connection_list_status = Gtk.Template.Child()
     connection_list_status_label = Gtk.Template.Child()
@@ -645,7 +649,8 @@ class SidebarHomeView(Adw.Bin):
 
     @Gtk.Template.Callback()
     def on_add_connection_button_clicked(self, button: Gtk.Button) -> None:
-        self.window.emit('add-new-connection')
+        application = self.window.get_application()
+        application.activate_action('add-connection')
 
     def repopulate_connection_list(self, connection_list: list[dict]) -> None:
         # This function should not be called directly. Instead, emit a signal
@@ -1733,3 +1738,10 @@ class SidebarHomeView(Adw.Bin):
 
         tab_page = self.window.sidebar_home_page
         self.window.sidebar_tab_view.set_selected_page(tab_page)
+
+    def open_sort_filter_sections(self) -> None:
+        self.sorts_expander.set_expanded(True)
+        self.filters_expander.set_expanded(True)
+
+        viewport = self.scrolled_window.get_first_child()
+        GLib.timeout_add(50, viewport.scroll_to, self.filters_section, None)

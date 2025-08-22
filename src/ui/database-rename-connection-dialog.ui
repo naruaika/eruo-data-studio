@@ -4,6 +4,7 @@
   <requires lib="Adw" version="1.0"/>
   <template class="DatabaseRenameConnectionDialog" parent="AdwDialog">
     <property name="title">Rename Connection</property>
+    <property name="width-request">250</property>
     <property name="can-close">true</property>
     <child>
       <object class="AdwToolbarView">
@@ -12,14 +13,27 @@
         </child>
         <property name="content">
           <object class="GtkBox">
+            <property name="orientation">vertical</property>
             <property name="margin-top">10</property>
             <property name="margin-bottom">10</property>
             <property name="margin-start">10</property>
             <property name="margin-end">10</property>
+            <property name="spacing">10</property>
             <child>
               <object class="GtkEntry" id="entry">
                 <property name="hexpand">true</property>
                 <signal name="activate" handler="on_entry_activated" swapped="no"/>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="halign">end</property>
+                <property name="hexpand">false</property>
+                <property name="label">Rename</property>
+                <signal name="clicked" handler="on_rename_button_clicked" swapped="no"/>
+                <style>
+                  <class name="suggested-action"/>
+                </style>
               </object>
             </child>
           </object>

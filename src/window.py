@@ -41,10 +41,13 @@ class Window(Adw.ApplicationWindow):
     __gtype_name__ = 'Window'
 
     __gsignals__ = {
-        'add-new-connection'       : (GObject.SIGNAL_RUN_FIRST, None, ()),
         'update-connection-list'   : (GObject.SIGNAL_RUN_FIRST, None, ()),
         'toggle-connection-active' : (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
     }
+
+    root_overlay = Gtk.Template.Child()
+    toast_overlay = Gtk.Template.Child()
+    content_overlay = Gtk.Template.Child()
 
     split_view = Gtk.Template.Child()
     window_title = Gtk.Template.Child()
@@ -77,13 +80,12 @@ class Window(Adw.ApplicationWindow):
     inline_formula_box = Gtk.Template.Child()
     inline_formula = Gtk.Template.Child()
 
-    toast_overlay = Gtk.Template.Child()
-    content_overlay = Gtk.Template.Child()
-
     tab_view = Gtk.Template.Child()
     tab_bar = Gtk.Template.Child()
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self,
+                 commands: list[dict],
+                 **kwargs) -> None:
         super().__init__(**kwargs)
 
         from .sheet_manager import SheetManager
@@ -117,6 +119,10 @@ class Window(Adw.ApplicationWindow):
             self.data_toggle_button,
             self.view_toggle_button,
         ]
+
+        from .command_palette_overlay import CommandPaletteOverlay
+        self.command_palette_overlay = CommandPaletteOverlay(self, commands)
+        self.root_overlay.add_overlay(self.command_palette_overlay)
 
         from .search_replace_overlay import SearchReplaceOverlay
         self.search_replace_overlay = SearchReplaceOverlay(self)
@@ -315,7 +321,7 @@ class Window(Adw.ApplicationWindow):
         else:
             section.append(_('Pin Tab'), f"app.pin-tab('{document_id}')")
         section.append(_('Duplicate Tab'), f"app.duplicate-tab('{document_id}')")
-        section.append(_('Rename Tab'), f"app.rename-tab('{document_id}')")
+        section.append(_('Rename Tab...'), f"app.rename-tab('{document_id}')")
         menu.append_section(None, section)
 
     def get_current_active_view(self) -> SheetView:
@@ -884,8 +890,8 @@ class Window(Adw.ApplicationWindow):
 
         # Position context menu
         rectangle = Gdk.Rectangle()
-        rectangle.x = int(x + width / 2)
-        rectangle.y = int(y + height)
+        rectangle.x = min(max(1, int(x + width / 2)), self.content_overlay.get_width() - 1)
+        rectangle.y = min(max(1, int(y + height)), self.content_overlay.get_height() - 1)
         rectangle.height = 1
         rectangle.width = 1
         self.context_menu.set_pointing_to(rectangle)
@@ -953,8 +959,8 @@ class Window(Adw.ApplicationWindow):
 
         # Position context menu
         rectangle = Gdk.Rectangle()
-        rectangle.x = int(x + width / 2)
-        rectangle.y = int(y + height)
+        rectangle.x = min(max(1, int(x + width / 2)), self.content_overlay.get_width() - 1)
+        rectangle.y = min(max(1, int(y + height)), self.content_overlay.get_height() - 1)
         rectangle.height = 1
         rectangle.width = 1
         self.context_menu.set_pointing_to(rectangle)
@@ -1076,6 +1082,9 @@ class Window(Adw.ApplicationWindow):
         sheet_document = self.get_current_active_document()
 
         if sheet_document is None:
+            return
+
+        if not isinstance(sheet_document, SheetDocument):
             return
 
         globals.is_editing_cells = True

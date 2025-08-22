@@ -3,13 +3,12 @@
   <requires lib="gtk" version="4.0"/>
   <requires lib="Adw" version="1.0"/>
   <template class="SearchReplaceOverlay" parent="AdwBin">
-    <property name="visible">false</property>
     <property name="valign">end</property>
     <property name="halign">center</property>
     <property name="margin-bottom">30</property>
     <property name="visible">false</property>
     <child>
-      <object class="GtkBox" id="search_box">
+      <object class="GtkBox" id="search_overlay">
         <property name="orientation">vertical</property>
         <property name="halign">center</property>
         <property name="valign">center</property>
@@ -186,8 +185,7 @@
           </object>
         </child>
         <style>
-          <class name="frame"/>
-          <class name="search-box"/>
+          <class name="search-overlay"/>
         </style>
       </object>
     </child>
