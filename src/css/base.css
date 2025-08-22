@@ -248,12 +248,6 @@ popover listview row {
     border-radius: 4px;
 }
 
-.search-command-entry {
-    min-height: 28px;
-    font-size: 14px;
-    -gtk-icon-size: 12px;
-}
-
 /* CUSTOMS */
 
 .search-overlay {

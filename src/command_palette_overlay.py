@@ -218,6 +218,8 @@ class CommandPaletteOverlay(Adw.Bin):
         return False
 
     def on_unfocused(self, event: Gtk.EventControllerFocus) -> None:
+        if self.is_animating_uis:
+            return
         self.close_command_overlay()
 
     def on_motion(self,
