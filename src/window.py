@@ -644,6 +644,11 @@ class Window(Adw.ApplicationWindow):
             sheet_view.main_canvas.grab_focus()
             return True
 
+        if keyval in {Gdk.KEY_Up, Gdk.KEY_Down}:
+            return True # keep the focus on the formula bar
+
+        return False
+
     def on_multiline_formula_bar_key_pressed(self,
                                              event:   Gtk.EventControllerKey,
                                              keyval:  int,
