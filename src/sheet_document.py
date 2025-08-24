@@ -572,7 +572,7 @@ class SheetDocument(GObject.Object):
         self.notify_selected_table_changed()
 
     def move_selection_to_corner(self,
-                                 bbox:   any, # SheetCellBoundingBox
+                                 bbox:   Any, # SheetCellBoundingBox
                                  corner: str = 'bottom-right') -> None:
         column = bbox.column + bbox.column_span - 1
         row = bbox.row + bbox.row_span - 1
@@ -784,7 +784,7 @@ class SheetDocument(GObject.Object):
             self.selection.current_search_range = arange
 
     #
-    # Manipulations
+    # Basic Manipulations
     #
 
     def insert_from_current_rows(self,
@@ -797,15 +797,24 @@ class SheetDocument(GObject.Object):
         mrow = arange.metadata.row
         row_span = arange.row_span
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.row_span < 0:
+            row_span = bbox.row_span + 2
+
         # Take hidden row(s) into account
         start_vrow = self.display.get_vrow_from_row(arange.row)
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
 
+        if arange.row_span < 0:
+            row_span -= 3
+
         if arange.btt:
             mrow = mrow - row_span + 1
 
-        if self.data.insert_rows_from_dataframe(dataframe, mrow, arange.metadata.dfi):
+        if self.data.insert_rows_from_dataframe(dataframe, mrow, mdfi):
             # Update row visibility flags
             if len(self.display.row_visibility_flags):
                 if vflags is not None:
@@ -853,6 +862,9 @@ class SheetDocument(GObject.Object):
 
         mrow = arange.metadata.row
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
         auto_range = False
 
         # Manually set column_span
@@ -863,10 +875,18 @@ class SheetDocument(GObject.Object):
         else:
             auto_range = True
 
+            row_span = arange.row_span
+
+            if arange.row_span < 0:
+                row_span = bbox.row_span + 2
+
             # Take hidden row(s) into account
             start_vrow = self.display.get_vrow_from_row(arange.row)
-            end_vrow = self.display.get_vrow_from_row(arange.row + arange.row_span - 1)
+            end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
             row_span = end_vrow - start_vrow + 1
+
+            if arange.row_span < 0:
+                row_span -= 3
 
             if not above:
                 mrow = mrow + row_span
@@ -881,7 +901,7 @@ class SheetDocument(GObject.Object):
             from .history_manager import InsertBlankRowState
             state = InsertBlankRowState(above, row_span, auto_range)
 
-        if self.data.insert_rows_from_metadata(mrow, row_span, arange.metadata.dfi):
+        if self.data.insert_rows_from_metadata(mrow, row_span, mdfi):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -927,15 +947,24 @@ class SheetDocument(GObject.Object):
         mcolumn = arange.metadata.column
         column_span = arange.column_span
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
 
+        if arange.column_span < 0:
+            column_span -= 1
+
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
 
-        if self.data.insert_columns_from_dataframe(dataframe, mcolumn, arange.metadata.dfi):
+        if self.data.insert_columns_from_dataframe(dataframe, mcolumn, mdfi):
             # Update column visibility flags
             if len(self.display.column_visibility_flags):
                 if vflags is not None:
@@ -970,7 +999,7 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            self.emit('columns-changed', arange.metadata.dfi)
+            self.emit('columns-changed', mdfi)
 
             return True
 
@@ -984,6 +1013,9 @@ class SheetDocument(GObject.Object):
 
         mcolumn = arange.metadata.column
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
         auto_range = False
 
         # Manually set column_span
@@ -994,10 +1026,18 @@ class SheetDocument(GObject.Object):
         else:
             auto_range = True
 
+            column_span = arange.column_span
+
+            if arange.column_span < 0:
+                column_span = bbox.column_span + 1
+
             # Take hidden column(s) into account
             start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
-            end_vcolumn = self.display.get_vcolumn_from_column(arange.column + arange.column_span - 1)
+            end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
             column_span = end_vcolumn - start_vcolumn + 1
+
+            if arange.column_span < 0:
+                column_span -= 1
 
             if not left:
                 mcolumn = mcolumn + column_span
@@ -1047,7 +1087,7 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def update_columns_from_dax(self, query: str) -> bool:
+    def update_current_columns_from_dax(self, query: str) -> bool:
         arange = self.selection.current_active_range
         mdfi = arange.metadata.dfi
 
@@ -1088,8 +1128,8 @@ class SheetDocument(GObject.Object):
 
         # Save snapshot
         if not globals.is_changing_state:
-            from .history_manager import UpdateColumnDataFromDAXState
-            state = UpdateColumnDataFromDAXState(self.data.read_cell_data_chunks_from_metadata(target_column_names, 0, -1, mdfi),
+            from .history_manager import UpdateColumnDataFromDaxState
+            state = UpdateColumnDataFromDaxState(self.data.read_cell_data_chunks_from_metadata(target_column_names, 0, -1, mdfi),
                                                  target_column_names,
                                                  added_column_names,
                                                  mdfi,
@@ -1137,7 +1177,19 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def update_columns_from_sql(self, query: str) -> bool:
+    def update_current_cells_from_formula(self, formula: str) -> bool:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        if mdfi < 0:
+            return False # TODO: create a new table?
+
+        from pprint import pprint
+        pprint(parse_dax(formula), sort_dicts=False)
+
+        return True
+
+    def update_current_columns_from_sql(self, query: str) -> bool:
         arange = self.selection.current_active_range
         mdfi = arange.metadata.dfi
 
@@ -1194,8 +1246,8 @@ class SheetDocument(GObject.Object):
 
         # Save snapshot
         if not globals.is_changing_state:
-            from .history_manager import UpdateColumnDataFromSQLState
-            state = UpdateColumnDataFromSQLState(self.data.read_cell_data_chunks_from_metadata(target_column_names, 0, -1, mdfi),
+            from .history_manager import UpdateColumnDataFromSqlState
+            state = UpdateColumnDataFromSqlState(self.data.read_cell_data_chunks_from_metadata(target_column_names, 0, -1, mdfi),
                                                  target_column_names,
                                                  added_column_names,
                                                  mdfi,
@@ -1245,7 +1297,103 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def update_current_cells(self, new_value: Any) -> bool:
+    def update_current_cells_from_operator(self,
+                                           operator_name:  str,
+                                           operation_args: list = [],
+                                           on_column:      bool = False) -> bool:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        if mdfi < 0:
+            return False
+
+        mcolumn = arange.metadata.column
+        mrow = arange.metadata.row
+        column_span = arange.column_span
+        row_span = arange.row_span
+
+        bbox = self.data.bbs[mdfi]
+
+        if on_column:
+            mrow = 1
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
+        if arange.row_span < 0 or on_column:
+            row_span = bbox.row_span + 2
+
+        # Take hidden column(s) into account
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+        column_span = end_vcolumn - start_vcolumn + 1
+
+        # Take hidden row(s) into account
+        start_vrow = self.display.get_vrow_from_row(arange.row)
+        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
+        row_span = end_vrow - start_vrow + 1
+
+        if arange.column_span < 0:
+            column_span -= 1
+
+        if arange.row_span < 0 or on_column:
+            row_span -= 3
+
+        if arange.rtl:
+            mcolumn = mcolumn - column_span + 1
+
+        if arange.btt:
+            mrow = mrow - row_span + 1
+
+        # By now header is always in the first row
+        include_header = arange.metadata.row == 0
+
+        # Prepare for snapshot
+        if not globals.is_changing_state:
+            from .history_manager import UpdateDataFromOperatorState
+            content = self.data.read_cell_data_block_from_metadata(mcolumn,
+                                                                   mrow,
+                                                                   column_span,
+                                                                   row_span,
+                                                                   mdfi,
+                                                                   include_header)
+            state = UpdateDataFromOperatorState(mcolumn,
+                                                mrow,
+                                                column_span,
+                                                row_span,
+                                                mdfi,
+                                                content,
+                                                include_header,
+                                                operator_name,
+                                                operation_args,
+                                                on_column)
+
+        # Update data
+        if self.data.update_cell_data_block_with_operator_from_metadata(mcolumn,
+                                                                        mrow,
+                                                                        column_span,
+                                                                        row_span,
+                                                                        mdfi,
+                                                                        include_header,
+                                                                        operator_name,
+                                                                        operation_args,
+                                                                        self.display.column_visible_series,
+                                                                        self.display.row_visible_series):
+            # Save snapshot
+            if not globals.is_changing_state:
+                globals.history.save(state)
+
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
+
+            active_cell = self.selection.current_active_cell
+            self.notify_selection_changed(active_cell.column, active_cell.row, active_cell.metadata)
+
+            return True
+
+        return False
+
+    def update_current_cells_from_literal(self, new_value: Any) -> bool:
         arange = self.selection.current_active_range
         active = self.selection.current_active_cell
         cursor = self.selection.current_cursor_cell
@@ -1284,6 +1432,9 @@ class SheetDocument(GObject.Object):
             return False
 
         # Automatically expand the dataframe if needed
+        # FIXME: expansion should happen at the actual edge of the dataframe,
+        #        not at the edge of the visual bounding box which will cause
+        #        the expansion from the current targeted column/row
         if should_expand and 'below' in collision_info['direction']:
             self.move_selection_to_corner(bbox, 'bottom-right')
             row_span = collision_info['nonov_row_span']
@@ -1299,8 +1450,8 @@ class SheetDocument(GObject.Object):
             column_span = collision_info['nonov_column_span']
             self.insert_blank_from_current_columns(True, column_span)
 
+        # Restore the selection range
         if should_expand:
-            # Restore the selection range
             self.update_selection_from_position(active.column,
                                                 active.row,
                                                 cursor.column,
@@ -1315,6 +1466,12 @@ class SheetDocument(GObject.Object):
         column_span = arange.column_span
         row_span = arange.row_span
 
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
+        if arange.row_span < 0:
+            row_span = bbox.row_span + 2
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
@@ -1325,17 +1482,17 @@ class SheetDocument(GObject.Object):
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
 
+        if arange.column_span < 0:
+            column_span -= 1
+
+        if arange.row_span < 0:
+            row_span -= 3
+
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
 
         if arange.btt:
             mrow = mrow - row_span + 1
-
-        if column_span < 0:
-            column_span = bbox.column_span
-
-        if row_span < 0:
-            row_span = bbox.row_span - 1
 
         # By now header is always in the first row
         include_header = arange.metadata.row == 0
@@ -1349,7 +1506,14 @@ class SheetDocument(GObject.Object):
                                                                    row_span,
                                                                    mdfi,
                                                                    include_header)
-            state = UpdateDataState(content, new_value, include_header)
+            state = UpdateDataState(mcolumn,
+                                    mrow,
+                                    column_span,
+                                    row_span,
+                                    mdfi,
+                                    content,
+                                    new_value,
+                                    include_header)
 
         # Update data
         # TODO: we still miss to tell the user when the update isn't successful.
@@ -1381,18 +1545,6 @@ class SheetDocument(GObject.Object):
             return True
 
         return False
-
-    def update_current_cells_from_formula(self, formula: str) -> bool:
-        arange = self.selection.current_active_range
-        mdfi = arange.metadata.dfi
-
-        if mdfi < 0:
-            return False # TODO: create a new table?
-
-        from pprint import pprint
-        pprint(parse_dax(formula), sort_dicts=False)
-
-        return True
 
     def update_current_cells_from_range(self, crange: Any) -> bool:
         arange = self.selection.current_active_range
@@ -1445,6 +1597,9 @@ class SheetDocument(GObject.Object):
             return False
 
         # Automatically expand the dataframe if needed
+        # FIXME: expansion should happen at the actual edge of the dataframe,
+        #        not at the edge of the visual bounding box which will cause
+        #        the expansion from the current targeted column/row
         if should_expand and 'below' in collision_info['direction']:
             self.move_selection_to_corner(bbox, 'bottom-right')
             row_span = collision_info['nonov_row_span']
@@ -1460,8 +1615,8 @@ class SheetDocument(GObject.Object):
             column_span = collision_info['nonov_column_span']
             self.insert_blank_from_current_columns(True, column_span)
 
+        # Restore the selection range
         if should_expand:
-            # Restore the selection range
             self.update_selection_from_position(active.column,
                                                 active.row,
                                                 cursor.column,
@@ -1471,10 +1626,17 @@ class SheetDocument(GObject.Object):
                                                 auto_scroll=True)
             arange = self.selection.current_active_range
 
+        # FIXME: buggy when the crange `rtl` or `btt`
         mcolumn = arange.metadata.column
         mrow = arange.metadata.row
         column_span = crange.column_span
         row_span = crange.row_span
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
+        if arange.row_span < 0:
+            row_span = bbox.row_span + 2
 
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
@@ -1486,31 +1648,38 @@ class SheetDocument(GObject.Object):
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
 
+        if arange.column_span < 0:
+            column_span -= 1
+
+        if arange.row_span < 0:
+            row_span -= 3
+
         if arange.rtl:
-            mcolumn = mcolumn - arange.column_span + 1
+            mcolumn = mcolumn - column_span + 1
 
         if arange.btt:
             mrow = mrow - row_span + 1
-
-        if column_span < 0:
-            column_span = bbox.column_span
-
-        if row_span < 0:
-            row_span = bbox.row_span - 1
 
         # By now header is always in the first row
         include_header = arange.metadata.row == 0
 
         # Prepare for snapshot
         if not globals.is_changing_state:
-            from .history_manager import UpdateRangeDataState
+            from .history_manager import UpdateDataFromRangeState
             content = self.data.read_cell_data_block_from_metadata(mcolumn,
                                                                    mrow,
                                                                    column_span,
                                                                    row_span,
                                                                    mdfi,
                                                                    include_header)
-            state = UpdateRangeDataState(content, crange, include_header)
+            state = UpdateDataFromRangeState(mcolumn,
+                                             mrow,
+                                             column_span,
+                                             row_span,
+                                             mdfi,
+                                             content,
+                                             include_header,
+                                             crange)
 
         # Update data
         if self.data.update_cell_data_block_with_range_from_metadata(mcolumn,
@@ -1524,8 +1693,8 @@ class SheetDocument(GObject.Object):
                                                                      self.display.row_visible_series):
             from .sheet_selection import SheetLocatorCell
 
+            # Update selection to fit the size of the dataframe being updated
             if not isinstance(crange, SheetLocatorCell):
-                # Update selection to fit the size of the dataframe being updated
                 self.update_selection_from_position(arange.column,
                                                     arange.row,
                                                     arange.column + crange.column_span - 1,
@@ -1559,10 +1728,19 @@ class SheetDocument(GObject.Object):
         mrow = arange.metadata.row
         row_span = arange.row_span
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.row_span < 0:
+            row_span = bbox.row_span + 2
+
         # Take hidden row(s) into account
         start_vrow = self.display.get_vrow_from_row(arange.row)
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
+
+        if arange.row_span < 0:
+            row_span -= 3
 
         if arange.btt:
             mrow = mrow - row_span + 1
@@ -1615,10 +1793,19 @@ class SheetDocument(GObject.Object):
         mcolumn = arange.metadata.column
         column_span = arange.column_span
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
+
+        if arange.column_span < 0:
+            column_span -= 1
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
@@ -1674,10 +1861,19 @@ class SheetDocument(GObject.Object):
         mrow = arange.metadata.row
         row_span = arange.row_span
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.row_span < 0:
+            row_span = bbox.row_span + 2
+
         # Take hidden row(s) into account
         start_vrow = self.display.get_vrow_from_row(arange.row)
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
+
+        if arange.row_span < 0:
+            row_span -= 3
 
         if arange.btt:
             mrow = mrow - row_span + 1
@@ -1730,10 +1926,19 @@ class SheetDocument(GObject.Object):
         mcolumn = arange.metadata.column
         column_span = arange.column_span
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
+
+        if arange.column_span < 0:
+            column_span -= 1
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
@@ -1790,10 +1995,19 @@ class SheetDocument(GObject.Object):
         mcolumn = arange.metadata.column
         column_span = arange.column_span
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
+
+        if arange.column_span < 0:
+            column_span -= 1
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
@@ -1837,10 +2051,19 @@ class SheetDocument(GObject.Object):
         mcolumn = arange.metadata.column
         column_span = arange.column_span
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
+
+        if arange.column_span < 0:
+            column_span -= 1
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
@@ -2153,10 +2376,19 @@ class SheetDocument(GObject.Object):
         column_span = arange.column_span
         metadata = arange.metadata
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
+
+        if arange.column_span < 0:
+            column_span -= 1
 
         # Prepare for snapshot
         if not globals.is_changing_state:
@@ -2262,11 +2494,19 @@ class SheetDocument(GObject.Object):
             arange = self.selection.current_search_range
             column_span = arange.column_span
 
+            mdfi = arange.metadata.dfi
+            bbox = self.data.bbs[mdfi]
+
+            if arange.column_span < 0:
+                column_span = bbox.column_span + 1
+
             # Take hidden column(s) into account
-            if len(self.display.column_visibility_flags):
-                start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
-                end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
-                column_span = end_vcolumn - start_vcolumn + 1
+            start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+            end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+            column_span = end_vcolumn - start_vcolumn + 1
+
+            if arange.column_span < 0:
+                column_span -= 1
 
             selected_column_names = self.data.dfs[0].columns[arange.metadata.column:arange.metadata.column + column_span]
 
@@ -2387,11 +2627,19 @@ class SheetDocument(GObject.Object):
             arange = self.selection.current_search_range
             column_span = arange.column_span
 
+            mdfi = arange.metadata.dfi
+            bbox = self.data.bbs[mdfi]
+
+            if arange.column_span < 0:
+                column_span = bbox.column_span + 1
+
             # Take hidden column(s) into account
-            if len(self.display.column_visibility_flags):
-                start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
-                end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
-                column_span = end_vcolumn - start_vcolumn + 1
+            start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+            end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+            column_span = end_vcolumn - start_vcolumn + 1
+
+            if arange.column_span < 0:
+                column_span -= 1
 
             selected_column_names = self.data.dfs[0].columns[arange.metadata.column:arange.metadata.column + column_span]
 
@@ -2583,6 +2831,10 @@ class SheetDocument(GObject.Object):
         self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 
+    #
+    # Clipboard
+    #
+
     def cut_from_current_selection(self, clipboard: ClipboardManager) -> None:
         self.copy_from_current_selection(clipboard)
         self.is_copying_cells = False
@@ -2596,8 +2848,9 @@ class SheetDocument(GObject.Object):
         self.is_copying_cells = True
 
         arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
 
-        if arange.metadata.dfi < 0:
+        if mdfi < 0:
             return # TODO: do something
 
         self.selection.current_cutcopy_range = arange
@@ -2607,6 +2860,13 @@ class SheetDocument(GObject.Object):
 
         row_span = arange.row_span
         column_span = arange.column_span
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
+        if arange.row_span < 0:
+            row_span = bbox.row_span + 2
 
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
@@ -2617,6 +2877,12 @@ class SheetDocument(GObject.Object):
         start_vrow = self.display.get_vrow_from_row(arange.row)
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
+
+        if arange.column_span < 0:
+            column_span -= 1
+
+        if arange.row_span < 0:
+            row_span -= 3
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
@@ -2678,10 +2944,6 @@ class SheetDocument(GObject.Object):
 
         crange = clipboard.range
 
-        is_single_cell = crange is None or (crange is not None
-                                            and crange.column_span == 1
-                                            and crange.row_span == 1)
-
         is_cutting_cells = self.is_cutting_cells
 
         def post_cutting_cells_action() -> None:
@@ -2694,7 +2956,7 @@ class SheetDocument(GObject.Object):
                                                 keep_order=True,
                                                 follow_cursor=False,
                                                 auto_scroll=False)
-            self.update_current_cells('')
+            self.update_current_cells_from_literal('')
 
             self.update_selection_from_position(arange.column,
                                                 arange.row,
@@ -2706,7 +2968,7 @@ class SheetDocument(GObject.Object):
 
             self.notify_selection_changed(arange.column, arange.row, arange.metadata)
 
-        if not is_single_cell:
+        if crange is not None:
             self.update_current_cells_from_range(crange)
 
             if is_cutting_cells:
@@ -2714,7 +2976,7 @@ class SheetDocument(GObject.Object):
 
             return
 
-        self.update_current_cells(content)
+        self.update_current_cells_from_literal(content)
 
         if is_cutting_cells:
             post_cutting_cells_action()
@@ -2833,7 +3095,7 @@ class SheetDocument(GObject.Object):
 
         # We need only one column resizer that'll adapt to the position of the pointer on the canvas
         # around any nearby column horizontal edges
-        column_resizer = SheetColumnResizer(x, y, width, height, self.display, on_hovered, on_released)
+        column_resizer = SheetColumnResizer(x, y, width, height, self.display, self.data, on_hovered, on_released)
         self.widgets.append(column_resizer)
 
     def repopulate_auto_filter_widgets(self) -> None:

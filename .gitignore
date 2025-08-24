@@ -1,6 +1,8 @@
 .flatpak
 .pyenv
 .vscode
-*.pyc
+*.backup
 *.bak
+*.pyc
+*.whl
 TODO

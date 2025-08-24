@@ -24,6 +24,7 @@
 from gi.repository import Adw, Gdk, GLib, Gtk
 import polars
 
+from .sheet_document import SheetDocument
 from .window import Window
 
 @Gtk.Template(resource_path='/com/macipra/eruo/ui/search-replace-overlay.ui')
@@ -117,43 +118,45 @@ class SearchReplaceOverlay(Adw.Bin):
 
         sheet_document = self.window.get_current_active_document()
 
-        # Reset the current search range
-        if not within_selection:
-            sheet_document.selection.current_search_range = None
+        if isinstance(sheet_document, SheetDocument):
+            # Reset the current search range
+            if not within_selection:
+                sheet_document.selection.current_search_range = None
 
-        # Initialize the current search range
-        elif sheet_document.selection.current_search_range is None:
-            arange = sheet_document.selection.current_active_range
-            sheet_document.selection.current_search_range = arange
+            # Initialize the current search range
+            elif sheet_document.selection.current_search_range is None:
+                arange = sheet_document.selection.current_active_range
+                sheet_document.selection.current_search_range = arange
 
         self.search_status.set_visible(True)
 
         new_search_states = self.get_current_search_states()
 
-        # Continue previous search
-        if new_search_states == self.search_states and self.search_results_length > 0:
-            vheight = sheet_document.view.main_canvas.get_height() - sheet_document.display.top_locator_height
-            vwidth = sheet_document.view.main_canvas.get_width() - sheet_document.display.left_locator_width
+        if isinstance(sheet_document, SheetDocument):
+            # Continue previous search
+            if new_search_states == self.search_states and self.search_results_length > 0:
+                vheight = sheet_document.view.main_canvas.get_height() - sheet_document.display.top_locator_height
+                vwidth = sheet_document.view.main_canvas.get_width() - sheet_document.display.left_locator_width
 
-            cell_name = sheet_document.selection.cell_name
-            vcol_index, vrow_index = sheet_document.display.get_cell_position_from_name(cell_name)
+                cell_name = sheet_document.selection.cell_name
+                vcol_index, vrow_index = sheet_document.display.get_cell_position_from_name(cell_name)
 
-            col_index = sheet_document.display.get_column_from_vcolumn(vcol_index)
-            row_index = sheet_document.display.get_row_from_vrow(vrow_index)
+                col_index = sheet_document.display.get_column_from_vcolumn(vcol_index)
+                row_index = sheet_document.display.get_row_from_vrow(vrow_index)
 
-            # Try to scroll to the search item first in case the user has scrolled.
-            # In addition, we force to continue previous search if the user chose to search within the selection
-            # when the user re-opens the search box.
-            if not within_selection and sheet_document.display.scroll_to_position(col_index, row_index, vheight, vwidth):
-                sheet_document.auto_adjust_scrollbars_by_selection()
-                sheet_document.renderer.render_caches = {}
-                sheet_document.view.main_canvas.queue_draw()
+                # Try to scroll to the search item first in case the user has scrolled.
+                # In addition, we force to continue previous search if the user chose to search within the selection
+                # when the user re-opens the search box.
+                if not within_selection and sheet_document.display.scroll_to_position(col_index, row_index, vheight, vwidth):
+                    sheet_document.auto_adjust_scrollbars_by_selection()
+                    sheet_document.renderer.render_caches = {}
+                    sheet_document.view.main_canvas.queue_draw()
+                    return
+
+                # Go to the next search item
+                self.find_next_search_occurrence()
+
                 return
-
-            # Go to the next search item
-            self.find_next_search_occurrence()
-
-            return
 
         self.search_states = new_search_states
 
@@ -171,9 +174,11 @@ class SearchReplaceOverlay(Adw.Bin):
         self.search_status.set_text(f'Showing 1 of {format(self.search_results_length, ',d')} results')
         self.search_status.set_visible(True)
 
-        # Set the search cursor to the first item
-        ridx_column_name = self.search_results.columns[0]
-        self.search_cursor_coordinate = (0, ridx_column_name)
+        if isinstance(sheet_document, SheetDocument):
+            # Set the search cursor to the first item
+            ridx_column_name = self.search_results.columns[0]
+            self.search_cursor_coordinate = (0, ridx_column_name)
+
         self.search_cursor_position = 0
 
         # Get the first occurrence of the search item index
@@ -323,7 +328,8 @@ class SearchReplaceOverlay(Adw.Bin):
             return
 
         # Reset the search states
-        sheet_view.document.selection.current_search_range = None
+        if isinstance(sheet_view.document, SheetDocument):
+            sheet_view.document.selection.current_search_range = None
         sheet_view.document.is_searching_cells = False
 
         # Focus on the main canvas
@@ -352,25 +358,26 @@ class SearchReplaceOverlay(Adw.Bin):
             'match_cell': match_cell,
             'within_selection': within_selection,
             'use_regexp': use_regexp,
-
-            # TODO: support multiple dataframes?
-            'table_id': id(sheet_document.data.dfs[0]),
-            'table_rvs_id': id(sheet_document.display.row_visible_series),
-            'table_cvs_id': id(sheet_document.display.column_visible_series),
         }
 
-        if within_selection:
-            if sheet_document.selection.current_search_range is None:
-                arange = sheet_document.selection.current_active_range
-                sheet_document.selection.current_search_range = arange
+        if isinstance(sheet_document, SheetDocument):
+            # TODO: support multiple dataframes?
+            search_states['table_id'] = id(sheet_document.data.dfs[0]),
+            search_states['table_rvs_id'] = id(sheet_document.display.row_visible_series),
+            search_states['table_cvs_id'] = id(sheet_document.display.column_visible_series),
 
-            csr_dict = sheet_document.selection.current_search_range.__dict__.copy()
-            search_states['selection'] = {
-                'column': csr_dict['column'],
-                'row': csr_dict['row'],
-                'column_span': csr_dict['column_span'],
-                'row_span': csr_dict['row_span'],
-            }
+            if within_selection:
+                if sheet_document.selection.current_search_range is None:
+                    arange = sheet_document.selection.current_active_range
+                    sheet_document.selection.current_search_range = arange
+
+                csr_dict = sheet_document.selection.current_search_range.__dict__.copy()
+                search_states['selection'] = {
+                    'column': csr_dict['column'],
+                    'row': csr_dict['row'],
+                    'column_span': csr_dict['column_span'],
+                    'row_span': csr_dict['row_span'],
+                }
 
         return search_states
 
@@ -459,32 +466,33 @@ class SearchReplaceOverlay(Adw.Bin):
 
         row_index, column_name = self.search_cursor_coordinate
 
-        # TODO: support multiple dataframes?
-        col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the $ridx column
-        row_index = self.search_results['$ridx'][row_index] + 2 # +2 for the locator and the header
-        cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
-
-        search_range = sheet_document.selection.current_search_range
-
-        sheet_document.update_selection_from_name(cname)
-
-        column = sheet_document.selection.current_active_cell.column
-        row = sheet_document.selection.current_active_cell.row
-        viewport_height = sheet_document.view.main_canvas.get_height() - sheet_document.display.top_locator_height
-        viewport_width = sheet_document.view.main_canvas.get_width() - sheet_document.display.left_locator_width
-
-        # Scroll to account for the search box if necessary
-        if 'bottom' in sheet_document.display.check_cell_position_near_edges(column, row, viewport_height, viewport_width):
-            offset_size = self.get_height() + self.get_margin_bottom() + sheet_document.display.DEFAULT_CELL_HEIGHT
-            sheet_document.display.scroll_y_position += offset_size
-            sheet_document.display.discretize_scroll_position()
+        if isinstance(sheet_document, SheetDocument):
+            # TODO: support multiple dataframes?
+            col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the $ridx column
+            row_index = self.search_results['$ridx'][row_index] + 2 # +2 for the locator and the header
             cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
+
+            search_range = sheet_document.selection.current_search_range
+
             sheet_document.update_selection_from_name(cname)
 
-        sheet_document.selection.current_search_range = search_range
+            column = sheet_document.selection.current_active_cell.column
+            row = sheet_document.selection.current_active_cell.row
+            viewport_height = sheet_document.view.main_canvas.get_height() - sheet_document.display.top_locator_height
+            viewport_width = sheet_document.view.main_canvas.get_width() - sheet_document.display.left_locator_width
 
-        sheet_document.renderer.render_caches = {}
-        sheet_document.view.main_canvas.queue_draw()
+            # Scroll to account for the search box if necessary
+            if 'bottom' in sheet_document.display.check_cell_position_near_edges(column, row, viewport_height, viewport_width):
+                offset_size = self.get_height() + self.get_margin_bottom() + sheet_document.display.DEFAULT_CELL_HEIGHT
+                sheet_document.display.scroll_y_position += offset_size
+                sheet_document.display.discretize_scroll_position()
+                cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
+                sheet_document.update_selection_from_name(cname)
+
+            sheet_document.selection.current_search_range = search_range
+
+            sheet_document.renderer.render_caches = {}
+            sheet_document.view.main_canvas.queue_draw()
 
         self.search_status.set_text(f'Showing {format(self.search_cursor_position, ',d')} of '
                                     f'{format(self.search_results_length, ',d')} results')
@@ -524,14 +532,15 @@ class SearchReplaceOverlay(Adw.Bin):
 
         sheet_document = self.window.get_current_active_document()
 
-        # Reset the current search range
-        if not within_selection:
-            sheet_document.selection.current_search_range = None
+        if isinstance(sheet_document, SheetDocument):
+            # Reset the current search range
+            if not within_selection:
+                sheet_document.selection.current_search_range = None
 
-        # Initialize the current search range
-        elif sheet_document.selection.current_search_range is None:
-            arange = sheet_document.selection.current_active_range
-            sheet_document.selection.current_search_range = arange
+            # Initialize the current search range
+            elif sheet_document.selection.current_search_range is None:
+                arange = sheet_document.selection.current_active_range
+                sheet_document.selection.current_search_range = arange
 
         sheet_document.find_replace_all_in_current_cells(search_pattern,
                                                          replace_with,

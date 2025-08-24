@@ -1,0 +1,14 @@
+{
+    "name": "python3-eruo-strutil",
+    "buildsystem": "simple",
+    "build-commands": [
+        "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"eruo-strutil\" --no-build-isolation"
+    ],
+    "sources": [
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/d7/0a/e6ea59b6b961a96e60c54644c81087048be2bdf93792c6c816ab71b6eeec/eruo_strutil-0.1.0-cp312-abi3-manylinux_2_34_x86_64.whl",
+            "sha256": "b5b03cdd7e3f727dadfd98fc623e5bae709ac6124494dd8bedeadd511c8603b9"
+        }
+    ]
+}

@@ -57,14 +57,6 @@ class SheetNotebookView(Gtk.Box):
         settings.connect('notify::gtk-application-prefer-dark-theme',
                          self.on_prefer_dark_theme_changed)
 
-        # We don't use all objects below, they're just placeholders
-        # so that it doesn't break the current design. Let's flag
-        # this as TODO.
-
-        self.main_canvas = Gtk.DrawingArea()
-        self.horizontal_scrollbar = Gtk.Scrollbar()
-        self.vertical_scrollbar = Gtk.Scrollbar()
-
     def on_prefer_dark_theme_changed(self,
                                      settings:     Gtk.Settings,
                                      gparamstring: str) -> None:

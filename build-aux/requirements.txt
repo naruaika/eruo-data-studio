@@ -1,4 +1,5 @@
 duckdb==1.3.2
+eruo-strutil==0.1.0
 numpy==2.3.2
 polars==1.32.1
 pyarrow==21.0.0

@@ -13,6 +13,7 @@
         "--socket=wayland",
         "--filesystem=host",
         "--env=RUST_BACKTRACE=full",
+        "--env=POLARS_VERBOSE=1",
         "--env=GTK_DEBUG=interactive",
         "--env=EDS_DEBUG=2"
     ],
@@ -39,6 +40,7 @@
         "python3-polars-aarch64.json",
         "python3-duckdb-x86_64.json",
         "python3-duckdb-aarch64.json",
+        "python3-eruo-strutil-devel.json",
         {
             "name" : "eruo-data-studio",
             "buildsystem" : "meson",

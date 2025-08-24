@@ -33,25 +33,27 @@ class SheetCellMenu(Gtk.PopoverMenu):
                  column_span:          int,       row_span:  int,
                  n_hidden_columns:     int,
                  n_all_hidden_columns: int,
-                 ctype:                SheetCell,
+                 ctype:                SheetCell, dfi:       int,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
         main_menu = Gio.Menu.new()
 
         self.create_cut_copy_paste_section(main_menu)
-        self.create_insert_duplicate_delete_section(main_menu,
-                                                    start_column, start_row,
-                                                    end_column,   end_row,
-                                                    column_span,  row_span,
-                                                    ctype)
-        self.create_hide_autofit_section(main_menu,
-                                         start_column, end_column,
-                                         n_hidden_columns,
-                                         n_all_hidden_columns,
-                                         ctype)
-        self.create_filter_sort_section(main_menu, ctype)
-        self.create_convert_section(main_menu, ctype)
+
+        if dfi >= 0:
+            self.create_insert_duplicate_delete_section(main_menu,
+                                                        start_column, start_row,
+                                                        end_column,   end_row,
+                                                        column_span,  row_span,
+                                                        ctype)
+            self.create_hide_autofit_section(main_menu,
+                                             start_column, end_column,
+                                             n_hidden_columns,
+                                             n_all_hidden_columns,
+                                             ctype)
+            self.create_filter_sort_section(main_menu, ctype)
+            self.create_convert_section(main_menu, ctype)
 
         self.set_menu_model(main_menu)
 

@@ -1,0 +1,16 @@
+[package]
+name = "eruo-strutil"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "eruo_strutil"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "*", features = ["extension-module", "abi3-py312"] }
+pyo3-polars = { version = "*", features = ["derive"] }
+serde = { version = "*", features = ["derive"] }
+polars = { version = "*", default-features = false }
+polars-arrow = { version = "*", default-features = false }
+rand = "0.9.2"

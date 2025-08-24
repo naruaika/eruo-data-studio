@@ -135,7 +135,8 @@ from polars import DataType, Categorical, \
                    UInt8, UInt16, UInt32, UInt64, \
                    Float32, Float64, Decimal, \
                    Date, Time, Datetime, Duration, \
-                   Boolean, Utf8, Null, List, Struct
+                   Boolean, Utf8, Null, List, Struct, \
+                   Binary
 
 def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
     symbol_map = {
@@ -160,6 +161,7 @@ def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
         Null:        {'short': 'null',   'long': 'null'},
         List:        {'short': 'list',   'long': 'list'},
         Struct:      {'short': 'struct', 'long': 'struct'},
+        Binary:      {'short': 'bin.',   'long': 'binary'},
     }
     for dt, symbol in symbol_map.items():
         if dtype == dt or isinstance(dtype, dt):
@@ -170,7 +172,7 @@ def get_dtype_symbol(dtype: DataType, short: bool = True) -> str:
 
 def get_dtype_class(dtype: DataType) -> type:
     class_map = {
-        Categorical: 'other',
+        Categorical: 'category',
         Int8:        'numeric',
         Int16:       'numeric',
         Int32:       'numeric',
@@ -183,14 +185,15 @@ def get_dtype_class(dtype: DataType) -> type:
         Float64:     'numeric',
         Decimal:     'numeric',
         Date:        'temporal',
-        Time:        'other',
+        Time:        'time',
         Datetime:    'temporal',
-        Duration:    'other',
-        Boolean:     'other',
+        Duration:    'duration',
+        Boolean:     'boolean',
         Utf8:        'text',
-        Null:        'other',
-        List:        'other',
-        Struct:      'other',
+        Null:        'null',
+        List:        'list',
+        Struct:      'struct',
+        Binary:      'binary',
     }
     for dt, cls in class_map.items():
         if dtype == dt or isinstance(dtype, dt):

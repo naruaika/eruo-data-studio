@@ -40,6 +40,7 @@ class FileManager(GObject.Object):
     __gtype_name__ = 'FileManager'
 
     __gsignals__ = {
+        'file-cancel' : (GObject.SIGNAL_RUN_FIRST, None, ()),
         'file-opened' : (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
         'file-saved'  : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
     }
@@ -451,6 +452,8 @@ class FileManager(GObject.Object):
             if response == 'save':
                 callback()
                 return
+
+            GLib.idle_add(self.emit, 'file-cancel')
 
         alert_dialog.choose(window, None, on_alert_dialog_dismissed)
 

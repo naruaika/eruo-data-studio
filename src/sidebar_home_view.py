@@ -27,6 +27,7 @@ import os
 import polars
 
 from . import utils
+from .sheet_document import SheetDocument
 from .window import Window
 
 class ConnectionListItem(GObject.Object):
@@ -861,6 +862,9 @@ class SidebarHomeView(Adw.Bin):
 
         sheet_document = self.window.get_current_active_document()
 
+        if not isinstance(sheet_document, SheetDocument):
+            return
+
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
             self.field_list_view.get_parent().set_visible(False)
             self.field_list_status.get_parent().set_visible(True)
@@ -1053,6 +1057,9 @@ class SidebarHomeView(Adw.Bin):
         self.sort_list_store.remove_all()
 
         sheet_document = self.window.get_current_active_document()
+
+        if not isinstance(sheet_document, SheetDocument):
+            return
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
             self.sort_list_view_box.get_parent().set_visible(False)
@@ -1276,6 +1283,9 @@ class SidebarHomeView(Adw.Bin):
         self.filter_list_store.remove_all()
 
         sheet_document = self.window.get_current_active_document()
+
+        if not isinstance(sheet_document, SheetDocument):
+            return
 
         if dfi < 0 or len(sheet_document.data.dfs) <= dfi:
             self.filter_list_view_box.get_parent().set_visible(False)

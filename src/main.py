@@ -76,12 +76,17 @@ class Application(Adw.Application):
         self.connection_list: list[dict] = deserialized_connection_list
 
         self.file_manager = FileManager()
+        self.file_manager.connect('file-cancel', self.on_file_cancel)
         self.file_manager.connect('file-opened', self.on_file_opened)
         self.file_manager.connect('file-saved', self.on_file_saved)
 
         self.clipboard = ClipboardManager()
 
         self.application_commands = []
+
+        # TODO: implement conditioning for all the commands
+        # Because not all commands relevant to the current context,
+        # i.e. current active document type or current active selection.
 
         # Register general actions
         self.create_action('add-connection',           'Add New Connection',
@@ -149,10 +154,10 @@ class Application(Adw.Application):
                                                        shortcuts=['<control><shift>h'])
 
         # Register view actions
-        self.create_action('close-selected-tab',       'View: Close Current Active Tab',
+        self.create_action('close-selected-tab',       'View: Close Tab',
                                                        self.on_close_selected_tab_action,
                                                        shortcuts=['<control>w'])
-        self.create_action('quit',                     'View: Close Current Active Window',
+        self.create_action('quit',                     'View: Close Window',
                                                        self.on_quit_action,
                                                        shortcuts=['<control>q'])
         self.create_action('toggle-history',           'View: Toggle History Panel',
@@ -272,6 +277,7 @@ class Application(Adw.Application):
                                                        is_command=False)
 
         # Register window non-command actions
+        # TODO: make these actions commandable
         self.create_action('close-other-tabs',         callback=self.on_close_other_tabs_action,
                                                        is_command=False,
                                                        param_type=GLib.VariantType('s'))
@@ -302,6 +308,106 @@ class Application(Adw.Application):
         self.create_action('unpin-tab',                callback=self.on_unpin_tab_action,
                                                        is_command=False,
                                                        param_type=GLib.VariantType('s'))
+
+        # Register new advanced worksheet actions
+        # Inspired by https://github.com/qcz/vscode-text-power-tools
+        self.create_action('append-prefix-to-cell',                         'Append Prefix to Cells...',
+                                                                            self.on_append_prefix_to_cell_action,
+                                                                            will_prompt=True)
+        self.create_action('append-suffix-to-cell',                         'Append Suffix to Cells...',
+                                                                            self.on_append_suffix_to_cell_action,
+                                                                            will_prompt=True)
+        self.create_action('change-cell-case-to-camel-case',                'Change Case Cells to Camel Case (camelCase)',
+                                                                            self.on_change_case_cell_to_camel_case_action)
+        self.create_action('change-cell-case-to-constant-case',             'Change Case Cells to Constant Case (CONSTANT_CASE)',
+                                                                            self.on_change_case_cell_to_constant_case_action)
+        self.create_action('change-cell-case-to-dot-case',                  'Change Case Cells to Dot Case (dot.case)',
+                                                                            self.on_change_case_cell_to_dot_case_action)
+        self.create_action('change-cell-case-to-kebab-case',                'Change Case Cells to Kebab Case (kebab-case)',
+                                                                            self.on_change_case_cell_to_kebab_case_action)
+        self.create_action('change-cell-case-to-lowercase',                 'Change Case Cells to Lowercase',
+                                                                            self.on_change_case_cell_to_lowercase_action)
+        self.create_action('change-cell-case-to-pascal-case',               'Change Case Cells to Pascal Case (PascalCase)',
+                                                                            self.on_change_case_cell_to_pascal_case_action)
+        self.create_action('change-cell-case-to-snake-case',                'Change Case Cells to Snake Case (snake_case)',
+                                                                            self.on_change_case_cell_to_snake_case_action)
+        self.create_action('change-cell-case-to-sentence-case',             'Change Case Cells to Sentence Case (Sentence case)',
+                                                                            self.on_change_case_cell_to_sentence_case_action)
+        self.create_action('change-cell-case-to-sponge-case',               'Change Case Cells to Sponge Case (RANdoM CAPiTAlizAtiON)',
+                                                                            self.on_change_case_cell_to_sponge_case_action)
+        self.create_action('change-cell-case-to-title-case',                'Change Case Cells to Title Case',
+                                                                            self.on_change_case_cell_to_title_case_action)
+        self.create_action('change-cell-case-to-uppercase',                 'Change Case Cells to Uppercase',
+                                                                            self.on_change_case_cell_to_uppercase_action)
+        self.create_action('decode-base64-cell-text',                       'Decode Base64 Cells Text',
+                                                                            self.on_decode_base64_cell_text_action)
+        self.create_action('decode-hexadecimal-cell-text',                  'Decode Hexadecimal Cells Text',
+                                                                            self.on_decode_hexadecimal_cell_text_action)
+        self.create_action('encode-base64-cell-text',                       'Encode Base64 Cells Text',
+                                                                            self.on_encode_base64_cell_text_action)
+        self.create_action('encode-hexadecimal-cell-text',                  'Encode Hexadecimal Cells Text',
+                                                                            self.on_encode_hexadecimal_cell_text_action)
+        self.create_action('pig-latinnify-cell',                            'Pig Latinnify Cells',
+                                                                            self.on_pig_latinnify_cell_action)
+        self.create_action('swap-cell-text-case',                           'Swap Cells Text Case',
+                                                                            self.on_swap_cell_text_case_action)
+        self.create_action('trim-cell-whitespace',                          'Trim Cells Leading &amp; Trailing Whitespace',
+                                                                            self.on_trim_cell_whitespace_action)
+        self.create_action('trim-cell-whitespace-and-remove-new-lines',     'Trim Cells Whitespace and Remove Newlines',
+                                                                            self.on_trim_cell_whitespace_and_remove_new_lines_action)
+        self.create_action('trim-cell-start-whitespace',                    'Trim Cells Leading Whitespace',
+                                                                            self.on_trim_cell_start_whitespace_action)
+        self.create_action('trim-cell-end-whitespace',                      'Trim Cells Trailing Whitespace',
+                                                                            self.on_trim_cell_end_whitespace_action)
+
+        self.create_action('append-prefix-to-column',                       'Append Prefix to Columns...',
+                                                                            self.on_append_prefix_to_column_action,
+                                                                            will_prompt=True)
+        self.create_action('append-suffix-to-column',                       'Append Suffix to Columns...',
+                                                                            self.on_append_suffix_to_column_action,
+                                                                            will_prompt=True)
+        self.create_action('change-column-case-to-camel-case',              'Change Case Columns to Camel Case (camelCase)',
+                                                                            self.on_change_case_column_to_camel_case_action)
+        self.create_action('change-column-case-to-constant-case',           'Change Case Columns to Constant Case (CONSTANT_CASE)',
+                                                                            self.on_change_case_column_to_constant_case_action)
+        self.create_action('change-column-case-to-dot-case',                'Change Case Columns to Dot Case (dot.case)',
+                                                                            self.on_change_case_column_to_dot_case_action)
+        self.create_action('change-column-case-to-kebab-case',              'Change Case Columns to Kebab Case (kebab-case)',
+                                                                            self.on_change_case_column_to_kebab_case_action)
+        self.create_action('change-column-case-to-lowercase',               'Change Case Columns to Lowercase',
+                                                                            self.on_change_case_column_to_lowercase_action)
+        self.create_action('change-column-case-to-pascal-case',             'Change Case Columns to Pascal Case (PascalCase)',
+                                                                            self.on_change_case_column_to_pascal_case_action)
+        self.create_action('change-column-case-to-snake-case',              'Change Case Columns to Snake Case (snake_case)',
+                                                                            self.on_change_case_column_to_snake_case_action)
+        self.create_action('change-column-case-to-sentence-case',           'Change Case Columns to Sentence Case (Sentence case)',
+                                                                            self.on_change_case_column_to_sentence_case_action)
+        self.create_action('change-column-case-to-sponge-case',             'Change Case Columns to Sponge Case (RANdoM CAPiTAlizAtiON)',
+                                                                            self.on_change_case_column_to_sponge_case_action)
+        self.create_action('change-column-case-to-title-case',              'Change Case Columns to Title Case',
+                                                                            self.on_change_case_column_to_title_case_action)
+        self.create_action('change-column-case-to-uppercase',               'Change Case Columns to Uppercase',
+                                                                            self.on_change_case_column_to_uppercase_action)
+        self.create_action('decode-base64-column-text',                     'Decode Base64 Columns Text',
+                                                                            self.on_decode_base64_column_text_action)
+        self.create_action('decode-hexadecimal-column-text',                'Decode Hexadecimal Columns Text',
+                                                                            self.on_decode_hexadecimal_column_text_action)
+        self.create_action('encode-base64-column-text',                     'Encode Base64 Columns Text',
+                                                                            self.on_encode_base64_column_text_action)
+        self.create_action('encode-hexadecimal-column-text',                'Encode Hexadecimal Columns Text',
+                                                                            self.on_encode_hexadecimal_column_text_action)
+        self.create_action('pig-latinnify-column',                          'Pig Latinnify Columns',
+                                                                            self.on_pig_latinnify_column_action)
+        self.create_action('swap-column-text-case',                         'Swap Columns Text Case',
+                                                                            self.on_swap_column_text_case_action)
+        self.create_action('trim-column-whitespace',                        'Trim Columns Leading &amp; Trailing Whitespace',
+                                                                            self.on_trim_column_whitespace_action)
+        self.create_action('trim-column-whitespace-and-remove-new-lines',   'Trim Columns Whitespace and Remove Newlines',
+                                                                            self.on_trim_column_whitespace_and_remove_new_lines_action)
+        self.create_action('trim-column-start-whitespace',                  'Trim Columns Leading Whitespace',
+                                                                            self.on_trim_column_start_whitespace_action)
+        self.create_action('trim-column-end-whitespace',                    'Trim Columns Trailing Whitespace',
+                                                                            self.on_trim_column_end_whitespace_action)
 
     def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
         args = command_line.get_arguments()[1:]
@@ -358,6 +464,7 @@ Options:
                       is_command:  bool = True,
                       shortcuts:   list = None,
                       steal_focus: bool = False,
+                      will_prompt: bool = False,
                       param_type:  GLib.VariantType = None) -> None:
         action = Gio.SimpleAction.new(name, param_type)
         action.connect('activate', callback)
@@ -372,6 +479,7 @@ Options:
                 'title'       : title,
                 'shortcuts'   : shortcuts,
                 'steal-focus' : steal_focus,
+                'will-prompt' : will_prompt,
             })
             self.application_commands.sort(key=lambda command: command['title'])
 
@@ -407,12 +515,7 @@ Options:
         # Set the focus to specific widgets
         sheet_view = selected_page.get_child()
         sheet_document = sheet_view.document
-        if isinstance(sheet_document, SheetDocument):
-            sheet_document.view.main_canvas.set_focusable(True)
-            sheet_document.view.main_canvas.grab_focus()
-        if isinstance(sheet_document, SheetNotebook) \
-                and len(sheet_document.view.list_items) > 0:
-            sheet_document.view.list_items[0]['source_view'].grab_focus()
+        self._return_focus_back(sheet_document)
 
         # Set the pinned tabs
         pinned_tabs = workspace_schema.get('pinned-tabs', [])
@@ -427,6 +530,7 @@ Options:
     def on_about_action(self,
                         action: Gio.SimpleAction,
                         *args) -> None:
+        window = self.get_active_window()
         dialog = Adw.AboutDialog(application_name='Data Studio',
                                  application_icon='com.macipra.eruo',
                                  developer_name='Naufan Rusyda Faikar',
@@ -436,7 +540,7 @@ Options:
                                  issue_url='https://github.com/naruaika/eruo-data-studio/issues',
                                  support_url='https://github.com/naruaika/eruo-data-studio/discussions')
         dialog.set_translator_credits(_('translator-credits'))
-        dialog.present(self.get_active_window())
+        dialog.present(window)
 
     def on_add_new_connection_action(self,
                                      action: Gio.SimpleAction,
@@ -482,11 +586,313 @@ Options:
         window = self.get_active_window()
         window.apply_pending_table(action_data_id)
 
+    def on_append_prefix_to_cell_action(self,
+                                        action: Gio.SimpleAction,
+                                        *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_append_prefix(prefix: str) -> None:
+            document.update_current_cells_from_operator('append-prefix', [prefix], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            help_text=_('Please enter the prefix for the cells'),
+                                                            callback=proceed_to_append_prefix)
+
+    def on_append_prefix_to_column_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_append_prefix(prefix: str) -> None:
+            document.update_current_cells_from_operator('append-prefix', [prefix], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            help_text=_('Please enter the prefix for the columns'),
+                                                            callback=proceed_to_append_prefix)
+
+    def on_append_suffix_to_cell_action(self,
+                                        action: Gio.SimpleAction,
+                                        *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_append_suffix(suffix: str) -> None:
+            document.update_current_cells_from_operator('append-suffix', [suffix], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            help_text=_('Please enter the suffix for the cells'),
+                                                            callback=proceed_to_append_suffix)
+
+    def on_append_suffix_to_column_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_append_suffix(suffix: str) -> None:
+            document.update_current_cells_from_operator('append-suffix', [suffix], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            help_text=_('Please enter the suffix for the columns'),
+                                                            callback=proceed_to_append_suffix)
+
+    def on_change_case_cell_to_camel_case_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('camel-case', on_column=False)
+
+    def on_change_case_cell_to_constant_case_action(self,
+                                                    action: Gio.SimpleAction,
+                                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('constant-case', on_column=False)
+
+    def on_change_case_cell_to_dot_case_action(self,
+                                               action: Gio.SimpleAction,
+                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('dot-case', on_column=False)
+
+    def on_change_case_cell_to_kebab_case_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('kebab-case', on_column=False)
+
+    def on_change_case_cell_to_lowercase_action(self,
+                                                action: Gio.SimpleAction,
+                                                *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('lowercase', on_column=False)
+
+    def on_change_case_cell_to_pascal_case_action(self,
+                                                  action: Gio.SimpleAction,
+                                                  *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('pascal-case', on_column=False)
+
+    def on_change_case_cell_to_snake_case_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('snake-case', on_column=False)
+
+    def on_change_case_cell_to_sentence_case_action(self,
+                                                    action: Gio.SimpleAction,
+                                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('sentence-case', on_column=False)
+
+    def on_change_case_cell_to_sponge_case_action(self,
+                                                  action: Gio.SimpleAction,
+                                                  *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('sponge-case', on_column=False)
+
+    def on_change_case_cell_to_title_case_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('title-case', on_column=False)
+
+    def on_change_case_cell_to_uppercase_action(self,
+                                                action: Gio.SimpleAction,
+                                                *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('uppercase', on_column=False)
+
+    def on_decode_base64_cell_text_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-base64', on_column=False)
+
+    def on_decode_base64_column_text_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-base64', on_column=True)
+
+    def on_decode_hexadecimal_cell_text_action(self,
+                                               action: Gio.SimpleAction,
+                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-hexadecimal', on_column=False)
+
+    def on_decode_hexadecimal_column_text_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-hexadecimal', on_column=True)
+
+    def on_encode_base64_cell_text_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-base64', on_column=False)
+
+    def on_encode_base64_column_text_action(self,
+                                            action: Gio.SimpleAction,
+                                            *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-base64', on_column=True)
+
+    def on_encode_hexadecimal_cell_text_action(self,
+                                               action: Gio.SimpleAction,
+                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-hexadecimal', on_column=False)
+
+    def on_encode_hexadecimal_column_text_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-hexadecimal', on_column=True)
+
+    def on_change_case_column_to_camel_case_action(self,
+                                                   action: Gio.SimpleAction,
+                                                   *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('camel-case', on_column=True)
+
+    def on_change_case_column_to_dot_case_action(self,
+                                                      action: Gio.SimpleAction,
+                                                      *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('dot-case', on_column=True)
+
+    def on_change_case_column_to_constant_case_action(self,
+                                                      action: Gio.SimpleAction,
+                                                      *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('constant-case', on_column=True)
+
+    def on_change_case_column_to_kebab_case_action(self,
+                                                   action: Gio.SimpleAction,
+                                                   *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('kebab-case', on_column=True)
+
+    def on_change_case_column_to_lowercase_action(self,
+                                                  action: Gio.SimpleAction,
+                                                  *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('lowercase', on_column=True)
+
+    def on_change_case_column_to_pascal_case_action(self,
+                                                    action: Gio.SimpleAction,
+                                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('pascal-case', on_column=True)
+
+    def on_change_case_column_to_snake_case_action(self,
+                                                   action: Gio.SimpleAction,
+                                                   *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('snake-case', on_column=True)
+
+    def on_change_case_column_to_sentence_case_action(self,
+                                                      action: Gio.SimpleAction,
+                                                      *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('sentence-case', on_column=True)
+
+    def on_change_case_column_to_sponge_case_action(self,
+                                                    action: Gio.SimpleAction,
+                                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('sponge-case', on_column=True)
+
+    def on_change_case_column_to_title_case_action(self,
+                                                   action: Gio.SimpleAction,
+                                                   *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('title-case', on_column=True)
+
+    def on_change_case_column_to_uppercase_action(self,
+                                                  action: Gio.SimpleAction,
+                                                  *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('uppercase', on_column=True)
+
     def on_clear_contents_action(self,
                                  action: Gio.SimpleAction,
                                  *args) -> None:
         document = self._get_current_active_document()
-        document.update_current_cells('')
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_literal('')
 
     def on_close_other_tabs_action(self,
                                    action: Gio.SimpleAction,
@@ -678,6 +1084,8 @@ Options:
                                 action: Gio.SimpleAction,
                                 *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.delete_current_columns()
 
     def on_delete_connection_action(self,
@@ -694,6 +1102,8 @@ Options:
                              action: Gio.SimpleAction,
                              *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.delete_current_rows()
 
     def on_duplicate_selected_tab_action(self,
@@ -714,25 +1124,36 @@ Options:
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.duplicate_from_current_rows(above=True)
 
     def on_duplicate_to_below_action(self,
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.duplicate_from_current_rows(above=False)
 
     def on_duplicate_to_left_action(self,
                                     action: Gio.SimpleAction,
                                     *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.duplicate_from_current_columns(left=True)
 
     def on_duplicate_to_right_action(self,
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.duplicate_from_current_columns(left=False)
+
+    def on_file_cancel(self, source: GObject.Object) -> None:
+        self._return_focus_back()
 
     def on_file_opened(self,
                        source:    GObject.Object,
@@ -754,23 +1175,30 @@ Options:
     def on_file_saved(self,
                       source:    GObject.Object,
                       file_path: str) -> None:
-        pass # TODO: indicate the user when the file has been saved
+        self._return_focus_back()
 
     def on_filter_cell_value_action(self,
                                     action: Gio.SimpleAction,
                                     *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.filter_current_rows()
 
     def on_filter_cell_values_action(self,
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.filter_current_rows(multiple=True)
 
     def on_focus_on_formula_editor_action(self,
                                           action: Gio.SimpleAction,
                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         window = self.get_active_window()
 
         editor_in_focus = window.name_formula_box.get_focus_child() and \
@@ -788,6 +1216,9 @@ Options:
     def on_focus_on_multiline_formula_editor_action(self,
                                                     action: Gio.SimpleAction,
                                                     *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         window = self.get_active_window()
 
         if window.multiline_formula_bar.get_focus_child():
@@ -800,6 +1231,9 @@ Options:
     def on_go_to_cell_action(self,
                              action: Gio.SimpleAction,
                              *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         window = self.get_active_window()
         window.on_name_box_pressed(Gtk.GestureClick(), 1, 0, 0)
 
@@ -807,6 +1241,8 @@ Options:
                               action: Gio.SimpleAction,
                               *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.hide_current_columns()
 
     def on_import_table_action(self,
@@ -819,24 +1255,32 @@ Options:
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.insert_blank_from_current_columns(left=True)
 
     def on_insert_column_right_action(self,
                                       action: Gio.SimpleAction,
                                       *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.insert_blank_from_current_columns(left=False)
 
     def on_insert_row_above_action(self,
                                    action: Gio.SimpleAction,
                                    *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.insert_blank_from_current_rows(above=True)
 
     def on_insert_row_below_action(self,
                                    action: Gio.SimpleAction,
                                    *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.insert_blank_from_current_rows(above=False)
 
     def on_move_tab_to_end_action(self,
@@ -893,6 +1337,9 @@ Options:
     def on_open_inline_formula_action(self,
                                       action: Gio.SimpleAction,
                                       *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         window = self.get_active_window()
 
         if window.inline_formula_box.get_focus_child():
@@ -919,6 +1366,9 @@ Options:
     def on_open_sort_filter_action(self,
                                    action: Gio.SimpleAction,
                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         window = self.get_active_window()
 
         # Close all possible views on the sidebar to reveal the home view
@@ -953,6 +1403,22 @@ Options:
         self.clipboard.read_text_async(on_clipboard_text_received)
 
         return True
+
+    def on_pig_latinnify_cell_action(self,
+                                     action: Gio.SimpleAction,
+                                     *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('pig-latinnify', on_column=False)
+
+    def on_pig_latinnify_column_action(self,
+                                       action: Gio.SimpleAction,
+                                       *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('pig-latinnify', on_column=True)
 
     def on_pin_tab_action(self,
                           action: Gio.SimpleAction,
@@ -1026,6 +1492,8 @@ Options:
                                     action: Gio.SimpleAction,
                                     *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.reset_all_filters()
 
     def on_save_as_file_action(self,
@@ -1044,13 +1512,33 @@ Options:
                                     action: Gio.SimpleAction,
                                     *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.sort_current_rows(descending=False)
 
     def on_sort_by_descending_action(self,
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.sort_current_rows(descending=True)
+
+    def on_swap_cell_text_case_action(self,
+                                      action: Gio.SimpleAction,
+                                      *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('swap-text-case', on_column=False)
+
+    def on_swap_column_text_case_action(self,
+                                        action: Gio.SimpleAction,
+                                        *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('swap-text-case', on_column=True)
 
     def on_toggle_connection_active(self,
                                     source:    GObject.Object,
@@ -1103,6 +1591,70 @@ Options:
         window = self.get_active_window()
         window.toggle_sidebar()
 
+    def on_trim_cell_whitespace_action(self,
+                                       action: Gio.SimpleAction,
+                                       *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('trim-whitespace', on_column=False)
+
+    def on_trim_cell_whitespace_and_remove_new_lines_action(self,
+                                                            action: Gio.SimpleAction,
+                                                            *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('trim-whitespace-and-remove-new-lines', on_column=False)
+
+    def on_trim_cell_start_whitespace_action(self,
+                                             action: Gio.SimpleAction,
+                                             *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('trim-start-whitespace', on_column=False)
+
+    def on_trim_cell_end_whitespace_action(self,
+                                           action: Gio.SimpleAction,
+                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('trim-end-whitespace', on_column=False)
+
+    def on_trim_column_whitespace_action(self,
+                                         action: Gio.SimpleAction,
+                                         *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('trim-whitespace', on_column=True)
+
+    def on_trim_column_whitespace_and_remove_new_lines_action(self,
+                                                              action: Gio.SimpleAction,
+                                                              *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('trim-whitespace-and-remove-new-lines', on_column=True)
+
+    def on_trim_column_start_whitespace_action(self,
+                                               action: Gio.SimpleAction,
+                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('trim-start-whitespace', on_column=True)
+
+    def on_trim_column_end_whitespace_action(self,
+                                             action: Gio.SimpleAction,
+                                             *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('trim-end-whitespace', on_column=True)
+
     def on_undo_action(self,
                        action: Gio.SimpleAction,
                        *args) -> None:
@@ -1121,12 +1673,16 @@ Options:
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.unhide_all_columns()
 
     def on_unhide_column_action(self,
                                 action: Gio.SimpleAction,
                                 *args) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.unhide_current_columns()
 
     def on_unpin_tab_action(self,
@@ -1164,7 +1720,8 @@ Options:
             view_prefix = f'{file_name}:'
 
             for sheet in window.sheet_manager.sheets.values():
-                if sheet.data.has_main_dataframe:
+                if isinstance(sheet, SheetDocument) \
+                        and sheet.data.has_main_dataframe:
                     view_name = f'{view_prefix}{sheet.title}'
                     connection_list.append({
                         'ctype'     : 'Dataframe',
@@ -1187,10 +1744,10 @@ Options:
         undo_stack_is_empty = len(sheet_document.history.undo_stack) <= 1
         redo_stack_is_empty = len(sheet_document.history.redo_stack) == 0
 
-        worksheet_has_no_data = not isinstance(sheet_document, SheetDocument) and \
-                                sheet_document.data.has_main_dataframe
-        notebook_has_no_data = not isinstance(sheet_document, SheetNotebook) and \
-                               len(sheet_document.view.list_items) > 0
+        worksheet_has_no_data = not (isinstance(sheet_document, SheetDocument) and
+                                     sheet_document.data.has_main_dataframe)
+        notebook_has_no_data = not (isinstance(sheet_document, SheetNotebook) and
+                                    len(sheet_document.view.list_items) > 0)
 
         return undo_stack_is_empty and \
                redo_stack_is_empty and \
@@ -1199,6 +1756,8 @@ Options:
 
     def _convert_to(self, dtype: polars.DataType) -> None:
         document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
         document.convert_current_columns_dtype(dtype)
 
     def _create_new_tab(self, file_path: str = '') -> bool:
@@ -1210,7 +1769,8 @@ Options:
             dataframe = self.file_manager.read_file(self, file_path)
 
         # Check for special return values
-        if not isinstance(dataframe, polars.DataFrame) and dataframe == 0:
+        if not isinstance(dataframe, polars.DataFrame) \
+                and dataframe == 0:
             return False
 
         window = self.get_active_window()
@@ -1233,7 +1793,8 @@ Options:
             dataframe = self.file_manager.read_file(self, file_path)
 
         # Check for special return values
-        if not isinstance(dataframe, polars.DataFrame) and dataframe == 0:
+        if not isinstance(dataframe, polars.DataFrame) \
+                and dataframe == 0:
             return None
 
         window = Window(self.application_commands, application=self)
@@ -1274,7 +1835,8 @@ Options:
 
             # Register all the main dataframe from all the sheets
             for sheet in window.sheet_manager.sheets.values():
-                if sheet.data.has_main_dataframe:
+                if isinstance(sheet, SheetDocument) \
+                        and sheet.data.has_main_dataframe:
                     view_name = f'{view_prefix}{sheet.title}'
                     connection.register(view_name, sheet.data.dfs[0])
 
@@ -1287,6 +1849,18 @@ Options:
                                                  if connection['connected']]
         return ';'.join(active_connections)
 
+    def _return_focus_back(self, document: Any = None) -> None:
+        if document is None:
+            document = self._get_current_active_document()
+
+        if isinstance(document, SheetDocument):
+            document.view.main_canvas.set_focusable(True)
+            document.view.main_canvas.grab_focus()
+
+        if isinstance(document, SheetNotebook) \
+                and len(document.view.list_items) > 0:
+            document.view.list_items[0]['source_view'].grab_focus()
+
     def _reuse_current_window(self, file_path: str = '') -> Any:
         window = self.get_active_window()
 
@@ -1296,7 +1870,7 @@ Options:
         no_linked_file = window.file is None
         no_opened_sheet = len(window.sheet_manager.sheets) == 0
         history_is_empty = globals.history is None or \
-                           (len(globals.history.undo_stack) <= 1 and \
+                           (len(globals.history.undo_stack) <= 1 and
                             len(globals.history.redo_stack) == 0)
 
         # Reuse the current active window if the window references to no file
@@ -1313,7 +1887,8 @@ Options:
             dataframe = self.file_manager.read_file(self, file_path)
 
         # Check for special return values
-        if not isinstance(dataframe, polars.DataFrame) and dataframe == 0:
+        if not isinstance(dataframe, polars.DataFrame) \
+                and dataframe == 0:
             return True
 
         window = self.get_active_window()

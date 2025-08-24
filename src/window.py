@@ -342,6 +342,7 @@ class Window(Adw.ApplicationWindow):
         # When focusing on the main canvas, pressing tab key
         # will keep the focus on the main canvas.
         if sheet_view is not None \
+                and isinstance(sheet_view.document, SheetDocument) \
                 and sheet_view.main_canvas.has_focus():
             return False
 
@@ -739,15 +740,11 @@ class Window(Adw.ApplicationWindow):
                 and len(sheet_document.view.list_items) > 0:
             sheet_document.view.list_items[0]['source_view'].grab_focus()
 
-        # Force the sidebar to update its content based on the current
-        # active selection
-        sheet_document.notify_selected_table_changed(force=True)
-
-        # Update the global references to the current active document
         globals.history = sheet_document.history
 
-        # Reset the input bar to represent the current selection
-        self.reset_inputbar()
+        if isinstance(sheet_document, SheetDocument):
+            sheet_document.notify_selected_table_changed(force=True)
+            self.reset_inputbar()
 
     def on_page_attached(self,
                          tab_view: Adw.TabView,
@@ -932,6 +929,7 @@ class Window(Adw.ApplicationWindow):
         row_span = row_2 - row_1 + 1
 
         ctype = type(sheet_document.selection.current_active_range)
+        mdfi = active_cell.metadata.dfi
 
         x = sheet_document.display.get_cell_x_from_point(x + 1)
         y = sheet_document.display.get_cell_y_from_point(y + 1)
@@ -946,12 +944,12 @@ class Window(Adw.ApplicationWindow):
         # Create context menu
         if self.context_menu is not None:
             self.context_menu.unparent()
-        self.context_menu = SheetCellMenu(start_column,start_row,
-                                          end_column,  end_row,
-                                          column_span, row_span,
+        self.context_menu = SheetCellMenu(start_column, start_row,
+                                          end_column,   end_row,
+                                          column_span,  row_span,
                                           n_hidden_columns,
                                           n_all_hidden_columns,
-                                          ctype)
+                                          ctype, mdfi)
         self.context_menu.set_parent(self.content_overlay)
 
         def on_context_menu_closed(widget: Gtk.Widget) -> None:
@@ -1006,25 +1004,27 @@ class Window(Adw.ApplicationWindow):
         # Switch to the new tab automatically
         self.tab_view.set_selected_page(tab_page)
 
-        # Re-enable the input bar
-        self.name_box.set_sensitive(True)
-        self.formula_bar.set_sensitive(True)
-        self.multiline_formula_bar.set_sensitive(True)
-        self.formula_bar_toggle_button.set_sensitive(True)
-        self.toolbar_tab_view.set_sensitive(True)
-        self.sidebar_tab_view.set_sensitive(True)
+        if isinstance(sheet_view.document, SheetDocument):
+            # Re-enable the input bar
+            self.name_box.set_sensitive(True)
+            self.formula_bar.set_sensitive(True)
+            self.multiline_formula_bar.set_sensitive(True)
+            self.formula_bar_toggle_button.set_sensitive(True)
+            self.toolbar_tab_view.set_sensitive(True)
+            self.sidebar_tab_view.set_sensitive(True)
 
-        # Focus the main canvas
-        sheet_view.main_canvas.set_focusable(True)
-        sheet_view.main_canvas.grab_focus()
+            # Focus the main canvas
+            sheet_view.main_canvas.set_focusable(True)
+            sheet_view.main_canvas.grab_focus()
 
     def duplicate_sheet(self,
                         document_id: str,
                         materialize: bool = False) -> None:
         sheet_view = self.sheet_manager.duplicate_sheet(document_id)
 
-        if materialize:
-            sheet_document = sheet_view.document
+        sheet_document = sheet_view.document
+        if isinstance(sheet_document, SheetDocument) \
+                and materialize:
             sheet_document.materialize_view()
 
         self.add_new_tab(sheet_view)
@@ -1151,8 +1151,10 @@ class Window(Adw.ApplicationWindow):
 
             # Hide the search range selection box if necessary
             if sheet_document.search_range_performer == 'search-all':
-                sheet_document.selection.current_search_range = None
                 sheet_document.is_searching_cells = False
+
+                if isinstance(sheet_document, SheetDocument):
+                    sheet_document.selection.current_search_range = None
 
             return
 
@@ -1207,12 +1209,12 @@ class Window(Adw.ApplicationWindow):
         query_pattern = r"(\r\n|\r|\n|\s)*=(\r\n|\r|\n|\s)*" \
                         r"[SELECT|WITH](\r\n|\r|\n|.)*"
         if re.fullmatch(query_pattern, formula, re.IGNORECASE):
-            return sheet_view.document.update_columns_from_sql(formula)
+            return sheet_view.document.update_current_columns_from_sql(formula)
 
         # Check if the input is an DAX-like syntax
         expression_pattern = r"(\r\n|\r|\n|\s)*[A-Za-z0-9]+.*=.*"
         if re.fullmatch(expression_pattern, formula, re.IGNORECASE):
-            return sheet_view.document.update_columns_from_dax(formula)
+            return sheet_view.document.update_current_columns_from_dax(formula)
 
         # Check if the input is a formula
         formula_pattern = r"(\r\n|\r|\n|\s)*=.*"
@@ -1220,7 +1222,7 @@ class Window(Adw.ApplicationWindow):
             return sheet_view.document.update_current_cells_from_formula(formula)
 
         # Update the current cells
-        return sheet_view.document.update_current_cells(formula)
+        return sheet_view.document.update_current_cells_from_literal(formula)
 
     def create_table_from_sql(self, query: str) -> bool:
         sheet_document = self.get_current_active_document()

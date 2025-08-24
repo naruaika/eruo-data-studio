@@ -33,6 +33,7 @@
         "python3-polars-aarch64.json",
         "python3-duckdb-x86_64.json",
         "python3-duckdb-aarch64.json",
+        "python3-eruo-strutil.json",
         {
             "name" : "eruo-data-studio",
             "buildsystem" : "meson",

@@ -24,6 +24,7 @@ from gi.repository import Gdk, GObject, Gtk, Pango, PangoCairo
 import cairo
 
 from . import utils
+from .sheet_data import SheetData
 from .sheet_display import SheetDisplay
 
 class SheetWidget(GObject.Object):
@@ -198,9 +199,12 @@ class SheetColumnResizer(SheetWidget):
                  width:       int,
                  height:      int,
                  display:     SheetDisplay,
+                 data:        SheetData,
                  on_hovered:  callable,
                  on_released: callable) -> None:
         super().__init__(x, y, width, height, display)
+
+        self.data = data
 
         self.on_hovered = on_hovered
         self.on_released = on_released
@@ -421,10 +425,21 @@ class SheetColumnResizer(SheetWidget):
 
         x = max(self.target_cell_x, self.display.left_locator_width)
 
+        rcolumn_span = arange.column_span
+
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            rcolumn_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + arange.column_span - 1)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + rcolumn_span - 1)
         rcolumn_span = end_vcolumn - start_vcolumn + 1
+
+        if arange.column_span < 0:
+            rcolumn_span -= 1
 
         # Adjust the rectangle position for the specific condition
         # based on pixel perfect calculation
@@ -481,14 +496,24 @@ class SheetColumnResizer(SheetWidget):
         if width < range_x + range_width:
             range_width = width - range_x
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            rcolumn_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(range_column)
         end_vcolumn = self.display.get_vcolumn_from_column(range_column + rcolumn_span - 1)
         rcolumn_span = end_vcolumn - start_vcolumn + 1
 
+        if arange.column_span < 0:
+            rcolumn_span -= 1
+
         # Only draw the selection if the target column is within the selection
-        if (range_column + rcolumn_span <= self.target_column \
-                or self.target_column < range_column) and 0 < rcolumn_span:
+        if 0 < rcolumn_span and \
+                (range_column + rcolumn_span <= self.target_column or
+                 self.target_column < range_column):
             return
 
         # Adjust the range if necessary to prevent from drawing over translucent cells
@@ -686,15 +711,24 @@ class SheetColumnResizer(SheetWidget):
         if width < range_x + range_width:
             range_width = width - range_x
 
+        mdfi = arange.metadata.dfi
+        bbox = self.data.bbs[mdfi]
+
+        if arange.column_span < 0:
+            rcolumn_span = bbox.column_span + 1
+
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(range_column)
         end_vcolumn = self.display.get_vcolumn_from_column(range_column + rcolumn_span - 1)
         rcolumn_span = end_vcolumn - start_vcolumn + 1
 
+        if arange.column_span < 0:
+            rcolumn_span -= 1
+
         # Only draw the selection if the target column is within the selection
-        if (range_column + rcolumn_span <= self.target_column or
-            self.target_column < range_column) \
-                and 0 < rcolumn_span:
+        if 0 < rcolumn_span and \
+                (range_column + rcolumn_span <= self.target_column or
+                 self.target_column < range_column):
             return
 
         # Adjust the range if necessary to prevent from drawing over translucent cells

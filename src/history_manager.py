@@ -230,8 +230,8 @@ class InsertBlankColumnState(State):
 
 
 
-class UpdateColumnDataFromDAXState(State):
-    __gtype_name__ = 'UpdateColumnDataFromDAXState'
+class UpdateColumnDataFromDaxState(State):
+    __gtype_name__ = 'UpdateColumnDataFromDaxState'
 
     file_path: str
 
@@ -282,12 +282,12 @@ class UpdateColumnDataFromDAXState(State):
 
     def redo(self) -> None:
         document = globals.history.document
-        document.update_columns_from_dax(self.query)
+        document.update_current_columns_from_dax(self.query)
 
 
 
-class UpdateColumnDataFromSQLState(State):
-    __gtype_name__ = 'UpdateColumnDataFromSQLState'
+class UpdateColumnDataFromSqlState(State):
+    __gtype_name__ = 'UpdateColumnDataFromSqlState'
 
     file_path: str
 
@@ -338,12 +338,18 @@ class UpdateColumnDataFromSQLState(State):
 
     def redo(self) -> None:
         document = globals.history.document
-        document.update_columns_from_sql(self.query)
+        document.update_current_columns_from_sql(self.query)
 
 
 
 class UpdateDataState(State):
     __gtype_name__ = 'UpdateDataState'
+
+    column: int
+    row: int
+    column_span: int
+    row_span: int
+    dfi: int
 
     content: Any
     file_path: str
@@ -353,12 +359,23 @@ class UpdateDataState(State):
     include_header: bool
 
     def __init__(self,
+                 column:         int,
+                 row:            int,
+                 column_span:    int,
+                 row_span:       int,
+                 dfi:            int,
                  content:        Any,
                  new_value:      Any,
                  include_header: bool) -> None:
         super().__init__()
 
         self.save_selection(True)
+
+        self.column = column
+        self.row = row
+        self.column_span = column_span
+        self.row_span = row_span
+        self.dfi = dfi
 
         self.file_path = self.write_snapshot(content)
 
@@ -368,14 +385,11 @@ class UpdateDataState(State):
 
     def undo(self) -> None:
         document = globals.history.document
-
-        arange = document.selection.current_active_range
-
-        document.data.update_cell_data_block_from_metadata(arange.metadata.column,
-                                                           arange.metadata.row,
-                                                           arange.column_span,
-                                                           arange.row_span,
-                                                           arange.metadata.dfi,
+        document.data.update_cell_data_block_from_metadata(self.column,
+                                                           self.row,
+                                                           self.column_span,
+                                                           self.row_span,
+                                                           self.dfi,
                                                            self.include_header,
                                                            polars.read_parquet(self.file_path))
 
@@ -383,44 +397,119 @@ class UpdateDataState(State):
 
     def redo(self) -> None:
         document = globals.history.document
-        document.update_current_cells(self.new_value)
+        document.update_current_cells_from_literal(self.new_value)
 
 
 
-class UpdateRangeDataState(State):
-    __gtype_name__ = 'UpdateRangeDataState'
+class UpdateDataFromOperatorState(State):
+    __gtype_name__ = 'UpdateDataFromOperatorState'
 
-    content: Any
+    column: int
+    row: int
+    column_span: int
+    row_span: int
+    dfi: int
+
     file_path: str
-
-    crange: SheetCell
-
     include_header: bool
 
+    operator_name: str
+    operation_args: list
+    on_column: bool
+
     def __init__(self,
+                 column:         int,
+                 row:            int,
+                 column_span:    int,
+                 row_span:       int,
+                 dfi:            int,
                  content:        Any,
-                 crange:         SheetCell,
-                 include_header: bool) -> None:
+                 include_header: bool,
+                 operator_name:  str,
+                 operation_args: list,
+                 on_column:      bool) -> None:
         super().__init__()
 
         self.save_selection(True)
 
+        self.column = column
+        self.row = row
+        self.column_span = column_span
+        self.row_span = row_span
+        self.dfi = dfi
+
         self.file_path = self.write_snapshot(content)
-
-        self.crange = crange
-
         self.include_header = include_header
+
+        self.operator_name = operator_name
+        self.operation_args = operation_args
+        self.on_column = on_column
 
     def undo(self) -> None:
         document = globals.history.document
+        document.data.update_cell_data_block_from_metadata(self.column,
+                                                           self.row,
+                                                           self.column_span,
+                                                           self.row_span,
+                                                           self.dfi,
+                                                           self.include_header,
+                                                           polars.read_parquet(self.file_path))
 
-        arange = document.selection.current_active_range
+        self.restore_selection()
 
-        document.data.update_cell_data_block_from_metadata(arange.metadata.column,
-                                                           arange.metadata.row,
-                                                           self.crange.column_span,
-                                                           self.crange.row_span,
-                                                           arange.metadata.dfi,
+    def redo(self) -> None:
+        document = globals.history.document
+        document.update_current_cells_from_operator(self.operator_name,
+                                                    self.operation_args,
+                                                    self.on_column)
+
+
+
+class UpdateDataFromRangeState(State):
+    __gtype_name__ = 'UpdateDataFromRangeState'
+
+    column: int
+    row: int
+    column_span: int
+    row_span: int
+    dfi: int
+
+    file_path: str
+    include_header: bool
+
+    crange: SheetCell
+
+    def __init__(self,
+                 column:         int,
+                 row:            int,
+                 column_span:    int,
+                 row_span:       int,
+                 dfi:            int,
+                 content:        Any,
+                 include_header: bool,
+                 crange:         SheetCell) -> None:
+        super().__init__()
+
+        self.save_selection(True)
+
+        self.column = column
+        self.row = row
+        self.column_span = column_span
+        self.row_span = row_span
+        self.dfi = dfi
+
+        self.file_path = self.write_snapshot(content)
+        self.include_header = include_header
+
+        self.crange = crange
+
+    def undo(self) -> None:
+        document = globals.history.document
+        document.data.update_cell_data_block_from_metadata(self.column,
+                                                           self.row,
+                                                           self.column_span,
+                                                           self.row_span,
+                                                           self.dfi,
                                                            self.include_header,
                                                            polars.read_parquet(self.file_path))
 
@@ -966,7 +1055,7 @@ class FindReplaceDataState(State):
 
     def undo(self) -> None:
         document = globals.history.document
-        document.update_current_cells(self.content)
+        document.update_current_cells_from_literal(self.content)
         self.restore_selection()
 
     def redo(self) -> None:
@@ -1225,26 +1314,28 @@ class HistoryManager(GObject.Object):
     def restore_scroll_position(self,
                                 scroll_y: float,
                                 scroll_x: float) -> None:
-        # TODO: don't restore the scroll position if the target cell is already visible
-        canvas_height = self.document.view.main_canvas.get_height()
-        canvas_width = self.document.view.main_canvas.get_width()
+        if isinstance(self.document, SheetDocument):
+            # TODO: don't restore if the target cell is already visible?
+            canvas_height = self.document.view.main_canvas.get_height()
+            canvas_width = self.document.view.main_canvas.get_width()
 
-        self.document.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y + canvas_height)
-        self.document.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x + canvas_width)
+            self.document.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y + canvas_height)
+            self.document.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x + canvas_width)
 
-        self.document.view.vertical_scrollbar.get_adjustment().set_value(scroll_y)
-        self.document.view.horizontal_scrollbar.get_adjustment().set_value(scroll_x)
+            self.document.view.vertical_scrollbar.get_adjustment().set_value(scroll_y)
+            self.document.view.horizontal_scrollbar.get_adjustment().set_value(scroll_x)
 
-        # Make sure that the cursor is visible in case the user has toggled some
-        # UI elements causing the cursor to be hidden, for example the sidebar.
-        self.document.auto_adjust_scrollbars_by_selection()
-        self.document.auto_adjust_locators_size_by_scroll()
-        self.document.auto_adjust_selections_by_scroll()
-        self.document.repopulate_auto_filter_widgets()
+            # Make sure that the cursor is visible in case the user has toggled some
+            # UI elements causing the cursor to be hidden, for example the sidebar.
+            self.document.auto_adjust_scrollbars_by_selection()
+            self.document.auto_adjust_locators_size_by_scroll()
+            self.document.auto_adjust_selections_by_scroll()
+            self.document.repopulate_auto_filter_widgets()
 
     def redraw_main_canvas(self) -> None:
-        self.document.renderer.render_caches = {}
-        self.document.view.main_canvas.queue_draw()
+        if isinstance(self.document, SheetDocument):
+            self.document.renderer.render_caches = {}
+            self.document.view.main_canvas.queue_draw()
 
     def delete_snapshot(self, file_path: str) -> None:
         self.file_manager.delete_file(file_path)

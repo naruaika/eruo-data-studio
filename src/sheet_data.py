@@ -23,7 +23,6 @@
 
 from gi.repository import GObject
 from datetime import datetime
-from time import time
 import duckdb
 import polars
 import re
@@ -31,6 +30,7 @@ import re
 from . import globals
 from . import utils
 from .sheet_document import SheetDocument
+from .sheet_functions import build_operation
 
 class SheetCellBoundingBox(GObject.Object):
     __gtype_name__ = 'SheetCellBoundingBox'
@@ -571,6 +571,101 @@ class SheetData(GObject.Object):
             globals.send_notification(message, action)
 
         return False
+
+    def update_cell_data_block_with_operator_from_metadata(self,
+                                                           column:         int,
+                                                           row:            int,
+                                                           column_span:    int,
+                                                           row_span:       int,
+                                                           dfi:            int,
+                                                           include_header: bool,
+                                                           operator_name:  str,
+                                                           operation_args: list,
+                                                           column_vseries: polars.Series,
+                                                           row_vseries:    polars.Series) -> bool:
+        if dfi < 0 or len(self.dfs) <= dfi:
+            return False
+
+        row -= 1
+
+        row_count = self.dfs[dfi].height
+
+        end_column = column + column_span
+        if column_span < 0:
+            end_column = self.dfs[dfi].width
+
+        start = max(0, row)
+        stop = min(row + row_span, row_count)
+
+        for column in range(column, end_column):
+            # Skip if the column is hidden
+            if len(column_vseries) and column not in column_vseries:
+                continue
+
+            # Skip out of range columns
+            if self.dfs[dfi].width <= column:
+                break
+
+            column_name = self.dfs[dfi].columns[column]
+            column_dtype = self.dfs[dfi].dtypes[column]
+
+            if isinstance(column_dtype, (polars.List, polars.Struct, polars.Object)):
+                continue # we cannot update a list or struct
+
+            expression = build_operation(polars.col(column_name), operator_name, operation_args)
+
+            try:
+                # Update the entire column
+                if row_span < 0:
+                    self.dfs[dfi] = self.dfs[dfi].with_columns(expression.alias(column_name))
+                # Update the dataframe in range, excluding the header row
+                elif stop - start > 0:
+                    when_expression = polars.col('$ridx').is_between(start, stop - 1)
+                    if len(row_vseries):
+                        when_expression &= polars.col('$ridx').is_in(row_vseries[1:] - 1)
+                    self.dfs[dfi] = self.dfs[dfi].with_row_index('$ridx') \
+                                                 .with_columns(polars.when(when_expression)
+                                                                     .then(expression)
+                                                                     .otherwise(polars.col(column_name))
+                                                                     .alias(column_name)) \
+                                                 .drop('$ridx')
+            except Exception as e:
+                globals.send_notification(str(e))
+                break
+
+            if not include_header:
+                continue # skip header cell
+
+            # Evaluate the expression
+            try:
+                expression = build_operation(polars.lit(column_name), operator_name, operation_args)
+                replace_with = polars.select(expression).item()
+            except Exception as e:
+                globals.send_notification(str(e))
+                break
+
+            # Remove leading '$' to prevent collision from internal column names
+            replace_with = replace_with.lstrip('$')
+
+            def generate_column_name(column_name: str) -> str:
+                cnumber = 1
+                for cname in self.dfs[dfi].columns:
+                    if match := re.match(column_name + r'_(\d+)', cname):
+                        cnumber = max(cnumber, int(match.group(1)) + 1)
+                return f'{column_name}_{cnumber}'
+
+            # Generate a new column name if needed
+            if replace_with in ['', None]:
+                replace_with = generate_column_name('column')
+            else:
+                replace_with = str(replace_with)
+                if replace_with in self.dfs[dfi].columns:
+                    replace_with = generate_column_name(replace_with)
+
+            # Update the column name
+            self.dfs[dfi] = self.dfs[dfi].rename({column_name: replace_with})
+
+        return True
 
     def update_cell_data_block_with_single_from_metadata(self,
                                                          column:         int,

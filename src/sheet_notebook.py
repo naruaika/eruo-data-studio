@@ -47,32 +47,15 @@ class SheetNotebook(GObject.Object):
         self.document_id = document_id
         self.title = title
 
+        from .history_manager import HistoryManager
+        self.history = HistoryManager(self)
+
         from .sheet_notebook_view import SheetNotebookView
         self.view = SheetNotebookView(self)
 
         # See the explanation in SheetDocument
         self.is_searching_cells: bool = False
         self.search_range_performer: str = ''
-
-        # We don't use all objects below, they're just placeholders
-        # so that it doesn't break the current design. Let's flag
-        # this as TODO.
-
-        from .sheet_widget import SheetWidget
-        self.widgets: list[SheetWidget] = []
-
-        from .history_manager import HistoryManager
-        self.history = HistoryManager(self)
-
-        from .sheet_data import SheetData
-        from .sheet_display import SheetDisplay
-        from .sheet_renderer import SheetRenderer
-        from .sheet_selection import SheetSelection
-
-        self.data = SheetData(self, None)
-        self.display = SheetDisplay(self)
-        self.renderer = SheetRenderer(self)
-        self.selection = SheetSelection(self)
 
     def run_sql_query(self, query: str) -> Any:
         connection = duckdb.connect()
@@ -112,13 +95,6 @@ class SheetNotebook(GObject.Object):
                                      content:   Any) -> None:
         pass
 
-    # We don't use all functions below, they're just placeholders
-    # so that it doesn't break the current design. Let's flag
-    # this as TODO.
-
-    def update_current_cells(self, new_value: Any) -> bool:
-        pass
-
     def find_in_current_cells(self,
                               text_value:       str,
                               match_case:       bool,
@@ -140,29 +116,4 @@ class SheetNotebook(GObject.Object):
                                           match_cell: bool,
                                           within_selection: bool,
                                           use_regexp: bool) -> None:
-        pass
-
-    def notify_selection_changed(self,
-                                 column: int,
-                                 row:    int,
-                                 metadata) -> None:
-        pass
-
-    def notify_selected_table_changed(self, force: bool = False) -> None:
-        pass
-
-    def repopulate_auto_filter_widgets(self) -> None:
-        pass
-
-    def auto_adjust_scrollbars_by_selection(self,
-                                            follow_cursor: bool = True,
-                                            scroll_axis:   str = 'both',
-                                            with_offset:   bool = False,
-                                            smooth_scroll: bool = False) -> None:
-        pass
-
-    def auto_adjust_locators_size_by_scroll(self) -> None:
-        pass
-
-    def auto_adjust_selections_by_scroll(self) -> None:
         pass

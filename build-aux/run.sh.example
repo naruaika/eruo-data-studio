@@ -1,0 +1,2 @@
+#!/bin/bash
+/app/bin/eruo-data-studio "$@"

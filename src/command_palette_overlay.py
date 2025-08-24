@@ -35,12 +35,14 @@ class CommandListItem(GObject.Object):
 
     shortcuts: list[str] = []
     steal_focus: bool = False
+    will_prompt: bool = False
 
     def __init__(self,
                  action_name: str,
                  title:       str,
                  shortcuts:   list[str],
-                 steal_focus: bool) -> None:
+                 steal_focus: bool,
+                 will_prompt: bool) -> None:
         super().__init__()
 
         self.action_name = action_name
@@ -49,6 +51,7 @@ class CommandListItem(GObject.Object):
 
         self.shortcuts = shortcuts or []
         self.steal_focus = steal_focus
+        self.will_prompt = will_prompt
 
 
 
@@ -59,6 +62,9 @@ class CommandPaletteOverlay(Adw.Bin):
     command_overlay = Gtk.Template.Child()
     command_entry = Gtk.Template.Child()
 
+    help_text = Gtk.Template.Child()
+
+    scrolled_window = Gtk.Template.Child()
     list_view = Gtk.Template.Child()
     list_store = Gtk.Template.Child()
     selection = Gtk.Template.Child()
@@ -106,9 +112,13 @@ class CommandPaletteOverlay(Adw.Bin):
             list_item = CommandListItem(command['action-name'],
                                         command['title'],
                                         command['shortcuts'],
-                                        command['steal-focus'])
+                                        command['steal-focus'],
+                                        command['will-prompt'])
             self.command_titles.append(list_item.title)
             self.list_store.append(list_item)
+
+        self.is_prompting = False
+        self.prompt_callback = None
 
     def setup_factory(self,
                       list_item_factory: Gtk.SignalListItemFactory,
@@ -166,6 +176,9 @@ class CommandPaletteOverlay(Adw.Bin):
         self.on_command_entry_changed(entry)
 
     def on_command_entry_changed(self, entry: Gtk.Entry) -> None:
+        if self.is_prompting:
+            return
+
         query = entry.get_text()
 
         if query == '':
@@ -196,17 +209,31 @@ class CommandPaletteOverlay(Adw.Bin):
 
         self.selection.set_model(new_list_store)
 
-        if new_list_store.get_n_items() == 0:
+        n_list_items = new_list_store.get_n_items()
+
+        self.scrolled_window.get_vscrollbar().set_visible(n_list_items > 3)
+        self.scrolled_window.set_visible(n_list_items > 0)
+
+        self.help_text.set_label('No matching commands')
+        self.help_text.set_visible(n_list_items == 0)
+
+        if n_list_items == 0:
             return
 
         self.list_view.set_single_click_activate(False)
         self.list_view.scroll_to(0, Gtk.ListScrollFlags.SELECT, None)
 
     def on_command_entry_activated(self, entry: Gtk.Entry) -> None:
+        if self.is_prompting:
+            self.prompt_callback(entry.get_text())
+            self.close_command_overlay(steal_focus=False)
+            return
+
         selected_item = self.selection.get_selected_item()
         action_name = selected_item.action_name
         self.window.get_application().activate_action(action_name, None)
-        self.close_command_overlay(selected_item.steal_focus)
+        self.close_command_overlay(selected_item.steal_focus,
+                                   selected_item.will_prompt)
 
     def on_list_view_activated(self,
                                list_view: Gtk.ListView,
@@ -257,12 +284,29 @@ class CommandPaletteOverlay(Adw.Bin):
             return
         self.list_view.set_single_click_activate(True)
 
-    def open_command_overlay(self) -> None:
+    def open_command_overlay(self,
+                             as_prompt: bool = False,
+                             help_text: str = '',
+                             callback:  callable = None) -> None:
+        self.is_prompting = as_prompt
+        self.prompt_callback = callback
+
+        self.help_text.set_visible(as_prompt)
+        self.help_text.set_label(help_text)
+
+        self.scrolled_window.set_visible(not as_prompt)
         self.list_view.set_single_click_activate(False)
+
         self.set_visible(True)
 
         self.command_entry.set_text('')
         self.command_entry.grab_focus()
+
+        if as_prompt:
+            return
+
+        self.help_text.set_visible(False)
+        self.scrolled_window.set_visible(True)
 
         self.is_animating_uis = True
         def stop_animating_uis() -> None:
@@ -272,7 +316,15 @@ class CommandPaletteOverlay(Adw.Bin):
         GLib.timeout_add(200, self.command_overlay.remove_css_class, 'slide-up-dialog')
         GLib.timeout_add(200, stop_animating_uis)
 
-    def close_command_overlay(self, steal_focus: bool = False) -> None:
+    def close_command_overlay(self,
+                              steal_focus: bool = False,
+                              will_prompt: bool = False) -> None:
+        if will_prompt:
+            return
+
+        self.is_prompting = False
+        self.prompt_callback = None
+
         self.command_overlay.add_css_class('slide-down-dialog')
         GLib.timeout_add(200, self.set_visible, False)
         GLib.timeout_add(200, self.command_overlay.remove_css_class, 'slide-down-dialog')

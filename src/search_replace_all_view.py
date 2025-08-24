@@ -26,6 +26,7 @@ import polars
 import threading
 
 from . import globals
+from .sheet_document import SheetDocument
 from .window import Window
 
 class SearchResultListItem(GObject.Object):
@@ -90,10 +91,11 @@ class SearchReplaceAllView(Gtk.Box):
         search_range = sheet_document.selection.current_search_range
 
         cname = self.search_list_store.get_item(position).cname
-        sheet_document.renderer.render_caches = {}
-        sheet_document.update_selection_from_name(cname)
 
-        sheet_document.selection.current_search_range = search_range
+        if isinstance(sheet_document, SheetDocument):
+            sheet_document.renderer.render_caches = {}
+            sheet_document.update_selection_from_name(cname)
+            sheet_document.selection.current_search_range = search_range
 
     @Gtk.Template.Callback()
     def on_search_entry_activated(self, entry: Gtk.Entry) -> None:
@@ -106,14 +108,15 @@ class SearchReplaceAllView(Gtk.Box):
 
         sheet_document = self.window.get_current_active_document()
 
-        # Reset the current search range
-        if not within_selection:
-            sheet_document.selection.current_search_range = None
+        if isinstance(sheet_document, SheetDocument):
+            # Reset the current search range
+            if not within_selection:
+                sheet_document.selection.current_search_range = None
 
-        # Initialize the current search range
-        elif sheet_document.selection.current_search_range is None:
-            arange = sheet_document.selection.current_active_range
-            sheet_document.selection.current_search_range = arange
+            # Initialize the current search range
+            elif sheet_document.selection.current_search_range is None:
+                arange = sheet_document.selection.current_active_range
+                sheet_document.selection.current_search_range = arange
 
         self.search_status.set_visible(True)
 
@@ -146,42 +149,43 @@ class SearchReplaceAllView(Gtk.Box):
             item_counter = 0
             has_more_items = False
 
-            # Update the search results
-            for row in range(search_results.height):
-                if item_counter == _MAX_SEARCH_RESULT_ITEMS:
-                    has_more_items = True
-                    break
-
-                for column_name in search_results.columns:
+            if isinstance(sheet_document, SheetDocument):
+                # Update the search results
+                for row in range(search_results.height):
                     if item_counter == _MAX_SEARCH_RESULT_ITEMS:
                         has_more_items = True
                         break
-                    if column_name == '$ridx':
-                        continue
-                    if search_results[column_name][row] is False:
-                        continue
 
-                    # TODO: support multiple dataframes?
-                    col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the $ridx column
-                    row_index = search_results['$ridx'][row] + 2 # +2 for the locator and the header
+                    for column_name in search_results.columns:
+                        if item_counter == _MAX_SEARCH_RESULT_ITEMS:
+                            has_more_items = True
+                            break
+                        if column_name == '$ridx':
+                            continue
+                        if search_results[column_name][row] is False:
+                            continue
 
-                    cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
-                    cvalue = str(sheet_document.data.dfs[0][column_name][row_index - 2])[:40]
+                        # TODO: support multiple dataframes?
+                        col_index = sheet_document.data.dfs[0].columns.index(column_name) + 1 # +1 for the $ridx column
+                        row_index = search_results['$ridx'][row] + 2 # +2 for the locator and the header
 
-                    list_item = _search_result_list_items_pool[item_counter]
-                    list_item.cname = cname
-                    list_item.cvalue = cvalue
-                    list_items_to_add.append(list_item)
+                        cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
+                        cvalue = str(sheet_document.data.dfs[0][column_name][row_index - 2])[:40]
 
-                    if item_counter == 0:
-                        first_list_item = list_item
-                        def update_selection():
-                            search_range = sheet_document.selection.current_search_range
-                            sheet_document.update_selection_from_name(first_list_item.cname)
-                            sheet_document.selection.current_search_range = search_range
-                        GLib.idle_add(update_selection)
+                        list_item = _search_result_list_items_pool[item_counter]
+                        list_item.cname = cname
+                        list_item.cvalue = cvalue
+                        list_items_to_add.append(list_item)
 
-                    item_counter += 1
+                        if item_counter == 0:
+                            first_list_item = list_item
+                            def update_selection():
+                                search_range = sheet_document.selection.current_search_range
+                                sheet_document.update_selection_from_name(first_list_item.cname)
+                                sheet_document.selection.current_search_range = search_range
+                            GLib.idle_add(update_selection)
+
+                        item_counter += 1
 
             GLib.idle_add(self.search_list_store.splice, 0, 0, list_items_to_add)
 
@@ -286,14 +290,15 @@ class SearchReplaceAllView(Gtk.Box):
 
         sheet_document = self.window.get_current_active_document()
 
-        # Reset the current search range
-        if not within_selection:
-            sheet_document.selection.current_search_range = None
+        if isinstance(sheet_document, SheetDocument):
+            # Reset the current search range
+            if not within_selection:
+                sheet_document.selection.current_search_range = None
 
-        # Initialize the current search range
-        elif sheet_document.selection.current_search_range is None:
-            arange = sheet_document.selection.current_active_range
-            sheet_document.selection.current_search_range = arange
+            # Initialize the current search range
+            elif sheet_document.selection.current_search_range is None:
+                arange = sheet_document.selection.current_active_range
+                sheet_document.selection.current_search_range = arange
 
         sheet_document.find_replace_all_in_current_cells(search_pattern,
                                                          replace_with,

@@ -3,14 +3,13 @@
   <requires lib="gtk" version="4.0"/>
   <requires lib="Adw" version="1.0"/>
   <template class="CommandPaletteOverlay" parent="AdwBin">
-    <property name="valign">center</property>
-    <property name="halign">center</property>
     <property name="width-request">600</property>
-    <property name="height-request">494</property>
-    <property name="margin-top">30</property>
-    <property name="margin-bottom">30</property>
-    <property name="margin-start">30</property>
-    <property name="margin-end">30</property>
+    <property name="valign">start</property>
+    <property name="halign">center</property>
+    <property name="margin-top">6</property>
+    <property name="margin-bottom">10</property>
+    <property name="margin-start">10</property>
+    <property name="margin-end">10</property>
     <property name="visible">false</property>
     <child>
       <object class="GtkBox" id="command_overlay">
@@ -29,8 +28,19 @@
               </object>
             </child>
             <child>
-              <object class="GtkScrolledWindow">
-                <property name="vexpand">true</property>
+              <object class="GtkLabel" id="help_text">
+                <property name="margin-start">8</property>
+                <property name="halign">start</property>
+                <property name="ellipsize">end</property>
+                <property name="visible">false</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkScrolledWindow" id="scrolled_window">
+                <property name="halign">fill</property>
+                <property name="hexpand">true</property>
+                <property name="max-content-height">494</property>
+                <property name="propagate-natural-height">true</property>
                 <child>
                   <object class="GtkListView" id="list_view">
                     <property name="single-click-activate">true</property>

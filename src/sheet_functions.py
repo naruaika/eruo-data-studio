@@ -23,12 +23,28 @@
 
 from datetime import datetime, date, time, timezone
 from typing import Any, Dict, List, Union
+from pyarrow import compute
 import copy
+import eruo_strutil as strx
 import math
 import polars
 import re
 
 from . import utils
+
+@polars.api.register_expr_namespace('strx')
+class ExpandedStringExpr:
+    def __init__(self, expr: polars.Expr) -> None:
+        self._expr = expr
+
+    def pig_latinnify(self) -> polars.Expr:
+        return strx.pig_latinnify(self._expr)
+
+    def to_sentence_case(self) -> polars.Expr:
+        return strx.to_sentence_case(self._expr)
+
+    def to_sponge_case(self) -> polars.Expr:
+        return strx.to_sponge_case(self._expr)
 
 MATH_EVAL_GLOBALS = {
     '__builtins__' : {},
@@ -113,35 +129,118 @@ FUNCTION_CONSTANTS = [
     'YEAR',
 ]
 
-def _get_operation_expression(operator: str,
-                              left:     polars.Expr,
-                              right:    polars.Expr) -> polars.Expr:
-    match operator:
-        case 'AND'  : return left.and_(right)
-        case 'OR'   : return left.or_(right)
-        case 'XOR'  : return left.xor(right)
-        case 'XAND' : return (left.and_(right)).or_(left.not_().and_(right.not_()))
-        case 'XNOR' : return (left.and_(right)).or_(left.not_().and_(right.not_()))
-        case '&'    : return left.and_(right)
-        case '|'    : return left.or_(right)
-        case '^'    : return left.xor(right)
-        case '+'    : return left.add(right)
-        case '-'    : return left.sub(right)
-        case '*'    : return left.mul(right)
-        case '/'    : return left.truediv(right)
-        case '//'   : return left.floordiv(right)
-        case '%'    : return left.mod(right)
-        case '**'   : return left.pow(right)
-        case '>='   : return left.ge(right)
-        case '<='   : return left.le(right)
-        case '=='   : return left.eq(right)
-        case '='    : return left.eq(right)
-        case '!='   : return left.eq(right).not_()
-        case '<>'   : return left.eq(right).not_()
-        case '>'    : return left.gt(right)
-        case '<'    : return left.lt(right)
+#
+# Operations Expression Builder
+#
 
-    raise ValueError(f'Unsupported operator: {operator}')
+def _get_operation_expression(left_expr:      polars.Expr,
+                              operator_name:  str,
+                              right_expr:     polars.Expr = None,
+                              operation_args: list = []) -> polars.Expr:
+    match operator_name:
+        # Comparisons
+        case '>='                                   : return left_expr.ge(right_expr)
+        case '<='                                   : return left_expr.le(right_expr)
+        case '=='                                   : return left_expr.eq(right_expr)
+        case '='                                    : return left_expr.eq(right_expr)
+        case '!='                                   : return left_expr.eq(right_expr).not_()
+        case '<>'                                   : return left_expr.eq(right_expr).not_()
+        case '>'                                    : return left_expr.gt(right_expr)
+        case '<'                                    : return left_expr.lt(right_expr)
+
+        # Bitwise
+        case 'AND'                                  : return left_expr.and_(right_expr)
+        case 'OR'                                   : return left_expr.or_(right_expr)
+        case 'XOR'                                  : return left_expr.xor(right_expr)
+        case 'XAND'                                 : return (left_expr.and_(right_expr)).or_(left_expr.not_().and_(right_expr.not_()))
+        case 'XNOR'                                 : return (left_expr.and_(right_expr)).or_(left_expr.not_().and_(right_expr.not_()))
+        case '&'                                    : return left_expr.and_(right_expr) # TODO:add support for string concatenation
+        case '|'                                    : return left_expr.or_(right_expr)
+        case '^'                                    : return left_expr.xor(right_expr)  # TODO:add support as math power() function
+
+        # Numeric
+        case '+'                                    : return left_expr.add(right_expr)  # TODO:add support for string concatenation
+        case '-'                                    : return left_expr.sub(right_expr)
+        case '*'                                    : return left_expr.mul(right_expr)
+        case '/'                                    : return left_expr.truediv(right_expr)
+        case '//'                                   : return left_expr.floordiv(right_expr)
+        case '%'                                    : return left_expr.mod(right_expr)
+        case '**'                                   : return left_expr.pow(right_expr)
+
+        # String
+        case 'append-prefix'                        : return operation_args[0] + left_expr
+        case 'append-suffix'                        : return left_expr + operation_args[0]
+        case 'camel-case'                           : return _get_change_case_to_camel_case_expression(left_expr)
+        case 'constant-case'                        : return _get_change_case_to_constant_case_expression(left_expr)
+        case 'dot-case'                             : return _get_change_case_to_dot_case_expression(left_expr)
+        case 'decode-base64'                        : return left_expr.str.decode('base64', strict=False)
+        case 'decode-hexadecimal'                   : return left_expr.str.decode('hex', strict=False)
+        case 'encode-base64'                        : return left_expr.str.encode('base64')
+        case 'encode-hexadecimal'                   : return left_expr.str.encode('hex')
+        case 'kebab-case'                           : return _get_change_case_to_kebab_case_expression(left_expr)
+        case 'lowercase'                            : return left_expr.str.to_lowercase()
+        case 'pascal-case'                          : return _get_change_case_to_pascal_case_expression(left_expr)
+        case 'snake-case'                           : return _get_change_case_to_snake_case_expression(left_expr)
+        case 'sentence-case'                        : return left_expr.strx.to_sentence_case()
+        case 'sponge-case'                          : return left_expr.strx.to_sponge_case()
+        case 'title-case'                           : return left_expr.str.to_titlecase()
+        case 'pig-latinnify'                        : return left_expr.strx.pig_latinnify()
+        case 'uppercase'                            : return left_expr.str.to_uppercase()
+        case 'swap-text-case'                       : return _get_swap_text_case_expression(left_expr)
+        case 'trim-whitespace'                      : return left_expr.str.strip_chars()
+        case 'trim-whitespace-and-remove-new-lines' : return left_expr.str.strip_chars().str.replace_all('\n', '')
+        case 'trim-start-whitespace'                : return left_expr.str.strip_chars_start()
+        case 'trim-end-whitespace'                  : return left_expr.str.strip_chars_end()
+
+    raise ValueError(f'Unsupported operator: {operator_name}')
+
+def _get_change_case_to_camel_case_expression(expr: polars.Expr) -> polars.Expr:
+    pascal_cased = expr.pipe(_get_operation_expression, 'pascal-case')
+    first_letter = pascal_cased.str.slice(0, 1).str.to_lowercase()
+    return first_letter + pascal_cased.str.slice(1, None)
+
+def _get_change_case_to_kebab_case_expression(expr: polars.Expr) -> polars.Expr:
+    return expr.str.replace_all('([a-z])([A-Z])', r'${1}-${2}') \
+               .str.replace_all(r'[\.\s_-]+', '-') \
+               .str.to_lowercase() \
+               .str.strip_chars('-')
+
+def _get_change_case_to_constant_case_expression(expr: polars.Expr) -> polars.Expr:
+    return expr.str.replace_all(r'([a-z])([A-Z])', r'${1}_${2}') \
+               .str.replace_all(r'[\.\s_-]+', '_') \
+               .str.to_uppercase() \
+               .str.strip_chars('_')
+
+def _get_change_case_to_dot_case_expression(expr: polars.Expr) -> polars.Expr:
+    return expr.str.replace_all(r'([a-z])([A-Z])', r'${1}.${2}') \
+               .str.replace_all(r'[\s_-]+', '.') \
+               .str.to_lowercase() \
+               .str.strip_chars('.')
+
+def _get_change_case_to_pascal_case_expression(expr: polars.Expr) -> polars.Expr:
+    normalized_string = expr.str.replace_all(r'([a-z])([A-Z])', r'${1} ${2}') \
+                            .str.replace_all(r'[\.\s_-]+', ' ') \
+                            .str.strip_chars(' ')
+    words = normalized_string.str.split(' ')
+    first_part = polars.element().str.slice(0, 1).str.to_uppercase()
+    last_part = polars.element().str.slice(1, None).str.to_lowercase()
+    return words.list.eval(first_part + last_part).list.join('')
+
+def _get_change_case_to_snake_case_expression(expr: polars.Expr) -> polars.Expr:
+    return expr.str.replace_all(r'([a-z])([A-Z])', r'${1}_${2}') \
+               .str.replace_all(r'[\.\s_-]+', '_') \
+               .str.to_lowercase() \
+               .str.strip_chars('_')
+
+def _get_swap_text_case_expression(expr: polars.Expr) -> polars.Expr:
+    def swap_text_case(series: polars.Series) -> polars.Series:
+        return polars.Series(compute.utf8_swapcase(series.to_arrow()))
+    return expr.map_batches(swap_text_case, polars.self_dtype())
+
+def build_operation(expression:     polars.Expr,
+                    operator_name:  str,
+                    operation_args: list = []) -> polars.Expr:
+    return _get_operation_expression(expression, operator_name, operation_args=operation_args)
 
 #
 # Formula Expression Builder
@@ -2334,7 +2433,7 @@ def _build_polars_expr(formula_dict: dict, func_type: str) -> polars.Expr:
         if not isinstance(right_expr, polars.Expr):
             right_expr = polars.lit(right_expr)
 
-        return _get_operation_expression(operator, left_expr, right_expr)
+        return _get_operation_expression(left_expr, operator, right_expr)
 
     raise ValueError(f'Unsupported formula type: {formula_dict['type']}')
 
@@ -2390,9 +2489,8 @@ def parse_dax(expression: str, transform: bool = True) -> Dict[str, Any]:
 # SQL Function Extensions
 #
 
-from pyarrow import compute
-from duckdb.typing import DOUBLE
 from duckdb import DuckDBPyConnection
+from duckdb.typing import DOUBLE
 
 def _sql_function_acot(x):
     return compute.atan(compute.divide(1, x))
@@ -2402,11 +2500,5 @@ SQL_FUNCTIONS = [
 ]
 
 def register_sql_functions(connection: DuckDBPyConnection) -> None:
-    for name, func, param, rtype in SQL_FUNCTIONS:
-        connection.create_function(
-            name,
-            func,
-            parameters=param,
-            return_type=rtype,
-            type='arrow',
-        )
+    for name, function, params, rtype in SQL_FUNCTIONS:
+        connection.create_function(name, function, params, rtype, type='arrow')

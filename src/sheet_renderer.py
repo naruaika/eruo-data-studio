@@ -508,6 +508,7 @@ class SheetRenderer(GObject.Object):
                 if vrow_index == 1:
                     layout.set_font_description(header_font_desc)
                     cname = data.dfs[0].columns[vcol_index - 1]
+                    cname = cname.split('\n', 1)[0]
                     dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
                     cell_text = f'{cname} [{dtype}]'
                     layout.set_text(cell_text, -1)

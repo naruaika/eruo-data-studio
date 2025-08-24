@@ -6,7 +6,7 @@ A powerful, intuitive, and integrated data platform for data analysts.
   <img src="docs/screenshot.png" alt="Eruo Data Studio" />
 </span>
 
-**Eruo Data Studio** is an innovative, free, and open-source application designed to revolutionize how you interact with and understand your data. Built on the lightning-fast [Polars](https://pola.rs/) data processing library, **Eruo Data Studio** brings together the best of Excel's flexibility, business intelligence's interactive visualization, and ETL's robust data preparation, *all in one seamless environment*.
+**Eruo Data Studio** is an innovative, free, and open-source application designed to revolutionize how you interact with and understand your data. Built on the one of the most popular data processing libraries, **Eruo Data Studio** brings together the best of Excel's flexibility, business intelligence's interactive visualization, and ETL's robust data preparation, *all in one seamless environment*.
 
 <span style="display: block; margin: -20px; margin-bottom: -10px;">
   <img src="docs/screenshot-1.png" alt="Eruo Data Studio" />
@@ -42,7 +42,7 @@ Data professionals today constantly juggle multiple tools, leading to fragmented
 
 - **Alteryx Designer:** Essential for building robust, repeatable data pipelines and automating complex transformations. While powerful, they introduce another separate application, increasing context switching and a steeper learning curve for users less familiar with visual programming or scripting.
 
-The result? Data analysts frequently switch back and forth between applications: filtering large datasets in a BI tool to fit Excel, then jumping back to the BI tool for visualization, often needing to revert to Excel mid-presentation for ad-hoc requests. This constant context switching isn't just inefficient; it breaks the analytical flow and hinders productivity.
+The result? Data analysts frequently switch back and forth between applications, often needing to revert to Excel mid-presentation for ad-hoc requests. This constant context switching isn't just inefficient; it breaks the analytical flow and hinders productivity.
 
 **Eruo Data Studio** addresses these challenges head-on by providing a unified platform that combines the strengths of these disparate tools. Our core advantages include:
 
@@ -101,11 +101,6 @@ The following are some of the resources that have informed our decision-making a
 - [What is Tableau's purpose?](https://www.reddit.com/r/tableau/comments/1lsyb4u/what_is_tableaus_purpose/)
 - [Do you guys find that a lot of senior execs really dislike Tableau dashboard visualizations for reporting and monitoring?](https://www.reddit.com/r/tableau/comments/ew8jyd/do_you_guys_find_that_a_lot_of_senior_execs/)
 
-<!--
-- [The ONLY Data Cleaning Framework You Need | Ep. 3](https://www.youtube.com/watch?v=y9wFFD2bXQM)
-- [How to NAIL Exploratory Data Analysis (Lead Analyst Demo)](https://www.youtube.com/watch?v=deS6lETubdU)
--->
-
 We've also conducted research on similar applications to understand their strengths and limitations:
 
 - [Microsoft Excel](https://www.microsoft.com/en-us/microsoft-365/excel)
@@ -115,26 +110,58 @@ We've also conducted research on similar applications to understand their streng
 - [Alteryx Designer](https://www.alteryx.com/products/alteryx-designer)
 - [SmoothCSV](https://smoothcsv.com/)
 
+In reality, we've done research on more resources and applications, but the above are the ones that have been the most influential.
+
 ## Limitations
 
-Currently we only support x86_64 architectures and Linux distributions using `glibc` (GNU C Library) due to lack of dependecy management by the team. Building [Polars](https://pola.rs/) from source doesn't seem to be so complicated though, so we'll make sure to try again in the near future.
+Currently we only support x86_64 architectures and Linux distributions using `glibc` (GNU C Library) due to lack of dependecy management by the team. Building the dependencies from the source doesn't seem to be so complicated though, so we'll make sure to try again in the near future.
 
 Since we started developing the proof-of-concept with Libadwaita, a building blocks for GNOME applications, so it's supposed to be compatible only with GNOME desktop environment. I think it's possible that the application will still look correct and good on other distributions. Anyway, we'll add support for Windows in the future and hopefully for macOS as well as web platforms!
 
+## Build and Run
+
+The recommended way to build and run this project is using [GNOME Builder](https://apps.gnome.org/Builder/). Select the `com.macipra.eruo.json` manifest file and click the `Run` button.
+
 ## Development
 
-The recommended way to build and run this project is using [GNOME Builder](https://apps.gnome.org/Builder/).
+I personally use [Visual Studio Code](https://code.visualstudio.com/), but you can use whatever your favorite is. To run and build using Flatpak on VS Code, consider installing [Flatpak](https://marketplace.visualstudio.com/items?itemName=bilelmoussaoui.flatpak-vscode) extension.
 
-I personally use [Visual Studio Code](https://code.visualstudio.com/), but you can use whatever your favorite is. To run and build using Flatpak on VS Code, consider installing [Flatpak](https://marketplace.visualstudio.com/items?itemName=bilelmoussaoui.flatpak-vscode) extension. Run the following commands in the terminal to install the dependencies (on Fedora):
+Execute the following commands in the terminal to install the dependencies (on Fedora):
 
 ```sh
 sudo dnf install flatpak flatpak-builder --assumeyes
-flatpak remote-add --if-not-exists gnome-nightly https://nightly.gnome.org/gnome-nightly.flatpakrepo
-flatpak install gnome-nightly org.gnome.Platform//master
-flatpak install gnome-nightly org.gnome.Sdk//master
 ```
 
-Type and run `Flatpak: Select or Change Active Manifest` in the command palette (<kbd>F1</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>) and select the `com.macipra.eruo.Devel.json` manifest file. Finally, type and run `Flatpak: Build and Run` in the command palette or simply hit <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd>.
+Select the `com.macipra.eruo.Devel.json` manifest file by typing in the command palette and running `Flatpak: Select or Change Active Manifest` (<kbd>F1</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>).
+
+Create the `run.sh` file in the `build-aux/` directory:
+
+```sh
+cp build-aux/run.sh.example build-aux/run.sh
+```
+
+To build the plugins, we need the `rustup` and `maturin` installed:
+
+```sh
+sudo dnf install rustup maturin --assumeyes
+rustup-init
+```
+
+Note that despite we call it "plugins", they're actually mandatory dependencies by now. Building all plugins is simply a matter of running the following command:
+
+```sh
+chmod +x build-aux/build.sh
+./build-aux/build.sh
+```
+
+Finally, type in the command palette and run `Flatpak: Build and Run` or simply hit <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd>.
+
+To override some environment variables or to add command-line arguments to the application, you can update the `build-aux/run.sh` file, for example:
+
+```txt
+#!/bin/bash
+GTK_DEBUG= EDS_DEBUG= /app/bin/eruo-data-studio "~/Datasets/Anime Quotes/AnimeQuotes_case.csv" "$@"
+```
 
 If you're using a Python language server, you may want to install the requirements. For better dependency management, it's recommended to create a virtual environment rather than installing packages globally:
 
@@ -146,17 +173,30 @@ pip install -r requirements-devel.txt
 
 To add new dependencies using [`pip`](https://packaging.python.org/en/latest/key_projects/#pip) to the [`flatpak-builder`](https://docs.flatpak.org/en/latest/flatpak-builder.html) manifest json file, you can use the [`flatpak-pip-generator`](https://github.com/flatpak/flatpak-builder-tools/tree/master/pip). Either adding the reference to the `com.macipra.eruo*.json` files or copy-pasting the content directly into the manifest files and delete the generated file. Do not forget to update the `requirements*.txt` files as well.
 
-Here are some useful references for the project development:
+When it comes to the plugin development, usually I do this following example steps:
 
-- **Flatpak:** https://docs.flatpak.org/en/latest/index.html
-- **Flathub:** https://docs.flathub.org/docs/category/for-app-authors
-- **GNOME developer:** https://developer.gnome.org/documentation/index.html
-- **GNOME Python API:** https://api.pygobject.gnome.org/index.html
-- **GTK4:** https://docs.gtk.org/gtk4/index.html
-- **PyGObject:** https://gnome.pages.gitlab.gnome.org/pygobject/index.html
-- **Pycairo:** https://pycairo.readthedocs.io/en/latest/index.html
-- **Libadwaita:** https://gnome.pages.gitlab.gnome.org/libadwaita/doc/1.4/index.html
-- **Polars:** https://docs.pola.rs/api/python/stable/reference/index.html
+1. Activate the virtual environment: `source .pyenv/bin/activate`
+
+1. Go to the plugin directory: `cd plugins/polars/eruo-strutil`
+
+1. Check if there's any dependency issues: `cargo check`
+
+1. Install the plugin in the current virtual environment: `maturin develop`
+
+1. Write/update some tests in `test/` directory
+
+1. Run the tests, make sure they all pass: `pytest -vv -s`
+
+1. Build the plugin as a wheel (.whl) file: `maturin build --release`
+
+1. Copy the wheel file to the `dist` directory: `cp target/wheels/*.whl ../../../dist/`
+
+1. Type in the command palette and run:
+
+    1. `Run Flatpak: Update Dependencies`
+    1. `Run Flatpak: Build and Run` (or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd>)
+
+1. Update the related files if necessary. For example, if we want to bump the version up, we need to update `Cargo.toml` and the related files in the `build-aux/` directory. We need to publish it to the [PyPI](https://pypi.org/) if it's a Python package.
 
 ## Licenses
 
