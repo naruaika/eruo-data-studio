@@ -106,6 +106,9 @@ class CommandPaletteOverlay(Adw.Bin):
         motion_event_controller.connect('motion', self.on_motion)
         self.add_controller(motion_event_controller)
 
+        self.mouse_x = -1
+        self.mouse_y = -1
+
         self.command_titles = [] # for faster subsequence search
 
         for command in commands:
@@ -282,6 +285,10 @@ class CommandPaletteOverlay(Adw.Bin):
                   y:     float) -> None:
         if self.is_animating_uis:
             return
+        if self.mouse_x == x and self.mouse_y == y:
+            return
+        self.mouse_x = x
+        self.mouse_y = y
         self.list_view.set_single_click_activate(True)
 
     def open_command_overlay(self,
