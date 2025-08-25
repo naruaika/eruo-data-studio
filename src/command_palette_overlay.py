@@ -33,21 +33,29 @@ class CommandListItem(GObject.Object):
     title = GObject.Property(type=str, default='Command')
     label = GObject.Property(type=str, default='Command')
 
+    is_separator = GObject.Property(type=bool, default=False)
+    is_recent_item = GObject.Property(type=bool, default=False)
+
     shortcuts: list[str] = []
     steal_focus: bool = False
     will_prompt: bool = False
 
     def __init__(self,
-                 action_name: str,
-                 title:       str,
-                 shortcuts:   list[str],
-                 steal_focus: bool,
-                 will_prompt: bool) -> None:
+                 action_name:    str = '',
+                 title:          str = '',
+                 shortcuts:      list[str] = [],
+                 steal_focus:    bool = False,
+                 will_prompt:    bool = False,
+                 is_separator:   bool = False,
+                 is_recent_item: bool = False) -> None:
         super().__init__()
 
         self.action_name = action_name
         self.title = title
         self.label = title
+
+        self.is_separator = is_separator
+        self.is_recent_item = is_recent_item
 
         self.shortcuts = shortcuts or []
         self.steal_focus = steal_focus
@@ -63,11 +71,13 @@ class CommandPaletteOverlay(Adw.Bin):
     command_entry = Gtk.Template.Child()
 
     help_text = Gtk.Template.Child()
-
     scrolled_window = Gtk.Template.Child()
+
     list_view = Gtk.Template.Child()
     list_store = Gtk.Template.Child()
     selection = Gtk.Template.Child()
+
+    MAX_RECENT_COMMANDS = 10
 
     def __init__(self,
                  window:   Window,
@@ -111,6 +121,8 @@ class CommandPaletteOverlay(Adw.Bin):
 
         self.command_titles = [] # for faster subsequence search
 
+        self.list_separator = CommandListItem(is_separator=True)
+
         for command in commands:
             list_item = CommandListItem(command['action-name'],
                                         command['title'],
@@ -120,6 +132,8 @@ class CommandPaletteOverlay(Adw.Bin):
             self.command_titles.append(list_item.title)
             self.list_store.append(list_item)
 
+        self.n_recent_items = 0
+
         self.is_prompting = False
         self.prompt_callback = None
 
@@ -128,33 +142,48 @@ class CommandPaletteOverlay(Adw.Bin):
                       list_item:         Gtk.ListItem) -> None:
         list_item.set_focusable(False)
 
-        box = Gtk.CenterBox(orientation=Gtk.Orientation.HORIZONTAL)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         list_item.set_child(box)
 
-        clabel = Gtk.Label()
-        clabel.set_halign(Gtk.Align.START)
-        clabel.set_ellipsize(Pango.EllipsizeMode.END)
-        clabel.set_use_markup(True)
-        box.set_start_widget(clabel)
+        content = Gtk.CenterBox(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(content)
 
-        shortcut = Gtk.Label()
-        shortcut.set_halign(Gtk.Align.END)
+        label = Gtk.Label(halign=Gtk.Align.START,
+                          ellipsize=Pango.EllipsizeMode.END,
+                          use_markup=True)
+        content.set_start_widget(label)
+
+        shortcut = Gtk.Label(halign=Gtk.Align.END)
         shortcut.add_css_class('command-shortcut')
         shortcut.add_css_class('dimmed')
-        box.set_end_widget(shortcut)
+        content.set_end_widget(shortcut)
 
-        list_item.clabel = clabel
+        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL,
+                                  visible=False)
+        box.append(separator)
+
+        list_item.content = content
+        list_item.label = label
         list_item.shortcut = shortcut
+        list_item.separator = separator
 
     def bind_factory(self,
                      list_item_factory: Gtk.SignalListItemFactory,
                      list_item:         Gtk.ListItem) -> None:
         item_data = list_item.get_item()
 
-        list_item.clabel.set_label(item_data.label)
+        if item_data.is_separator:
+            list_item.set_focusable(False)
+            list_item.set_selectable(False)
+            list_item.set_activatable(False)
+            list_item.content.set_visible(False)
+            list_item.separator.set_visible(True)
+            return
+
+        list_item.label.set_label(item_data.label)
         list_item.shortcut.set_visible(False)
 
-        item_data.bind_property('label', list_item.clabel,
+        item_data.bind_property('label', list_item.label,
                                 'label', GObject.BindingFlags.SYNC_CREATE)
 
         if len(item_data.shortcuts) > 0:
@@ -169,8 +198,10 @@ class CommandPaletteOverlay(Adw.Bin):
     def teardown_factory(self,
                          list_item_factory: Gtk.SignalListItemFactory,
                          list_item:         Gtk.ListItem) -> None:
-        list_item.clabel = None
+        list_item.content = None
+        list_item.label = None
         list_item.shortcut = None
+        list_item.separator = None
 
     def on_command_entry_deleted(self,
                                  entry:     Gtk.Entry,
@@ -200,6 +231,10 @@ class CommandPaletteOverlay(Adw.Bin):
         # Get all the items that match the query
         for iidx in range(self.list_store.get_n_items()):
             current_item = self.list_store.get_item(iidx)
+
+            # Skip recent and separator items
+            if current_item.is_recent_item or current_item.is_separator:
+                continue
 
             # Get the highlighted string for the current item
             highlighted_title = self.get_highlighted_string(query, current_item.title)
@@ -234,6 +269,25 @@ class CommandPaletteOverlay(Adw.Bin):
 
         selected_item = self.selection.get_selected_item()
         action_name = selected_item.action_name
+
+        if self.n_recent_items == 0:
+            self.list_store.insert(0, self.list_separator)
+
+        # Add the selected item to the recently used commands
+        selected_item = CommandListItem(action_name,
+                                        selected_item.title,
+                                        selected_item.shortcuts,
+                                        selected_item.steal_focus,
+                                        selected_item.will_prompt,
+                                        is_recent_item=True)
+
+        self.list_store.insert(0, selected_item)
+        self.n_recent_items += 1
+
+        if self.n_recent_items > self.MAX_RECENT_COMMANDS:
+            self.list_store.remove(self.MAX_RECENT_COMMANDS)
+            self.n_recent_items -= 1
+
         self.window.get_application().activate_action(action_name, None)
         self.close_command_overlay(selected_item.steal_focus,
                                    selected_item.will_prompt)
@@ -260,14 +314,24 @@ class CommandPaletteOverlay(Adw.Bin):
 
         # Cycle through the commands and keep the focus on the entry box
         if keyval in {Gdk.KEY_Up, Gdk.KEY_Down}:
+            n_items = self.selection.get_model().get_n_items()
+
             position = self.selection.get_selected()
             position += 1 if keyval == Gdk.KEY_Down else -1
-            position %= self.selection.get_model().get_n_items()
+            position %= n_items
 
             # Prevent the mouse cursor from interrupting the selection,
             # it'll be enabled back when the user moves the mouse again
-            # FIXME: still happens when the user cycles through too fast
             self.list_view.set_single_click_activate(False)
+
+            if position == self.n_recent_items \
+                    and self.n_recent_items > 0 \
+                    and self.command_entry.get_text() == '':
+                if keyval == Gdk.KEY_Up:
+                    position -= 1
+                if keyval == Gdk.KEY_Down:
+                    position += 1
+                position %= n_items
 
             self.list_view.scroll_to(position, Gtk.ListScrollFlags.SELECT, None)
             return True
