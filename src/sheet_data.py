@@ -347,7 +347,7 @@ class SheetData(GObject.Object):
             if dataframe_height < series_length:
                 n_rows_to_add = series_length - dataframe_height
                 empty_rows = polars.DataFrame({column_name: polars.Series(values=[None] * n_rows_to_add, dtype=column_dtype)
-                                                            for column_name, column_dtype in self.dfs[dfi].schema.items()})
+                                                            for column_name, column_dtype in dataframe.schema.items()})
 
                 padded_dataframe = dataframe.vstack(empty_rows)
                 return padded_dataframe.with_columns(series)
