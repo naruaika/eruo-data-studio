@@ -14,26 +14,35 @@ if TYPE_CHECKING:
 LIB = Path(__file__).parent
 
 
-def pig_latinnify(expr: IntoExprColumn) -> pl.Expr:
+def pig_latinnify(expression: IntoExprColumn) -> pl.Expr:
     return register_plugin_function(
-        args=[expr],
         plugin_path=LIB,
         function_name='pig_latinnify',
+        args=[expression],
         is_elementwise=True,
     )
 
-def to_sentence_case(expr: IntoExprColumn) -> pl.Expr:
+def split_by_chars(expression: IntoExprColumn, characters: str) -> pl.Expr:
     return register_plugin_function(
-        args=[expr],
+        plugin_path=LIB,
+        function_name='split_by_chars',
+        args=[expression],
+        kwargs={'characters': characters},
+        is_elementwise=True,
+    )
+
+def to_sentence_case(expression: IntoExprColumn) -> pl.Expr:
+    return register_plugin_function(
         plugin_path=LIB,
         function_name='to_sentence_case',
+        args=[expression],
         is_elementwise=True,
     )
 
-def to_sponge_case(expr: IntoExprColumn) -> pl.Expr:
+def to_sponge_case(expression: IntoExprColumn) -> pl.Expr:
     return register_plugin_function(
-        args=[expr],
         plugin_path=LIB,
         function_name='to_sponge_case',
+        args=[expression],
         is_elementwise=True,
     )

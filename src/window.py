@@ -375,6 +375,7 @@ class Window(Adw.ApplicationWindow):
 
     def do_close_request(self) -> bool:
         # TODO: check for unsaved changes and show confirmation dialog if needed
+        # TODO: switch to the previous active tab after closing the current one
 
         # We do cleanup the history of all sheets in the current window, mainly
         # to free up disk space from the temporary files, usually .ersnap files
@@ -1198,14 +1199,13 @@ class Window(Adw.ApplicationWindow):
         if sheet_view is None:
             return False
 
-        # Check if the input is an SQL-like syntax but for DDL
+        # Check if the input is an SQL syntax but for DDL
         query_pattern = r"(\r\n|\r|\n|\s)*[A-Za-z0-9]+.*=(\r\n|\r|\n|\s)*" \
                         r"[SELECT|WITH](\r\n|\r|\n|.)*"
         if re.fullmatch(query_pattern, formula, re.IGNORECASE):
             return self.create_table_from_sql(formula)
 
-        # Check if the input is an SQL-like syntax
-        # TODO: add support for UPDATE statement
+        # Check if the input is an SQL syntax
         query_pattern = r"(\r\n|\r|\n|\s)*=(\r\n|\r|\n|\s)*" \
                         r"[SELECT|WITH](\r\n|\r|\n|.)*"
         if re.fullmatch(query_pattern, formula, re.IGNORECASE):
@@ -1220,6 +1220,8 @@ class Window(Adw.ApplicationWindow):
         formula_pattern = r"(\r\n|\r|\n|\s)*=.*"
         if re.fullmatch(formula_pattern, formula, re.IGNORECASE):
             return sheet_view.document.update_current_cells_from_formula(formula)
+
+        # TODO: add support for Python code
 
         # Update the current cells
         return sheet_view.document.update_current_cells_from_literal(formula)

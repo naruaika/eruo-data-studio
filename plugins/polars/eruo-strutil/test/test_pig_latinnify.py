@@ -5,15 +5,42 @@ import polars
 def test_pig_latinnify():
     df = polars.DataFrame(
         {
-            'input': ['this', 'is', 'not', 'pig', 'latin'],
+            'input': [
+                'he does not know',
+                'this',
+                'is',
+                'banana',
+                'black',
+                'smile',
+                'straight',
+                'hello!',
+            ],
         }
     )
     result = df.with_columns(output=pig_latinnify('input'))
 
     expected = polars.DataFrame(
         {
-            'input':  ['this', 'is', 'not', 'pig', 'latin'],
-            'output': ['histay', 'siay', 'otnay', 'igpay', 'atinlay'],
+            'input': [
+                'he does not know',
+                'this',
+                'is',
+                'banana',
+                'black',
+                'smile',
+                'straight',
+                'hello!',
+            ],
+            'output': [
+                'ehay oesday otnay owknay',
+                'isthay',
+                'isway',
+                'ananabay',
+                'ackblay',
+                'ilesmay',
+                'aightstray',
+                'ellohay!',
+            ],
         }
     )
 

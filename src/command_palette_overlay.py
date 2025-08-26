@@ -22,8 +22,10 @@
 
 
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
+from typing import Any
 import html
 
+from . import utils
 from .window import Window
 
 class CommandListItem(GObject.Object):
@@ -70,7 +72,7 @@ class CommandPaletteOverlay(Adw.Bin):
     command_overlay = Gtk.Template.Child()
     command_entry = Gtk.Template.Child()
 
-    help_text = Gtk.Template.Child()
+    prompt_text = Gtk.Template.Child()
     scrolled_window = Gtk.Template.Child()
 
     list_view = Gtk.Template.Child()
@@ -132,10 +134,12 @@ class CommandPaletteOverlay(Adw.Bin):
             self.command_titles.append(list_item.title)
             self.list_store.append(list_item)
 
-        self.n_recent_items = 0
+        self.recent_command_titles = []
 
         self.is_prompting = False
         self.prompt_callback = None
+        self.prompt_arguments = []
+        self.will_prompt_again = False
 
     def setup_factory(self,
                       list_item_factory: Gtk.SignalListItemFactory,
@@ -252,8 +256,8 @@ class CommandPaletteOverlay(Adw.Bin):
         self.scrolled_window.get_vscrollbar().set_visible(n_list_items > 3)
         self.scrolled_window.set_visible(n_list_items > 0)
 
-        self.help_text.set_label('No matching commands')
-        self.help_text.set_visible(n_list_items == 0)
+        self.prompt_text.set_label('No matching commands')
+        self.prompt_text.set_visible(n_list_items == 0)
 
         if n_list_items == 0:
             return
@@ -263,14 +267,17 @@ class CommandPaletteOverlay(Adw.Bin):
 
     def on_command_entry_activated(self, entry: Gtk.Entry) -> None:
         if self.is_prompting:
-            self.prompt_callback(entry.get_text())
-            self.close_command_overlay(steal_focus=False)
+            will_prompt = self.will_prompt_again
+            if not utils.is_iterable(self.prompt_arguments):
+                self.prompt_arguments = [self.prompt_arguments]
+            self.prompt_callback(entry.get_text(), *self.prompt_arguments)
+            self.close_command_overlay(steal_focus=False, will_prompt=will_prompt)
             return
 
         selected_item = self.selection.get_selected_item()
         action_name = selected_item.action_name
 
-        if self.n_recent_items == 0:
+        if len(self.recent_command_titles) == 0:
             self.list_store.insert(0, self.list_separator)
 
         # Add the selected item to the recently used commands
@@ -281,12 +288,17 @@ class CommandPaletteOverlay(Adw.Bin):
                                         selected_item.will_prompt,
                                         is_recent_item=True)
 
-        self.list_store.insert(0, selected_item)
-        self.n_recent_items += 1
+        if selected_item.title in self.recent_command_titles:
+            list_item_index = self.recent_command_titles.index(selected_item.title)
+            self.list_store.remove(list_item_index)
+            self.recent_command_titles.remove(selected_item.title)
 
-        if self.n_recent_items > self.MAX_RECENT_COMMANDS:
+        self.list_store.insert(0, selected_item)
+        self.recent_command_titles.insert(0, selected_item.title)
+
+        if len(self.recent_command_titles) > self.MAX_RECENT_COMMANDS:
             self.list_store.remove(self.MAX_RECENT_COMMANDS)
-            self.n_recent_items -= 1
+            self.recent_command_titles.pop()
 
         self.window.get_application().activate_action(action_name, None)
         self.close_command_overlay(selected_item.steal_focus,
@@ -324,8 +336,8 @@ class CommandPaletteOverlay(Adw.Bin):
             # it'll be enabled back when the user moves the mouse again
             self.list_view.set_single_click_activate(False)
 
-            if position == self.n_recent_items \
-                    and self.n_recent_items > 0 \
+            if len(self.recent_command_titles) > 0 \
+                    and position == len(self.recent_command_titles) \
                     and self.command_entry.get_text() == '':
                 if keyval == Gdk.KEY_Up:
                     position -= 1
@@ -356,14 +368,18 @@ class CommandPaletteOverlay(Adw.Bin):
         self.list_view.set_single_click_activate(True)
 
     def open_command_overlay(self,
-                             as_prompt: bool = False,
-                             help_text: str = '',
-                             callback:  callable = None) -> None:
+                             as_prompt:   bool = False,
+                             prompt_text: str = '',
+                             callback:    callable = None,
+                             user_data:   Any = [],
+                             more_prompt: bool = False) -> None:
         self.is_prompting = as_prompt
         self.prompt_callback = callback
+        self.prompt_arguments = user_data
+        self.will_prompt_again = more_prompt
 
-        self.help_text.set_visible(as_prompt)
-        self.help_text.set_label(help_text)
+        self.prompt_text.set_label(f"{prompt_text} (Press 'Enter' to confirm or 'Escape' to cancel)")
+        self.prompt_text.set_visible(as_prompt)
 
         self.scrolled_window.set_visible(not as_prompt)
         self.list_view.set_single_click_activate(False)
@@ -376,7 +392,7 @@ class CommandPaletteOverlay(Adw.Bin):
         if as_prompt:
             return
 
-        self.help_text.set_visible(False)
+        self.prompt_text.set_visible(False)
         self.scrolled_window.set_visible(True)
 
         self.is_animating_uis = True
@@ -395,6 +411,8 @@ class CommandPaletteOverlay(Adw.Bin):
 
         self.is_prompting = False
         self.prompt_callback = None
+        self.prompt_arguments = []
+        self.will_prompt_again = False
 
         self.command_overlay.add_css_class('slide-down-dialog')
         GLib.timeout_add(200, self.set_visible, False)

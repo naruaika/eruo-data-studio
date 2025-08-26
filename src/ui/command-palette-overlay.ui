@@ -28,10 +28,11 @@
               </object>
             </child>
             <child>
-              <object class="GtkLabel" id="help_text">
+              <object class="GtkLabel" id="prompt_text">
                 <property name="margin-start">8</property>
                 <property name="halign">start</property>
-                <property name="ellipsize">end</property>
+                <property name="wrap">true</property>
+                <property name="wrap-mode">word-char</property>
                 <property name="visible">false</property>
               </object>
             </child>

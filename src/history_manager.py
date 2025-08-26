@@ -624,8 +624,8 @@ class DeleteRowState(State):
         self.restore_selection(False)
 
         document.insert_from_current_rows(polars.read_parquet(self.file_path),
-                                          polars.read_parquet(self.vflags_path).to_series(0) if self.vflags_path is not None else None,
-                                          polars.read_parquet(self.rheights_path).to_series(0) if self.rheights_path is not None else None)
+                                          polars.read_parquet(self.vflags_path).to_series() if self.vflags_path is not None else None,
+                                          polars.read_parquet(self.rheights_path).to_series() if self.rheights_path is not None else None)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -660,8 +660,8 @@ class DeleteColumnState(State):
         self.restore_selection(False)
 
         document.insert_from_current_columns(polars.read_parquet(self.file_path),
-                                             polars.read_parquet(self.vflags_path).to_series(0) if self.vflags_path is not None else None,
-                                             polars.read_parquet(self.cwidths_path).to_series(0) if self.cwidths_path is not None else None)
+                                             polars.read_parquet(self.vflags_path).to_series() if self.vflags_path is not None else None,
+                                             polars.read_parquet(self.cwidths_path).to_series() if self.cwidths_path is not None else None)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -714,7 +714,7 @@ class UnhideColumnState(State):
 
         # Update column visibility flags
         document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:mcolumn],
-                                                                  polars.read_parquet(self.vflags_path).to_series(0),
+                                                                  polars.read_parquet(self.vflags_path).to_series(),
                                                                   document.display.column_visibility_flags[mcolumn + self.column_span:]])
         document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
         document.data.bbs[self.range.metadata.dfi].column_span = len(document.display.column_visible_series)
@@ -745,7 +745,7 @@ class UnhideAllColumnState(State):
         document = globals.history.document
 
         # Update column visibility flags
-        document.display.column_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+        document.display.column_visibility_flags = polars.read_parquet(self.vflags_path).to_series()
         document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
         document.data.bbs[0].column_span = len(document.display.column_visible_series)
 
@@ -805,7 +805,7 @@ class FilterRowState(State):
 
         # Update row visibility flags
         if self.vflags_path is not None:
-            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series()
             document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
             document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
         else:
@@ -815,7 +815,7 @@ class FilterRowState(State):
 
         # Update row heights
         if self.rheights_path is not None:
-            document.display.row_heights = polars.read_parquet(self.rheights_path).to_series(0)
+            document.display.row_heights = polars.read_parquet(self.rheights_path).to_series()
             row_heights_visible_only = document.display.row_heights
             if len(document.display.row_visibility_flags):
                 row_heights_visible_only = row_heights_visible_only.filter(document.display.row_visibility_flags)
@@ -871,7 +871,7 @@ class ResetFilterRowState(State):
 
         # Update row visibility flags
         if self.vflags_path is not None:
-            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series()
             document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
             document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
         else:
@@ -881,7 +881,7 @@ class ResetFilterRowState(State):
 
         # Update row heights
         if self.rheights_path is not None:
-            document.display.row_heights = polars.read_parquet(self.rheights_path).to_series(0)
+            document.display.row_heights = polars.read_parquet(self.rheights_path).to_series()
             row_heights_visible_only = document.display.row_heights
             if len(document.display.row_visibility_flags):
                 row_heights_visible_only = row_heights_visible_only.filter(document.display.row_visibility_flags)
@@ -935,18 +935,18 @@ class SortRowState(State):
     def undo(self) -> None:
         document = globals.history.document
 
-        document.data.dfs[self.dfi].insert_column(0, polars.read_parquet(self.rindex_path).to_series(0))
+        document.data.dfs[self.dfi].insert_column(0, polars.read_parquet(self.rindex_path).to_series())
         document.data.sort_rows_from_metadata({'$ridx': {'descending': False}}, self.dfi)
 
         # Update row visibility flags
         if self.vflags_path is not None:
-            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series(0)
+            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series()
             document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
 
         # Update row heights
         if len(document.display.row_heights):
             sorted_row_heights = polars.DataFrame({'rheights': document.display.row_heights[1:],
-                                                   '$ridx': document.data.dfs[self.dfi]['$ridx']}).sort('$ridx').to_series(0)
+                                                   '$ridx': document.data.dfs[self.dfi]['$ridx']}).sort('$ridx').to_series()
             document.display.row_heights = polars.concat([polars.Series([True]), sorted_row_heights])
             row_heights_visible_only = document.display.row_heights
             if len(document.display.row_visibility_flags):
@@ -1233,7 +1233,7 @@ class HistoryManager(GObject.Object):
     undo_stack: deque[State]
     redo_stack: deque[State]
 
-    TIME_THRESHOLD = 0.5 # in seconds
+    TIME_THRESHOLD = 1.0 # in seconds
 
     def __init__(self, document: SheetDocument) -> None:
         super().__init__()

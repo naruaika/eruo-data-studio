@@ -68,6 +68,8 @@ class Application(Adw.Application):
 
         globals.register_connection = self._register_connection
 
+        self._register_expressions()
+
         self.settings = Gio.Settings.new('com.macipra.eruo')
 
         # Load the recently opened connection list
@@ -84,178 +86,182 @@ class Application(Adw.Application):
 
         self.application_commands = []
 
-        # TODO: implement conditioning for all the commands
-        # Because not all commands relevant to the current context,
-        # i.e. current active document type or current active selection.
+        # TODO: implement conditioning for all the registered commands.
+        #       Because not all commands relevant to the current context,
+        #       i.e. current active document type or current active selection.
 
         # Register general actions
-        self.create_action('add-connection',           'Add New Connection',
+        # FIXME: when the display language isn't English, we should provide a way so that
+        #        the user can still querying the commands in both languages.
+        self.create_action('add-connection',           _('Add New Connection...'),
                                                        self.on_add_new_connection_action)
-        self.create_action('cut',                      'Cut',
+        self.create_action('cut',                      _('Cut'),
                                                        self.on_cut_action,
                                                        shortcuts=['<control>x'])
-        self.create_action('copy',                     'Copy',
+        self.create_action('copy',                     _('Copy'),
                                                        self.on_copy_action,
                                                        shortcuts=['<control>c'])
-        self.create_action('paste',                    'Paste',
+        self.create_action('paste',                    _('Paste'),
                                                        self.on_paste_action,
                                                        shortcuts=['<control>v'])
-        self.create_action('undo',                     'Undo',
+        self.create_action('undo',                     _('Undo'),
                                                        self.on_undo_action,
                                                        shortcuts=['<control>z'])
-        self.create_action('redo',                     'Redo',
+        self.create_action('redo',                     _('Redo'),
                                                        self.on_redo_action,
                                                        shortcuts=['<shift><control>z', '<control>y'])
 
         # Register create actions
-        self.create_action('duplicate-selected-tab',   'Create: Duplicate Sheet Into New Worksheet',
+        self.create_action('duplicate-selected-tab',   _('Create: Duplicate Sheet Into New Worksheet'),
                                                        self.on_duplicate_selected_tab_action)
-        self.create_action('import-table',             'Create: Import Table Into New Worksheet',
+        self.create_action('import-table',             _('Create: Import Table Into New Worksheet'),
                                                        self.on_import_table_action)
-        self.create_action('new-worksheet-from-view',  'Create: Materialize View Into New Worksheet',
+        self.create_action('new-worksheet-from-view',  _('Create: Materialize View Into New Worksheet'),
                                                        self.on_new_worksheet_from_view_action)
-        self.create_action('new-notebook',             'Create: New Blank Notebook',
+        self.create_action('new-notebook',             _('Create: New Blank Notebook'),
                                                        self.on_new_notebook_action,
                                                        shortcuts=['<control>n'])
-        self.create_action('new-worksheet',            'Create: New Blank Worksheet',
+        self.create_action('new-worksheet',            _('Create: New Blank Worksheet'),
                                                        self.on_new_worksheet_action,
                                                        shortcuts=['<control>t'])
 
         # Register file actions
-        self.create_action('open-file',                'File: Open File...',
+        self.create_action('open-file',                _('File: Open File...'),
                                                        self.on_open_file_action,
                                                        shortcuts=['<control>o'])
-        self.create_action('save-as',                  'File: Save As...',
+        self.create_action('save-as',                  _('File: Save As...'),
                                                        self.on_save_as_file_action,
                                                        shortcuts=['<shift><control>s'])
-        self.create_action('save',                     'File: Save',
+        self.create_action('save',                     _('File: Save'),
                                                        self.on_save_file_action,
                                                        shortcuts=['<control>s'])
 
         # Register help actions
-        self.create_action('about',                    'Help: About',
+        self.create_action('about',                    _('Help: About'),
                                                        self.on_about_action)
-        self.create_action('preferences',              'Help: Open Settings',
+        self.create_action('preferences',              _('Help: Open Settings'),
                                                        self.on_preferences_action,
                                                        shortcuts=['<control>comma'])
 
         # Register search actions
-        self.create_action('open-search',              'Search: Quick Search',
+        self.create_action('open-search',              _('Search: Quick Search'),
                                                        self.on_open_search_action,
                                                        shortcuts=['<control>f'])
-        self.create_action('toggle-replace',           'Search: Quick Replace',
+        self.create_action('toggle-replace',           _('Search: Quick Replace'),
                                                        self.on_toggle_replace_action,
                                                        shortcuts=['<control>h'])
-        self.create_action('toggle-search-all',        'Search: Search All',
+        self.create_action('toggle-search-all',        _('Search: Search All'),
                                                        self.on_toggle_search_all_action,
                                                        shortcuts=['<control><shift>f'])
-        self.create_action('toggle-replace-all',       'Search: Replace All',
+        self.create_action('toggle-replace-all',       _('Search: Replace All'),
                                                        self.on_toggle_replace_all_action,
                                                        shortcuts=['<control><shift>h'])
 
         # Register view actions
-        self.create_action('close-selected-tab',       'View: Close Tab',
+        self.create_action('close-selected-tab',       _('View: Close Tab'),
                                                        self.on_close_selected_tab_action,
                                                        shortcuts=['<control>w'])
-        self.create_action('quit',                     'View: Close Window',
+        self.create_action('quit',                     _('View: Close Window'),
                                                        self.on_quit_action,
                                                        shortcuts=['<control>q'])
-        self.create_action('toggle-history',           'View: Toggle History Panel',
+        self.create_action('toggle-history',           _('View: Toggle History Panel'),
                                                        self.on_toggle_history_action)
-        self.create_action('toggle-sidebar',           'View: Toggle Sidebar Panel',
+        self.create_action('toggle-sidebar',           _('View: Toggle Sidebar Panel'),
                                                        self.on_toggle_sidebar_action,
                                                        shortcuts=['<control>b'])
 
         # Register worksheet actions
-        self.create_action('clear-contents',           'Clear Cell Contents',
+        self.create_action('clear-contents',           _('Cell: Clear Contents'),
                                                        self.on_clear_contents_action,
                                                        shortcuts=['Delete'])
-        self.create_action('convert-to-boolean',       'Convert Columns to Boolean',
+        self.create_action('convert-to-boolean',       _('Column: Convert to Boolean'),
                                                        self.on_convert_to_boolean_action)
-        self.create_action('convert-to-categorical',   'Convert Columns to Categorical',
+        self.create_action('convert-to-categorical',   _('Column: Convert to Categorical'),
                                                        self.on_convert_to_categorical_action)
-        self.create_action('convert-to-date',          'Convert Columns to Date',
+        self.create_action('convert-to-date',          _('Column: Convert to Date'),
                                                        self.on_convert_to_date_action)
-        self.create_action('convert-to-datetime',      'Convert Columns to Datetime',
+        self.create_action('convert-to-datetime',      _('Column: Convert to Datetime'),
                                                        self.on_convert_to_datetime_action)
-        self.create_action('convert-to-decimal',       'Convert Columns to Decimal Number',
+        self.create_action('convert-to-decimal',       _('Column: Convert to Decimal Number'),
                                                        self.on_convert_to_decimal_action)
-        self.create_action('convert-to-float32',       'Convert Columns to Float (32-Bit)',
+        self.create_action('convert-to-float32',       _('Column: Convert to Float (32-Bit)'),
                                                        self.on_convert_to_float32_action)
-        self.create_action('convert-to-float64',       'Convert Columns to Float (64-Bit)',
+        self.create_action('convert-to-float64',       _('Column: Convert to Float (64-Bit)'),
                                                        self.on_convert_to_float64_action)
-        self.create_action('convert-to-int8',          'Convert Columns to Integer (8-Bit)',
+        self.create_action('convert-to-int8',          _('Column: Convert to Integer (8-Bit)'),
                                                        self.on_convert_to_int8_action)
-        self.create_action('convert-to-int16',         'Convert Columns to Integer (16-Bit)',
+        self.create_action('convert-to-int16',         _('Column: Convert to Integer (16-Bit)'),
                                                        self.on_convert_to_int16_action)
-        self.create_action('convert-to-int32',         'Convert Columns to Integer (32-Bit)',
+        self.create_action('convert-to-int32',         _('Column: Convert to Integer (32-Bit)'),
                                                        self.on_convert_to_int32_action)
-        self.create_action('convert-to-int64',         'Convert Columns to Integer (64-Bit)',
+        self.create_action('convert-to-int64',         _('Column: Convert to Integer (64-Bit)'),
                                                        self.on_convert_to_int64_action)
-        self.create_action('convert-to-text',          'Convert Columns to Text',
+        self.create_action('convert-to-text',          _('Column: Convert to Text'),
                                                        self.on_convert_to_text_action)
-        self.create_action('convert-to-time',          'Convert Columns to Time',
+        self.create_action('convert-to-time',          _('Column: Convert to Time'),
                                                        self.on_convert_to_time_action)
-        self.create_action('convert-to-uint8',         'Convert Columns to Unsigned Integer (8-Bit)',
+        self.create_action('convert-to-uint8',         _('Column: Convert to Unsigned Integer (8-Bit)'),
                                                        self.on_convert_to_uint8_action)
-        self.create_action('convert-to-uint16',        'Convert Columns to Unsigned Integer (16-Bit)',
+        self.create_action('convert-to-uint16',        _('Column: Convert to Unsigned Integer (16-Bit)'),
                                                        self.on_convert_to_uint16_action)
-        self.create_action('convert-to-uint32',        'Convert Columns to Unsigned Integer (32-Bit)',
+        self.create_action('convert-to-uint32',        _('Column: Convert to Unsigned Integer (32-Bit)'),
                                                        self.on_convert_to_uint32_action)
-        self.create_action('convert-to-uint64',        'Convert Columns to Unsigned Integer (64-Bit)',
+        self.create_action('convert-to-uint64',        _('Column: Convert to Unsigned Integer (64-Bit)'),
                                                        self.on_convert_to_uint64_action)
-        self.create_action('convert-to-whole-number',  'Convert Columns to Whole Number',
+        self.create_action('convert-to-whole-number',  _('Column: Convert to Whole Number'),
                                                        self.on_convert_to_int64_action)
-        self.create_action('delete-column',            'Delete Columns',
+        self.create_action('delete-column',            _('Column: Delete Columns'),
                                                        self.on_delete_column_action)
-        self.create_action('delete-row',               'Delete Rows',
+        self.create_action('delete-row',               _('Row: Delete Rows'),
                                                        self.on_delete_row_action)
-        self.create_action('duplicate-to-above',       'Duplicate Rows to Above',
+        self.create_action('duplicate-to-above',       _('Row: Duplicate Rows to Above'),
                                                        self.on_duplicate_to_above_action)
-        self.create_action('duplicate-to-below',       'Duplicate Rows to Below',
+        self.create_action('duplicate-to-below',       _('Row: Duplicate Rows to Below'),
                                                        self.on_duplicate_to_below_action)
-        self.create_action('duplicate-to-left',        'Duplicate Columns to Left',
+        self.create_action('duplicate-to-left',        _('Column: Duplicate Columns to Left'),
                                                        self.on_duplicate_to_left_action)
-        self.create_action('duplicate-to-right',       'Duplicate Columns to Right',
+        self.create_action('duplicate-to-right',       _('Column: Duplicate Columns to Right'),
                                                        self.on_duplicate_to_right_action)
-        self.create_action('filter-cell-value',        'Filter Rows by Cell Value',
+        self.create_action('filter-cell-value',        _('Filter: Filter Rows by Cell Value'),
                                                        self.on_filter_cell_value_action)
-        self.create_action('go-to-cell',               'Go to Cell...',
+        self.create_action('go-to-cell',               _('View: Go to Cell...'),
                                                        self.on_go_to_cell_action,
                                                        shortcuts=['<control>g'],
                                                        steal_focus=True)
-        self.create_action('hide-column',              'Hide Columns',
+        self.create_action('hide-column',              _('Column: Hide Columns'),
                                                        self.on_hide_column_action)
-        self.create_action('insert-column-left',       'Insert Column to the Left',
+        self.create_action('insert-column-left',       _('Column: Insert Column to the Left'),
                                                        self.on_insert_column_left_action)
-        self.create_action('insert-column-right',      'Insert Column to the Right',
+        self.create_action('insert-column-right',      _('Column: Insert Column to the Right'),
                                                        self.on_insert_column_right_action)
-        self.create_action('insert-row-above',         'Insert Rows Above',
+        self.create_action('insert-row-above',         _('Row: Insert Rows Above'),
                                                        self.on_insert_row_above_action)
-        self.create_action('insert-row-below',         'Insert Rows Below',
+        self.create_action('insert-row-below',         _('Row: Insert Rows Below'),
                                                        self.on_insert_row_below_action)
-        self.create_action('reset-all-filters',        'Clear All Rows Filters',
+        self.create_action('rechunk-table',            _('Sheet: Rechunk Table'),
+                                                       self.on_rechunk_table_action)
+        self.create_action('reset-all-filters',        _('Filter: Clear All Rows Filters'),
                                                        self.on_reset_all_filters_action)
-        self.create_action('sort-by-ascending',        'Sort Rows by Ascending',
+        self.create_action('sort-by-ascending',        _('Sort: Sort Rows by Ascending'),
                                                        self.on_sort_by_ascending_action)
-        self.create_action('sort-by-descending',       'Sort Rows by Descending',
+        self.create_action('sort-by-descending',       _('Sort: Sort Rows by Descending'),
                                                        self.on_sort_by_descending_action)
-        self.create_action('unhide-all-columns',       'Unhide All Columns',
+        self.create_action('unhide-all-columns',       _('Column: Unhide All Columns'),
                                                        self.on_unhide_all_columns_action)
-        self.create_action('unhide-column',            'Unhide Columns',
+        self.create_action('unhide-column',            _('Column: Unhide Columns'),
                                                        self.on_unhide_column_action)
-        self.create_action('focus-on-formula-editor',  'View: Focus on Formula Editor',
+        self.create_action('focus-on-formula-editor',  _('View: Focus on Formula Editor'),
                                                        self.on_focus_on_formula_editor_action,
                                                        shortcuts=['<shift>F2'],
                                                        steal_focus=True)
-        self.create_action('open-multiline-formula',   'View: Focus on Multiple Line Formula Editor',
+        self.create_action('open-multiline-formula',   _('View: Focus on Multiple Line Formula Editor'),
                                                        self.on_focus_on_multiline_formula_editor_action,
                                                        steal_focus=True)
-        self.create_action('open-inline-formula',      'View: Open Inline Formula Editor',
+        self.create_action('open-inline-formula',      _('View: Open Inline Formula Editor'),
                                                        self.on_open_inline_formula_action,
                                                        shortcuts=['F2'],
                                                        steal_focus=True)
-        self.create_action('open-sort-filter',         'View: Open Sort &amp; Filter Panel',
+        self.create_action('open-sort-filter',         _('View: Open Sort &amp; Filter Panel'),
                                                        self.on_open_sort_filter_action)
 
         # Register application non-command actions
@@ -311,103 +317,212 @@ class Application(Adw.Application):
 
         # Register new advanced worksheet actions
         # Inspired by https://github.com/qcz/vscode-text-power-tools
-        self.create_action('append-prefix-to-cell',                         'Append Prefix to Cells...',
-                                                                            self.on_append_prefix_to_cell_action,
-                                                                            will_prompt=True)
-        self.create_action('append-suffix-to-cell',                         'Append Suffix to Cells...',
-                                                                            self.on_append_suffix_to_cell_action,
-                                                                            will_prompt=True)
-        self.create_action('change-cell-case-to-camel-case',                'Change Case Cells to Camel Case (camelCase)',
-                                                                            self.on_change_case_cell_to_camel_case_action)
-        self.create_action('change-cell-case-to-constant-case',             'Change Case Cells to Constant Case (CONSTANT_CASE)',
-                                                                            self.on_change_case_cell_to_constant_case_action)
-        self.create_action('change-cell-case-to-dot-case',                  'Change Case Cells to Dot Case (dot.case)',
-                                                                            self.on_change_case_cell_to_dot_case_action)
-        self.create_action('change-cell-case-to-kebab-case',                'Change Case Cells to Kebab Case (kebab-case)',
-                                                                            self.on_change_case_cell_to_kebab_case_action)
-        self.create_action('change-cell-case-to-lowercase',                 'Change Case Cells to Lowercase',
-                                                                            self.on_change_case_cell_to_lowercase_action)
-        self.create_action('change-cell-case-to-pascal-case',               'Change Case Cells to Pascal Case (PascalCase)',
-                                                                            self.on_change_case_cell_to_pascal_case_action)
-        self.create_action('change-cell-case-to-snake-case',                'Change Case Cells to Snake Case (snake_case)',
-                                                                            self.on_change_case_cell_to_snake_case_action)
-        self.create_action('change-cell-case-to-sentence-case',             'Change Case Cells to Sentence Case (Sentence case)',
-                                                                            self.on_change_case_cell_to_sentence_case_action)
-        self.create_action('change-cell-case-to-sponge-case',               'Change Case Cells to Sponge Case (RANdoM CAPiTAlizAtiON)',
-                                                                            self.on_change_case_cell_to_sponge_case_action)
-        self.create_action('change-cell-case-to-title-case',                'Change Case Cells to Title Case',
-                                                                            self.on_change_case_cell_to_title_case_action)
-        self.create_action('change-cell-case-to-uppercase',                 'Change Case Cells to Uppercase',
-                                                                            self.on_change_case_cell_to_uppercase_action)
-        self.create_action('decode-base64-cell-text',                       'Decode Base64 Cells Text',
-                                                                            self.on_decode_base64_cell_text_action)
-        self.create_action('decode-hexadecimal-cell-text',                  'Decode Hexadecimal Cells Text',
-                                                                            self.on_decode_hexadecimal_cell_text_action)
-        self.create_action('encode-base64-cell-text',                       'Encode Base64 Cells Text',
-                                                                            self.on_encode_base64_cell_text_action)
-        self.create_action('encode-hexadecimal-cell-text',                  'Encode Hexadecimal Cells Text',
-                                                                            self.on_encode_hexadecimal_cell_text_action)
-        self.create_action('pig-latinnify-cell',                            'Pig Latinnify Cells',
-                                                                            self.on_pig_latinnify_cell_action)
-        self.create_action('swap-cell-text-case',                           'Swap Cells Text Case',
-                                                                            self.on_swap_cell_text_case_action)
-        self.create_action('trim-cell-whitespace',                          'Trim Cells Leading &amp; Trailing Whitespace',
-                                                                            self.on_trim_cell_whitespace_action)
-        self.create_action('trim-cell-whitespace-and-remove-new-lines',     'Trim Cells Whitespace and Remove Newlines',
-                                                                            self.on_trim_cell_whitespace_and_remove_new_lines_action)
-        self.create_action('trim-cell-start-whitespace',                    'Trim Cells Leading Whitespace',
-                                                                            self.on_trim_cell_start_whitespace_action)
-        self.create_action('trim-cell-end-whitespace',                      'Trim Cells Trailing Whitespace',
-                                                                            self.on_trim_cell_end_whitespace_action)
-
-        self.create_action('append-prefix-to-column',                       'Append Prefix to Columns...',
-                                                                            self.on_append_prefix_to_column_action,
-                                                                            will_prompt=True)
-        self.create_action('append-suffix-to-column',                       'Append Suffix to Columns...',
-                                                                            self.on_append_suffix_to_column_action,
-                                                                            will_prompt=True)
-        self.create_action('change-column-case-to-camel-case',              'Change Case Columns to Camel Case (camelCase)',
-                                                                            self.on_change_case_column_to_camel_case_action)
-        self.create_action('change-column-case-to-constant-case',           'Change Case Columns to Constant Case (CONSTANT_CASE)',
-                                                                            self.on_change_case_column_to_constant_case_action)
-        self.create_action('change-column-case-to-dot-case',                'Change Case Columns to Dot Case (dot.case)',
-                                                                            self.on_change_case_column_to_dot_case_action)
-        self.create_action('change-column-case-to-kebab-case',              'Change Case Columns to Kebab Case (kebab-case)',
-                                                                            self.on_change_case_column_to_kebab_case_action)
-        self.create_action('change-column-case-to-lowercase',               'Change Case Columns to Lowercase',
-                                                                            self.on_change_case_column_to_lowercase_action)
-        self.create_action('change-column-case-to-pascal-case',             'Change Case Columns to Pascal Case (PascalCase)',
-                                                                            self.on_change_case_column_to_pascal_case_action)
-        self.create_action('change-column-case-to-snake-case',              'Change Case Columns to Snake Case (snake_case)',
-                                                                            self.on_change_case_column_to_snake_case_action)
-        self.create_action('change-column-case-to-sentence-case',           'Change Case Columns to Sentence Case (Sentence case)',
-                                                                            self.on_change_case_column_to_sentence_case_action)
-        self.create_action('change-column-case-to-sponge-case',             'Change Case Columns to Sponge Case (RANdoM CAPiTAlizAtiON)',
-                                                                            self.on_change_case_column_to_sponge_case_action)
-        self.create_action('change-column-case-to-title-case',              'Change Case Columns to Title Case',
-                                                                            self.on_change_case_column_to_title_case_action)
-        self.create_action('change-column-case-to-uppercase',               'Change Case Columns to Uppercase',
-                                                                            self.on_change_case_column_to_uppercase_action)
-        self.create_action('decode-base64-column-text',                     'Decode Base64 Columns Text',
-                                                                            self.on_decode_base64_column_text_action)
-        self.create_action('decode-hexadecimal-column-text',                'Decode Hexadecimal Columns Text',
-                                                                            self.on_decode_hexadecimal_column_text_action)
-        self.create_action('encode-base64-column-text',                     'Encode Base64 Columns Text',
-                                                                            self.on_encode_base64_column_text_action)
-        self.create_action('encode-hexadecimal-column-text',                'Encode Hexadecimal Columns Text',
-                                                                            self.on_encode_hexadecimal_column_text_action)
-        self.create_action('pig-latinnify-column',                          'Pig Latinnify Columns',
-                                                                            self.on_pig_latinnify_column_action)
-        self.create_action('swap-column-text-case',                         'Swap Columns Text Case',
-                                                                            self.on_swap_column_text_case_action)
-        self.create_action('trim-column-whitespace',                        'Trim Columns Leading &amp; Trailing Whitespace',
-                                                                            self.on_trim_column_whitespace_action)
-        self.create_action('trim-column-whitespace-and-remove-new-lines',   'Trim Columns Whitespace and Remove Newlines',
-                                                                            self.on_trim_column_whitespace_and_remove_new_lines_action)
-        self.create_action('trim-column-start-whitespace',                  'Trim Columns Leading Whitespace',
-                                                                            self.on_trim_column_start_whitespace_action)
-        self.create_action('trim-column-end-whitespace',                    'Trim Columns Trailing Whitespace',
-                                                                            self.on_trim_column_end_whitespace_action)
+        self.create_action('append-prefix-to-cell',                             _('Cell: Append Prefix...'),
+                                                                                self.on_append_prefix_to_cell_action,
+                                                                                will_prompt=True)
+        self.create_action('append-prefix-to-column',                           _('Column: Append Prefix...'),
+                                                                                self.on_append_prefix_to_column_action,
+                                                                                will_prompt=True)
+        self.create_action('append-suffix-to-cell',                             _('Cell: Append Suffix...'),
+                                                                                self.on_append_suffix_to_cell_action,
+                                                                                will_prompt=True)
+        self.create_action('append-suffix-to-column',                           _('Column: Append Suffix...'),
+                                                                                self.on_append_suffix_to_column_action,
+                                                                                will_prompt=True)
+        self.create_action('change-cell-case-to-camel-case',                    _('Cell: Change Case to Camel Case (camelCase)'),
+                                                                                self.on_change_case_cell_to_camel_case_action)
+        self.create_action('change-cell-case-to-constant-case',                 _('Cell: Change Case to Constant Case (CONSTANT_CASE)'),
+                                                                                self.on_change_case_cell_to_constant_case_action)
+        self.create_action('change-cell-case-to-dot-case',                      _('Cell: Change Case to Dot Case (dot.case)'),
+                                                                                self.on_change_case_cell_to_dot_case_action)
+        self.create_action('change-cell-case-to-kebab-case',                    _('Cell: Change Case to Kebab Case (kebab-case)'),
+                                                                                self.on_change_case_cell_to_kebab_case_action)
+        self.create_action('change-cell-case-to-lowercase',                     _('Cell: Change Case to Lowercase'),
+                                                                                self.on_change_case_cell_to_lowercase_action)
+        self.create_action('change-cell-case-to-pascal-case',                   _('Cell: Change Case to Pascal Case (PascalCase)'),
+                                                                                self.on_change_case_cell_to_pascal_case_action)
+        self.create_action('change-cell-case-to-snake-case',                    _('Cell: Change Case to Snake Case (snake_case)'),
+                                                                                self.on_change_case_cell_to_snake_case_action)
+        self.create_action('change-cell-case-to-sentence-case',                 _('Cell: Change Case to Sentence Case (Sentence case)'),
+                                                                                self.on_change_case_cell_to_sentence_case_action)
+        self.create_action('change-cell-case-to-sponge-case',                   _('Cell: Change Case to Sponge Case (RANdoM CAPiTAlizAtiON)'),
+                                                                                self.on_change_case_cell_to_sponge_case_action)
+        self.create_action('change-cell-case-to-title-case',                    _('Cell: Change Case to Title Case (Capitalize Each Word)'),
+                                                                                self.on_change_case_cell_to_title_case_action)
+        self.create_action('change-cell-case-to-uppercase',                     _('Cell: Change Case to Uppercase'),
+                                                                                self.on_change_case_cell_to_uppercase_action)
+        self.create_action('change-column-case-to-camel-case',                  _('Column: Change Case to Camel Case (camelCase)'),
+                                                                                self.on_change_case_column_to_camel_case_action)
+        self.create_action('change-column-case-to-constant-case',               _('Column: Change Case to Constant Case (CONSTANT_CASE)'),
+                                                                                self.on_change_case_column_to_constant_case_action)
+        self.create_action('change-column-case-to-dot-case',                    _('Column: Change Case to Dot Case (dot.case)'),
+                                                                                self.on_change_case_column_to_dot_case_action)
+        self.create_action('change-column-case-to-kebab-case',                  _('Column: Change Case to Kebab Case (kebab-case)'),
+                                                                                self.on_change_case_column_to_kebab_case_action)
+        self.create_action('change-column-case-to-lowercase',                   _('Column: Change Case to Lowercase'),
+                                                                                self.on_change_case_column_to_lowercase_action)
+        self.create_action('change-column-case-to-pascal-case',                 _('Column: Change Case to Pascal Case (PascalCase)'),
+                                                                                self.on_change_case_column_to_pascal_case_action)
+        self.create_action('change-column-case-to-snake-case',                  _('Column: Change Case to Snake Case (snake_case)'),
+                                                                                self.on_change_case_column_to_snake_case_action)
+        self.create_action('change-column-case-to-sentence-case',               _('Column: Change Case to Sentence Case (Sentence case)'),
+                                                                                self.on_change_case_column_to_sentence_case_action)
+        self.create_action('change-column-case-to-sponge-case',                 _('Column: Change Case to Sponge Case (RANdoM CAPiTAlizAtiON)'),
+                                                                                self.on_change_case_column_to_sponge_case_action)
+        self.create_action('change-column-case-to-title-case',                  _('Column: Change Case to Title Case (Capitalize Each Word)'),
+                                                                                self.on_change_case_column_to_title_case_action)
+        self.create_action('change-column-case-to-uppercase',                   _('Column: Change Case to Uppercase'),
+                                                                                self.on_change_case_column_to_uppercase_action)
+        self.create_action('convert-cell-to-unicode-normalization-nfc',         _('Cell: Convert to NFC Unicode Normalization Form'),
+                                                                                self.on_convert_cell_to_unicode_normalization_nfc_action)
+        self.create_action('convert-cell-to-unicode-normalization-nfd',         _('Cell: Convert to NFD Unicode Normalization Form'),
+                                                                                self.on_convert_cell_to_unicode_normalization_nfd_action)
+        self.create_action('convert-cell-to-unicode-normalization-nfkc',        _('Cell: Convert to NFKC Unicode Normalization Form'),
+                                                                                self.on_convert_cell_to_unicode_normalization_nfkc_action)
+        self.create_action('convert-cell-to-unicode-normalization-nfkd',        _('Cell: Convert to NFKD Unicode Normalization Form'),
+                                                                                self.on_convert_cell_to_unicode_normalization_nfkd_action)
+        self.create_action('convert-column-to-unicode-normalization-nfc',       _('Column: Convert to NFC Unicode Normalization Form'),
+                                                                                self.on_convert_column_to_unicode_normalization_nfc_action)
+        self.create_action('convert-column-to-unicode-normalization-nfd',       _('Column: Convert to NFD Unicode Normalization Form'),
+                                                                                self.on_convert_column_to_unicode_normalization_nfd_action)
+        self.create_action('convert-column-to-unicode-normalization-nfkc',      _('Column: Convert to NFKC Unicode Normalization Form'),
+                                                                                self.on_convert_column_to_unicode_normalization_nfkc_action)
+        self.create_action('convert-column-to-unicode-normalization-nfkd',      _('Column: Convert to NFKD Unicode Normalization Form'),
+                                                                                self.on_convert_column_to_unicode_normalization_nfkd_action)
+        self.create_action('decode-base64-cell-text',                           _('Cell: Decode Base64 Text'),
+                                                                                self.on_decode_base64_cell_text_action)
+        self.create_action('decode-base64-column-text',                         _('Column: Decode Base64 Text'),
+                                                                                self.on_decode_base64_column_text_action)
+        self.create_action('decode-hexadecimal-cell-text',                      _('Cell: Decode Hexadecimal Text'),
+                                                                                self.on_decode_hexadecimal_cell_text_action)
+        self.create_action('decode-hexadecimal-column-text',                    _('Column: Decode Hexadecimal Text'),
+                                                                                self.on_decode_hexadecimal_column_text_action)
+        self.create_action('decode-url-cell-text',                              _('Cell: Decode URL Text'),
+                                                                                self.on_decode_url_cell_text_action)
+        self.create_action('decode-url-column-text',                            _('Column: Decode URL Text'),
+                                                                                self.on_decode_url_column_text_action)
+        self.create_action('encode-base64-cell-text',                           _('Cell: Encode Base64 Text'),
+                                                                                self.on_encode_base64_cell_text_action)
+        self.create_action('encode-base64-column-text',                         _('Column: Encode Base64 Text'),
+                                                                                self.on_encode_base64_column_text_action)
+        self.create_action('encode-hexadecimal-cell-text',                      _('Cell: Encode Hexadecimal Text'),
+                                                                                self.on_encode_hexadecimal_cell_text_action)
+        self.create_action('encode-hexadecimal-column-text',                    _('Column: Encode Hexadecimal Text'),
+                                                                                self.on_encode_hexadecimal_column_text_action)
+        self.create_action('encode-url-cell-text',                              _('Cell: Encode URL Text'),
+                                                                                self.on_encode_url_cell_text_action)
+        self.create_action('encode-url-column-text',                            _('Column: Encode URL Text'),
+                                                                                self.on_encode_url_column_text_action)
+        self.create_action('pig-latinnify-cell',                                _('Cell: Pig Latinnify'),
+                                                                                self.on_pig_latinnify_cell_action)
+        self.create_action('pig-latinnify-column',                              _('Column: Pig Latinnify'),
+                                                                                self.on_pig_latinnify_column_action)
+        self.create_action('remove-prefix-from-cell-case-insensitive',          _('Cell: Remove Prefix (Case Insensitive)...'),
+                                                                                self.on_remove_prefix_from_cell_case_insensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('remove-prefix-from-cell-case-sensitive',            _('Cell: Remove Prefix (Case Sensitive)...'),
+                                                                                self.on_remove_prefix_from_cell_case_sensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('remove-prefix-from-column-case-insensitive',        _('Column: Remove Prefix (Case Insensitive)...'),
+                                                                                self.on_remove_prefix_from_column_case_insensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('remove-prefix-from-column-case-sensitive',          _('Column: Remove Prefix (Case Sensitive)...'),
+                                                                                self.on_remove_prefix_from_column_case_sensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('remove-suffix-from-cell-case-insensitive',          _('Cell: Remove Suffix (Case Insensitive)...'),
+                                                                                self.on_remove_suffix_from_cell_case_insensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('remove-suffix-from-cell-case-sensitive',            _('Cell: Remove Suffix (Case Sensitive)...'),
+                                                                                self.on_remove_suffix_from_cell_case_sensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('remove-suffix-from-column-case-insensitive',        _('Column: Remove Suffix (Case Insensitive)...'),
+                                                                                self.on_remove_suffix_from_column_case_insensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('remove-suffix-from-column-case-sensitive',          _('Column: Remove Suffix (Case Sensitive)...'),
+                                                                                self.on_remove_suffix_from_column_case_sensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('replace-cell-values-case-insensitive',              _('Cell: Replace Text Value (Case Insensitive)...'),
+                                                                                self.on_replace_cell_text_value_case_insensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('replace-cell-values-case-insensitive-with-regex',   _('Cell: Replace Text Value with Regex (Case Insensitive)...'),
+                                                                                self.on_replace_cell_text_value_case_insensitive_with_regex_action,
+                                                                                will_prompt=True)
+        self.create_action('replace-cell-values-case-sensitive',                _('Cell: Replace Text Value (Case Sensitive)...'),
+                                                                                self.on_replace_cell_text_value_case_sensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('replace-cell-values-case-sensitive-with-regex',     _('Cell: Replace Text Value with Regex (Case Sensitive)...'),
+                                                                                self.on_replace_cell_text_value_case_sensitive_with_regex_action,
+                                                                                will_prompt=True)
+        self.create_action('replace-column-values-case-insensitive',            _('Column: Replace Text Value (Case Insensitive)...'),
+                                                                                self.on_replace_column_text_value_case_insensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('replace-column-values-case-insensitive-with-regex', _('Column: Replace Text Value with Regex (Case Insensitive)...'),
+                                                                                self.on_replace_column_text_value_case_insensitive_with_regex_action,
+                                                                                will_prompt=True)
+        self.create_action('replace-column-values-case-sensitive',              _('Column: Replace Text Value (Case Sensitive)...'),
+                                                                                self.on_replace_column_text_value_case_sensitive_action,
+                                                                                will_prompt=True)
+        self.create_action('replace-column-values-case-sensitive-with-regex',   _('Column: Replace Text Value with Regex (Case Sensitive)...'),
+                                                                                self.on_replace_column_text_value_case_sensitive_with_regex_action,
+                                                                                will_prompt=True)
+        self.create_action('slugify-cell',                                      _('Cell: Slugify'),
+                                                                                self.on_slugify_cells_action)
+        self.create_action('slugify-column',                                    _('Column: Slugify'),
+                                                                                self.on_slugify_columns_action)
+        self.create_action('split-cell-by-comma-into-new-worksheet',            _('Cell: Split by Comma Into New Worksheet'),
+                                                                                self.on_split_cells_by_comma_into_new_worksheet_action)
+        self.create_action('split-cell-by-characters-into-new-worksheet',       _('Cell: Split by a Set of Characters Into New Worksheet'),
+                                                                                self.on_split_cells_by_characters_into_new_worksheet_action,
+                                                                                will_prompt=True)
+        self.create_action('split-cell-by-pipe-into-new-worksheet',             _('Cell: Split by Pipe Into New Worksheet'),
+                                                                                self.on_split_cells_by_pipe_into_new_worksheet_action)
+        self.create_action('split-cell-by-semicolon-into-new-worksheet',        _('Cell: Split by Semicolon Into New Worksheet'),
+                                                                                self.on_split_cells_by_semicolon_into_new_worksheet_action)
+        self.create_action('split-cell-by-space-into-new-worksheet',            _('Cell: Split by Space Into New Worksheet'),
+                                                                                self.on_split_cells_by_space_into_new_worksheet_action)
+        self.create_action('split-column-by-comma-into-new-worksheet',          _('Column: Split by Comma Into New Worksheet'),
+                                                                                self.on_split_columns_by_comma_into_new_worksheet_action)
+        self.create_action('split-column-by-characters-into-new-worksheet',     _('Column: Split by a Set of Characters Into New Worksheet'),
+                                                                                self.on_split_columns_by_characters_into_new_worksheet_action,
+                                                                                will_prompt=True)
+        self.create_action('split-column-by-pipe-into-new-worksheet',           _('Column: Split by Pipe Into New Worksheet'),
+                                                                                self.on_split_columns_by_pipe_into_new_worksheet_action)
+        self.create_action('split-column-by-semicolon-into-new-worksheet',      _('Column: Split by Semicolon Into New Worksheet'),
+                                                                                self.on_split_columns_by_semicolon_into_new_worksheet_action)
+        self.create_action('split-column-by-space-into-new-worksheet',          _('Column: Split by Space Into New Worksheet'),
+                                                                                self.on_split_columns_by_space_into_new_worksheet_action)
+        self.create_action('swap-cell-text-case',                               _('Cell: Swap Text Case'),
+                                                                                self.on_swap_cell_text_case_action)
+        self.create_action('swap-column-text-case',                             _('Column: Swap Text Case'),
+                                                                                self.on_swap_column_text_case_action)
+        self.create_action('trim-cell-whitespace',                              _('Cell: Trim Leading &amp; Trailing Whitespace'),
+                                                                                self.on_trim_cell_whitespace_action)
+        self.create_action('trim-cell-whitespace-and-remove-new-lines',         _('Cell: Trim Whitespace &amp; Remove Newlines'),
+                                                                                self.on_trim_cell_whitespace_and_remove_new_lines_action)
+        self.create_action('trim-cell-start-whitespace',                        _('Cell: Trim Leading Whitespace'),
+                                                                                self.on_trim_cell_start_whitespace_action)
+        self.create_action('trim-cell-end-whitespace',                          _('Cell: Trim Trailing Whitespace'),
+                                                                                self.on_trim_cell_end_whitespace_action)
+        self.create_action('trim-column-whitespace',                            _('Column: Trim Leading &amp; Trailing Whitespace'),
+                                                                                self.on_trim_column_whitespace_action)
+        self.create_action('trim-column-whitespace-and-remove-new-lines',       _('Column: Trim Whitespace &amp; Remove Newlines'),
+                                                                                self.on_trim_column_whitespace_and_remove_new_lines_action)
+        self.create_action('trim-column-start-whitespace',                      _('Column: Trim Leading Whitespace'),
+                                                                                self.on_trim_column_start_whitespace_action)
+        self.create_action('trim-column-end-whitespace',                        _('Column: Trim Trailing Whitespace'),
+                                                                                self.on_trim_column_end_whitespace_action)
+        self.create_action('wrap-cell-with-text-different',                     _('Cell: Wrap with Text (Different Prefix and Suffix)'),
+                                                                                self.on_wrap_cell_with_text_different_action,
+                                                                                will_prompt=True)
+        self.create_action('wrap-cell-with-text-same',                          _('Cell: Wrap with Text (Same Prefix and Suffix)'),
+                                                                                self.on_wrap_cell_with_text_same_action,
+                                                                                will_prompt=True)
+        self.create_action('wrap-column-with-text-different',                   _('Column: Wrap with Text (Different Prefix and Suffix)'),
+                                                                                self.on_wrap_column_with_text_different_action,
+                                                                                will_prompt=True)
+        self.create_action('wrap-column-with-text-same',                        _('Column: Wrap with Text (Same Prefix and Suffix)'),
+                                                                                self.on_wrap_column_with_text_same_action,
+                                                                                will_prompt=True)
 
     def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
         args = command_line.get_arguments()[1:]
@@ -579,13 +694,6 @@ Options:
         dialog = DatabaseAddConnectionDialog(window, _add_new_connection)
         dialog.present(window)
 
-    def on_apply_pending_table_action(self,
-                                      action: Gio.SimpleAction,
-                                      *args) -> None:
-        action_data_id = args[0].get_string()
-        window = self.get_active_window()
-        window.apply_pending_table(action_data_id)
-
     def on_append_prefix_to_cell_action(self,
                                         action: Gio.SimpleAction,
                                         *args) -> None:
@@ -598,7 +706,7 @@ Options:
 
         window = self.get_active_window()
         window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            help_text=_('Please enter the prefix for the cells'),
+                                                            prompt_text=_('Please enter the prefix for the cells'),
                                                             callback=proceed_to_append_prefix)
 
     def on_append_prefix_to_column_action(self,
@@ -613,7 +721,7 @@ Options:
 
         window = self.get_active_window()
         window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            help_text=_('Please enter the prefix for the columns'),
+                                                            prompt_text=_('Please enter the prefix for the columns'),
                                                             callback=proceed_to_append_prefix)
 
     def on_append_suffix_to_cell_action(self,
@@ -628,7 +736,7 @@ Options:
 
         window = self.get_active_window()
         window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            help_text=_('Please enter the suffix for the cells'),
+                                                            prompt_text=_('Please enter the suffix for the cells'),
                                                             callback=proceed_to_append_suffix)
 
     def on_append_suffix_to_column_action(self,
@@ -643,8 +751,15 @@ Options:
 
         window = self.get_active_window()
         window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            help_text=_('Please enter the suffix for the columns'),
+                                                            prompt_text=_('Please enter the suffix for the columns'),
                                                             callback=proceed_to_append_suffix)
+
+    def on_apply_pending_table_action(self,
+                                      action: Gio.SimpleAction,
+                                      *args) -> None:
+        action_data_id = args[0].get_string()
+        window = self.get_active_window()
+        window.apply_pending_table(action_data_id)
 
     def on_change_case_cell_to_camel_case_action(self,
                                                  action: Gio.SimpleAction,
@@ -734,70 +849,6 @@ Options:
             return
         document.update_current_cells_from_operator('uppercase', on_column=False)
 
-    def on_decode_base64_cell_text_action(self,
-                                          action: Gio.SimpleAction,
-                                          *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-base64', on_column=False)
-
-    def on_decode_base64_column_text_action(self,
-                                          action: Gio.SimpleAction,
-                                          *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-base64', on_column=True)
-
-    def on_decode_hexadecimal_cell_text_action(self,
-                                               action: Gio.SimpleAction,
-                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-hexadecimal', on_column=False)
-
-    def on_decode_hexadecimal_column_text_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-hexadecimal', on_column=True)
-
-    def on_encode_base64_cell_text_action(self,
-                                          action: Gio.SimpleAction,
-                                          *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-base64', on_column=False)
-
-    def on_encode_base64_column_text_action(self,
-                                            action: Gio.SimpleAction,
-                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-base64', on_column=True)
-
-    def on_encode_hexadecimal_cell_text_action(self,
-                                               action: Gio.SimpleAction,
-                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-hexadecimal', on_column=False)
-
-    def on_encode_hexadecimal_column_text_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-hexadecimal', on_column=True)
-
     def on_change_case_column_to_camel_case_action(self,
                                                    action: Gio.SimpleAction,
                                                    *args) -> None:
@@ -885,6 +936,70 @@ Options:
         if not isinstance(document, SheetDocument):
             return
         document.update_current_cells_from_operator('uppercase', on_column=True)
+
+    def on_convert_cell_to_unicode_normalization_nfc_action(self,
+                                                            action: Gio.SimpleAction,
+                                                            *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('unicode-normalization-nfc', on_column=False)
+
+    def on_convert_cell_to_unicode_normalization_nfd_action(self,
+                                                            action: Gio.SimpleAction,
+                                                            *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('unicode-normalization-nfd', on_column=False)
+
+    def on_convert_cell_to_unicode_normalization_nfkc_action(self,
+                                                             action: Gio.SimpleAction,
+                                                             *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('unicode-normalization-nfkc', on_column=False)
+
+    def on_convert_cell_to_unicode_normalization_nfkd_action(self,
+                                                             action: Gio.SimpleAction,
+                                                             *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('unicode-normalization-nfkd', on_column=False)
+
+    def on_convert_column_to_unicode_normalization_nfc_action(self,
+                                                              action: Gio.SimpleAction,
+                                                              *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('unicode-normalization-nfc', on_column=True)
+
+    def on_convert_column_to_unicode_normalization_nfd_action(self,
+                                                              action: Gio.SimpleAction,
+                                                              *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('unicode-normalization-nfd', on_column=True)
+
+    def on_convert_column_to_unicode_normalization_nfkc_action(self,
+                                                               action: Gio.SimpleAction,
+                                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('unicode-normalization-nfkc', on_column=True)
+
+    def on_convert_column_to_unicode_normalization_nfkd_action(self,
+                                                               action: Gio.SimpleAction,
+                                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('unicode-normalization-nfkd', on_column=True)
 
     def on_clear_contents_action(self,
                                  action: Gio.SimpleAction,
@@ -1080,6 +1195,54 @@ Options:
 
         return True
 
+    def on_decode_base64_cell_text_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-base64', on_column=False)
+
+    def on_decode_base64_column_text_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-base64', on_column=True)
+
+    def on_decode_hexadecimal_cell_text_action(self,
+                                               action: Gio.SimpleAction,
+                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-hexadecimal', on_column=False)
+
+    def on_decode_hexadecimal_column_text_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-hexadecimal', on_column=True)
+
+    def on_decode_url_cell_text_action(self,
+                                       action: Gio.SimpleAction,
+                                       *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-url', on_column=False)
+
+    def on_decode_url_column_text_action(self,
+                                         action: Gio.SimpleAction,
+                                         *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('decode-url', on_column=True)
+
     def on_delete_column_action(self,
                                 action: Gio.SimpleAction,
                                 *args) -> None:
@@ -1151,6 +1314,54 @@ Options:
         if not isinstance(document, SheetDocument):
             return
         document.duplicate_from_current_columns(left=False)
+
+    def on_encode_base64_cell_text_action(self,
+                                          action: Gio.SimpleAction,
+                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-base64', on_column=False)
+
+    def on_encode_base64_column_text_action(self,
+                                            action: Gio.SimpleAction,
+                                            *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-base64', on_column=True)
+
+    def on_encode_hexadecimal_cell_text_action(self,
+                                               action: Gio.SimpleAction,
+                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-hexadecimal', on_column=False)
+
+    def on_encode_hexadecimal_column_text_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-hexadecimal', on_column=True)
+
+    def on_encode_url_cell_text_action(self,
+                                       action: Gio.SimpleAction,
+                                       *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-url', on_column=False)
+
+    def on_encode_url_column_text_action(self,
+                                         action: Gio.SimpleAction,
+                                         *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('encode-url', on_column=True)
 
     def on_file_cancel(self, source: GObject.Object) -> None:
         self._return_focus_back()
@@ -1460,6 +1671,126 @@ Options:
 
         globals.history.redo()
 
+    def on_remove_prefix_from_cell_case_insensitive_action(self,
+                                                           action: Gio.SimpleAction,
+                                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_remove_prefix(prefix: str) -> None:
+            document.update_current_cells_from_operator('remove-prefix-case-insensitive', [prefix], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the prefix for the cells'),
+                                                            callback=proceed_to_remove_prefix)
+
+    def on_remove_prefix_from_cell_case_sensitive_action(self,
+                                                         action: Gio.SimpleAction,
+                                                         *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_remove_prefix(prefix: str) -> None:
+            document.update_current_cells_from_operator('remove-prefix-case-sensitive', [prefix], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the prefix for the cells'),
+                                                            callback=proceed_to_remove_prefix)
+
+    def on_remove_prefix_from_column_case_insensitive_action(self,
+                                                             action: Gio.SimpleAction,
+                                                             *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_remove_prefix(prefix: str) -> None:
+            document.update_current_cells_from_operator('remove-prefix-case-insensitive', [prefix], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the prefix for the columns'),
+                                                            callback=proceed_to_remove_prefix)
+
+    def on_remove_prefix_from_column_case_sensitive_action(self,
+                                                           action: Gio.SimpleAction,
+                                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_remove_prefix(prefix: str) -> None:
+            document.update_current_cells_from_operator('remove-prefix-case-sensitive', [prefix], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the prefix for the columns'),
+                                                            callback=proceed_to_remove_prefix)
+
+    def on_remove_suffix_from_cell_case_insensitive_action(self,
+                                                           action: Gio.SimpleAction,
+                                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_remove_suffix(suffix: str) -> None:
+            document.update_current_cells_from_operator('remove-suffix-case-insensitive', [suffix], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the suffix for the cells'),
+                                                            callback=proceed_to_remove_suffix)
+
+    def on_remove_suffix_from_cell_case_sensitive_action(self,
+                                                         action: Gio.SimpleAction,
+                                                         *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_remove_suffix(suffix: str) -> None:
+            document.update_current_cells_from_operator('remove-suffix-case-sensitive', [suffix], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the suffix for the cells'),
+                                                            callback=proceed_to_remove_suffix)
+
+    def on_remove_suffix_from_column_case_sensitive_action(self,
+                                                           action: Gio.SimpleAction,
+                                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_remove_suffix(suffix: str) -> None:
+            document.update_current_cells_from_operator('remove-suffix-case-sensitive', [suffix], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the suffix for the columns'),
+                                                            callback=proceed_to_remove_suffix)
+
+    def on_remove_suffix_from_column_case_insensitive_action(self,
+                                                             action: Gio.SimpleAction,
+                                                             *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_remove_suffix(suffix: str) -> None:
+            document.update_current_cells_from_operator('remove-suffix-case-insensitive', [suffix], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the suffix for the columns'),
+                                                            callback=proceed_to_remove_suffix)
+
     def on_rename_connection_action(self,
                                     action: Gio.SimpleAction,
                                     *args) -> None:
@@ -1487,6 +1818,14 @@ Options:
         document_id = args[0].get_string()
         tab_page = self._get_current_tab_page(window, document_id)
         window.rename_sheet(tab_page)
+
+    def on_rechunk_table_action(self,
+                                action: Gio.SimpleAction,
+                                *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.rechunk_table()
 
     def on_reset_all_filters_action(self,
                                     action: Gio.SimpleAction,
@@ -1523,6 +1862,203 @@ Options:
         if not isinstance(document, SheetDocument):
             return
         document.sort_current_rows(descending=True)
+
+    def on_replace_cell_text_value_case_insensitive_action(self,
+                                                           action: Gio.SimpleAction,
+                                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        self._replace_text_value()
+
+    def on_replace_cell_text_value_case_insensitive_with_regex_action(self,
+                                                                      action: Gio.SimpleAction,
+                                                                      *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        self._replace_text_value(use_regexp=True)
+
+    def on_replace_cell_text_value_case_sensitive_action(self,
+                                                         action: Gio.SimpleAction,
+                                                         *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        self._replace_text_value(match_case=True)
+
+    def on_replace_cell_text_value_case_sensitive_with_regex_action(self,
+                                                                    action: Gio.SimpleAction,
+                                                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        self._replace_text_value(match_case=True,
+                                 use_regexp=True)
+
+    def on_replace_column_text_value_case_insensitive_action(self,
+                                                             action: Gio.SimpleAction,
+                                                             *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        self._replace_text_value(column_wise=True)
+
+    def on_replace_column_text_value_case_insensitive_with_regex_action(self,
+                                                                        action: Gio.SimpleAction,
+                                                                        *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        self._replace_text_value(use_regexp=True,
+                                 column_wise=True)
+
+    def on_replace_column_text_value_case_sensitive_action(self,
+                                                           action: Gio.SimpleAction,
+                                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        self._replace_text_value(match_case=True,
+                                 column_wise=True)
+
+    def on_replace_column_text_value_case_sensitive_with_regex_action(self,
+                                                                      action: Gio.SimpleAction,
+                                                                      *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        self._replace_text_value(match_case=True,
+                                 use_regexp=True,
+                                 column_wise=True)
+
+    def on_slugify_cells_action(self,
+                                action: Gio.SimpleAction,
+                                *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('slugify', on_column=False)
+
+    def on_slugify_columns_action(self,
+                                  action: Gio.SimpleAction,
+                                  *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.update_current_cells_from_operator('slugify', on_column=True)
+
+    def on_split_cells_by_comma_into_new_worksheet_action(self,
+                                                          action: Gio.SimpleAction,
+                                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        dataframe = document.create_table_from_operator('split-by-characters', [','], on_column=False)
+        self._create_new_tab(dataframe=dataframe)
+
+    def on_split_cells_by_characters_into_new_worksheet_action(self,
+                                                                  action: Gio.SimpleAction,
+                                                                  *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_split_by_characters(characters: str) -> None:
+            dataframe = document.create_table_from_operator('split-by-characters', [characters], on_column=False)
+            self._create_new_tab(dataframe=dataframe)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter a set of characters to split the cells by'),
+                                                            callback=proceed_to_split_by_characters)
+
+    def on_split_cells_by_pipe_into_new_worksheet_action(self,
+                                                         action: Gio.SimpleAction,
+                                                         *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        dataframe = document.create_table_from_operator('split-by-characters', ['|'], on_column=False)
+        self._create_new_tab(dataframe=dataframe)
+
+    def on_split_cells_by_semicolon_into_new_worksheet_action(self,
+                                                              action: Gio.SimpleAction,
+                                                              *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        dataframe = document.create_table_from_operator('split-by-characters', [';'], on_column=False)
+        self._create_new_tab(dataframe=dataframe)
+
+    def on_split_cells_by_space_into_new_worksheet_action(self,
+                                                          action: Gio.SimpleAction,
+                                                          *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        dataframe = document.create_table_from_operator('split-by-characters', [' '], on_column=False)
+        self._create_new_tab(dataframe=dataframe)
+
+    def on_split_columns_by_comma_into_new_worksheet_action(self,
+                                                            action: Gio.SimpleAction,
+                                                            *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        dataframe = document.create_table_from_operator('split-by-characters', [','], on_column=True)
+        self._create_new_tab(dataframe=dataframe)
+
+    def on_split_columns_by_characters_into_new_worksheet_action(self,
+                                                                    action: Gio.SimpleAction,
+                                                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_split_by_characters(characters: str) -> None:
+            dataframe = document.create_table_from_operator('split-by-characters', [characters], on_column=True)
+            self._create_new_tab(dataframe=dataframe)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter a set of characters to split the columns by'),
+                                                            callback=proceed_to_split_by_characters)
+
+    def on_split_columns_by_pipe_into_new_worksheet_action(self,
+                                                           action: Gio.SimpleAction,
+                                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        dataframe = document.create_table_from_operator('split-by-characters', ['|'], on_column=True)
+        self._create_new_tab(dataframe=dataframe)
+
+    def on_split_columns_by_semicolon_into_new_worksheet_action(self,
+                                                                action: Gio.SimpleAction,
+                                                                *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        dataframe = document.create_table_from_operator('split-by-characters', [';'], on_column=True)
+        self._create_new_tab(dataframe=dataframe)
+
+    def on_split_columns_by_space_into_new_worksheet_action(self,
+                                                            action: Gio.SimpleAction,
+                                                            *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        dataframe = document.create_table_from_operator('split-by-characters', [' '], on_column=True)
+        self._create_new_tab(dataframe=dataframe)
 
     def on_swap_cell_text_case_action(self,
                                       action: Gio.SimpleAction,
@@ -1655,6 +2191,82 @@ Options:
             return
         document.update_current_cells_from_operator('trim-end-whitespace', on_column=True)
 
+    def on_wrap_cell_with_text_different_action(self,
+                                                action: Gio.SimpleAction,
+                                                *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        window = self.get_active_window()
+
+        def proceed_to_wrap_text(suffix: str, prefix: str) -> None:
+            document.update_current_cells_from_operator('wrap-with-text-different', [prefix, suffix], on_column=False)
+
+        def ask_for_suffix_text(search_pattern: str) -> None:
+            window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                                prompt_text=_('Please enter the suffix for the cells'),
+                                                                callback=proceed_to_wrap_text,
+                                                                user_data=[search_pattern])
+
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the prefix for the cells'),
+                                                            callback=ask_for_suffix_text,
+                                                            more_prompt=True)
+
+    def on_wrap_cell_with_text_same_action(self,
+                                           action: Gio.SimpleAction,
+                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_wrap_text(prefix: str) -> None:
+            document.update_current_cells_from_operator('wrap-with-text-same', [prefix], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the text to wrap the cells with'),
+                                                            callback=proceed_to_wrap_text)
+
+    def on_wrap_column_with_text_different_action(self,
+                                                  action: Gio.SimpleAction,
+                                                  *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        window = self.get_active_window()
+
+        def proceed_to_wrap_text(prefix: str, suffix: str) -> None:
+            document.update_current_cells_from_operator('wrap-with-text-different', [prefix, suffix], on_column=True)
+
+        def ask_for_suffix_text(search_pattern: str) -> None:
+            window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                                prompt_text=_('Please enter the suffix for the columns'),
+                                                                callback=proceed_to_wrap_text,
+                                                                user_data=[search_pattern])
+
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the prefix for the columns'),
+                                                            callback=ask_for_suffix_text,
+                                                            more_prompt=True)
+
+    def on_wrap_column_with_text_same_action(self,
+                                             action: Gio.SimpleAction,
+                                             *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_wrap_text(prefix: str) -> None:
+            document.update_current_cells_from_operator('wrap-with-text-same', [prefix], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the text to wrap the columns with'),
+                                                            callback=proceed_to_wrap_text)
+
     def on_undo_action(self,
                        action: Gio.SimpleAction,
                        *args) -> None:
@@ -1760,9 +2372,11 @@ Options:
             return
         document.convert_current_columns_dtype(dtype)
 
-    def _create_new_tab(self, file_path: str = '') -> bool:
+    def _create_new_tab(self,
+                        file_path: str = '',
+                        dataframe: polars.DataFrame = None) -> bool:
         file = None
-        dataframe = None
+        dataframe = dataframe
 
         if file_path:
             file = Gio.File.new_for_path(file_path)
@@ -1807,8 +2421,9 @@ Options:
 
         return window
 
-    def _get_current_active_document(self) -> SheetDocument:
-        window = self.get_active_window()
+    def _get_current_active_document(self, window: Window = None) -> SheetDocument:
+        if window is None:
+            window = self.get_active_window()
         return window.get_current_active_document()
 
     def _get_current_tab_page(self,
@@ -1848,6 +2463,68 @@ Options:
         active_connections = [connection['curl'] for connection in self.connection_list
                                                  if connection['connected']]
         return ';'.join(active_connections)
+
+    def _register_expressions(self) -> None:
+        import eruo_strutil as strx
+
+        @polars.api.register_expr_namespace('strx')
+        class ExpandedStringExpr:
+            def __init__(self, expr: polars.Expr) -> None:
+                self._expr = expr
+
+            def pig_latinnify(self) -> polars.Expr:
+                return strx.pig_latinnify(self._expr)
+
+            def split_by_chars(self, characters: str) -> polars.Expr:
+                return strx.split_by_chars(self._expr, characters)
+
+            def to_sentence_case(self) -> polars.Expr:
+                return strx.to_sentence_case(self._expr)
+
+            def to_sponge_case(self) -> polars.Expr:
+                return strx.to_sponge_case(self._expr)
+
+    def _replace_text_value(self,
+                            match_case:  bool = False,
+                            use_regexp:  bool = False,
+                            column_wise: bool = False) -> None:
+        window = self.get_active_window()
+
+        def proceed_to_replace_value(replace_with: str, search_pattern: str) -> None:
+            window = self.get_active_window()
+            sheet_document = self._get_current_active_document(window)
+
+            active = sheet_document.selection.current_active_range
+            if column_wise:
+                from .sheet_selection import SheetCell
+                nactive = SheetCell(active.x, active.y, active.column, active.row,
+                                    active.width, active.height, active.column_span,
+                                    active.row_span, active.metadata,
+                                    active.rtl, active.btt)
+                nactive.row_span = -1 # select the entire column(s)
+            else:
+                nactive = active
+
+            sheet_document.selection.current_search_range = nactive
+            sheet_document.find_replace_all_in_current_cells(search_pattern,
+                                                             replace_with,
+                                                             match_case=match_case,
+                                                             match_cell=False,
+                                                             within_selection=True,
+                                                             use_regexp=use_regexp)
+
+            sheet_document.selection.current_search_range = None
+
+        def ask_for_replace_value(search_pattern: str) -> None:
+            window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                                prompt_text=_('Please enter the value to replace'),
+                                                                callback=proceed_to_replace_value,
+                                                                user_data=[search_pattern])
+
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the pattern to find'),
+                                                            callback=ask_for_replace_value,
+                                                            more_prompt=True)
 
     def _return_focus_back(self, document: Any = None) -> None:
         if document is None:

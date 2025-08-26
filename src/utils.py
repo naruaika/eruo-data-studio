@@ -228,3 +228,14 @@ import time
 
 def generate_ulid():
     return int(time.time() * 1000)
+
+
+
+from typing import Any
+
+def is_iterable(obj: Any) -> bool:
+    try:
+        iter(obj)
+        return True
+    except TypeError:
+        return False

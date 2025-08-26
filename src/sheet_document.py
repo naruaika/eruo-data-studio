@@ -784,8 +784,66 @@ class SheetDocument(GObject.Object):
             self.selection.current_search_range = arange
 
     #
-    # Basic Manipulations
+    # DDL and CRUD
     #
+
+    def create_table_from_operator(self,
+                                   operator_name:  str,
+                                   operation_args: list = [],
+                                   on_column:      bool = False) -> polars.DataFrame:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        if mdfi < 0:
+            return False
+
+        mcolumn = arange.metadata.column
+        mrow = arange.metadata.row
+        column_span = arange.column_span
+        row_span = arange.row_span
+
+        bbox = self.data.bbs[mdfi]
+
+        if on_column:
+            mrow = 1
+
+        if arange.column_span < 0:
+            column_span = bbox.column_span + 1
+
+        if arange.row_span < 0 or on_column:
+            row_span = bbox.row_span + 2
+
+        # Take hidden column(s) into account
+        start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+        column_span = end_vcolumn - start_vcolumn + 1
+
+        # Take hidden row(s) into account
+        start_vrow = self.display.get_vrow_from_row(arange.row)
+        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
+        row_span = end_vrow - start_vrow + 1
+
+        if arange.column_span < 0:
+            column_span -= 1
+
+        if arange.row_span < 0 or on_column:
+            row_span -= 3
+
+        if arange.rtl:
+            mcolumn = mcolumn - column_span + 1
+
+        if arange.btt:
+            mrow = mrow - row_span + 1
+
+        return self.data.read_cell_data_block_with_operator_from_metadata(mcolumn,
+                                                                          mrow,
+                                                                          column_span,
+                                                                          row_span,
+                                                                          mdfi,
+                                                                          operator_name,
+                                                                          operation_args,
+                                                                          self.display.column_visible_series,
+                                                                          self.display.row_visible_series)
 
     def insert_from_current_rows(self,
                                  dataframe: polars.DataFrame,
@@ -838,7 +896,7 @@ class SheetDocument(GObject.Object):
                                                               self.display.row_heights[mrow:]])
                 else:
                     self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
-                                                              polars.Series([self.display.DEFAULT_CELL_WIDTH] * dataframe.width),
+                                                              polars.Series([self.display.DEFAULT_CELL_HEIGHT] * dataframe.height, dtype=polars.Int32),
                                                               self.display.row_heights[mrow:]])
                 row_heights_visible_only = self.display.row_heights
                 if len(self.display.row_visibility_flags):
@@ -847,6 +905,10 @@ class SheetDocument(GObject.Object):
 
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, False)
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -921,7 +983,7 @@ class SheetDocument(GObject.Object):
             # Update row heights
             if len(self.display.row_heights):
                 self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
-                                                          polars.Series([self.display.DEFAULT_CELL_WIDTH] * row_span),
+                                                          polars.Series([self.display.DEFAULT_CELL_HEIGHT] * row_span, dtype=polars.Int32),
                                                           self.display.row_heights[mrow:]])
                 row_heights_visible_only = self.display.row_heights
                 if len(self.display.row_visibility_flags):
@@ -930,6 +992,10 @@ class SheetDocument(GObject.Object):
 
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -986,7 +1052,7 @@ class SheetDocument(GObject.Object):
                                                                 self.display.column_widths[mcolumn:]])
                 else:
                     self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
-                                                                polars.Series([self.display.DEFAULT_CELL_WIDTH] * dataframe.width),
+                                                                polars.Series([self.display.DEFAULT_CELL_WIDTH] * dataframe.width, dtype=polars.Int32),
                                                                 self.display.column_widths[mcolumn:]])
                 column_widths_visible_only = self.display.column_widths
                 if len(self.display.column_visibility_flags):
@@ -996,6 +1062,10 @@ class SheetDocument(GObject.Object):
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, False)
             self.repopulate_auto_filter_widgets()
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1078,6 +1148,10 @@ class SheetDocument(GObject.Object):
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
             self.repopulate_auto_filter_widgets()
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1165,6 +1239,9 @@ class SheetDocument(GObject.Object):
             if not globals.is_changing_state:
                 globals.history.save(state)
 
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1176,18 +1253,6 @@ class SheetDocument(GObject.Object):
             return True
 
         return False
-
-    def update_current_cells_from_formula(self, formula: str) -> bool:
-        arange = self.selection.current_active_range
-        mdfi = arange.metadata.dfi
-
-        if mdfi < 0:
-            return False # TODO: create a new table?
-
-        from pprint import pprint
-        pprint(parse_dax(formula), sort_dicts=False)
-
-        return True
 
     def update_current_columns_from_sql(self, query: str) -> bool:
         arange = self.selection.current_active_range
@@ -1232,12 +1297,12 @@ class SheetDocument(GObject.Object):
         if self.data.has_main_dataframe:
             connection.register('self', self.data.dfs[0])
         connection_strings = globals.register_connection(connection)
-        nquery = connection_strings + nquery
 
         register_sql_functions(connection)
 
         try:
-            relation = connection.sql(nquery)
+            rquery = connection_strings + nquery
+            relation = connection.sql(rquery)
             target_column_names = list(set(self.data.dfs[mdfi].columns) & set(relation.columns))
             added_column_names = list(set(relation.columns) - set(target_column_names))
             n_added_columns = len(added_column_names)
@@ -1264,7 +1329,7 @@ class SheetDocument(GObject.Object):
             # Update column widths
             if len(self.display.column_widths):
                 self.display.column_widths = polars.concat([self.display.column_widths,
-                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH] * n_added_columns)])
+                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH] * n_added_columns, dtype=polars.UInt32)])
                 column_widths_visible_only = self.display.column_widths
                 if len(self.display.column_visibility_flags):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
@@ -1281,6 +1346,9 @@ class SheetDocument(GObject.Object):
             if not globals.is_changing_state:
                 globals.history.save(state)
 
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1296,6 +1364,18 @@ class SheetDocument(GObject.Object):
         connection.close()
 
         return False
+
+    def update_current_cells_from_formula(self, formula: str) -> bool:
+        arange = self.selection.current_active_range
+        mdfi = arange.metadata.dfi
+
+        if mdfi < 0:
+            return False # TODO: create a new table?
+
+        from pprint import pprint
+        pprint(parse_dax(formula), sort_dicts=False)
+
+        return True
 
     def update_current_cells_from_operator(self,
                                            operator_name:  str,
@@ -1382,6 +1462,9 @@ class SheetDocument(GObject.Object):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
 
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -1535,6 +1618,9 @@ class SheetDocument(GObject.Object):
 
             if self.is_cutting_cells:
                 self.cancel_cutcopy_operation()
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
 
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
@@ -1711,6 +1797,9 @@ class SheetDocument(GObject.Object):
             if self.is_cutting_cells:
                 self.cancel_cutcopy_operation()
 
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1779,6 +1868,10 @@ class SheetDocument(GObject.Object):
 
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1844,6 +1937,10 @@ class SheetDocument(GObject.Object):
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
             self.repopulate_auto_filter_widgets()
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1911,6 +2008,10 @@ class SheetDocument(GObject.Object):
 
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, True)
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -1975,6 +2076,10 @@ class SheetDocument(GObject.Object):
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, True)
             self.repopulate_auto_filter_widgets()
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -2308,9 +2413,10 @@ class SheetDocument(GObject.Object):
 
         # Update row heights
         if len(self.display.row_heights):
+            row_header_height = self.display.row_heights[0]
             sorted_row_heights = polars.DataFrame({'rheights': self.display.row_heights[1:],
-                                                    '$ridx': self.data.dfs[mdfi]['$ridx']}).sort('$ridx').to_series(0)
-            self.display.row_heights = polars.concat([polars.Series([True]), sorted_row_heights])
+                                                   '$ridx': self.data.dfs[mdfi]['$ridx']}).sort('$ridx').to_series()
+            self.display.row_heights = polars.concat([polars.Series([row_header_height]), sorted_row_heights])
             row_heights_visible_only = self.display.row_heights
             if len(self.display.row_visibility_flags):
                 row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
@@ -2365,6 +2471,9 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_selections_by_crud(0, 0, False)
         self.repopulate_auto_filter_widgets()
 
+        # TODO: clear only for the related columns
+        self.data.clear_cell_data_unique_cache(0)
+
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
@@ -2406,6 +2515,10 @@ class SheetDocument(GObject.Object):
                 globals.history.save(state)
 
             self.auto_adjust_selections_by_crud(0, 0, True)
+
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -2457,6 +2570,12 @@ class SheetDocument(GObject.Object):
         # Reset these as they're no longer relevant
         self.current_sorts = []
         self.current_filters = []
+
+    def rechunk_table(self) -> None:
+        # TODO: support multiple dataframes?
+        if not self.data.has_main_dataframe:
+            return
+        self.data.dfs[0] = self.data.dfs[0].rechunk()
 
     def find_in_current_cells(self,
                               text_value:       str,
@@ -2597,6 +2716,9 @@ class SheetDocument(GObject.Object):
             if not globals.is_changing_state:
                 globals.history.save(state)
 
+            # TODO: clear only for the related columns
+            self.data.clear_cell_data_unique_cache(0)
+
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
@@ -2608,12 +2730,12 @@ class SheetDocument(GObject.Object):
         return False
 
     def find_replace_all_in_current_cells(self,
-                                          search_pattern: str,
-                                          replace_with: str,
-                                          match_case: bool,
-                                          match_cell: bool,
+                                          search_pattern:   str,
+                                          replace_with:     str,
+                                          match_case:       bool,
+                                          match_cell:       bool,
                                           within_selection: bool,
-                                          use_regexp: bool) -> None:
+                                          use_regexp:       bool) -> None:
         # Collect hidden column names
         hidden_column_names = []
         for col_index, is_visible in enumerate(self.display.column_visibility_flags):
@@ -2732,6 +2854,9 @@ class SheetDocument(GObject.Object):
                                            .with_columns(**with_columns) \
                                            .drop('$ridx')
 
+        # TODO: clear only for the related columns
+        self.data.clear_cell_data_unique_cache(0)
+
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
@@ -2789,13 +2914,13 @@ class SheetDocument(GObject.Object):
                             width:  int) -> None:
         # Initialize column widths if needed
         if len(self.display.column_widths) == 0:
-            self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * (column - 1), dtype=polars.Int64)
+            self.display.column_widths = polars.Series([self.display.DEFAULT_CELL_WIDTH] * (column - 1), dtype=polars.Int32)
 
         # Expand column widths if needed
         if len(self.display.column_widths) < column:
             offset = column - len(self.display.column_widths)
             self.display.column_widths = polars.concat([self.display.column_widths,
-                                                        polars.Series([self.display.DEFAULT_CELL_WIDTH] * offset)])
+                                                        polars.Series([self.display.DEFAULT_CELL_WIDTH] * offset, dtype=polars.Int32)])
 
         # Save snapshot
         if not globals.is_changing_state:
