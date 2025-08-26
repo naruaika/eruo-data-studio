@@ -3,21 +3,34 @@ import polars
 
 
 def test_to_sentence_case():
-    df = polars.DataFrame(
-        {
-            'input': ['lorem. ipsum! dolor? sit amet.',
-                      'lorem.ipsum!dolor?sit amet.'],
-        }
-    )
-    result = df.with_columns(output=to_sentence_case('input'))
+    df = polars.DataFrame({
+        'input': [
+            'lorem. ipsum! dolor? sit amet.',
+            'lorem.ipsum!dolor?sit amet.',
+            'UPPERCASE',
+            'lowercase',
+            'kebab-case',
+            'snake_case',
+            'camelCase',
+            'PascalCase',
+            'CONSTANT_CASE',
+            'dot.case',
+            'Sentence case',
+        ],
+        'expected': [
+            'Lorem. Ipsum! Dolor? Sit amet.',
+            'Lorem.ipsum!dolor?sit amet.',
+            'Uppercase',
+            'Lowercase',
+            'Kebab-case',
+            'Snake_case',
+            'Camel case',
+            'Pascal case',
+            'Constant_case',
+            'Dot.case',
+            'Sentence case',
+        ],
+    })
+    df = df.with_columns(output=to_sentence_case('input'))
 
-    expected = polars.DataFrame(
-        {
-            'input':  ['lorem. ipsum! dolor? sit amet.',
-                       'lorem.ipsum!dolor?sit amet.'],
-            'output': ['Lorem. Ipsum! Dolor? Sit amet.',
-                       'Lorem.ipsum!dolor?sit amet.'],
-        }
-    )
-
-    assert result['output'].to_list() == expected['output'].to_list()
+    assert df['output'].to_list() == df['expected'].to_list()

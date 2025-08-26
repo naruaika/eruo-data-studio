@@ -106,39 +106,48 @@ fn split_by_chars(inputs: &[Series], kwargs: SplitByCharsKwargs) -> PolarsResult
 fn to_sentence_case(inputs: &[Series]) -> PolarsResult<Series> {
     let ca: &StringChunked = inputs[0].str()?;
     let out: StringChunked = ca.apply_into_string_amortized(|value: &str, output: &mut String| {
-        // Tracks whether the next alphabetic character should be capitalized.
-        let mut should_capitalize = true;
+        let mut capitalize_next = true;
+        let mut last_char_was_lowercase = false;
+        let mut last_char_was_sentence_ender = false;
 
-        // Looks ahead for spaces after a punctuation mark.
-        let mut chars = value.chars().peekable();
-
-        while let Some(c) = chars.next() {
-            // Capitalize the current non-whitespace character.
-            if should_capitalize && c.is_alphabetic() {
-                output.extend(c.to_uppercase());
-                should_capitalize = false;
-            } else {
-                output.push(c);
-            }
-
-            // Check if we just encountered a punctuation mark.
-            if ".!?".contains(c) {
-                // Peek at the next character to see if it's a space.
-                if let Some(&next_char) = chars.peek() {
-                    if next_char.is_whitespace() {
-                        // If it's a space, consume all following whitespace characters.
-                        while let Some(&next_c) = chars.peek() {
-                            if next_c.is_whitespace() {
-                                output.push(next_c);
-                                chars.next(); // Consume the space
-                            } else {
-                                break;
-                            }
-                        }
-                        // Capitalize the next non-whitespace character.
-                        should_capitalize = true;
-                    }
+        for c in value.chars() {
+            if c.is_alphabetic() {
+                // Insert a space if the last character was lowercase and the current is uppercase.
+                let should_insert_space = last_char_was_lowercase && c.is_uppercase();
+                if should_insert_space {
+                    output.push(' ');
                 }
+
+                // Apply capitalization rules
+                if capitalize_next {
+                    output.extend(c.to_uppercase());
+                } else {
+                    output.extend(c.to_lowercase());
+                }
+
+                // Update state variables for the next iteration.
+                capitalize_next = false;
+                last_char_was_lowercase = c.is_lowercase();
+                last_char_was_sentence_ender = false;
+            }
+            // It's a non-alphabetic character.
+            else {
+                output.push(c);
+
+                if c == '.' || c == '!' || c == '?' {
+                    last_char_was_sentence_ender = true;
+                }
+                // Capitalize the next letter if the last character was a sentence ender and this is a space.
+                else if c.is_whitespace() && last_char_was_sentence_ender {
+                    capitalize_next = true;
+                    last_char_was_sentence_ender = false;
+                }
+                // For other characters like hyphens or underscores, do not capitalize the next letter.
+                else {
+                    capitalize_next = false;
+                    last_char_was_sentence_ender = false;
+                }
+                last_char_was_lowercase = false;
             }
         }
     });
