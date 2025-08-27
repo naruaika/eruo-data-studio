@@ -171,22 +171,24 @@ class SheetDocument(GObject.Object):
         globals.is_changing_state = False
 
         # Initialize the undo stack
-        self.history.setup()
+        self.history.setup_history()
 
     #
     # Event handlers
     #
 
     def on_sheet_view_scrolled(self, source: GObject.Object) -> None:
+        if self.is_refreshing_uis:
+            return
+
         vscrollbar = self.view.vertical_scrollbar
         hscrollbar = self.view.horizontal_scrollbar
 
         vadjustment = vscrollbar.get_adjustment()
         hadjustment = hscrollbar.get_adjustment()
 
-        self.display.scroll_y_position = vadjustment.get_value()
-        self.display.scroll_x_position = hadjustment.get_value()
-        self.display.discretize_scroll_position()
+        self.display.scroll_y_position = int(vadjustment.get_value())
+        self.display.scroll_x_position = int(hadjustment.get_value())
 
         self.auto_adjust_scrollbars_by_scroll()
         self.auto_adjust_locators_size_by_scroll()
@@ -844,6 +846,11 @@ class SheetDocument(GObject.Object):
                                                                           operation_args,
                                                                           self.display.column_visible_series,
                                                                           self.display.row_visible_series)
+
+    def replace_table_from_operator(self,
+                                    operator_name:  str,
+                                    operation_args: list = []) -> None:
+        pass
 
     def insert_from_current_rows(self,
                                  dataframe: polars.DataFrame,
@@ -2229,7 +2236,9 @@ class SheetDocument(GObject.Object):
 
         self.emit('columns-changed', arange.metadata.dfi)
 
-    def filter_current_rows(self, multiple: bool = False) -> None:
+    def filter_current_rows(self,
+                            multiple: bool = False,
+                            inverse:  bool = False) -> None:
         active = self.selection.current_active_cell
 
         metadata = active.metadata
@@ -2239,7 +2248,7 @@ class SheetDocument(GObject.Object):
         if mdfi < 0 or len(self.data.dfs) <= mdfi:
             return False
 
-        # Build pending filters for single value filter
+        # Build pending filters from a single value
         if not multiple:
             column_name = self.data.dfs[mdfi].columns[mcolumn]
             column_index = self.data.dfs[mdfi].columns.index(column_name)
@@ -2247,6 +2256,11 @@ class SheetDocument(GObject.Object):
 
             cell_value = self.data.read_single_cell_data_from_metadata(mcolumn, metadata.row, mdfi)
 
+            operator = '=' if not inverse else '!='
+            expression = polars.col(column_name).eq(cell_value)
+            expression = expression.not_() if inverse else expression
+
+            # TODO: create a new class?
             self.pending_filters = [{
                 'qhash': hash((column_name, 'single')),
                 'qtype': 'primitive',
@@ -2257,11 +2271,11 @@ class SheetDocument(GObject.Object):
                         'findex': column_index,
                         'fdtype': column_dtype,
                         'field': column_name,
-                        'operator': '=',
+                        'operator': operator,
                         'value': cell_value,
                     }],
                 },
-                'expression': polars.col(column_name).eq(cell_value),
+                'expression': expression,
             }]
 
         # Save snapshot
@@ -2306,10 +2320,7 @@ class SheetDocument(GObject.Object):
         # Update row visibility flags
         self.display.row_visibility_flags = self.data.filter_rows_from_metadata(self.current_filters, mdfi)
         self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
-        if len(self.display.row_visible_series):
-            self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
-        else:
-            self.data.bbs[mdfi].row_span = self.data.dfs[mdfi].height + 1
+        self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
 
         # Update row heights
         if len(self.display.row_heights):
@@ -2320,16 +2331,18 @@ class SheetDocument(GObject.Object):
         self.auto_adjust_locators_size_by_scroll()
         self.auto_adjust_selections_by_crud(0, 0, True)
         self.repopulate_auto_filter_widgets()
-        self.renderer.render_caches = {}
-        self.view.main_canvas.queue_draw()
+
+        active = self.selection.current_active_cell
+        mdfi = active.metadata.dfi
 
         # Automatically adjust when the cursor is outside the current dataframe bounding box
-        active = self.selection.current_active_cell
-        if active.metadata.dfi < 0:
-            vrow = self.display.row_visible_series[-1]
-            vcolumn = self.display.get_vcolumn_from_column(active.column)
-            cell_name = self.display.get_cell_name_from_position(vcolumn, vrow)
+        if mdfi < 0:
+            row = self.display.row_visible_series[-1] + 1
+            cell_name = self.display.get_cell_name_from_position(active.column, row)
             self.update_selection_from_name(cell_name)
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
 
         if not self.is_refreshing_uis:
             self.emit('filters-changed', mdfi)
@@ -2543,12 +2556,17 @@ class SheetDocument(GObject.Object):
         for col_index, is_visible in enumerate(self.display.column_visibility_flags):
             if is_visible:
                 visible_column_names.append(self.data.dfs[0].columns[col_index])
+        if len(self.display.column_visibility_flags) == 0:
+            visible_column_names = self.data.dfs[0].columns
+
+        # Discard all dataframes
+        if len(visible_column_names) == 0:
+            self.data.bbs = []
+            self.data.dfs = []
+            return
 
         # Discards all dataframes but the main one
         self.data.materialize_view(self.current_filters, visible_column_names)
-
-        self.auto_adjust_selections_by_crud(0, 0, False)
-        self.repopulate_auto_filter_widgets()
 
         # Update column widths and visibility flags
         if len(self.display.column_visibility_flags):
@@ -2563,6 +2581,9 @@ class SheetDocument(GObject.Object):
                 self.display.row_heights = self.display.row_heights.filter(self.display.row_visibility_flags)
             self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
             self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_auto_filter_widgets()
 
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
@@ -2584,20 +2605,20 @@ class SheetDocument(GObject.Object):
                               within_selection: bool,
                               use_regexp:       bool) -> int:
         # Prepare the search expression
-        filter_expression = polars.all().str.contains_any([text_value], ascii_case_insensitive=not match_case)
+        filter_expression = polars.col(polars.String).str.contains_any([text_value], ascii_case_insensitive=not match_case)
         if match_cell:
-            filter_expression = polars.all().str.to_lowercase() == text_value.lower()
+            filter_expression = polars.col(polars.String).str.to_lowercase() == text_value.lower()
             if match_case:
-                filter_expression = polars.all().str == text_value
+                filter_expression = polars.col(polars.String).str == text_value
         if use_regexp:
             filter_expression = polars.col(polars.String).str.contains(f'(?i){text_value}')
             if match_case:
                 filter_expression = polars.col(polars.String).str.contains(text_value)
 
         if text_value in ['', None]:
-            filter_expression = polars.all().is_null()
+            filter_expression = polars.col(polars.String).is_null()
         else:
-            filter_expression &= polars.all().is_not_null()
+            filter_expression &= polars.col(polars.String).is_not_null()
 
         # Collect hidden column names
         hidden_column_names = []
@@ -3316,11 +3337,13 @@ class SheetDocument(GObject.Object):
             if len(self.display.cumulative_column_widths):
                 content_width = self.display.cumulative_column_widths[-1] + self.display.DEFAULT_CELL_WIDTH * 1
 
-        scroll_y_upper = max(content_height + self.display.top_locator_height, self.display.scroll_y_position + canvas_height)
+        scroll_y_upper = max(content_height + self.display.top_locator_height,
+                             self.display.scroll_y_position + canvas_height)
         self.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y_upper)
         self.view.vertical_scrollbar.get_adjustment().set_page_size(canvas_height)
 
-        scroll_x_upper = max(content_width + self.display.left_locator_width, self.display.scroll_x_position + canvas_width)
+        scroll_x_upper = max(content_width + self.display.left_locator_width,
+                             self.display.scroll_x_position + canvas_width)
         self.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x_upper)
         self.view.horizontal_scrollbar.get_adjustment().set_page_size(canvas_width)
 
@@ -3372,13 +3395,12 @@ class SheetDocument(GObject.Object):
                                             smooth_scroll: bool = False) -> None:
         column = self.selection.current_cursor_cell.column
         row = self.selection.current_cursor_cell.row
+
         viewport_height = self.view.main_canvas.get_height() - self.display.top_locator_height
         viewport_width = self.view.main_canvas.get_width() - self.display.left_locator_width
 
         # TODO: implement smooth scrolling so that the cursor doesn't jump infinitely
         # when the cursor near the edge of the viewport
-        if smooth_scroll:
-            pass
 
         self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis, with_offset)
 
@@ -3387,20 +3409,14 @@ class SheetDocument(GObject.Object):
             row = self.selection.current_active_cell.row
             self.display.scroll_to_position(column, row, viewport_height, viewport_width, scroll_axis, with_offset)
 
-        self.display.discretize_scroll_position()
         self.auto_adjust_scrollbars_by_scroll()
 
-        vertical_adjustment = self.view.vertical_scrollbar.get_adjustment()
-        horizontal_adjustment = self.view.horizontal_scrollbar.get_adjustment()
+        self.is_refreshing_uis = True
 
-        vertical_adjustment.handler_block_by_func(self.on_sheet_view_scrolled)
-        horizontal_adjustment.handler_block_by_func(self.on_sheet_view_scrolled)
+        self.view.vertical_scrollbar.get_adjustment().set_value(self.display.scroll_y_position)
+        self.view.horizontal_scrollbar.get_adjustment().set_value(self.display.scroll_x_position)
 
-        vertical_adjustment.set_value(self.display.scroll_y_position)
-        horizontal_adjustment.set_value(self.display.scroll_x_position)
-
-        vertical_adjustment.handler_unblock_by_func(self.on_sheet_view_scrolled)
-        horizontal_adjustment.handler_unblock_by_func(self.on_sheet_view_scrolled)
+        self.is_refreshing_uis = False
 
     def auto_adjust_selections_by_crud(self,
                                        column_offset: int,

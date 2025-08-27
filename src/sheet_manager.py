@@ -23,10 +23,12 @@
 
 from gi.repository import GObject
 from typing import Any
+import copy
 import polars
 import re
 
 from . import utils
+from .sheet_data import SheetCellBoundingBox
 from .sheet_document import SheetDocument
 from .sheet_notebook import SheetNotebook
 from .sheet_view import SheetView
@@ -89,10 +91,10 @@ class SheetManager(GObject.Object):
         self.sheet_counter += 1
 
         if isinstance(target_sheet, SheetNotebook):
-            new_sheet = SheetNotebook(self, document_id, title)
+            document = SheetNotebook(self, document_id, title)
 
-            new_sheet.is_searching_cells     = target_sheet.is_searching_cells
-            new_sheet.search_range_performer = target_sheet.search_range_performer
+            document.is_searching_cells = target_sheet.is_searching_cells
+            document.search_range_performer = target_sheet.search_range_performer
 
             for list_item in target_sheet.view.list_items:
                 source_view = list_item['source_view']
@@ -102,53 +104,58 @@ class SheetManager(GObject.Object):
                 end_iter = text_buffer.get_end_iter()
                 query = text_buffer.get_text(start_iter, end_iter, True)
 
-                new_sheet.view.add_new_sql_cell(query)
+                document.view.add_new_sql_cell(query)
 
         if isinstance(target_sheet, SheetDocument):
             dataframe = target_sheet.data.dfs[0]
             configs = target_sheet.configs
 
-            new_sheet = SheetDocument(self, document_id, title, dataframe, configs)
+            document = SheetDocument(self, document_id, title, dataframe, configs)
 
-            new_sheet.is_searching_cells               = target_sheet.is_searching_cells
-            new_sheet.search_range_performer           = target_sheet.search_range_performer
-            new_sheet.current_dfi                      = target_sheet.current_dfi
-            new_sheet.current_sorts                    = target_sheet.current_sorts
-            new_sheet.current_filters                  = target_sheet.current_filters
+            document.is_searching_cells               = target_sheet.is_searching_cells
+            document.search_range_performer           = target_sheet.search_range_performer
+            document.current_dfi                      = target_sheet.current_dfi
+            document.current_sorts                    = copy.deepcopy(target_sheet.current_sorts)
+            document.current_filters                  = copy.deepcopy(target_sheet.current_filters)
 
-            new_sheet.data.bbs                         = target_sheet.data.bbs
-            new_sheet.data.dfs                         = target_sheet.data.dfs
-            new_sheet.data.has_main_dataframe          = target_sheet.data.has_main_dataframe
+            for bbox in target_sheet.data.bbs:
+                new_bbox                              = SheetCellBoundingBox(bbox.column,      bbox.row,
+                                                                             bbox.column_span, bbox.row_span)
+                document.data.bbs.append(new_bbox)
 
-            new_sheet.renderer.render_caches           = target_sheet.renderer.render_caches
+            document.data.dfs                         = copy.deepcopy(target_sheet.data.dfs)
+            document.data.has_main_dataframe          = target_sheet.data.has_main_dataframe
 
-            new_sheet.display.left_locator_width       = target_sheet.display.left_locator_width
-            new_sheet.display.top_locator_height       = target_sheet.display.top_locator_height
-            new_sheet.display.scroll_increment         = target_sheet.display.scroll_increment
-            new_sheet.display.page_increment           = target_sheet.display.page_increment
-            new_sheet.display.scroll_y_position        = target_sheet.display.scroll_y_position
-            new_sheet.display.scroll_x_position        = target_sheet.display.scroll_x_position
-            new_sheet.display.row_visibility_flags     = target_sheet.display.row_visibility_flags
-            new_sheet.display.column_visibility_flags  = target_sheet.display.column_visibility_flags
-            new_sheet.display.row_visible_series       = target_sheet.display.row_visible_series
-            new_sheet.display.column_visible_series    = target_sheet.display.column_visible_series
-            new_sheet.display.row_heights              = target_sheet.display.row_heights
-            new_sheet.display.column_widths            = target_sheet.display.column_widths
-            new_sheet.display.cumulative_row_heights   = target_sheet.display.cumulative_row_heights
-            new_sheet.display.cumulative_column_widths = target_sheet.display.cumulative_column_widths
+            document.renderer.render_caches           = target_sheet.renderer.render_caches
 
-            new_sheet.selection.cell_name              = target_sheet.selection.cell_name
-            new_sheet.selection.cell_data              = target_sheet.selection.cell_data
-            new_sheet.selection.cell_dtype             = target_sheet.selection.cell_dtype
-            new_sheet.selection.current_active_range   = target_sheet.selection.current_active_range
-            new_sheet.selection.current_active_cell    = target_sheet.selection.current_active_cell
-            new_sheet.selection.current_cursor_cell    = target_sheet.selection.current_cursor_cell
-            new_sheet.selection.current_search_range   = target_sheet.selection.current_search_range
+            document.display.left_locator_width       = target_sheet.display.left_locator_width
+            document.display.top_locator_height       = target_sheet.display.top_locator_height
+            document.display.scroll_increment         = target_sheet.display.scroll_increment
+            document.display.page_increment           = target_sheet.display.page_increment
+            document.display.scroll_y_position        = target_sheet.display.scroll_y_position
+            document.display.scroll_x_position        = target_sheet.display.scroll_x_position
+            document.display.row_visibility_flags     = target_sheet.display.row_visibility_flags
+            document.display.column_visibility_flags  = target_sheet.display.column_visibility_flags
+            document.display.row_visible_series       = target_sheet.display.row_visible_series
+            document.display.column_visible_series    = target_sheet.display.column_visible_series
+            document.display.row_heights              = target_sheet.display.row_heights
+            document.display.column_widths            = target_sheet.display.column_widths
+            document.display.cumulative_row_heights   = target_sheet.display.cumulative_row_heights
+            document.display.cumulative_column_widths = target_sheet.display.cumulative_column_widths
 
-            new_sheet.setup_document()
+            document.selection.cell_name              = target_sheet.selection.cell_name
+            document.selection.cell_data              = target_sheet.selection.cell_data
+            document.selection.cell_dtype             = target_sheet.selection.cell_dtype
+            document.selection.current_active_range   = target_sheet.selection.current_active_range
+            document.selection.current_active_cell    = target_sheet.selection.current_active_cell
+            document.selection.current_cursor_cell    = target_sheet.selection.current_cursor_cell
+            document.selection.current_search_range   = target_sheet.selection.current_search_range
 
-        self.sheets[document_id] = new_sheet
-        return new_sheet.view
+            document.setup_document()
+
+        self.sheets[document_id] = document
+
+        return document.view
 
     def delete_sheet(self, sheet_view: SheetView) -> None:
         self.sheets.pop(sheet_view.document.document_id, None)

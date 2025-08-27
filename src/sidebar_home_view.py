@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, GtkSource, Pango
 from datetime import datetime, timedelta
 import os
 import polars
@@ -1041,17 +1041,17 @@ class SidebarHomeView(Adw.Bin):
         self.apply_pending_sort()
 
     def apply_pending_sort(self) -> None:
-        document = self.window.get_current_active_document()
+        sheet_document = self.window.get_current_active_document()
 
-        document.pending_sorts = {}
+        sheet_document.pending_sorts = {}
         for sort_item in self.sort_list_store:
             descending = sort_item.order == 'Descending'
-            document.pending_sorts[sort_item.cname] = {'cindex': sort_item.cindex,
+            sheet_document.pending_sorts[sort_item.cname] = {'cindex': sort_item.cindex,
                                                        'descending': descending}
 
-        document.is_refreshing_uis = True
-        document.sort_current_rows(multiple=True)
-        document.is_refreshing_uis = False
+        sheet_document.is_refreshing_uis = True
+        sheet_document.sort_current_rows(multiple=True)
+        sheet_document.is_refreshing_uis = False
 
     def repopulate_sort_list(self, dfi: int = 0) -> None:
         self.sort_list_store.remove_all()
@@ -1157,7 +1157,7 @@ class SidebarHomeView(Adw.Bin):
         item_data = list_item.get_item()
 
         if item_data.qtype == 'primitive':
-            text_view = self.create_general_text_view(item_data.query)
+            text_view = self.create_source_view(item_data.query)
             text_view.add_css_class('dimmed')
             text_view.set_editable(False)
             list_item.container.append(text_view)
@@ -1199,7 +1199,7 @@ class SidebarHomeView(Adw.Bin):
 
                         # Custom input
                         elif row_item == '$custom':
-                            text_view = self.create_general_text_view(item_data.query)
+                            text_view = self.create_source_view(item_data.query)
                             text_view.get_buffer().bind_property('text', item_data,
                                                                  'query', GObject.BindingFlags.DEFAULT)
                             box.append(text_view)
@@ -1218,7 +1218,7 @@ class SidebarHomeView(Adw.Bin):
 
             # Fallback for unsupported queries
             else:
-                text_view = self.create_general_text_view(item_data.query)
+                text_view = self.create_source_view(item_data.query)
                 list_item.container.append(text_view)
 
         def on_delete_filter_button_clicked(button: Gtk.Button) -> None:
@@ -1336,8 +1336,8 @@ class SidebarHomeView(Adw.Bin):
         item = self.filter_list_store.get_item(position)
 
         # TODO: support multiple dataframes?
-        document = self.window.get_current_active_document()
-        dtypes = document.data.dfs[0].dtypes
+        sheet_document = self.window.get_current_active_document()
+        dtypes = sheet_document.data.dfs[0].dtypes
 
         qtype = item.qtype
         query = '' # to always reset
@@ -1425,15 +1425,15 @@ class SidebarHomeView(Adw.Bin):
 
     def apply_pending_filter(self) -> None:
         # TODO: support multiple dataframes?
-        document = self.window.get_current_active_document()
-        dtypes = document.data.dfs[0].dtypes
+        sheet_document = self.window.get_current_active_document()
+        dtypes = sheet_document.data.dfs[0].dtypes
 
-        if len(document.current_filters) == 0 \
+        if len(sheet_document.current_filters) == 0 \
                 and self.filter_list_store.get_n_items() == 0:
             return # skip to prevent from saving new history item
 
-        document.current_filters = []
-        document.pending_filters = []
+        sheet_document.current_filters = []
+        sheet_document.pending_filters = []
 
         for filter_item in self.filter_list_store:
             qtype = filter_item.qtype
@@ -1457,29 +1457,31 @@ class SidebarHomeView(Adw.Bin):
             except Exception:
                 continue # skip invalid filters, FIXME: show a warning to user
 
+            query_builder = {
+                'operator': 'and',
+                'conditions': [{
+                    'findex': findex,
+                    'fdtype': fdtype,
+                    'field': field,
+                    'operator': operator,
+                    'value': value,
+                }],
+            }
+
             # TODO: add support for OR operator?
             metadata = {
                 'qhash': None,
                 'qtype': qtype,
                 'operator': 'and',
-                'query-builder': {
-                    'operator': 'and',
-                    'conditions': [{
-                        'findex': findex,
-                        'fdtype': fdtype,
-                        'field': field,
-                        'operator': operator,
-                        'value': value,
-                    }],
-                },
+                'query-builder': query_builder,
                 'expression': expression,
             }
 
-            document.pending_filters.append(metadata)
+            sheet_document.pending_filters.append(metadata)
 
-        document.is_refreshing_uis = True
-        document.filter_current_rows(multiple=True)
-        document.is_refreshing_uis = False
+        sheet_document.is_refreshing_uis = True
+        sheet_document.filter_current_rows(multiple=True)
+        sheet_document.is_refreshing_uis = False
 
     #
     # Helpers
@@ -1720,19 +1722,22 @@ class SidebarHomeView(Adw.Bin):
 
         return basic_filter_dropdown
 
-    def create_general_text_view(self, text: str = '') -> Gtk.TextView:
-        text_view = Gtk.TextView()
-        text_view.set_hexpand(True)
-        text_view.set_vexpand(False)
-        text_view.set_size_request(-1, 68)
+    def create_source_view(self, text: str = '') -> Gtk.TextView:
+        source_buffer = GtkSource.Buffer()
+        source_buffer.set_highlight_syntax(True)
 
-        buffer = Gtk.TextBuffer()
-        buffer.set_text(text)
-        text_view.set_buffer(buffer)
+        source_view = GtkSource.View.new_with_buffer(source_buffer)
+        source_view.add_css_class('sidebar-source-view')
+        source_view.set_hexpand(True)
+        source_view.set_vexpand(False)
+        source_view.set_monospace(True)
+        source_view.set_tab_width(4)
+        source_view.set_size_request(-1, 66)
+        source_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
 
-        text_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        GLib.timeout_add(50, source_buffer.set_text, text)
 
-        return text_view
+        return source_view
 
     def create_delete_button(self) -> Gtk.Button:
         delete_button = Gtk.Button()

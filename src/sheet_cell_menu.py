@@ -216,9 +216,9 @@ class SheetCellMenu(Gtk.PopoverMenu):
         main_menu.append_section(None, filter_sort_section)
 
         filter_menu = Gio.Menu.new()
-        filter_menu.append(_('By Cell _Value'), 'app.filter-cell-value')
-        filter_menu.append(_('By Cell _Color'), 'app.filter-cell-color')
-        filter_menu.append(_('By _Font Color'), 'app.filter-font-color')
+        filter_menu.append(_('By Cell _Value'), 'app.filter-by-cell-value')
+        filter_menu.append(_('By Cell _Color'), 'app.filter-by-cell-color')
+        filter_menu.append(_('By _Font Color'), 'app.filter-by-font-color')
 
         filter_menu_item = Gio.MenuItem.new(_('_Filter'), None)
         filter_menu_item.set_submenu(filter_menu)

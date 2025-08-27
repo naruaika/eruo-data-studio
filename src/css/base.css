@@ -149,6 +149,9 @@ popover listview row {
 .sidebar-list-view-box > row button {
     font-weight: normal;
 }
+.sidebar-list-view-box popover listview {
+    padding: 4px;
+}
 .sidebar-list-view-box popover row {
     padding: 4px 8px;
     border-radius: 12px;
@@ -174,9 +177,11 @@ popover listview row {
     padding: 0 8px;
 }
 .sidebar-expander-row textview {
-    padding: 5px 8px;
-    font-feature-settings: "tnum" 1;
-    border-radius: 10px;
+    padding: 5px;
+    border-radius: 8px;
+}
+.sidebar-expander-row textview text  {
+    background: transparent;
 }
 
 .sidebar-list-item-badge {

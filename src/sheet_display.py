@@ -350,7 +350,7 @@ class SheetDisplay(GObject.Object):
         vcolumn = self.get_vcolumn_from_column(column)
         if vcolumn == 0:
             return self.left_locator_width
-        if vcolumn <= len(self.column_widths):
+        if 0 < vcolumn <= len(self.column_widths):
             return self.column_widths[vcolumn - 1]
         return self.DEFAULT_CELL_WIDTH
 
@@ -359,7 +359,7 @@ class SheetDisplay(GObject.Object):
         vrow = self.get_vrow_from_row(row)
         if vrow == 0:
             return self.top_locator_height
-        if vrow <= len(self.row_heights):
+        if 0 < vrow <= len(self.row_heights):
             return self.row_heights[vrow - 1]
         return self.DEFAULT_CELL_HEIGHT
 
@@ -640,10 +640,10 @@ class SheetDisplay(GObject.Object):
             return (*start_pos, *start_pos)
 
     def check_cell_position_near_edges(self,
-                                       column: int,
-                                       row: int,
+                                       column:          int,
+                                       row:             int,
                                        viewport_height: int,
-                                       viewport_width: int) -> list[str]:
+                                       viewport_width:  int) -> list[str]:
         cell_y = self.get_cell_y_from_row(row)
         cell_x = self.get_cell_x_from_column(column)
         cell_width = self.get_cell_width_from_column(column)
@@ -679,13 +679,13 @@ class SheetDisplay(GObject.Object):
         return near_edges
 
     def scroll_to_position(self,
-                           column: int,
-                           row: int,
+                           column:          int,
+                           row:             int,
                            viewport_height: int,
-                           viewport_width: int,
-                           scroll_axis: str = 'both',
-                           with_offset: bool = False,
-                           offset_size: int = 0) -> bool:
+                           viewport_width:  int,
+                           scroll_axis:     str = 'both',
+                           with_offset:     bool = False,
+                           offset_size:     int = 0) -> bool:
         cell_y = self.get_cell_y_from_row(row)
         cell_x = self.get_cell_x_from_column(column)
         cell_width = self.get_cell_width_from_column(column)
@@ -731,18 +731,4 @@ class SheetDisplay(GObject.Object):
         self.scroll_y_position = max(0, self.scroll_y_position)
         self.scroll_x_position = max(0, self.scroll_x_position)
 
-        if with_offset:
-            self.discretize_scroll_position()
-
         return True
-
-    def discretize_scroll_position(self) -> None:
-        self.scroll_y_position = round(self.scroll_y_position / self.DEFAULT_CELL_HEIGHT) * self.DEFAULT_CELL_HEIGHT
-        self.scroll_x_position = round(self.scroll_x_position / self.DEFAULT_CELL_WIDTH) * self.DEFAULT_CELL_WIDTH
-
-
-def run_tests() -> None:
-    pass
-
-if __name__ == '__main__':
-    run_tests()

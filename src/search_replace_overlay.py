@@ -262,8 +262,8 @@ class SearchReplaceOverlay(Adw.Bin):
         self.search_entry.get_first_child().set_focus_on_click(True)
         self.search_entry.get_first_child().grab_focus()
 
-        document = self.window.get_current_active_document()
-        document.is_searching_cells = True
+        sheet_document = self.window.get_current_active_document()
+        sheet_document.is_searching_cells = True
 
         self.search_entry.grab_focus()
 
@@ -485,7 +485,6 @@ class SearchReplaceOverlay(Adw.Bin):
             if 'bottom' in sheet_document.display.check_cell_position_near_edges(column, row, viewport_height, viewport_width):
                 offset_size = self.get_height() + self.get_margin_bottom() + sheet_document.display.DEFAULT_CELL_HEIGHT
                 sheet_document.display.scroll_y_position += offset_size
-                sheet_document.display.discretize_scroll_position()
                 cname = sheet_document.display.get_cell_name_from_position(col_index, row_index)
                 sheet_document.update_selection_from_name(cname)
 

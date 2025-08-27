@@ -20,7 +20,7 @@
     <section>
       <item>
         <attribute name="label" translatable="yes">Apply Filter</attribute>
-        <attribute name="action">app.filter-cell-values</attribute>
+        <attribute name="action">app.filter-by-unique-values</attribute>
       </item>
       <item>
         <attribute name="label" translatable="yes">Custom Filter...</attribute>

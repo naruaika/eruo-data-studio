@@ -314,9 +314,11 @@ class SheetRenderer(GObject.Object):
 
         layout.set_font_description(header_font_desc)
 
+        context.save()
+        context.rectangle(0, display.top_locator_height, width, height)
+        context.clip()
+
         # Draw row headers texts (right-aligned)
-        # Here we don't necessarily need the clip region because the row headers are usually if not always
-        # readjusted before even moving to the rendering process.
         row_index = display.get_starting_row()
         y = display.get_cell_y_from_row(row_index)
 
@@ -361,13 +363,13 @@ class SheetRenderer(GObject.Object):
         # Create the cache if it doesn't exist
         if 'content' not in self.render_caches:
             self.render_caches['content'] = {
-                'surface': cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height),
-                'width': width,
-                'height': height,
-                'x_pos': display.scroll_x_position,
-                'y_pos': display.scroll_y_position,
-                'x_trans': 0,
-                'y_trans': 0,
+                'surface' : cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height),
+                'width'   : width,
+                'height'  : height,
+                'x_pos'   : display.scroll_x_position,
+                'y_pos'   : display.scroll_y_position,
+                'x_trans' : 0,
+                'y_trans' : 0,
             }
             use_cache = False
 
@@ -401,7 +403,7 @@ class SheetRenderer(GObject.Object):
                     ncontext.rectangle(x_start, y_start, cwidth, y_end)
 
                 # When the user scrolls the canvas to the left
-                elif x_offset < 0:
+                if x_offset < 0:
                     nx_end = display.get_cell_x_from_point(x_start - x_offset)
                     cwidth = display.get_cell_width_from_point(x_start - x_offset)
                     ncontext.rectangle(nx_end + cwidth, y_start, x_end, y_end)
@@ -413,8 +415,8 @@ class SheetRenderer(GObject.Object):
                     ncontext.rectangle(x_start, y_start, x_end, cheight)
 
                 # When the user scrolls the canvas up
-                elif y_offset < 0:
-                    ny_end = display.get_cell_y_from_point(y_start - y_offset, -1)
+                if y_offset < 0:
+                    ny_end = display.get_cell_y_from_point(y_start - y_offset)
                     cheight = display.get_cell_height_from_point(y_start - y_offset)
                     ncontext.rectangle(x_start, ny_end + cheight, x_end, y_end)
 
@@ -426,6 +428,11 @@ class SheetRenderer(GObject.Object):
                     col_index = display.get_starting_column()
                     x = display.get_cell_x_from_column(col_index)
                     nx_start = x
+
+                if not (y_offset > 0):
+                    row_index = display.get_starting_row()
+                    y = display.get_cell_y_from_row(row_index)
+                    ny_start = y
 
                 ncontext.translate(rcache['x_trans'], rcache['y_trans'])
                 ncontext.clip()
@@ -453,6 +460,7 @@ class SheetRenderer(GObject.Object):
         body_font_desc = Pango.font_description_from_string(f'{font_family} Normal Regular {display.FONT_SIZE}px #tnum=1')
 
         layout = PangoCairo.create_layout(ccontext)
+        layout.set_wrap(Pango.WrapMode.NONE)
 
         ccontext.save()
         ccontext.rectangle(x_start, y_start, x_end, y_end)
@@ -473,11 +481,13 @@ class SheetRenderer(GObject.Object):
         # TODO: support multiple dataframes?
         while x < x_end:
             if data.bbs[0].column_span < col_index:
-                width = x # prevent iteration over empty cells
+                width = x # prevent iteration over out of bounds cells
                 break
 
             vcol_index = display.get_vcolumn_from_column(col_index)
             cell_width = display.get_cell_width_from_column(col_index)
+
+            layout.set_font_description(body_font_desc)
 
             ccontext.save()
             ccontext.rectangle(x, display.top_locator_height, cell_width - 1, height)
@@ -485,6 +495,18 @@ class SheetRenderer(GObject.Object):
 
             row_index = display.get_starting_row()
             y = display.get_cell_y_from_row(row_index)
+
+            if not use_cache:
+                ny_start = y
+
+            col_dtype = data.dfs[0].dtypes[vcol_index - 1]
+
+            is_series = col_dtype == polars.Series
+            is_numeric = col_dtype.is_numeric()
+            is_temporal = col_dtype.is_temporal()
+
+            alignment_width = cell_width - (2 * display.DEFAULT_CELL_PADDING)
+            layout.set_width(alignment_width * Pango.SCALE)
 
             while y < y_end:
                 vrow_index = display.get_vrow_from_row(row_index)
@@ -500,28 +522,27 @@ class SheetRenderer(GObject.Object):
 
                 if data.bbs[0].row_span < row_index:
                     height = y
-                    break # prevent iteration over empty cells
+                    break # prevent iteration over out of bounds cells
 
                 x_text = x + display.DEFAULT_CELL_PADDING
 
                 # Draw dataframe header
                 if vrow_index == 1:
+                    layout.set_alignment(Pango.Alignment.LEFT)
                     layout.set_font_description(header_font_desc)
                     cname = data.dfs[0].columns[vcol_index - 1]
                     cname = cname.split('\n', 1)[0]
-                    dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
+                    dtype = utils.get_dtype_symbol(col_dtype)
                     cell_text = f'{cname} [{dtype}]'
                     layout.set_text(cell_text, -1)
 
                 # Draw dataframe content
                 else:
-                    layout.set_font_description(body_font_desc)
                     cell_text = data.dfs[0][vrow_index - 2, vcol_index - 1]
-                    col_dtype = data.dfs[0].dtypes[vcol_index - 1]
 
                     # We don't natively support object types, but in any case the user has perfomed
                     # an operation that returned an object, we want to show it properly in minimal.
-                    if isinstance(cell_text, polars.Series):
+                    if is_series:
                         cell_text = str(cell_text.to_list())
 
                     if cell_text in ['', None]:
@@ -532,13 +553,13 @@ class SheetRenderer(GObject.Object):
                     cell_text = str(cell_text)
 
                     # Right-align numeric and temporal values
-                    if col_dtype.is_numeric() or col_dtype.is_temporal():
+                    if is_numeric or is_temporal:
+                        layout.set_alignment(Pango.Alignment.RIGHT)
                         layout.set_text(cell_text, -1)
-                        text_width = layout.get_size()[0] / Pango.SCALE
-                        x_text = x + cell_width - text_width - display.DEFAULT_CELL_PADDING
 
                     # Otherwise keep it left-aligned
                     else:
+                        layout.set_alignment(Pango.Alignment.LEFT)
                         # Truncate before the first line break to prevent overflow
                         cell_text = cell_text.split('\n', 1)[0]
                         # Truncate the contents for performance reasons
@@ -547,6 +568,9 @@ class SheetRenderer(GObject.Object):
 
                 ccontext.move_to(x_text, y + 2)
                 PangoCairo.show_layout(ccontext, layout)
+
+                if vrow_index == 1:
+                    layout.set_font_description(body_font_desc)
 
                 y += cell_height
                 row_index += 1

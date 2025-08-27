@@ -1246,7 +1246,9 @@ class HistoryManager(GObject.Object):
         from .file_manager import FileManager
         self.file_manager = FileManager()
 
-    def setup(self) -> None:
+    def setup_history(self) -> None:
+        self.undo_stack.clear()
+
         # We need to save the current state at the beginning
         state = SelectionState(1, 1, 1, 1, True, True, True)
         self.undo_stack.append(state)

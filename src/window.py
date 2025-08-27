@@ -1020,13 +1020,28 @@ class Window(Adw.ApplicationWindow):
 
     def duplicate_sheet(self,
                         document_id: str,
-                        materialize: bool = False) -> None:
+                        materialize: bool = False,
+                        filter_by:   dict = {}) -> None:
         sheet_view = self.sheet_manager.duplicate_sheet(document_id)
 
         sheet_document = sheet_view.document
-        if isinstance(sheet_document, SheetDocument) \
-                and materialize:
-            sheet_document.materialize_view()
+
+        if isinstance(sheet_document, SheetDocument):
+            match filter_by.get('operator-name'):
+                case 'current-selection':
+                    sheet_document.filter_current_rows()
+                case 'inverse-selection':
+                    sheet_document.filter_current_rows(inverse=True)
+                case 'query-builder':
+                    sheet_document.pending_filters = filter_by['operator-args']
+                    sheet_document.filter_current_rows(multiple=True)
+
+            if materialize:
+                sheet_document.materialize_view()
+
+            if 'operator-name' in filter_by:
+                sheet_document.setup_document()
+                sheet_document.setup_history()
 
         self.add_new_tab(sheet_view)
 

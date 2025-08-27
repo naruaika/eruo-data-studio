@@ -26,6 +26,7 @@ from typing import Any
 import html
 
 from . import utils
+from .sheet_document import SheetDocument
 from .window import Window
 
 class CommandListItem(GObject.Object):
@@ -373,12 +374,16 @@ class CommandPaletteOverlay(Adw.Bin):
                              callback:    callable = None,
                              user_data:   Any = [],
                              more_prompt: bool = False) -> None:
+        if self.get_focus_child():
+            return
+
         self.is_prompting = as_prompt
         self.prompt_callback = callback
         self.prompt_arguments = user_data
         self.will_prompt_again = more_prompt
 
-        self.prompt_text.set_label(f"{prompt_text} (Press 'Enter' to confirm or 'Escape' to cancel)")
+        self.command_entry.set_placeholder_text(f"{prompt_text or 'Type a command or search'}...")
+        self.prompt_text.set_label("Press 'Enter' to confirm or 'Escape' to cancel")
         self.prompt_text.set_visible(as_prompt)
 
         self.scrolled_window.set_visible(not as_prompt)
@@ -426,9 +431,10 @@ class CommandPaletteOverlay(Adw.Bin):
         if sheet_view is None:
             return
 
-        # Focus on the main canvas
-        sheet_view.main_canvas.set_focusable(True)
-        sheet_view.main_canvas.grab_focus()
+        # Focus on the main canvas back
+        if isinstance(sheet_view.document, SheetDocument):
+            sheet_view.main_canvas.set_focusable(True)
+            sheet_view.main_canvas.grab_focus()
 
     def find_subsequence_indices(self,
                                  query:  str,

@@ -2,7 +2,8 @@
 
 .toolbar-view,
 .multiline-formula-bar-box,
-.notebook-source-view {
+.notebook-source-view,
+.sidebar-source-view {
     background-color: rgb(52, 52, 54);
 }
 
@@ -33,7 +34,8 @@
     background-color: color(srgb 0 0 0.0235294 / 0.5);
 }
 
-.notebook-source-view {
+.notebook-source-view,
+.sidebar-source-view {
     color: #fff;
     caret-color: #fff;
 }
