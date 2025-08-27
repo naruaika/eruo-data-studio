@@ -327,17 +327,17 @@ class SearchReplaceOverlay(Adw.Bin):
         if sheet_view is None:
             return
 
+        # Focus on the main canvas
+        if isinstance(sheet_view.document, SheetDocument):
+            sheet_view.main_canvas.set_focusable(True)
+            sheet_view.main_canvas.grab_focus()
+
         # Reset the search states
         if isinstance(sheet_view.document, SheetDocument):
             sheet_view.document.selection.current_search_range = None
-        sheet_view.document.is_searching_cells = False
-
-        # Focus on the main canvas
-        sheet_view.main_canvas.set_focusable(True)
-        sheet_view.main_canvas.grab_focus()
-
         if self.search_within_selection.get_active():
             sheet_view.document.search_range_performer = ''
+        sheet_view.document.is_searching_cells = False
 
     def get_current_search_states(self) -> bool:
         text_value = self.search_entry.get_text()

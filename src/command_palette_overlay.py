@@ -35,6 +35,7 @@ class CommandListItem(GObject.Object):
     action_name = GObject.Property(type=str, default='')
     title = GObject.Property(type=str, default='Command')
     label = GObject.Property(type=str, default='Command')
+    when_expression = GObject.Property(type=str, default='')
 
     is_separator = GObject.Property(type=bool, default=False)
     is_recent_item = GObject.Property(type=bool, default=False)
@@ -44,18 +45,20 @@ class CommandListItem(GObject.Object):
     will_prompt: bool = False
 
     def __init__(self,
-                 action_name:    str = '',
-                 title:          str = '',
-                 shortcuts:      list[str] = [],
-                 steal_focus:    bool = False,
-                 will_prompt:    bool = False,
-                 is_separator:   bool = False,
-                 is_recent_item: bool = False) -> None:
+                 action_name:     str = '',
+                 title:           str = '',
+                 shortcuts:       list[str] = [],
+                 steal_focus:     bool = False,
+                 will_prompt:     bool = False,
+                 when_expression: str = '',
+                 is_separator:    bool = False,
+                 is_recent_item:  bool = False) -> None:
         super().__init__()
 
         self.action_name = action_name
         self.title = title
         self.label = title
+        self.when_expression = when_expression
 
         self.is_separator = is_separator
         self.is_recent_item = is_recent_item
@@ -131,11 +134,13 @@ class CommandPaletteOverlay(Adw.Bin):
                                         command['title'],
                                         command['shortcuts'],
                                         command['steal-focus'],
-                                        command['will-prompt'])
+                                        command['will-prompt'],
+                                        command['when-expression'])
             self.command_titles.append(list_item.title)
             self.list_store.append(list_item)
 
         self.recent_command_titles = []
+        self.eligible_list_store = Gio.ListStore()
 
         self.is_prompting = False
         self.prompt_callback = None
@@ -208,12 +213,6 @@ class CommandPaletteOverlay(Adw.Bin):
         list_item.shortcut = None
         list_item.separator = None
 
-    def on_command_entry_deleted(self,
-                                 entry:     Gtk.Entry,
-                                 start_pos: int,
-                                 end_pos:   int) -> None:
-        self.on_command_entry_changed(entry)
-
     def on_command_entry_changed(self, entry: Gtk.Entry) -> None:
         if self.is_prompting:
             return
@@ -222,20 +221,24 @@ class CommandPaletteOverlay(Adw.Bin):
 
         if query == '':
             # Reset all the labels
-            for iidx in range(self.list_store.get_n_items()):
-                current_item = self.list_store.get_item(iidx)
+            for iidx in range(self.eligible_list_store.get_n_items()):
+                current_item = self.eligible_list_store.get_item(iidx)
                 current_item.label = current_item.title
 
+            self.scrolled_window.get_vscrollbar().set_visible(True)
+            self.scrolled_window.set_visible(True)
+            self.prompt_text.set_visible(False)
+
             # Show all items if the query is empty
-            self.selection.set_model(self.list_store)
+            self.selection.set_model(self.eligible_list_store)
             self.list_view.scroll_to(0, Gtk.ListScrollFlags.SELECT, None)
             return
 
         new_list_store = Gio.ListStore()
 
         # Get all the items that match the query
-        for iidx in range(self.list_store.get_n_items()):
-            current_item = self.list_store.get_item(iidx)
+        for iidx in range(self.eligible_list_store.get_n_items()):
+            current_item = self.eligible_list_store.get_item(iidx)
 
             # Skip recent and separator items
             if current_item.is_recent_item or current_item.is_separator:
@@ -265,6 +268,12 @@ class CommandPaletteOverlay(Adw.Bin):
 
         self.list_view.set_single_click_activate(False)
         self.list_view.scroll_to(0, Gtk.ListScrollFlags.SELECT, None)
+
+    def on_command_entry_deleted(self,
+                                 entry:     Gtk.Entry,
+                                 start_pos: int,
+                                 end_pos:   int) -> None:
+        self.on_command_entry_changed(entry)
 
     def on_command_entry_activated(self, entry: Gtk.Entry) -> None:
         if self.is_prompting:
@@ -389,6 +398,16 @@ class CommandPaletteOverlay(Adw.Bin):
         self.scrolled_window.set_visible(not as_prompt)
         self.list_view.set_single_click_activate(False)
 
+        # Filter out the commands that are not eligible
+        if not as_prompt:
+            eligible_list_store = Gio.ListStore()
+            for item in self.list_store:
+                if item.when_expression == '' \
+                        or utils.check_command_eligible(self.window, item.when_expression):
+                    eligible_list_store.append(item)
+            self.eligible_list_store = eligible_list_store
+            self.selection.set_model(self.eligible_list_store)
+
         self.set_visible(True)
 
         self.command_entry.set_text('')
@@ -403,9 +422,10 @@ class CommandPaletteOverlay(Adw.Bin):
         self.is_animating_uis = True
         def stop_animating_uis() -> None:
             self.is_animating_uis = False
+            self.command_overlay.remove_css_class('slide-up-dialog')
+            self.command_entry.grab_focus()
 
         self.command_overlay.add_css_class('slide-up-dialog')
-        GLib.timeout_add(200, self.command_overlay.remove_css_class, 'slide-up-dialog')
         GLib.timeout_add(200, stop_animating_uis)
 
     def close_command_overlay(self,
@@ -419,9 +439,12 @@ class CommandPaletteOverlay(Adw.Bin):
         self.prompt_arguments = []
         self.will_prompt_again = False
 
+        def stop_animating_uis() -> None:
+            self.command_overlay.remove_css_class('slide-down-dialog')
+            self.set_visible(False)
+
         self.command_overlay.add_css_class('slide-down-dialog')
-        GLib.timeout_add(200, self.set_visible, False)
-        GLib.timeout_add(200, self.command_overlay.remove_css_class, 'slide-down-dialog')
+        GLib.timeout_add(200, stop_animating_uis)
 
         if steal_focus:
             return
@@ -466,7 +489,7 @@ class CommandPaletteOverlay(Adw.Bin):
                                query:  str,
                                target: str) -> str:
         """
-        Generates an HTML string with `<b>` tags around the matched subsequence.
+        Generates an HTML string with `<u>` tags around the matched subsequence.
 
         Returns the highlighted string if a match is found, otherwise None.
         """

@@ -239,3 +239,28 @@ def is_iterable(obj: Any) -> bool:
         return True
     except TypeError:
         return False
+
+
+from gi.repository import Gtk
+
+COMMAND_EVAL_GLOBALS = {
+    '__builtins__': {
+        'str': str,
+        'bool': bool,
+    }
+}
+
+
+def check_command_eligible(window: Gtk.Window, when_expression: str) -> bool:
+    _globals = COMMAND_EVAL_GLOBALS.copy()
+
+    from .sheet_document import SheetDocument
+    from .sheet_notebook import SheetNotebook
+
+    document = window.get_current_active_document()
+    if isinstance(document, SheetDocument):
+        _globals['document'] = 'worksheet'
+    if isinstance(document, SheetNotebook):
+        _globals['document'] = 'notebook'
+
+    return eval(when_expression, _globals, {})

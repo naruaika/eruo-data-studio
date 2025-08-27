@@ -86,10 +86,6 @@ class Application(Adw.Application):
 
         self.application_commands = []
 
-        # TODO: implement conditioning for all the registered commands.
-        #       Because not all commands relevant to the current context,
-        #       i.e. current active document type or current active selection.
-
         # Register general actions
         # FIXME: when the display language isn't English, we should provide a way so that
         #        the user can still querying the commands in both languages.
@@ -117,7 +113,8 @@ class Application(Adw.Application):
         self.create_action('import-table',                                                  _('Create: Import Table Into New Worksheet'),
                                                                                             self.on_import_table_action)
         self.create_action('new-worksheet-from-view',                                       _('Create: Materialize View Into New Worksheet'),
-                                                                                            self.on_new_worksheet_from_view_action)
+                                                                                            self.on_new_worksheet_from_view_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('new-notebook',                                                  _('Create: New Blank Notebook'),
                                                                                             self.on_new_notebook_action,
                                                                                             shortcuts=['<control>n'])
@@ -173,164 +170,232 @@ class Application(Adw.Application):
         # Register worksheet actions
         self.create_action('clear-contents',                                                _('Cell: Clear Contents'),
                                                                                             self.on_clear_contents_action,
-                                                                                            shortcuts=['Delete'])
+                                                                                            shortcuts=['Delete'],
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-boolean',                                            _('Column: Convert to Boolean'),
-                                                                                            self.on_convert_to_boolean_action)
+                                                                                            self.on_convert_to_boolean_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-categorical',                                        _('Column: Convert to Categorical'),
-                                                                                            self.on_convert_to_categorical_action)
+                                                                                            self.on_convert_to_categorical_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-date',                                               _('Column: Convert to Date'),
-                                                                                            self.on_convert_to_date_action)
+                                                                                            self.on_convert_to_date_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-datetime',                                           _('Column: Convert to Datetime'),
-                                                                                            self.on_convert_to_datetime_action)
+                                                                                            self.on_convert_to_datetime_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-decimal',                                            _('Column: Convert to Decimal Number'),
-                                                                                            self.on_convert_to_decimal_action)
+                                                                                            self.on_convert_to_decimal_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-float32',                                            _('Column: Convert to Float (32-Bit)'),
-                                                                                            self.on_convert_to_float32_action)
+                                                                                            self.on_convert_to_float32_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-float64',                                            _('Column: Convert to Float (64-Bit)'),
-                                                                                            self.on_convert_to_float64_action)
+                                                                                            self.on_convert_to_float64_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-int8',                                               _('Column: Convert to Integer (8-Bit)'),
-                                                                                            self.on_convert_to_int8_action)
+                                                                                            self.on_convert_to_int8_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-int16',                                              _('Column: Convert to Integer (16-Bit)'),
-                                                                                            self.on_convert_to_int16_action)
+                                                                                            self.on_convert_to_int16_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-int32',                                              _('Column: Convert to Integer (32-Bit)'),
-                                                                                            self.on_convert_to_int32_action)
+                                                                                            self.on_convert_to_int32_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-int64',                                              _('Column: Convert to Integer (64-Bit)'),
-                                                                                            self.on_convert_to_int64_action)
+                                                                                            self.on_convert_to_int64_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-text',                                               _('Column: Convert to Text'),
-                                                                                            self.on_convert_to_text_action)
+                                                                                            self.on_convert_to_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-time',                                               _('Column: Convert to Time'),
-                                                                                            self.on_convert_to_time_action)
+                                                                                            self.on_convert_to_time_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-uint8',                                              _('Column: Convert to Unsigned Integer (8-Bit)'),
-                                                                                            self.on_convert_to_uint8_action)
+                                                                                            self.on_convert_to_uint8_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-uint16',                                             _('Column: Convert to Unsigned Integer (16-Bit)'),
-                                                                                            self.on_convert_to_uint16_action)
+                                                                                            self.on_convert_to_uint16_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-uint32',                                             _('Column: Convert to Unsigned Integer (32-Bit)'),
-                                                                                            self.on_convert_to_uint32_action)
+                                                                                            self.on_convert_to_uint32_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-uint64',                                             _('Column: Convert to Unsigned Integer (64-Bit)'),
-                                                                                            self.on_convert_to_uint64_action)
+                                                                                            self.on_convert_to_uint64_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-to-whole-number',                                       _('Column: Convert to Whole Number'),
-                                                                                            self.on_convert_to_int64_action)
+                                                                                            self.on_convert_to_int64_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('delete-column',                                                 _('Column: Delete Columns'),
-                                                                                            self.on_delete_column_action)
+                                                                                            self.on_delete_column_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('delete-row',                                                    _('Row: Delete Rows'),
-                                                                                            self.on_delete_row_action)
+                                                                                            self.on_delete_row_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('duplicate-to-above',                                            _('Row: Duplicate Rows to Above'),
-                                                                                            self.on_duplicate_to_above_action)
+                                                                                            self.on_duplicate_to_above_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('duplicate-to-below',                                            _('Row: Duplicate Rows to Below'),
-                                                                                            self.on_duplicate_to_below_action)
+                                                                                            self.on_duplicate_to_below_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('duplicate-to-left',                                             _('Column: Duplicate Columns to Left'),
-                                                                                            self.on_duplicate_to_left_action)
+                                                                                            self.on_duplicate_to_left_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('duplicate-to-right',                                            _('Column: Duplicate Columns to Right'),
-                                                                                            self.on_duplicate_to_right_action)
+                                                                                            self.on_duplicate_to_right_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('go-to-cell',                                                    _('View: Go to Cell...'),
                                                                                             self.on_go_to_cell_action,
                                                                                             shortcuts=['<control>g'],
-                                                                                            steal_focus=True)
+                                                                                            steal_focus=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('hide-column',                                                   _('Column: Hide Columns'),
-                                                                                            self.on_hide_column_action)
+                                                                                            self.on_hide_column_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('insert-column-left',                                            _('Column: Insert Column to the Left'),
-                                                                                            self.on_insert_column_left_action)
+                                                                                            self.on_insert_column_left_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('insert-column-right',                                           _('Column: Insert Column to the Right'),
-                                                                                            self.on_insert_column_right_action)
+                                                                                            self.on_insert_column_right_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('insert-row-above',                                              _('Row: Insert Rows Above'),
-                                                                                            self.on_insert_row_above_action)
+                                                                                            self.on_insert_row_above_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('insert-row-below',                                              _('Row: Insert Rows Below'),
-                                                                                            self.on_insert_row_below_action)
+                                                                                            self.on_insert_row_below_action,
+                                                                                            when_expression="document == 'worksheet'")
 #       self.create_action('keep-duplicated-rows-only',                                     _('Filter: Keep Duplicated Rows Only'),
-#                                                                                           self.on_keep_duplicated_rows_only_action)
+#                                                                                           self.on_keep_duplicated_rows_only_action,
+#                                                                                           when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-including-selection',                            _('Filter: Keep Rows Only Including the Selection'),
-                                                                                            self.on_keep_rows_only_including_selection)
+                                                                                            self.on_keep_rows_only_including_selection,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-including-selection-into-new-worksheet',         _('Filter: Keep Rows Only Including the Selection Into a New Worksheet'),
-                                                                                            self.on_keep_rows_only_including_selection_into_new_worksheet_action)
+                                                                                            self.on_keep_rows_only_including_selection_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-including-case-insensitive-string',              _('Filter: Keep Rows Only Including a String (Case Insensitive)...'),
                                                                                             self.on_keep_rows_only_including_case_insensitive_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-including-case-sensitive-string',                _('Filter: Keep Rows Only Including a String (Case Sensitive)...'),
                                                                                             self.on_keep_rows_only_including_case_sensitive_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-including-insensitive-string-into-new-worksheet',_('Filter: Keep Rows Only Including a String Into a New Worksheet (Case Insensitive)...'),
                                                                                             self.on_keep_rows_only_including_case_insensitive_string_into_new_worksheet_action_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-including-sensitive-string-into-new-worksheet',  _('Filter: Keep Rows Only Including a String Into a New Worksheet (Case Sensitive)...'),
                                                                                             self.on_keep_rows_only_including_case_sensitive_string_into_new_worksheet_action_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-matching-regex-case-insensitive',                _('Filter: Keep Rows Only Matching a Regex (Case Insensitive)...'),
                                                                                             self.on_keep_rows_only_matching_regex_case_insensitive_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-matching-regex-case-sensitive',                  _('Filter: Keep Rows Only Matching a Regex (Case Sensitive)...'),
                                                                                             self.on_keep_rows_only_matching_regex_case_sensitive_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-matching-regex-insensitive-into-new-worksheet',  _('Filter: Keep Rows Only Matching a Regex Into a New Worksheet (Case Insensitive)...'),
                                                                                             self.on_keep_rows_only_matching_regex_case_insensitive_string_into_new_worksheet_action_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('keep-rows-only-matching-regex-sensitive-into-new-worksheet',    _('Filter: Keep Rows Only Matching a Regex Into a New Worksheet (Case Sensitive)...'),
                                                                                             self.on_keep_rows_only_matching_regex_case_sensitive_string_into_new_worksheet_action_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('rechunk-table',                                                 _('Sheet: Rechunk Table'),
-                                                                                            self.on_rechunk_table_action)
+                                                                                            self.on_rechunk_table_action,
+                                                                                            when_expression="document == 'worksheet'")
 #       self.create_action('reverse-rows',                                                  _('Sort: Reverse Rows'),
-#                                                                                           self.on_reverse_rows_action)
+#                                                                                           self.on_reverse_rows_action,
+#                                                                                           when_expression="document == 'worksheet'")
 #       self.create_action('remove-blank-rows',                                             _('Remove Blank Rows'),
-#                                                                                            self.on_remove_blank_rows_action)
+#                                                                                            self.on_remove_blank_rows_action,
+#                                                                                           when_expression="document == 'worksheet'")
 #       self.create_action('remove-duplicated-rows',                                        _('Remove Duplicated Rows'),
-#                                                                                            self.on_remove_duplicated_rows_action)
+#                                                                                            self.on_remove_duplicated_rows_action,
+#                                                                                           when_expression="document == 'worksheet'")
 #       self.create_action('remove-empty-rows',                                             _('Remove Empty Rows'),
-#                                                                                            self.on_remove_empty_rows_action)
+#                                                                                            self.on_remove_empty_rows_action,
+#                                                                                           when_expression="document == 'worksheet'")
         self.create_action('remove-rows-including-selection',                               _('Filter: Remove Rows Including the Selection'),
-                                                                                            self.on_remove_rows_including_selection)
+                                                                                            self.on_remove_rows_including_selection,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-including-selection-into-new-worksheet',            _('Filter: Remove Rows Including the Selection Into a New Worksheet'),
-                                                                                            self.on_remove_rows_including_selection_into_new_worksheet_action)
+                                                                                            self.on_remove_rows_including_selection_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-including-case-insensitive-string',                 _('Filter: Remove Rows Including a String (Case Insensitive)...'),
                                                                                             self.on_remove_rows_including_case_insensitive_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-including-case-sensitive-string',                   _('Filter: Remove Rows Including a String (Case Sensitive)...'),
                                                                                             self.on_remove_rows_including_case_sensitive_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-including-insensitive-string-into-new-worksheet',   _('Filter: Remove Rows Including a String Into a New Worksheet (Case Insensitive)...'),
                                                                                             self.on_remove_rows_including_case_insensitive_string_into_new_worksheet_action_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-including-sensitive-string-into-new-worksheet',     _('Filter: Remove Rows Including a String Into a New Worksheet (Case Sensitive)...'),
                                                                                             self.on_remove_rows_including_case_sensitive_string_into_new_worksheet_action_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-matching-regex-case-insensitive',                   _('Filter: Remove Rows Matching a Regex (Case Insensitive)...'),
                                                                                             self.on_remove_rows_matching_regex_case_insensitive_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-matching-regex-case-sensitive',                     _('Filter: Remove Rows Matching a Regex (Case Sensitive)...'),
                                                                                             self.on_remove_rows_matching_regex_case_sensitive_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-matching-regex-insensitive-into-new-worksheet',     _('Filter: Remove Rows Matching a Regex Into a New Worksheet (Case Insensitive)...'),
                                                                                             self.on_remove_rows_matching_regex_case_insensitive_string_into_new_worksheet_action_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-rows-matching-regex-sensitive-into-new-worksheet',       _('Filter: Remove Rows Matching a Regex Into a New Worksheet (Case Sensitive)...'),
                                                                                             self.on_remove_rows_matching_regex_case_sensitive_string_into_new_worksheet_action_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
 #       self.create_action('remove-surplus-blank-rows',                                     _('Remove Surplus Blank Rows'),
-#                                                                                            self.on_remove_surplus_blank_rows_action)
+#                                                                                            self.on_remove_surplus_blank_rows_action,
+#                                                                                           when_expression="document == 'worksheet'")
 #       self.create_action('remove-surplus-empty-rows',                                     _('Remove Surplus Empty Rows'),
-#                                                                                            self.on_remove_surplus_empty_rows_action)
+#                                                                                            self.on_remove_surplus_empty_rows_action,
+#                                                                                           when_expression="document == 'worksheet'")
         self.create_action('reset-all-filters',                                             _('Filter: Clear All Rows Filters'),
-                                                                                            self.on_reset_all_filters_action)
+                                                                                            self.on_reset_all_filters_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('sort-by-ascending',                                             _('Sort: Sort Rows by Ascending'),
-                                                                                            self.on_sort_by_ascending_action)
+                                                                                            self.on_sort_by_ascending_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('sort-by-descending',                                            _('Sort: Sort Rows by Descending'),
-                                                                                            self.on_sort_by_descending_action)
+                                                                                            self.on_sort_by_descending_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('unhide-all-columns',                                            _('Column: Unhide All Columns'),
-                                                                                            self.on_unhide_all_columns_action)
+                                                                                            self.on_unhide_all_columns_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('unhide-column',                                                 _('Column: Unhide Columns'),
-                                                                                            self.on_unhide_column_action)
+                                                                                            self.on_unhide_column_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('focus-on-formula-editor',                                       _('View: Focus on Formula Editor'),
                                                                                             self.on_focus_on_formula_editor_action,
                                                                                             shortcuts=['<shift>F2'],
-                                                                                            steal_focus=True)
+                                                                                            steal_focus=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('open-multiline-formula',                                        _('View: Focus on Multiple Line Formula Editor'),
                                                                                             self.on_focus_on_multiline_formula_editor_action,
-                                                                                            steal_focus=True)
+                                                                                            steal_focus=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('open-inline-formula',                                           _('View: Open Inline Formula Editor'),
                                                                                             self.on_open_inline_formula_action,
                                                                                             shortcuts=['F2'],
-                                                                                            steal_focus=True)
+                                                                                            steal_focus=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('open-sort-filter',                                              _('View: Open Sort &amp; Filter Panel'),
-                                                                                            self.on_open_sort_filter_action)
+                                                                                            self.on_open_sort_filter_action,
+                                                                                            when_expression="document == 'worksheet'")
 
         # Register application non-command actions
         self.create_action('apply-pending-table',                                           callback=self.on_apply_pending_table_action,
@@ -389,262 +454,374 @@ class Application(Adw.Application):
         # Inspired by https://github.com/qcz/vscode-text-power-tools
         self.create_action('append-prefix-to-cell',                                         _('Cell: Append Prefix...'),
                                                                                             self.on_append_prefix_to_cell_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('append-prefix-to-column',                                       _('Column: Append Prefix...'),
                                                                                             self.on_append_prefix_to_column_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('append-suffix-to-cell',                                         _('Cell: Append Suffix...'),
                                                                                             self.on_append_suffix_to_cell_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('append-suffix-to-column',                                       _('Column: Append Suffix...'),
                                                                                             self.on_append_suffix_to_column_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-camel-case',                                _('Cell: Change Case to Camel Case (camelCase)'),
-                                                                                            self.on_change_case_cell_to_camel_case_action)
+                                                                                            self.on_change_case_cell_to_camel_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-constant-case',                             _('Cell: Change Case to Constant Case (CONSTANT_CASE)'),
-                                                                                            self.on_change_case_cell_to_constant_case_action)
+                                                                                            self.on_change_case_cell_to_constant_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-dot-case',                                  _('Cell: Change Case to Dot Case (dot.case)'),
-                                                                                            self.on_change_case_cell_to_dot_case_action)
+                                                                                            self.on_change_case_cell_to_dot_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-kebab-case',                                _('Cell: Change Case to Kebab Case (kebab-case)'),
-                                                                                            self.on_change_case_cell_to_kebab_case_action)
+                                                                                            self.on_change_case_cell_to_kebab_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-lowercase',                                 _('Cell: Change Case to Lowercase'),
-                                                                                            self.on_change_case_cell_to_lowercase_action)
+                                                                                            self.on_change_case_cell_to_lowercase_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-pascal-case',                               _('Cell: Change Case to Pascal Case (PascalCase)'),
-                                                                                            self.on_change_case_cell_to_pascal_case_action)
+                                                                                            self.on_change_case_cell_to_pascal_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-snake-case',                                _('Cell: Change Case to Snake Case (snake_case)'),
-                                                                                            self.on_change_case_cell_to_snake_case_action)
+                                                                                            self.on_change_case_cell_to_snake_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-sentence-case',                             _('Cell: Change Case to Sentence Case (Sentence case)'),
-                                                                                            self.on_change_case_cell_to_sentence_case_action)
+                                                                                            self.on_change_case_cell_to_sentence_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-sponge-case',                               _('Cell: Change Case to Sponge Case (RANdoM CAPiTAlizAtiON)'),
-                                                                                            self.on_change_case_cell_to_sponge_case_action)
+                                                                                            self.on_change_case_cell_to_sponge_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-title-case',                                _('Cell: Change Case to Title Case (Capitalize Each Word)'),
-                                                                                            self.on_change_case_cell_to_title_case_action)
+                                                                                            self.on_change_case_cell_to_title_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-cell-case-to-uppercase',                                 _('Cell: Change Case to Uppercase'),
-                                                                                            self.on_change_case_cell_to_uppercase_action)
+                                                                                            self.on_change_case_cell_to_uppercase_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-camel-case',                              _('Column: Change Case to Camel Case (camelCase)'),
-                                                                                            self.on_change_case_column_to_camel_case_action)
+                                                                                            self.on_change_case_column_to_camel_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-constant-case',                           _('Column: Change Case to Constant Case (CONSTANT_CASE)'),
-                                                                                            self.on_change_case_column_to_constant_case_action)
+                                                                                            self.on_change_case_column_to_constant_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-dot-case',                                _('Column: Change Case to Dot Case (dot.case)'),
-                                                                                            self.on_change_case_column_to_dot_case_action)
+                                                                                            self.on_change_case_column_to_dot_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-kebab-case',                              _('Column: Change Case to Kebab Case (kebab-case)'),
-                                                                                            self.on_change_case_column_to_kebab_case_action)
+                                                                                            self.on_change_case_column_to_kebab_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-lowercase',                               _('Column: Change Case to Lowercase'),
-                                                                                            self.on_change_case_column_to_lowercase_action)
+                                                                                            self.on_change_case_column_to_lowercase_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-pascal-case',                             _('Column: Change Case to Pascal Case (PascalCase)'),
-                                                                                            self.on_change_case_column_to_pascal_case_action)
+                                                                                            self.on_change_case_column_to_pascal_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-snake-case',                              _('Column: Change Case to Snake Case (snake_case)'),
-                                                                                            self.on_change_case_column_to_snake_case_action)
+                                                                                            self.on_change_case_column_to_snake_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-sentence-case',                           _('Column: Change Case to Sentence Case (Sentence case)'),
-                                                                                            self.on_change_case_column_to_sentence_case_action)
+                                                                                            self.on_change_case_column_to_sentence_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-sponge-case',                             _('Column: Change Case to Sponge Case (RANdoM CAPiTAlizAtiON)'),
-                                                                                            self.on_change_case_column_to_sponge_case_action)
+                                                                                            self.on_change_case_column_to_sponge_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-title-case',                              _('Column: Change Case to Title Case (Capitalize Each Word)'),
-                                                                                            self.on_change_case_column_to_title_case_action)
+                                                                                            self.on_change_case_column_to_title_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('change-column-case-to-uppercase',                               _('Column: Change Case to Uppercase'),
-                                                                                            self.on_change_case_column_to_uppercase_action)
+                                                                                            self.on_change_case_column_to_uppercase_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-cell-to-unicode-normalization-nfc',                     _('Cell: Convert to NFC Unicode Normalization Form'),
-                                                                                            self.on_convert_cell_to_unicode_normalization_nfc_action)
+                                                                                            self.on_convert_cell_to_unicode_normalization_nfc_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-cell-to-unicode-normalization-nfd',                     _('Cell: Convert to NFD Unicode Normalization Form'),
-                                                                                            self.on_convert_cell_to_unicode_normalization_nfd_action)
+                                                                                            self.on_convert_cell_to_unicode_normalization_nfd_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-cell-to-unicode-normalization-nfkc',                    _('Cell: Convert to NFKC Unicode Normalization Form'),
-                                                                                            self.on_convert_cell_to_unicode_normalization_nfkc_action)
+                                                                                            self.on_convert_cell_to_unicode_normalization_nfkc_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-cell-to-unicode-normalization-nfkd',                    _('Cell: Convert to NFKD Unicode Normalization Form'),
-                                                                                            self.on_convert_cell_to_unicode_normalization_nfkd_action)
+                                                                                            self.on_convert_cell_to_unicode_normalization_nfkd_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-column-to-unicode-normalization-nfc',                   _('Column: Convert to NFC Unicode Normalization Form'),
-                                                                                            self.on_convert_column_to_unicode_normalization_nfc_action)
+                                                                                            self.on_convert_column_to_unicode_normalization_nfc_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-column-to-unicode-normalization-nfd',                   _('Column: Convert to NFD Unicode Normalization Form'),
-                                                                                            self.on_convert_column_to_unicode_normalization_nfd_action)
+                                                                                            self.on_convert_column_to_unicode_normalization_nfd_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-column-to-unicode-normalization-nfkc',                  _('Column: Convert to NFKC Unicode Normalization Form'),
-                                                                                            self.on_convert_column_to_unicode_normalization_nfkc_action)
+                                                                                            self.on_convert_column_to_unicode_normalization_nfkc_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('convert-column-to-unicode-normalization-nfkd',                  _('Column: Convert to NFKD Unicode Normalization Form'),
-                                                                                            self.on_convert_column_to_unicode_normalization_nfkd_action)
+                                                                                            self.on_convert_column_to_unicode_normalization_nfkd_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('decode-base64-cell-text',                                       _('Cell: Decode Base64 Text'),
-                                                                                            self.on_decode_base64_cell_text_action)
+                                                                                            self.on_decode_base64_cell_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('decode-base64-column-text',                                     _('Column: Decode Base64 Text'),
-                                                                                            self.on_decode_base64_column_text_action)
+                                                                                            self.on_decode_base64_column_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('decode-hexadecimal-cell-text',                                  _('Cell: Decode Hexadecimal Text'),
-                                                                                            self.on_decode_hexadecimal_cell_text_action)
+                                                                                            self.on_decode_hexadecimal_cell_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('decode-hexadecimal-column-text',                                _('Column: Decode Hexadecimal Text'),
-                                                                                            self.on_decode_hexadecimal_column_text_action)
+                                                                                            self.on_decode_hexadecimal_column_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('decode-url-cell-text',                                          _('Cell: Decode URL Text'),
-                                                                                            self.on_decode_url_cell_text_action)
+                                                                                            self.on_decode_url_cell_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('decode-url-column-text',                                        _('Column: Decode URL Text'),
-                                                                                            self.on_decode_url_column_text_action)
+                                                                                            self.on_decode_url_column_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('encode-base64-cell-text',                                       _('Cell: Encode Base64 Text'),
-                                                                                            self.on_encode_base64_cell_text_action)
+                                                                                            self.on_encode_base64_cell_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('encode-base64-column-text',                                     _('Column: Encode Base64 Text'),
-                                                                                            self.on_encode_base64_column_text_action)
+                                                                                            self.on_encode_base64_column_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('encode-hexadecimal-cell-text',                                  _('Cell: Encode Hexadecimal Text'),
-                                                                                            self.on_encode_hexadecimal_cell_text_action)
+                                                                                            self.on_encode_hexadecimal_cell_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('encode-hexadecimal-column-text',                                _('Column: Encode Hexadecimal Text'),
-                                                                                            self.on_encode_hexadecimal_column_text_action)
+                                                                                            self.on_encode_hexadecimal_column_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('encode-url-cell-text',                                          _('Cell: Encode URL Text'),
-                                                                                            self.on_encode_url_cell_text_action)
+                                                                                            self.on_encode_url_cell_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('encode-url-column-text',                                        _('Column: Encode URL Text'),
-                                                                                            self.on_encode_url_column_text_action)
+                                                                                            self.on_encode_url_column_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pad-end-cell-with-custom-string',                               _('Cell: Pad End (Right) with Custom Character...'),
                                                                                             self.on_pad_end_cell_with_custom_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pad-end-cell',                                                  _('Cell: Pad End (Right) with Whitespace'),
                                                                                             self.on_pad_end_cell_with_whitespace_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pad-end-column-with-custom-string',                             _('Column: Pad End (Right) with Custom Character...'),
                                                                                             self.on_pad_end_column_with_custom_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pad-end-column',                                                _('Column: Pad End (Right) with Whitespace'),
                                                                                             self.on_pad_end_column_with_whitespace_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pad-start-cell-with-custom-string',                             _('Cell: Pad Start (Left) with Custom Character...'),
                                                                                             self.on_pad_start_cell_with_custom_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pad-start-cell',                                                _('Cell: Pad Start (Left) with Whitespace'),
                                                                                             self.on_pad_start_cell_with_whitespace_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pad-start-column-with-custom-string',                           _('Column: Pad Start (Left) with Custom Character...'),
                                                                                             self.on_pad_start_column_with_custom_string_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pad-start-column',                                              _('Column: Pad Start (Left) with Whitespace'),
                                                                                             self.on_pad_start_column_with_whitespace_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pig-latinnify-cell',                                            _('Cell: Pig Latinnify'),
-                                                                                            self.on_pig_latinnify_cell_action)
+                                                                                            self.on_pig_latinnify_cell_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('pig-latinnify-column',                                          _('Column: Pig Latinnify'),
-                                                                                            self.on_pig_latinnify_column_action)
+                                                                                            self.on_pig_latinnify_column_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-prefix-from-cell-case-insensitive',                      _('Cell: Remove Prefix (Case Insensitive)...'),
                                                                                             self.on_remove_prefix_from_cell_case_insensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-prefix-from-cell-case-sensitive',                        _('Cell: Remove Prefix (Case Sensitive)...'),
                                                                                             self.on_remove_prefix_from_cell_case_sensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-prefix-from-column-case-insensitive',                    _('Column: Remove Prefix (Case Insensitive)...'),
                                                                                             self.on_remove_prefix_from_column_case_insensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-prefix-from-column-case-sensitive',                      _('Column: Remove Prefix (Case Sensitive)...'),
                                                                                             self.on_remove_prefix_from_column_case_sensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-suffix-from-cell-case-insensitive',                      _('Cell: Remove Suffix (Case Insensitive)...'),
                                                                                             self.on_remove_suffix_from_cell_case_insensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-suffix-from-cell-case-sensitive',                        _('Cell: Remove Suffix (Case Sensitive)...'),
                                                                                             self.on_remove_suffix_from_cell_case_sensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-suffix-from-column-case-insensitive',                    _('Column: Remove Suffix (Case Insensitive)...'),
                                                                                             self.on_remove_suffix_from_column_case_insensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-suffix-from-column-case-sensitive',                      _('Column: Remove Suffix (Case Sensitive)...'),
                                                                                             self.on_remove_suffix_from_column_case_sensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
 #       self.create_action('remove-cell-ansi-escape-codes',                                 _('Cell: Remove ANSI Escape Codes'),
-#                                                                                           self.on_remove_cell_ansi_escape_codes_action)
+#                                                                                           self.on_remove_cell_ansi_escape_codes_action,
+#                                                                                           when_expression="document == 'worksheet'")
 #       self.create_action('remove-cell-control-characters',                                _('Cell: Remove Control Characters'),
-#                                                                                           self.on_remove_cell_control_characters_action)
+#                                                                                           self.on_remove_cell_control_characters_action,
+#                                                                                           when_expression="document == 'worksheet'")
         self.create_action('remove-cell-new-lines-characters',                              _('Cell: Remove New-Lines Characters'),
-                                                                                            self.on_remove_cell_new_lines_characters_action)
+                                                                                            self.on_remove_cell_new_lines_characters_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-cell-whitespace-characters',                             _('Cell: Remove Whitespace Characters'),
-                                                                                            self.on_remove_cell_whitespace_characters_action)
+                                                                                            self.on_remove_cell_whitespace_characters_action,
+                                                                                            when_expression="document == 'worksheet'")
 #       self.create_action('remove-column-ansi-escape-codes',                               _('Cell: Remove ANSI Escape Codes'),
-#                                                                                           self.on_remove_column_ansi_escape_codes_action)
+#                                                                                           self.on_remove_column_ansi_escape_codes_action,
+#                                                                                           when_expression="document == 'worksheet'")
 #       self.create_action('remove-column-control-characters',                              _('Column: Remove Control Characters'),
-#                                                                                           self.on_remove_column_control_characters_action)
+#                                                                                           self.on_remove_column_control_characters_action,
+#                                                                                           when_expression="document == 'worksheet'")
         self.create_action('remove-column-new-lines-characters',                            _('Column: Remove New-Lines Characters'),
-                                                                                            self.on_remove_column_new_lines_characters_action)
+                                                                                            self.on_remove_column_new_lines_characters_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('remove-column-whitespace-characters',                           _('Column: Remove Whitespace Characters'),
-                                                                                            self.on_remove_column_whitespace_characters_action)
+                                                                                            self.on_remove_column_whitespace_characters_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-cell-values-case-insensitive',                          _('Cell: Replace Text Value (Case Insensitive)...'),
                                                                                             self.on_replace_cell_text_value_case_insensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-cell-values-case-insensitive-with-regex',               _('Cell: Replace Text Value with Regex (Case Insensitive)...'),
                                                                                             self.on_replace_cell_text_value_case_insensitive_with_regex_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-cell-values-case-sensitive',                            _('Cell: Replace Text Value (Case Sensitive)...'),
                                                                                             self.on_replace_cell_text_value_case_sensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-cell-values-case-sensitive-with-regex',                 _('Cell: Replace Text Value with Regex (Case Sensitive)...'),
                                                                                             self.on_replace_cell_text_value_case_sensitive_with_regex_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-cell-whitespace-with-a-single-space',                   _('Cell: Replace Whitespace with a Single Space'),
-                                                                                            self.on_replace_cell_whitespace_with_a_single_space_action)
+                                                                                            self.on_replace_cell_whitespace_with_a_single_space_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-cell-whitespace-and-new-lines-with-a-single-space',     _('Cell: Replace Whitespace &amp; New-Lines with a Single Space'),
-                                                                                            self.on_replace_cell_whitespace_and_new_lines_with_a_single_space_action)
+                                                                                            self.on_replace_cell_whitespace_and_new_lines_with_a_single_space_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-column-values-case-insensitive',                        _('Column: Replace Text Value (Case Insensitive)...'),
                                                                                             self.on_replace_column_text_value_case_insensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-column-values-case-insensitive-with-regex',             _('Column: Replace Text Value with Regex (Case Insensitive)...'),
                                                                                             self.on_replace_column_text_value_case_insensitive_with_regex_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-column-values-case-sensitive',                          _('Column: Replace Text Value (Case Sensitive)...'),
                                                                                             self.on_replace_column_text_value_case_sensitive_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-column-values-case-sensitive-with-regex',               _('Column: Replace Text Value with Regex (Case Sensitive)...'),
                                                                                             self.on_replace_column_text_value_case_sensitive_with_regex_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-column-whitespace-with-a-single-space',                 _('Column: Replace Whitespace with a Single Space'),
-                                                                                            self.on_replace_column_whitespace_with_a_single_space_action)
+                                                                                            self.on_replace_column_whitespace_with_a_single_space_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('replace-column-whitespace-and-new-lines-with-a-single-space',   _('Column: Replace Whitespace &amp; New-Lines with a Single Space'),
-                                                                                            self.on_replace_column_whitespace_and_new_lines_with_a_single_space_action)
+                                                                                            self.on_replace_column_whitespace_and_new_lines_with_a_single_space_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('reverse-text-cell',                                             _('Cell: Reverse Text'),
-                                                                                            self.on_reverse_cell_text_action)
+                                                                                            self.on_reverse_cell_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('reverse-text-column',                                           _('Column: Reverse Text'),
-                                                                                            self.on_reverse_column_text_action)
+                                                                                            self.on_reverse_column_text_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('slugify-cell',                                                  _('Cell: Slugify'),
-                                                                                            self.on_slugify_cells_action)
+                                                                                            self.on_slugify_cells_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('slugify-column',                                                _('Column: Slugify'),
-                                                                                            self.on_slugify_columns_action)
+                                                                                            self.on_slugify_columns_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-cell-by-comma-into-new-worksheet',                        _('Cell: Split Text by Comma Into New Worksheet'),
-                                                                                            self.on_split_cells_by_comma_into_new_worksheet_action)
+                                                                                            self.on_split_cells_by_comma_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-cell-by-characters-into-new-worksheet',                   _('Cell: Split Text by a Set of Characters Into New Worksheet...'),
                                                                                             self.on_split_cells_by_characters_into_new_worksheet_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-cell-by-pipe-into-new-worksheet',                         _('Cell: Split Text by Pipe Into New Worksheet'),
-                                                                                            self.on_split_cells_by_pipe_into_new_worksheet_action)
+                                                                                            self.on_split_cells_by_pipe_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-cell-by-semicolon-into-new-worksheet',                    _('Cell: Split Text by Semicolon Into New Worksheet'),
-                                                                                            self.on_split_cells_by_semicolon_into_new_worksheet_action)
+                                                                                            self.on_split_cells_by_semicolon_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-cell-by-space-into-new-worksheet',                        _('Cell: Split Text by Space Into New Worksheet'),
-                                                                                            self.on_split_cells_by_space_into_new_worksheet_action)
+                                                                                            self.on_split_cells_by_space_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-column-by-comma-into-new-worksheet',                      _('Column: Split Text by Comma Into New Worksheet'),
-                                                                                            self.on_split_columns_by_comma_into_new_worksheet_action)
+                                                                                            self.on_split_columns_by_comma_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-column-by-characters-into-new-worksheet',                 _('Column: Split Text by a Set of Characters Into New Worksheet...'),
                                                                                             self.on_split_columns_by_characters_into_new_worksheet_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-column-by-pipe-into-new-worksheet',                       _('Column: Split Text by Pipe Into New Worksheet'),
-                                                                                            self.on_split_columns_by_pipe_into_new_worksheet_action)
+                                                                                            self.on_split_columns_by_pipe_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-column-by-semicolon-into-new-worksheet',                  _('Column: Split Text by Semicolon Into New Worksheet'),
-                                                                                            self.on_split_columns_by_semicolon_into_new_worksheet_action)
+                                                                                            self.on_split_columns_by_semicolon_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('split-column-by-space-into-new-worksheet',                      _('Column: Split Text by Space Into New Worksheet'),
-                                                                                            self.on_split_columns_by_space_into_new_worksheet_action)
+                                                                                            self.on_split_columns_by_space_into_new_worksheet_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('swap-cell-text-case',                                           _('Cell: Swap Text Case'),
-                                                                                            self.on_swap_cell_text_case_action)
+                                                                                            self.on_swap_cell_text_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('swap-column-text-case',                                         _('Column: Swap Text Case'),
-                                                                                            self.on_swap_column_text_case_action)
+                                                                                            self.on_swap_column_text_case_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('trim-cell-whitespace',                                          _('Cell: Trim Leading &amp; Trailing Whitespace'),
-                                                                                            self.on_trim_cell_whitespace_action)
+                                                                                            self.on_trim_cell_whitespace_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('trim-cell-whitespace-and-remove-new-lines',                     _('Cell: Trim Whitespace &amp; Remove Newlines'),
-                                                                                            self.on_trim_cell_whitespace_and_remove_new_lines_action)
+                                                                                            self.on_trim_cell_whitespace_and_remove_new_lines_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('trim-cell-start-whitespace',                                    _('Cell: Trim Leading Whitespace'),
-                                                                                            self.on_trim_cell_start_whitespace_action)
+                                                                                            self.on_trim_cell_start_whitespace_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('trim-cell-end-whitespace',                                      _('Cell: Trim Trailing Whitespace'),
-                                                                                            self.on_trim_cell_end_whitespace_action)
+                                                                                            self.on_trim_cell_end_whitespace_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('trim-column-whitespace',                                        _('Column: Trim Leading &amp; Trailing Whitespace'),
-                                                                                            self.on_trim_column_whitespace_action)
+                                                                                            self.on_trim_column_whitespace_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('trim-column-whitespace-and-remove-new-lines',                   _('Column: Trim Whitespace &amp; Remove Newlines'),
-                                                                                            self.on_trim_column_whitespace_and_remove_new_lines_action)
+                                                                                            self.on_trim_column_whitespace_and_remove_new_lines_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('trim-column-start-whitespace',                                  _('Column: Trim Leading Whitespace'),
-                                                                                            self.on_trim_column_start_whitespace_action)
+                                                                                            self.on_trim_column_start_whitespace_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('trim-column-end-whitespace',                                    _('Column: Trim Trailing Whitespace'),
-                                                                                            self.on_trim_column_end_whitespace_action)
+                                                                                            self.on_trim_column_end_whitespace_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('wrap-cell-with-text-different',                                 _('Cell: Wrap with Text (Different Prefix and Suffix)...'),
                                                                                             self.on_wrap_cell_with_text_different_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('wrap-cell-with-text-same',                                      _('Cell: Wrap with Text (Same Prefix and Suffix)...'),
                                                                                             self.on_wrap_cell_with_text_same_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('wrap-column-with-text-different',                               _('Column: Wrap with Text (Different Prefix and Suffix)...'),
                                                                                             self.on_wrap_column_with_text_different_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('wrap-column-with-text-same',                                    _('Column: Wrap with Text (Same Prefix and Suffix)...'),
                                                                                             self.on_wrap_column_with_text_same_action,
-                                                                                            will_prompt=True)
+                                                                                            will_prompt=True,
+                                                                                            when_expression="document == 'worksheet'")
 
     def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
         args = command_line.get_arguments()[1:]
@@ -695,14 +872,15 @@ Options:
         Gio.Application.do_shutdown(self)
 
     def create_action(self,
-                      name:        str,
-                      title:       str = '',
-                      callback:    callable = None,
-                      is_command:  bool = True,
-                      shortcuts:   list = None,
-                      steal_focus: bool = False,
-                      will_prompt: bool = False,
-                      param_type:  GLib.VariantType = None) -> None:
+                      name:            str,
+                      title:           str = '',
+                      callback:        callable = None,
+                      param_type:      GLib.VariantType = None,
+                      shortcuts:       list = None,
+                      is_command:      bool = True,
+                      will_prompt:     bool = False,
+                      steal_focus:     bool = False,
+                      when_expression: str = '') -> None:
         action = Gio.SimpleAction.new(name, param_type)
         action.connect('activate', callback)
         self.add_action(action)
@@ -712,11 +890,12 @@ Options:
 
         if is_command:
             self.application_commands.append({
-                'action-name' : name,
-                'title'       : title,
-                'shortcuts'   : shortcuts,
-                'steal-focus' : steal_focus,
-                'will-prompt' : will_prompt,
+                'action-name'     : name,
+                'title'           : title,
+                'shortcuts'       : shortcuts,
+                'steal-focus'     : steal_focus,
+                'will-prompt'     : will_prompt,
+                'when-expression' : when_expression,
             })
             self.application_commands.sort(key=lambda command: command['title'])
 
