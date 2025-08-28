@@ -893,7 +893,7 @@ class Window(Adw.ApplicationWindow):
 
         # Position context menu
         rectangle = Gdk.Rectangle()
-        rectangle.x = min(max(1, int(x + width / 2)), self.content_overlay.get_width() - 1)
+        rectangle.x = min(max(1, int(x + width - 10)), self.content_overlay.get_width() - 1)
         rectangle.y = min(max(1, int(y + height)), self.content_overlay.get_height() - 1)
         rectangle.height = 1
         rectangle.width = 1
@@ -932,11 +932,6 @@ class Window(Adw.ApplicationWindow):
         ctype = type(sheet_document.selection.current_active_range)
         mdfi = active_cell.metadata.dfi
 
-        x = sheet_document.display.get_cell_x_from_point(x + 1)
-        y = sheet_document.display.get_cell_y_from_point(y + 1)
-        width = sheet_document.display.get_cell_width_from_point(x + 1)
-        height = sheet_document.display.get_cell_height_from_point(y + 1)
-
         n_hidden_columns = sheet_document.display.get_n_hidden_columns(col_1, col_2)
         n_all_hidden_columns = sheet_document.display.get_n_all_hidden_columns()
 
@@ -963,8 +958,8 @@ class Window(Adw.ApplicationWindow):
 
         # Position context menu
         rectangle = Gdk.Rectangle()
-        rectangle.x = min(max(1, int(x + width / 2)), self.content_overlay.get_width() - 1)
-        rectangle.y = min(max(1, int(y + height)), self.content_overlay.get_height() - 1)
+        rectangle.x = min(max(1, int(x)), self.content_overlay.get_width() - 1)
+        rectangle.y = min(max(1, int(y)), self.content_overlay.get_height() - 1)
         rectangle.height = 1
         rectangle.width = 1
         self.context_menu.set_pointing_to(rectangle)

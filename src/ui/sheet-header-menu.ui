@@ -125,6 +125,7 @@
   </menu>
   <template class="SheetHeaderMenu" parent="GtkPopoverMenu">
     <property name="menu-model">sheet_header_menu</property>
+    <property name="flags">GTK_POPOVER_MENU_NESTED</property>
     <child type="filter_box">
       <object class="GtkBox">
         <property name="orientation">vertical</property>

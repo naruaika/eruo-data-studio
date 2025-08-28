@@ -38,8 +38,8 @@ class SheetCellMenu(Gtk.PopoverMenu):
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
+        # The default flags make the menu width too large
         self.set_flags(Gtk.PopoverMenuFlags.NESTED)
-        self.set_has_arrow(False)
 
         main_menu = Gio.Menu.new()
 
