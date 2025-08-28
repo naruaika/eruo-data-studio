@@ -81,12 +81,15 @@ class Application(Adw.Application):
         self.file_manager.connect('file-cancel', self.on_file_cancel)
         self.file_manager.connect('file-opened', self.on_file_opened)
         self.file_manager.connect('file-saved', self.on_file_saved)
+        self.file_manager.connect('file-exported', self.on_file_exported)
 
         self.clipboard = ClipboardManager()
 
         self.application_commands = []
 
+        #
         # Register general actions
+        #
         # FIXME: when the display language isn't English, we should provide a way so that
         #        the user can still querying the commands in both languages.
         self.create_action('add-connection',                                                _('Add New Connection...'),
@@ -107,7 +110,9 @@ class Application(Adw.Application):
                                                                                             self.on_redo_action,
                                                                                             shortcuts=['<shift><control>z', '<control>y'])
 
+        #
         # Register create actions
+        #
         self.create_action('duplicate-selected-tab',                                        _('Create: Duplicate Sheet Into New Worksheet'),
                                                                                             self.on_duplicate_selected_tab_action)
         self.create_action('import-table',                                                  _('Create: Import Table Into New Worksheet'),
@@ -122,7 +127,9 @@ class Application(Adw.Application):
                                                                                             self.on_new_worksheet_action,
                                                                                             shortcuts=['<control>t'])
 
+        #
         # Register file actions
+        #
         self.create_action('open-file',                                                     _('File: Open File...'),
                                                                                             self.on_open_file_action,
                                                                                             shortcuts=['<control>o'])
@@ -132,15 +139,22 @@ class Application(Adw.Application):
         self.create_action('save-as',                                                       _('File: Save As...'),
                                                                                             self.on_save_file_as_action,
                                                                                             shortcuts=['<shift><control>s'])
+        self.create_action('export-as',                                                     _('File: Export As...'),
+                                                                                            self.on_export_file_as_action,
+                                                                                            shortcuts=['<control><alt>s'])
 
+        #
         # Register help actions
+        #
         self.create_action('about',                                                         _('Help: About'),
                                                                                             self.on_about_action)
         self.create_action('preferences',                                                   _('Help: Open Settings'),
                                                                                             self.on_preferences_action,
                                                                                             shortcuts=['<control>comma'])
 
+        #
         # Register search actions
+        #
         self.create_action('open-search',                                                   _('Search: Quick Search'),
                                                                                             self.on_open_search_action,
                                                                                             shortcuts=['<control>f'])
@@ -154,7 +168,9 @@ class Application(Adw.Application):
                                                                                             self.on_toggle_replace_all_action,
                                                                                             shortcuts=['<control><shift>h'])
 
+        #
         # Register view actions
+        #
         self.create_action('close-selected-tab',                                            _('View: Close Tab'),
                                                                                             self.on_close_selected_tab_action,
                                                                                             shortcuts=['<control>w'])
@@ -167,7 +183,9 @@ class Application(Adw.Application):
                                                                                             self.on_toggle_sidebar_action,
                                                                                             shortcuts=['<control>b'])
 
+        #
         # Register worksheet actions
+        #
         self.create_action('clear-contents',                                                _('Cell: Clear Contents'),
                                                                                             self.on_clear_contents_action,
                                                                                             shortcuts=['Delete'],
@@ -397,7 +415,9 @@ class Application(Adw.Application):
                                                                                             self.on_open_sort_filter_action,
                                                                                             when_expression="document == 'worksheet'")
 
+        #
         # Register application non-command actions
+        #
         self.create_action('apply-pending-table',                                           callback=self.on_apply_pending_table_action,
                                                                                             is_command=False,
                                                                                             param_type=GLib.VariantType('s'))
@@ -411,13 +431,17 @@ class Application(Adw.Application):
                                                                                             is_command=False,
                                                                                             param_type=GLib.VariantType('s'))
 
+        #
         # Register worksheet non-command actions
+        #
         self.create_action('filter-by-cell-value',                                          callback=self.on_filter_by_cell_value_action,
                                                                                             is_command=False)
         self.create_action('filter-by-unique-values',                                       callback=self.on_filter_by_unique_values_action,
                                                                                             is_command=False)
 
+        #
         # Register window non-command actions
+        #
         # TODO: make these actions commandable
         self.create_action('close-other-tabs',                                              callback=self.on_close_other_tabs_action,
                                                                                             is_command=False,
@@ -450,7 +474,9 @@ class Application(Adw.Application):
                                                                                             is_command=False,
                                                                                             param_type=GLib.VariantType('s'))
 
+        #
         # Register new advanced worksheet actions
+        #
         # Inspired by https://github.com/qcz/vscode-text-power-tools
         self.create_action('append-prefix-to-cell',                                         _('Cell: Append Prefix...'),
                                                                                             self.on_append_prefix_to_cell_action,
@@ -1664,167 +1690,18 @@ Options:
             return
         document.update_current_cells_from_operator('encode-url', on_column=True)
 
-    def on_pad_end_cell_with_custom_string_action(self,
-                                                  action: Gio.SimpleAction,
-                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_end(fill_char: str, length: str) -> None:
-            fill_char = fill_char[0] if len(fill_char) else ' '
-            document.update_current_cells_from_operator('pad-end-custom', [length, fill_char], on_column=False)
-
-        def ask_for_fill_char(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the character used for padding the cells'),
-                                                                callback=proceed_to_pad_end,
-                                                                user_data=[length])
-
+    def on_export_file_as_action(self,
+                                 action: Gio.SimpleAction,
+                                 *args) -> None:
         window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
-                                                            callback=ask_for_fill_char,
-                                                            more_prompt=True)
-
-    def on_pad_end_cell_with_whitespace_action(self,
-                                               action: Gio.SimpleAction,
-                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_end(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            document.update_current_cells_from_operator('pad-end-default', [length], on_column=False)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
-                                                            callback=proceed_to_pad_end)
-
-    def on_pad_end_column_with_custom_string_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_end(fill_char: str, length: str) -> None:
-            fill_char = fill_char[0] if len(fill_char) else ' '
-            document.update_current_cells_from_operator('pad-end-custom', [length, fill_char], on_column=True)
-
-        def ask_for_fill_char(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the character used for padding the columns'),
-                                                                callback=proceed_to_pad_end,
-                                                                user_data=[length])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
-                                                            callback=ask_for_fill_char,
-                                                            more_prompt=True)
-
-    def on_pad_end_column_with_whitespace_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_end(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            document.update_current_cells_from_operator('pad-end-default', [length], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
-                                                            callback=proceed_to_pad_end)
-
-    def on_pad_start_cell_with_custom_string_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_start(fill_char: str, length: str) -> None:
-            fill_char = fill_char[0] if len(fill_char) else ' '
-            document.update_current_cells_from_operator('pad-start-custom', [length, fill_char], on_column=False)
-
-        def ask_for_fill_char(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the character used for padding the cells'),
-                                                                callback=proceed_to_pad_start,
-                                                                user_data=[length])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
-                                                            callback=ask_for_fill_char,
-                                                            more_prompt=True)
-
-    def on_pad_start_cell_with_whitespace_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_start(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            document.update_current_cells_from_operator('pad-start-default', [length], on_column=False)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
-                                                            callback=proceed_to_pad_start)
-
-    def on_pad_start_column_with_custom_string_action(self,
-                                                      action: Gio.SimpleAction,
-                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_start(fill_char: str, length: str) -> None:
-            fill_char = fill_char[0] if len(fill_char) else ' '
-            document.update_current_cells_from_operator('pad-start-custom', [length, fill_char], on_column=True)
-
-        def ask_for_fill_char(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the character used for padding the columns'),
-                                                                callback=proceed_to_pad_start,
-                                                                user_data=[length])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
-                                                            callback=ask_for_fill_char,
-                                                            more_prompt=True)
-
-    def on_pad_start_column_with_whitespace_action(self,
-                                                   action: Gio.SimpleAction,
-                                                   *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_start(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            document.update_current_cells_from_operator('pad-start-default', [length], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
-                                                            callback=proceed_to_pad_start)
+        self.file_manager.export_as_file(window)
 
     def on_file_cancel(self, source: GObject.Object) -> None:
+        self._return_focus_back()
+
+    def on_file_exported(self,
+                         source:    GObject.Object,
+                         file_path: str) -> None:
         self._return_focus_back()
 
     def on_file_opened(self,
@@ -2252,6 +2129,166 @@ Options:
         # Open the home view
         window.sidebar_home_view.open_home_view()
         window.sidebar_home_view.open_sort_filter_sections()
+
+    def on_pad_end_cell_with_custom_string_action(self,
+                                                  action: Gio.SimpleAction,
+                                                  *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_pad_end(fill_char: str, length: str) -> None:
+            fill_char = fill_char[0] if len(fill_char) else ' '
+            document.update_current_cells_from_operator('pad-end-custom', [length, fill_char], on_column=False)
+
+        def ask_for_fill_char(length: str) -> None:
+            length = int(length) if length.isnumeric() else 0
+            window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                                prompt_text=_('Please enter the character used for padding the cells'),
+                                                                callback=proceed_to_pad_end,
+                                                                user_data=[length])
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
+                                                            callback=ask_for_fill_char,
+                                                            more_prompt=True)
+
+    def on_pad_end_cell_with_whitespace_action(self,
+                                               action: Gio.SimpleAction,
+                                               *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_pad_end(length: str) -> None:
+            length = int(length) if length.isnumeric() else 0
+            document.update_current_cells_from_operator('pad-end-default', [length], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
+                                                            callback=proceed_to_pad_end)
+
+    def on_pad_end_column_with_custom_string_action(self,
+                                                    action: Gio.SimpleAction,
+                                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_pad_end(fill_char: str, length: str) -> None:
+            fill_char = fill_char[0] if len(fill_char) else ' '
+            document.update_current_cells_from_operator('pad-end-custom', [length, fill_char], on_column=True)
+
+        def ask_for_fill_char(length: str) -> None:
+            length = int(length) if length.isnumeric() else 0
+            window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                                prompt_text=_('Please enter the character used for padding the columns'),
+                                                                callback=proceed_to_pad_end,
+                                                                user_data=[length])
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
+                                                            callback=ask_for_fill_char,
+                                                            more_prompt=True)
+
+    def on_pad_end_column_with_whitespace_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_pad_end(length: str) -> None:
+            length = int(length) if length.isnumeric() else 0
+            document.update_current_cells_from_operator('pad-end-default', [length], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
+                                                            callback=proceed_to_pad_end)
+
+    def on_pad_start_cell_with_custom_string_action(self,
+                                                    action: Gio.SimpleAction,
+                                                    *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_pad_start(fill_char: str, length: str) -> None:
+            fill_char = fill_char[0] if len(fill_char) else ' '
+            document.update_current_cells_from_operator('pad-start-custom', [length, fill_char], on_column=False)
+
+        def ask_for_fill_char(length: str) -> None:
+            length = int(length) if length.isnumeric() else 0
+            window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                                prompt_text=_('Please enter the character used for padding the cells'),
+                                                                callback=proceed_to_pad_start,
+                                                                user_data=[length])
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
+                                                            callback=ask_for_fill_char,
+                                                            more_prompt=True)
+
+    def on_pad_start_cell_with_whitespace_action(self,
+                                                 action: Gio.SimpleAction,
+                                                 *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_pad_start(length: str) -> None:
+            length = int(length) if length.isnumeric() else 0
+            document.update_current_cells_from_operator('pad-start-default', [length], on_column=False)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
+                                                            callback=proceed_to_pad_start)
+
+    def on_pad_start_column_with_custom_string_action(self,
+                                                      action: Gio.SimpleAction,
+                                                      *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_pad_start(fill_char: str, length: str) -> None:
+            fill_char = fill_char[0] if len(fill_char) else ' '
+            document.update_current_cells_from_operator('pad-start-custom', [length, fill_char], on_column=True)
+
+        def ask_for_fill_char(length: str) -> None:
+            length = int(length) if length.isnumeric() else 0
+            window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                                prompt_text=_('Please enter the character used for padding the columns'),
+                                                                callback=proceed_to_pad_start,
+                                                                user_data=[length])
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
+                                                            callback=ask_for_fill_char,
+                                                            more_prompt=True)
+
+    def on_pad_start_column_with_whitespace_action(self,
+                                                   action: Gio.SimpleAction,
+                                                   *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        def proceed_to_pad_start(length: str) -> None:
+            length = int(length) if length.isnumeric() else 0
+            document.update_current_cells_from_operator('pad-start-default', [length], on_column=True)
+
+        window = self.get_active_window()
+        window.command_palette_overlay.open_command_overlay(as_prompt=True,
+                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
+                                                            callback=proceed_to_pad_start)
 
     def on_paste_action(self,
                         action: Gio.SimpleAction,

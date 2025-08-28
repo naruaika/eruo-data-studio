@@ -35,9 +35,9 @@ from .window import Window
 class FileSaveAsDialog(Adw.Dialog):
     __gtype_name__ = 'FileSaveAsDialog'
 
-    view_stack = Gtk.Template.Child()
-
     warning_banner = Gtk.Template.Child()
+    view_stack = Gtk.Template.Child()
+    save_button = Gtk.Template.Child()
 
     def __init__(self,
                  window:   Window,

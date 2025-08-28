@@ -8,7 +8,7 @@
 .toolbar-view {
     margin: 6px;
     margin-top: 0;
-    border-radius: 8px;
+    border-radius: 10px;
     -gtk-icon-size: 20px;
 }
 .toolbar-view button label {

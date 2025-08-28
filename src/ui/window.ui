@@ -373,8 +373,12 @@
         <attribute name="action">app.save</attribute>
       </item>
       <item>
-        <attribute name="label" translatable="yes">_Save As...</attribute>
+        <attribute name="label" translatable="yes">S_ave As...</attribute>
         <attribute name="action">app.save-as</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Export As...</attribute>
+        <attribute name="action">app.export-as</attribute>
       </item>
     </section>
     <section>

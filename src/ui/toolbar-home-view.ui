@@ -32,12 +32,31 @@
               </object>
             </child>
             <child>
-              <object class="GtkButton">
-                <property name="icon-name">save-symbolic</property>
-                <property name="tooltip-text">Save (Ctrl+S)</property>
-                <property name="action-name">app.save</property>
+              <object class="GtkBox">
+                <property name="orientation">horizontal</property>
+                <child>
+                  <object class="GtkButton">
+                    <property name="icon-name">save-symbolic</property>
+                    <property name="tooltip-text">Save (Ctrl+S)</property>
+                    <property name="action-name">app.save</property>
+                    <style>
+                      <class name="flat"/>
+                    </style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkMenuButton">
+                    <property name="icon-name">chevron-down-symbolic</property>
+                    <property name="tooltip-text" translatable="yes">More Options</property>
+                    <property name="menu-model">home_save_menu</property>
+                    <style>
+                      <class name="flat"/>
+                      <class name="arrow"/>
+                    </style>
+                  </object>
+                </child>
                 <style>
-                  <class name="flat"/>
+                  <class name="linked"/>
                 </style>
               </object>
             </child>
@@ -230,6 +249,22 @@
       </object>
     </child>
   </template>
+  <menu id="home_save_menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">_Save</attribute>
+        <attribute name="action">app.save</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">S_ave As...</attribute>
+        <attribute name="action">app.save-as</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Export As...</attribute>
+        <attribute name="action">app.export-as</attribute>
+      </item>
+    </section>
+  </menu>
   <menu id="home_row_menu">
     <section>
       <item>

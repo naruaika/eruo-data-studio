@@ -40,9 +40,10 @@ class FileManager(GObject.Object):
     __gtype_name__ = 'FileManager'
 
     __gsignals__ = {
-        'file-cancel' : (GObject.SIGNAL_RUN_FIRST, None, ()),
-        'file-opened' : (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
-        'file-saved'  : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
+        'file-cancel'   : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'file-opened'   : (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
+        'file-saved'    : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
+        'file-exported' : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
     }
 
     def read_file(self,
@@ -147,11 +148,12 @@ class FileManager(GObject.Object):
     def write_file(self,
                    window:      Window,
                    file_path:   str,
+                   export:      bool = False,
                    **kwargs) -> bool:
         file_format = file_path.split('.')[-1].lower()
 
         if file_format == 'erbook':
-            return self.write_erbook(window, file_path)
+            return self.write_erbook(window, file_path, export)
 
         has_backup = False
 
@@ -175,8 +177,12 @@ class FileManager(GObject.Object):
         try:
             if file_format in write_methods:
                 write_methods[file_format](file_path, **kwargs)
-                window.file = Gio.File.new_for_path(file_path)
-                # We keep, if exists, the backup file intentionally
+
+                # Update the file signature if needed
+                if not export:
+                    window.file = Gio.File.new_for_path(file_path)
+
+                # Note that we keep, if exists, the backup file intentionally
                 return True
 
             globals.send_notification(f'Unsupported file format: {file_format}')
@@ -194,7 +200,8 @@ class FileManager(GObject.Object):
 
     def write_erbook(self,
                      window:    Window,
-                     file_path: str) -> bool:
+                     file_path: str,
+                     export:    bool) -> bool:
         # Read the UI states
         sidebar_collapsed = window.split_view.get_collapsed()
 
@@ -291,8 +298,9 @@ class FileManager(GObject.Object):
                     for dataframe_path in all_dataframe_paths:
                         zip_file.write(os.path.join(temp_dir, dataframe_path), dataframe_path)
 
-                # Update the file signature
-                window.file = Gio.File.new_for_path(file_path)
+                # Update the file signature if needed
+                if not export:
+                    window.file = Gio.File.new_for_path(file_path)
 
                 return True
 
@@ -411,10 +419,23 @@ class FileManager(GObject.Object):
 
         # A successful write will trigger the `file-saved` signal so that the users
         # can be notified that their work has been saved. Otherwise, the `write_file`
-        # function will send an in-app notification to the user.
+        # function will send an in-app notification to the user if something went wrong.
         def write_file() -> None:
             if self.write_file(window, file_path, **kwargs):
                 GLib.idle_add(self.emit, 'file-saved', file_path)
+
+        # FIXME: Using a thread to write the file to avoid blocking the main thread,
+        #        but potentially it can introduce to some race conditions.
+        threading.Thread(target=write_file, daemon=True).start()
+
+    def export_file(self,
+                    window:      Window,
+                    file_path:   str = '',
+                    **kwargs) -> None:
+
+        def write_file() -> None:
+            if self.write_file(window, file_path, export=True, **kwargs):
+                GLib.idle_add(self.emit, 'file-exported', file_path)
 
         # FIXME: Using a thread to write the file to avoid blocking the main thread,
         #        but potentially it can introduce to some race conditions.
@@ -461,4 +482,10 @@ class FileManager(GObject.Object):
         # In here, we just open a file save-as dialog to let the users
         # configure where and in which format they want to save the work.
         dialog = FileSaveAsDialog(window, self.save_file)
+        dialog.present(window)
+
+    def export_as_file(self, window: Window) -> None:
+        dialog = FileSaveAsDialog(window, self.export_file)
+        dialog.view_stack.set_visible_child_name('csv')
+        dialog.save_button.set_label('Export')
         dialog.present(window)

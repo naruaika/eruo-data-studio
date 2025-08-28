@@ -43,7 +43,7 @@
             <property name="margin-start">6</property>
             <property name="margin-end">6</property>
             <property name="end-widget">
-              <object class="GtkButton">
+              <object class="GtkButton" id="save_button">
                 <property name="label">Save</property>
                 <signal name="clicked" handler="on_save_button_clicked" swapped="no"/>
                 <style>
