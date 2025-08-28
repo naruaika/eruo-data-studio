@@ -38,6 +38,7 @@
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
     <file preprocess="xml-stripblanks">checkmark-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">document-edit-symbolic.svg</file>
     <file preprocess="xml-stripblanks">edit-copy-symbolic.svg</file>
     <file preprocess="xml-stripblanks">edit-find-replace-symbolic.svg</file>
     <file preprocess="xml-stripblanks">edit-find-symbolic.svg</file>

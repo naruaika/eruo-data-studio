@@ -1433,7 +1433,7 @@ class SheetDocument(GObject.Object):
             mrow = mrow - row_span + 1
 
         # By now header is always in the first row
-        include_header = arange.metadata.row == 0
+        include_header = mrow == 0
 
         # Prepare for snapshot
         if not globals.is_changing_state:
@@ -1585,7 +1585,7 @@ class SheetDocument(GObject.Object):
             mrow = mrow - row_span + 1
 
         # By now header is always in the first row
-        include_header = arange.metadata.row == 0
+        include_header = mrow == 0
 
         # Prepare for snapshot
         if not globals.is_changing_state:
@@ -1754,7 +1754,7 @@ class SheetDocument(GObject.Object):
             mrow = mrow - row_span + 1
 
         # By now header is always in the first row
-        include_header = arange.metadata.row == 0
+        include_header = mrow == 0
 
         # Prepare for snapshot
         if not globals.is_changing_state:
@@ -3069,7 +3069,7 @@ class SheetDocument(GObject.Object):
                                         .drop('$ridx')
 
         # By now header is always in the first row
-        include_header = arange.metadata.row == 0
+        include_header = mrow == 0
 
         # Transform contents to tab-separated values
         cell_contents = cell_contents.write_csv(include_header=include_header, separator='\t').strip('\n')

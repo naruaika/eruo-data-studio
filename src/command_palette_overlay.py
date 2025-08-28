@@ -313,8 +313,7 @@ class CommandPaletteOverlay(Adw.Bin):
             self.recent_command_titles.pop()
 
         self.window.get_application().activate_action(action_name, None)
-        self.close_command_overlay(selected_item.steal_focus,
-                                   selected_item.will_prompt)
+        self.close_command_overlay(selected_item.steal_focus, selected_item.will_prompt)
 
     def on_list_view_activated(self,
                                list_view: Gtk.ListView,
@@ -350,7 +349,8 @@ class CommandPaletteOverlay(Adw.Bin):
 
             # Skip the recent command list separator item if exists
             if self.n_eligible_recent_commands > 0 \
-                    and position == self.n_eligible_recent_commands:
+                    and position == self.n_eligible_recent_commands \
+                    and self.command_entry.get_text() == '':
                 if keyval == Gdk.KEY_Up:
                     position -= 1
                 if keyval == Gdk.KEY_Down:
@@ -385,9 +385,6 @@ class CommandPaletteOverlay(Adw.Bin):
                              callback:    callable = None,
                              user_data:   Any = [],
                              more_prompt: bool = False) -> None:
-        if self.get_focus_child():
-            return
-
         self.is_prompting = as_prompt
         self.prompt_callback = callback
         self.prompt_arguments = user_data
@@ -415,16 +412,18 @@ class CommandPaletteOverlay(Adw.Bin):
             self.eligible_list_store = eligible_list_store
             self.selection.set_model(self.eligible_list_store)
 
-        self.set_visible(True)
-
+        self.command_entry.set_icon_from_icon_name(Gtk.EntryIconPosition.PRIMARY,
+                                                   f"{'document-edit' if as_prompt else 'edit-find'}-symbolic")
         self.command_entry.set_text('')
         self.command_entry.grab_focus()
 
-        if as_prompt:
-            return
+        if not as_prompt:
+            self.prompt_text.set_visible(False)
+            self.scrolled_window.set_visible(True)
 
-        self.prompt_text.set_visible(False)
-        self.scrolled_window.set_visible(True)
+        if self.get_visible():
+            return
+        self.set_visible(True)
 
         self.is_animating_uis = True
         def stop_animating_uis() -> None:
@@ -496,7 +495,7 @@ class CommandPaletteOverlay(Adw.Bin):
                                query:  str,
                                target: str) -> str:
         """
-        Generates an HTML string with `<u>` tags around the matched subsequence.
+        Generates an HTML string with `<span>` tags around the matched subsequence.
 
         Returns the highlighted string if a match is found, otherwise None.
         """
@@ -513,6 +512,8 @@ class CommandPaletteOverlay(Adw.Bin):
         orig_target_cursor = 0
         plain_cursor = 0
 
+        color = utils.get_color_accent_hex()
+
         # Iterate through the original target string
         while orig_target_cursor < len(target):
             is_bold = plain_cursor in is_matched_at_index
@@ -520,7 +521,7 @@ class CommandPaletteOverlay(Adw.Bin):
             # Determine if we need to start a new bold tag
             if is_bold and (plain_cursor == 0 or
                             plain_cursor - 1 not in is_matched_at_index):
-                parts.append('<u>')
+                parts.append(f'<span color="{color}" weight="bold">')
 
             # Check for HTML entities in the original string
             if target[orig_target_cursor] == '&':
@@ -529,7 +530,8 @@ class CommandPaletteOverlay(Adw.Bin):
                     entity_str = target[orig_target_cursor:end_entity_index + 1]
                     parts.append(entity_str)
                     orig_target_cursor = end_entity_index + 1
-                else: # Malformed entity, treat '&' as a regular character
+                # Malformed entity, treat '&' as a regular character
+                else:
                     parts.append('&')
                     orig_target_cursor += 1
             else:
@@ -539,7 +541,7 @@ class CommandPaletteOverlay(Adw.Bin):
 
             # Determine if we need to close the bold tag
             if is_bold and (plain_cursor + 1 not in is_matched_at_index):
-                parts.append('</u>')
+                parts.append('</span>')
 
             plain_cursor += 1
 

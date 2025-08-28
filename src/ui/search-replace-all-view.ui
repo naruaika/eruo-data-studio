@@ -40,7 +40,7 @@
                 <child>
                   <object class="GtkToggleButton">
                     <property name="icon-name">view-more-horizontal-symbolic</property>
-                    <property name="tooltip-text" translatable="yes">Toggle Search Options</property>
+                    <property name="tooltip-text" translatable="yes">More Options</property>
                     <signal name="toggled" handler="on_search_options_toggled" swapped="no" />
                   </object>
                 </child>

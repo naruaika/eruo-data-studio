@@ -29,7 +29,7 @@
     </section>
     <section>
       <item>
-        <attribute name="label" translatable="yes">Clear All Filters</attribute>
+        <attribute name="label" translatable="yes">Reset All Filters</attribute>
         <attribute name="action">app.reset-all-filters</attribute>
       </item>
     </section>
@@ -37,92 +37,88 @@
       <item>
         <attribute name="label" translatable="yes">Change Type</attribute>
         <link name="submenu">
-          <item>
-            <attribute name="label" translatable="yes">To _Categorical</attribute>
-            <attribute name="action">app.convert-to-categorical</attribute>
-          </item>
-          <item>
-            <attribute name="label" translatable="yes">To _Number</attribute>
-            <link name="submenu">
-              <section>
-                <item>
-                  <attribute name="label" translatable="yes">Integer _8</attribute>
-                  <attribute name="action">app.convert-to-int8</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">Integer _16</attribute>
-                  <attribute name="action">app.convert-to-int16</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">Integer _32</attribute>
-                  <attribute name="action">app.convert-to-int32</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">Integer _64</attribute>
-                  <attribute name="action">app.convert-to-int64</attribute>
-                </item>
-              </section>
-              <section>
-                <item>
-                  <attribute name="label" translatable="yes">Unsigned Integer _8</attribute>
-                  <attribute name="action">app.convert-to-uint8</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">Unsigned Integer _16</attribute>
-                  <attribute name="action">app.convert-to-uint16</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">Unsigned Integer _32</attribute>
-                  <attribute name="action">app.convert-to-uint32</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">Unsigned Integer _64</attribute>
-                  <attribute name="action">app.convert-to-uint64</attribute>
-                </item>
-              </section>
-              <section>
-                <item>
-                  <attribute name="label" translatable="yes">Float _32</attribute>
-                  <attribute name="action">app.convert-to-float32</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">Float _64</attribute>
-                  <attribute name="action">app.convert-to-float64</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">_Decimal</attribute>
-                  <attribute name="action">app.convert-to-decimal</attribute>
-                </item>
-              </section>
-            </link>
-          </item>
-          <item>
-            <attribute name="label" translatable="yes">To _Date/Time</attribute>
-            <link name="submenu">
-              <section>
-                <item>
-                  <attribute name="label" translatable="yes">_Date</attribute>
-                  <attribute name="action">app.convert-to-date</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">_Time</attribute>
-                  <attribute name="action">app.convert-to-time</attribute>
-                </item>
-                <item>
-                  <attribute name="label" translatable="yes">D_atetime</attribute>
-                  <attribute name="action">app.convert-to-datetime</attribute>
-                </item>
-              </section>
-            </link>
-          </item>
-          <item>
-            <attribute name="label" translatable="yes">To _Boolean</attribute>
-            <attribute name="action">app.convert-to-boolean</attribute>
-          </item>
-          <item>
-            <attribute name="label" translatable="yes">To _Text</attribute>
-            <attribute name="action">app.convert-to-text</attribute>
-          </item>
+          <section>
+            <item>
+              <attribute name="label" translatable="yes">Change To _Categorical</attribute>
+              <attribute name="action">app.convert-to-categorical</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To _Whole Number</attribute>
+              <attribute name="action">app.convert-to-whole-number</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To _Decimal</attribute>
+              <attribute name="action">app.convert-to-decimal</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To _Text</attribute>
+              <attribute name="action">app.convert-to-text</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To _Boolean</attribute>
+              <attribute name="action">app.convert-to-boolean</attribute>
+            </item>
+          </section>
+          <section>
+            <item>
+              <attribute name="label" translatable="yes">Change To _Date</attribute>
+              <attribute name="action">app.convert-to-date</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To _Time</attribute>
+              <attribute name="action">app.convert-to-time</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To D_atetime</attribute>
+              <attribute name="action">app.convert-to-datetime</attribute>
+            </item>
+          </section>
+          <section>
+            <item>
+              <attribute name="label" translatable="yes">Change To Integer _8</attribute>
+              <attribute name="action">app.convert-to-int8</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To Integer _16</attribute>
+              <attribute name="action">app.convert-to-int16</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To Integer _32</attribute>
+              <attribute name="action">app.convert-to-int32</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To Integer _64</attribute>
+              <attribute name="action">app.convert-to-int64</attribute>
+            </item>
+          </section>
+          <section>
+            <item>
+              <attribute name="label" translatable="yes">Change To Unsigned Integer _8</attribute>
+              <attribute name="action">app.convert-to-uint8</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To Unsigned Integer _16</attribute>
+              <attribute name="action">app.convert-to-uint16</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To Unsigned Integer _32</attribute>
+              <attribute name="action">app.convert-to-uint32</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To Unsigned Integer _64</attribute>
+              <attribute name="action">app.convert-to-uint64</attribute>
+            </item>
+          </section>
+          <section>
+            <item>
+              <attribute name="label" translatable="yes">Change To Float _32</attribute>
+              <attribute name="action">app.convert-to-float32</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">Change To Float _64</attribute>
+              <attribute name="action">app.convert-to-float64</attribute>
+            </item>
+          </section>
         </link>
       </item>
     </section>

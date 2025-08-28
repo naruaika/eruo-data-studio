@@ -190,58 +190,58 @@ class Application(Adw.Application):
                                                                                             self.on_clear_contents_action,
                                                                                             shortcuts=['Delete'],
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-boolean',                                            _('Column: Convert to Boolean'),
+        self.create_action('convert-to-boolean',                                            _('Column: Change Type to Boolean'),
                                                                                             self.on_convert_to_boolean_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-categorical',                                        _('Column: Convert to Categorical'),
+        self.create_action('convert-to-categorical',                                        _('Column: Change Type to Categorical'),
                                                                                             self.on_convert_to_categorical_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-date',                                               _('Column: Convert to Date'),
+        self.create_action('convert-to-date',                                               _('Column: Change Type to Date'),
                                                                                             self.on_convert_to_date_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-datetime',                                           _('Column: Convert to Datetime'),
+        self.create_action('convert-to-datetime',                                           _('Column: Change Type to Datetime'),
                                                                                             self.on_convert_to_datetime_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-decimal',                                            _('Column: Convert to Decimal Number'),
+        self.create_action('convert-to-decimal',                                            _('Column: Change Type to Decimal Number'),
                                                                                             self.on_convert_to_decimal_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-float32',                                            _('Column: Convert to Float (32-Bit)'),
+        self.create_action('convert-to-float32',                                            _('Column: Change Type to Float (32-Bit)'),
                                                                                             self.on_convert_to_float32_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-float64',                                            _('Column: Convert to Float (64-Bit)'),
+        self.create_action('convert-to-float64',                                            _('Column: Change Type to Float (64-Bit)'),
                                                                                             self.on_convert_to_float64_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-int8',                                               _('Column: Convert to Integer (8-Bit)'),
+        self.create_action('convert-to-int8',                                               _('Column: Change Type to Integer (8-Bit)'),
                                                                                             self.on_convert_to_int8_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-int16',                                              _('Column: Convert to Integer (16-Bit)'),
+        self.create_action('convert-to-int16',                                              _('Column: Change Type to Integer (16-Bit)'),
                                                                                             self.on_convert_to_int16_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-int32',                                              _('Column: Convert to Integer (32-Bit)'),
+        self.create_action('convert-to-int32',                                              _('Column: Change Type to Integer (32-Bit)'),
                                                                                             self.on_convert_to_int32_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-int64',                                              _('Column: Convert to Integer (64-Bit)'),
+        self.create_action('convert-to-int64',                                              _('Column: Change Type to Integer (64-Bit)'),
                                                                                             self.on_convert_to_int64_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-text',                                               _('Column: Convert to Text'),
+        self.create_action('convert-to-text',                                               _('Column: Change Type to Text'),
                                                                                             self.on_convert_to_text_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-time',                                               _('Column: Convert to Time'),
+        self.create_action('convert-to-time',                                               _('Column: Change Type to Time'),
                                                                                             self.on_convert_to_time_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-uint8',                                              _('Column: Convert to Unsigned Integer (8-Bit)'),
+        self.create_action('convert-to-uint8',                                              _('Column: Change Type to Unsigned Integer (8-Bit)'),
                                                                                             self.on_convert_to_uint8_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-uint16',                                             _('Column: Convert to Unsigned Integer (16-Bit)'),
+        self.create_action('convert-to-uint16',                                             _('Column: Change Type to Unsigned Integer (16-Bit)'),
                                                                                             self.on_convert_to_uint16_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-uint32',                                             _('Column: Convert to Unsigned Integer (32-Bit)'),
+        self.create_action('convert-to-uint32',                                             _('Column: Change Type to Unsigned Integer (32-Bit)'),
                                                                                             self.on_convert_to_uint32_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-uint64',                                             _('Column: Convert to Unsigned Integer (64-Bit)'),
+        self.create_action('convert-to-uint64',                                             _('Column: Change Type to Unsigned Integer (64-Bit)'),
                                                                                             self.on_convert_to_uint64_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('convert-to-whole-number',                                       _('Column: Convert to Whole Number'),
+        self.create_action('convert-to-whole-number',                                       _('Column: Change Type to Whole Number'),
                                                                                             self.on_convert_to_int64_action,
                                                                                             when_expression="document == 'worksheet'")
         self.create_action('delete-column',                                                 _('Column: Delete Columns'),
@@ -382,7 +382,7 @@ class Application(Adw.Application):
 #       self.create_action('remove-surplus-empty-rows',                                     _('Remove Surplus Empty Rows'),
 #                                                                                            self.on_remove_surplus_empty_rows_action,
 #                                                                                           when_expression="document == 'worksheet'")
-        self.create_action('reset-all-filters',                                             _('Filter: Clear All Rows Filters'),
+        self.create_action('reset-all-filters',                                             _('Filter: Reset All Rows Filters'),
                                                                                             self.on_reset_all_filters_action,
                                                                                             when_expression="document == 'worksheet'")
         self.create_action('sort-by-ascending',                                             _('Sort: Sort Rows by Ascending'),
@@ -478,19 +478,19 @@ class Application(Adw.Application):
         # Register new advanced worksheet actions
         #
         # Inspired by https://github.com/qcz/vscode-text-power-tools
-        self.create_action('append-prefix-to-cell',                                         _('Cell: Append Prefix...'),
+        self.create_action('append-prefix-to-cell',                                         _('Cell: Append Text Prefix...'),
                                                                                             self.on_append_prefix_to_cell_action,
                                                                                             will_prompt=True,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('append-prefix-to-column',                                       _('Column: Append Prefix...'),
+        self.create_action('append-prefix-to-column',                                       _('Column: Append Text Prefix...'),
                                                                                             self.on_append_prefix_to_column_action,
                                                                                             will_prompt=True,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('append-suffix-to-cell',                                         _('Cell: Append Suffix...'),
+        self.create_action('append-suffix-to-cell',                                         _('Cell: Append Text Suffix...'),
                                                                                             self.on_append_suffix_to_cell_action,
                                                                                             will_prompt=True,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('append-suffix-to-column',                                       _('Column: Append Suffix...'),
+        self.create_action('append-suffix-to-column',                                       _('Column: Append Text Suffix...'),
                                                                                             self.on_append_suffix_to_column_action,
                                                                                             will_prompt=True,
                                                                                             when_expression="document == 'worksheet'")
@@ -770,36 +770,36 @@ class Application(Adw.Application):
         self.create_action('slugify-column',                                                _('Column: Slugify'),
                                                                                             self.on_slugify_columns_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-cell-by-comma-into-new-worksheet',                        _('Cell: Split Text by Comma Into New Worksheet'),
+        self.create_action('split-cell-by-comma-into-new-worksheet',                        _('Cell: Split Text by Comma &amp; Collect Into New Worksheet'),
                                                                                             self.on_split_cells_by_comma_into_new_worksheet_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-cell-by-characters-into-new-worksheet',                   _('Cell: Split Text by a Set of Characters Into New Worksheet...'),
+        self.create_action('split-cell-by-characters-into-new-worksheet',                   _('Cell: Split Text by a Set of Characters &amp; Collect Into New Worksheet...'),
                                                                                             self.on_split_cells_by_characters_into_new_worksheet_action,
                                                                                             will_prompt=True,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-cell-by-pipe-into-new-worksheet',                         _('Cell: Split Text by Pipe Into New Worksheet'),
+        self.create_action('split-cell-by-pipe-into-new-worksheet',                         _('Cell: Split Text by Pipe &amp; Collect Into New Worksheet'),
                                                                                             self.on_split_cells_by_pipe_into_new_worksheet_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-cell-by-semicolon-into-new-worksheet',                    _('Cell: Split Text by Semicolon Into New Worksheet'),
+        self.create_action('split-cell-by-semicolon-into-new-worksheet',                    _('Cell: Split Text by Semicolon &amp; Collect Into New Worksheet'),
                                                                                             self.on_split_cells_by_semicolon_into_new_worksheet_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-cell-by-space-into-new-worksheet',                        _('Cell: Split Text by Space Into New Worksheet'),
+        self.create_action('split-cell-by-space-into-new-worksheet',                        _('Cell: Split Text by Whitespace &amp; Collect Into New Worksheet'),
                                                                                             self.on_split_cells_by_space_into_new_worksheet_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-column-by-comma-into-new-worksheet',                      _('Column: Split Text by Comma Into New Worksheet'),
+        self.create_action('split-column-by-comma-into-new-worksheet',                      _('Column: Split Text by Comma &amp; Collect Into New Worksheet'),
                                                                                             self.on_split_columns_by_comma_into_new_worksheet_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-column-by-characters-into-new-worksheet',                 _('Column: Split Text by a Set of Characters Into New Worksheet...'),
+        self.create_action('split-column-by-characters-into-new-worksheet',                 _('Column: Split Text by a Set of Characters &amp; Collect Into New Worksheet...'),
                                                                                             self.on_split_columns_by_characters_into_new_worksheet_action,
                                                                                             will_prompt=True,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-column-by-pipe-into-new-worksheet',                       _('Column: Split Text by Pipe Into New Worksheet'),
+        self.create_action('split-column-by-pipe-into-new-worksheet',                       _('Column: Split Text by Pipe &amp; Collect Into New Worksheet'),
                                                                                             self.on_split_columns_by_pipe_into_new_worksheet_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-column-by-semicolon-into-new-worksheet',                  _('Column: Split Text by Semicolon Into New Worksheet'),
+        self.create_action('split-column-by-semicolon-into-new-worksheet',                  _('Column: Split Text by Semicolon &amp; Collect Into New Worksheet'),
                                                                                             self.on_split_columns_by_semicolon_into_new_worksheet_action,
                                                                                             when_expression="document == 'worksheet'")
-        self.create_action('split-column-by-space-into-new-worksheet',                      _('Column: Split Text by Space Into New Worksheet'),
+        self.create_action('split-column-by-space-into-new-worksheet',                      _('Column: Split Text by Whitespace &amp; Collect Into New Worksheet'),
                                                                                             self.on_split_columns_by_space_into_new_worksheet_action,
                                                                                             when_expression="document == 'worksheet'")
         self.create_action('swap-cell-text-case',                                           _('Cell: Swap Text Case'),
@@ -1864,9 +1864,8 @@ Options:
         def proceed_to_keep_rows(string: str) -> None:
             operator = 'contains'
             expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=True)
-            expression = polars.any_horizontal()
+            expression = polars.any_horizontal(expression)
             document.pending_filters = [self._construct_query_builder(operator, string, expression)]
-
             document.filter_current_rows(multiple=True)
 
         window = self.get_active_window()

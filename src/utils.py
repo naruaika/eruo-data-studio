@@ -264,3 +264,23 @@ def check_command_eligible(window: Gtk.Window, when_expression: str) -> bool:
         _globals['document'] = 'notebook'
 
     return eval(when_expression, _globals, {})
+
+
+
+from gi.repository import Adw
+
+def get_color_accent_hex() -> str:
+    dark = Adw.StyleManager().get_dark()
+    rgba = Adw.StyleManager().get_accent_color()
+    rgba = rgba.to_standalone_rgba(dark)
+    rgba = list(rgba)
+
+    r = rgba[0]
+    g = rgba[1]
+    b = rgba[2]
+
+    r_int = int(r * 255)
+    g_int = int(g * 255)
+    b_int = int(b * 255)
+
+    return f'#{r_int:02x}{g_int:02x}{b_int:02x}'
