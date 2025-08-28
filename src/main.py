@@ -1505,8 +1505,8 @@ Options:
         document.update_current_cells_from_operator('decode-base64', on_column=False)
 
     def on_decode_base64_column_text_action(self,
-                                          action: Gio.SimpleAction,
-                                          *args) -> None:
+                                            action: Gio.SimpleAction,
+                                            *args) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
@@ -2372,8 +2372,8 @@ Options:
         window.rename_sheet(tab_page)
 
     def on_remove_cell_new_lines_characters_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
+                                                   action: Gio.SimpleAction,
+                                                   *args) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
@@ -2388,8 +2388,8 @@ Options:
         document.update_current_cells_from_operator('remove-whitespaces', on_column=False)
 
     def on_remove_column_new_lines_characters_action(self,
-                                                      action: Gio.SimpleAction,
-                                                      *args) -> None:
+                                                     action: Gio.SimpleAction,
+                                                     *args) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
@@ -2614,8 +2614,8 @@ Options:
                                                             callback=proceed_to_keep_rows)
 
     def on_remove_rows_matching_regex_case_insensitive_string_into_new_worksheet_action_action(self,
-                                                                                                  action: Gio.SimpleAction,
-                                                                                                  *args) -> None:
+                                                                                               action: Gio.SimpleAction,
+                                                                                               *args) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
@@ -2640,8 +2640,8 @@ Options:
                                                             callback=proceed_to_keep_rows)
 
     def on_remove_rows_matching_regex_case_sensitive_string_into_new_worksheet_action_action(self,
-                                                                                                action: Gio.SimpleAction,
-                                                                                                *args) -> None:
+                                                                                             action: Gio.SimpleAction,
+                                                                                             *args) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return

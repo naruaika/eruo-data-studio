@@ -140,6 +140,7 @@ class CommandPaletteOverlay(Adw.Bin):
             self.list_store.append(list_item)
 
         self.recent_command_titles = []
+        self.n_eligible_recent_commands = 0
         self.eligible_list_store = Gio.ListStore()
 
         self.is_prompting = False
@@ -296,6 +297,7 @@ class CommandPaletteOverlay(Adw.Bin):
                                         selected_item.shortcuts,
                                         selected_item.steal_focus,
                                         selected_item.will_prompt,
+                                        selected_item.when_expression,
                                         is_recent_item=True)
 
         if selected_item.title in self.recent_command_titles:
@@ -346,9 +348,9 @@ class CommandPaletteOverlay(Adw.Bin):
             # it'll be enabled back when the user moves the mouse again
             self.list_view.set_single_click_activate(False)
 
-            if len(self.recent_command_titles) > 0 \
-                    and position == len(self.recent_command_titles) \
-                    and self.command_entry.get_text() == '':
+            # Skip the recent command list separator item if exists
+            if self.n_eligible_recent_commands > 0 \
+                    and position == self.n_eligible_recent_commands:
                 if keyval == Gdk.KEY_Up:
                     position -= 1
                 if keyval == Gdk.KEY_Down:
@@ -400,10 +402,15 @@ class CommandPaletteOverlay(Adw.Bin):
 
         # Filter out the commands that are not eligible
         if not as_prompt:
+            self.n_eligible_recent_commands = 0
             eligible_list_store = Gio.ListStore()
             for item in self.list_store:
                 if item.when_expression == '' \
                         or utils.check_command_eligible(self.window, item.when_expression):
+                    if item.is_recent_item:
+                        self.n_eligible_recent_commands += 1
+                    if item.is_separator and self.n_eligible_recent_commands == 0:
+                        continue
                     eligible_list_store.append(item)
             self.eligible_list_store = eligible_list_store
             self.selection.set_model(self.eligible_list_store)
