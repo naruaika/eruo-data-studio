@@ -3018,9 +3018,11 @@ class SheetDocument(GObject.Object):
         mrow = self.data.bbs[0].row
         column_span = self.data.bbs[0].column_span
 
-        self.update_selection_from_position(mcolumn, mrow, column_span, mrow)
+        table_width = self.data.dfs[0].width
+        row_index = self.display.get_vrow_from_row(mrow + 1)
+        first_row = self.data.read_cell_data_block_from_metadata(0, row_index - 1, table_width, 1, 0)
 
-        first_row = self.data.dfs[0][0]
+        self.update_selection_from_position(mcolumn, mrow, column_span, mrow)
         self.update_current_cells_from_datatable(first_row)
 
         self.update_selection_from_position(mcolumn, mrow + 1, column_span, mrow + 1)
