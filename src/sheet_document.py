@@ -1794,9 +1794,6 @@ class SheetDocument(GObject.Object):
                                                  content,   # before
                                                  datatable) # after
 
-        column_span = crange.column_span
-        row_span = crange.row_span
-
         # Move the first row to the header row
         if include_header:
             first_row = datatable[0].cast(polars.String).row(0)
@@ -1807,11 +1804,13 @@ class SheetDocument(GObject.Object):
         # Update data
         if self.data.update_cell_data_block_from_metadata(mcolumn,
                                                           mrow,
-                                                          column_span,
-                                                          row_span,
+                                                          crange.column_span,
+                                                          crange.row_span,
                                                           mdfi,
                                                           include_header,
-                                                          datatable):
+                                                          datatable,
+                                                          self.display.column_visible_series,
+                                                          self.display.row_visible_series):
             from .sheet_selection import SheetLocatorCell
 
             # Update selection to fit the size of the dataframe being updated
@@ -2949,8 +2948,10 @@ class SheetDocument(GObject.Object):
                 column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
             self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
+        self.cancel_cutcopy_operation()
         self.auto_adjust_selections_by_crud(0, 0, False)
         self.repopulate_auto_filter_widgets()
+
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
@@ -3120,7 +3121,7 @@ class SheetDocument(GObject.Object):
             column_span -= 1
 
         if arange.row_span < 0:
-            row_span -= 3
+            row_span -= 2
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1

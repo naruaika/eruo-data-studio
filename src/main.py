@@ -397,6 +397,12 @@ class Application(Adw.Application):
         self.create_action('unhide-column',                                                 _('Column: Unhide Columns'),
                                                                                             self.on_unhide_column_action,
                                                                                             when_expression="document == 'worksheet'")
+        self.create_action('use-first-row-as-headers',                                      _('Sheet: Use First Row as Headers'),
+                                                                                            self.on_use_first_row_as_headers_action,
+                                                                                            when_expression="document == 'worksheet'")
+        self.create_action('use-headers-as-first-row',                                      _('Sheet: Use Headers as First Row'),
+                                                                                            self.on_use_headers_as_first_row_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('focus-on-formula-editor',                                       _('View: Focus on Formula Editor'),
                                                                                             self.on_focus_on_formula_editor_action,
                                                                                             shortcuts=['<shift>F2'],
@@ -831,12 +837,6 @@ class Application(Adw.Application):
                                                                                             when_expression="document == 'worksheet'")
         self.create_action('trim-column-end-whitespace',                                    _('Column: Trim Trailing Whitespace'),
                                                                                             self.on_trim_column_end_whitespace_action,
-                                                                                            when_expression="document == 'worksheet'")
-        self.create_action('use-first-row-as-headers',                                      _('Sheet: Use First Row as Headers'),
-                                                                                            self.on_use_first_row_as_headers_action,
-                                                                                            when_expression="document == 'worksheet'")
-        self.create_action('use-headers-as-first-row',                                      _('Sheet: Use Headers as First Row'),
-                                                                                            self.on_use_headers_as_first_row_action,
                                                                                             when_expression="document == 'worksheet'")
         self.create_action('wrap-cell-with-text-different',                                 _('Cell: Wrap with Text (Different Prefix and Suffix)...'),
                                                                                             self.on_wrap_cell_with_text_different_action,

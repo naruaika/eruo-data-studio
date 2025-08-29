@@ -953,50 +953,59 @@ FROM indexed_self
                                              row_span:       int,
                                              dfi:            int,
                                              include_header: bool,
-                                             content:        polars.DataFrame) -> bool:
+                                             content:        polars.DataFrame,
+                                             column_vseries: polars.Series = None,
+                                             row_vseries:    polars.Series = None) -> bool:
         if dfi < 0 or len(self.dfs) <= dfi:
             return False
 
+        if column_vseries is None:
+            column_vseries = polars.Series()
+
+        if row_vseries is None:
+            row_vseries = polars.Series()
+
         row -= 1
 
-        row_count = self.dfs[dfi].height
-
-        end_column = column + column_span
-        if column_span < 0:
-            end_column = self.dfs[dfi].width
-
         if row_span < 0:
-            row_span = row_count
+            row_span = self.dfs[dfi].height + 1
 
-        start = max(0, row)
-        stop = min(row + row_span, row_count)
+        row_start = max(0, row)
+        row_stop = row + row_span
 
-        content_index = -1
-        for column in range(column, end_column):
-            if self.dfs[dfi].width <= column:
-                break
+        # Prepare for row index
+        if len(row_vseries):
+            ridx_offset = row_vseries.index_of(row + 1)
+            ridx = row_vseries.slice(ridx_offset + include_header,
+                                     row_span - include_header)
+            ridx -= 1 # shift the values after excluding the header
+        else:
+            ridx = polars.int_range(row_start, row_stop, eager=True)
 
-            content_index += 1
-            content_dtype = content.dtypes[content_index]
+        # Prepare for column index
+        if len(column_vseries):
+            cidx_offset = column_vseries.index_of(column)
+            cidx = column_vseries.slice(cidx_offset, column_span)
+        else:
+            cidx = polars.int_range(column, column + column_span, eager=True)
 
+        for ccolumn, column in enumerate(cidx.to_list()):
             column_name = self.dfs[dfi].columns[column]
-            column_dtype = self.dfs[dfi].dtypes[column]
 
-            new_dtype = column_dtype if column_dtype != polars.Null \
-                                     else content_dtype
-
-            # Update the dataframe in range
-            self.dfs[dfi] = self.dfs[dfi].with_columns(
-                self.dfs[dfi][:start, column].cast(new_dtype)
-                                             .extend(content[:, content_index].cast(new_dtype))
-                                             .extend(self.dfs[dfi][stop:, column])
-                                             .alias(column_name)
-            )
+            self.dfs[dfi] = self.dfs[dfi].with_row_index('$ridx') \
+                                         .join(polars.DataFrame({'$nval': content[:, ccolumn],
+                                                                 '$ridx': ridx}),
+                                               on='$ridx', how='left') \
+                                         .with_columns(polars.when(polars.col('$ridx').is_in(ridx))
+                                                             .then(polars.col('$nval'))
+                                                             .otherwise(polars.col(column_name))
+                                                             .alias(column_name)) \
+                                         .drop(['$ridx', '$nval'])
 
             if not include_header:
                 continue # skip header cell
 
-            replace_with = content.columns[content_index]
+            replace_with = content.columns[ccolumn]
             replace_with = self._generate_new_column_name(dfi, column_name, replace_with)
 
             # Update the column name
