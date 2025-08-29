@@ -23,6 +23,7 @@
 
 from gi.repository import GObject
 from datetime import datetime
+from typing import Any
 import duckdb
 import polars
 import re
@@ -853,25 +854,8 @@ FROM indexed_self
                 globals.send_notification(str(e))
                 break
 
-            # Remove leading '$' to prevent collision from internal column names
-            replace_with = replace_with.lstrip('$')
-
-            def generate_column_name(column_name: str) -> str:
-                cnumber = 1
-                for cname in self.dfs[dfi].columns:
-                    if match := re.match(column_name + r'_(\d+)', cname):
-                        cnumber = max(cnumber, int(match.group(1)) + 1)
-                return f'{column_name}_{cnumber}'
-
-            # Generate a new column name if needed
-            if replace_with in ['', None]:
-                replace_with = generate_column_name('column')
-            else:
-                replace_with = str(replace_with)
-                if replace_with in self.dfs[dfi].columns:
-                    replace_with = generate_column_name(replace_with)
-
             # Update the column name
+            replace_with = self._generate_new_column_name(dfi, column_name, replace_with)
             self.dfs[dfi] = self.dfs[dfi].rename({column_name: replace_with})
 
         return True
@@ -956,198 +940,9 @@ FROM indexed_self
             if not include_header:
                 continue # skip header cell
 
-            # Remove leading '$' to prevent collision from internal column names
-            replace_with = new_value.lstrip('$')
-
-            def generate_column_name(column_name: str) -> str:
-                cnumber = 1
-                for cname in self.dfs[dfi].columns:
-                    if match := re.match(column_name + r'_(\d+)', cname):
-                        cnumber = max(cnumber, int(match.group(1)) + 1)
-                return f'{column_name}_{cnumber}'
-
-            # Generate a new column name if needed
-            if replace_with in ['', None]:
-                replace_with = generate_column_name('column')
-            else:
-                replace_with = str(replace_with)
-                if replace_with in self.dfs[dfi].columns:
-                    replace_with = generate_column_name(replace_with)
-
             # Update the column name
+            replace_with = self._generate_new_column_name(dfi, column_name, new_value)
             self.dfs[dfi] = self.dfs[dfi].rename({column_name: replace_with})
-
-        return True
-
-    def update_cell_data_block_with_range_from_metadata(self,
-                                                        t_column:         int,
-                                                        t_row:            int,
-                                                        column_span:      int,
-                                                        row_span:         int,
-                                                        t_dfi:            int,
-                                                        t_include_header: bool,
-                                                        crange:           any,
-                                                        column_vseries:   polars.Series,
-                                                        row_vseries:      polars.Series) -> bool:
-        if t_dfi < 0 or len(self.dfs) <= t_dfi:
-            return False
-
-        s_dfi = crange.metadata.dfi
-        s_include_header = crange.metadata.row == 0 # by now header is always in the first row
-
-        # TODO: support multiple dataframes?
-        if column_span == -1:
-            column_span = self.bbs[s_dfi].column_span
-
-        if row_span == -1:
-            row_span = self.bbs[s_dfi].row_span
-
-        s_row_start = max(0, crange.metadata.row - 1)
-        s_row_stop = min(crange.metadata.row - 1 + row_span, self.dfs[s_dfi].height)
-
-        t_row_start = max(0, t_row - 1)
-        t_row_stop = min(t_row - 1 + row_span, self.dfs[t_dfi].height)
-
-        t_n_rows = t_row_stop - t_row_start
-        s_n_rows = s_row_stop - s_row_start
-
-        # Prepare for source row index
-        if len(row_vseries):
-            s_ridx_length = self.dfs[s_dfi].height
-            s_ridx = (
-                polars.DataFrame({'$ridx': polars.int_range(0, s_ridx_length, eager=True)})
-                      .filter(polars.col('$ridx').is_in(row_vseries[1:] - 1) |
-                              polars.col('$ridx').ge(self.dfs[s_dfi].height))
-                      .slice(s_row_start + s_include_header - 1, s_n_rows + s_include_header)['$ridx']
-            )
-            if s_include_header:
-                s_ridx = polars.concat([polars.Series([-1]), s_ridx[1:].cast(polars.Int64) - 1])
-        else:
-            s_ridx = polars.int_range(s_row_start, s_row_stop, eager=True)
-
-        # Prepare for target row index
-        if len(row_vseries):
-            t_ridx_offset = row_vseries.index_of(t_row)
-            t_ridx = row_vseries.slice(t_ridx_offset + t_include_header, t_n_rows) - 1
-            if t_include_header:
-                t_ridx = polars.concat([polars.Series([-1]), t_ridx.cast(polars.Int64)])
-        else:
-            t_ridx_offset = t_row_start + s_include_header - t_include_header
-            t_ridx = polars.int_range(t_ridx_offset, t_ridx_offset + row_span - s_include_header, eager=True)
-
-        # Handle a case when the user selects a range that contains cells
-        # that are vertically out of range of the source dataframe.
-        if s_n_rows < t_n_rows:
-            s_ridx.extend(polars.Series([-1] * (t_n_rows - s_n_rows)))
-
-        t_end_column = t_column + column_span
-        if column_span < 0:
-            t_end_column = self.dfs[t_dfi].width
-
-        s_column_index = crange.metadata.column
-
-        for t_column in range(t_column, t_end_column):
-            # Skip if the column is hidden
-            if len(column_vseries) and t_column not in column_vseries:
-                continue
-
-            # Skip out of range columns
-            if self.dfs[t_dfi].width <= t_column:
-                break
-
-            t_column_name = self.dfs[t_dfi].columns[t_column]
-
-            # Handle a case when the user selects a range that contains cells
-            # that are horizontally out of range of the source dataframe.
-            if self.dfs[s_dfi].width <= s_column_index and t_n_rows > 0:
-                self.dfs[t_dfi] = (
-                    self.dfs[t_dfi]
-                        .with_row_index('$t_ridx')
-                        .join(
-                            polars.DataFrame({
-                                '$t_nval': polars.DataFrame({
-                                    t_column_name: [None] * (t_n_rows + (t_n_rows - s_n_rows))
-                                }),
-                                '$t_ridx': t_ridx
-                            }),
-                            on='$t_ridx',
-                            how='left',
-                        )
-                        .with_columns(polars.when(polars.col('$t_ridx').is_in(t_ridx))
-                                            .then(polars.col('$t_nval'))
-                                            .otherwise(polars.col(t_column_name))
-                                            .alias(t_column_name)
-                        )
-                        .drop(['$t_ridx', '$t_nval'])
-                )
-                continue
-
-            s_column_name = self.dfs[s_dfi].columns[s_column_index]
-            s_column_index += 1
-
-            # Update the dataframe in range, excluding the header row
-            # FIXME: updating the same area as the source area will clear its contents
-            self.dfs[t_dfi] = (
-                self.dfs[t_dfi]
-                    .with_row_index('$t_ridx')
-                    .join(
-                        polars.DataFrame({
-                            '$t_nval': (
-                                polars.concat([
-                                    self.dfs[s_dfi][s_column_name],
-                                    polars.Series([None] * (t_n_rows - s_n_rows)),
-                                ]).gather(s_ridx)
-                            ),
-                            '$t_ridx': t_ridx
-                        }),
-                        on='$t_ridx',
-                        how='left',
-                    )
-                    .with_columns(polars.when(polars.col('$t_ridx').is_in(t_ridx))
-                                        .then(polars.col('$t_nval'))
-                                        .otherwise(polars.col(t_column_name))
-                                        .alias(t_column_name)
-                    )
-                    .drop(['$t_ridx', '$t_nval'])
-            )
-
-            if not s_include_header and not t_include_header:
-                continue
-
-            t_first_row = self.dfs[s_dfi][s_row_start, s_column_name]
-
-            if t_first_row is None:
-                t_first_row = ''
-
-            t_first_row = str(t_first_row)
-
-            if s_include_header:
-                t_first_row = s_column_name
-
-            if not t_include_header:
-                self.dfs[t_dfi][t_row_start, t_column_name] = t_first_row
-                continue
-
-            # Remove leading '$' to prevent collision from internal column names
-            t_new_col_name = t_first_row.lstrip('$')
-
-            def generate_column_name(column_name: str) -> str:
-                cnumber = 1
-                for cname in self.dfs[t_dfi].columns:
-                    if match := re.match(column_name + r'_(\d+)', cname):
-                        cnumber = max(cnumber, int(match.group(1)) + 1)
-                return f'{column_name}_{cnumber}'
-
-            # Generate a new column name if needed
-            if t_new_col_name in ['', None]:
-                t_new_col_name = generate_column_name('column')
-            else:
-                t_new_col_name = str(t_new_col_name)
-                if t_new_col_name in self.dfs[t_dfi].columns:
-                    t_new_col_name = generate_column_name(t_new_col_name)
-
-            # Update the column name
-            self.dfs[t_dfi] = self.dfs[t_dfi].rename({t_column_name: t_new_col_name})
 
         return True
 
@@ -1182,13 +977,18 @@ FROM indexed_self
                 break
 
             content_index += 1
+            content_dtype = content.dtypes[content_index]
 
             column_name = self.dfs[dfi].columns[column]
             column_dtype = self.dfs[dfi].dtypes[column]
 
+            new_dtype = column_dtype if column_dtype != polars.Null \
+                                     else content_dtype
+
             # Update the dataframe in range
             self.dfs[dfi] = self.dfs[dfi].with_columns(
-                self.dfs[dfi][:start, column].extend(content[:, content_index].cast(column_dtype))
+                self.dfs[dfi][:start, column].cast(new_dtype)
+                                             .extend(content[:, content_index].cast(new_dtype))
                                              .extend(self.dfs[dfi][stop:, column])
                                              .alias(column_name)
             )
@@ -1196,8 +996,11 @@ FROM indexed_self
             if not include_header:
                 continue # skip header cell
 
+            replace_with = content.columns[content_index]
+            replace_with = self._generate_new_column_name(dfi, column_name, replace_with)
+
             # Update the column name
-            self.dfs[dfi] = self.dfs[dfi].rename({column_name: content.columns[content_index]})
+            self.dfs[dfi] = self.dfs[dfi].rename({column_name: replace_with})
 
         return True
 
@@ -1464,3 +1267,28 @@ FROM indexed_self
                                                 flags=re.IGNORECASE)
 
         return True
+
+    def _generate_new_column_name(self,
+                                  dfi:          int,
+                                  current_name: str,
+                                  replace_with: str) -> str:
+        # Remove leading '$' to prevent collision from internal column names
+        replace_with = replace_with.lstrip('$')
+
+        def generate_column_name(column_name: str) -> str:
+            cnumber = 1
+            for cname in self.dfs[dfi].columns:
+                if match := re.match(column_name + r'_(\d+)', cname):
+                    cnumber = max(cnumber, int(match.group(1)) + 1)
+            return f'{column_name}_{cnumber}'
+
+        # Generate a new column name if needed
+        if replace_with in ['', None]:
+            replace_with = generate_column_name('column')
+        else:
+            replace_with = str(replace_with)
+            if replace_with != current_name \
+                    and replace_with in self.dfs[dfi].columns:
+                replace_with = generate_column_name(replace_with)
+
+        return replace_with

@@ -59,7 +59,7 @@
                     <child>
                       <object class="AdwButtonContent">
                         <property name="icon-name">document-add-symbolic</property>
-                        <property name="label" translatable="yes">From View</property>
+                        <property name="label" translatable="yes">Materialize View</property>
                       </object>
                     </child>
                     <style>

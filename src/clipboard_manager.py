@@ -33,7 +33,8 @@ class ClipboardManager(GObject.Object):
         self.clipboard = display.get_clipboard()
 
         from .sheet_selection import SheetCell
-        self.range: SheetCell = None
+        self.crange: SheetCell = None
+        self.datatable = None
 
     def set_text(self, text: str) -> None:
         self.clipboard.set(GObject.Value(str, text))
@@ -42,5 +43,6 @@ class ClipboardManager(GObject.Object):
         self.clipboard.read_text_async(None, callback)
 
     def clear(self) -> None:
+        self.crange = None
+        self.datatable = None
         self.clipboard.set_content(None)
-        self.range = None

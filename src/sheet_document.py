@@ -97,6 +97,7 @@ class SheetDocument(GObject.Object):
         self.focused_widget: SheetWidget = None
 
         self.is_refreshing_uis: bool = False
+        self.is_expanding_cells: bool = False
         self.is_selecting_cells: bool = False
         self.is_cutting_cells: bool = False
         self.is_copying_cells: bool = False
@@ -847,11 +848,6 @@ class SheetDocument(GObject.Object):
                                                                           self.display.column_visible_series,
                                                                           self.display.row_visible_series)
 
-    def replace_table_from_operator(self,
-                                    operator_name:  str,
-                                    operation_args: list = []) -> None:
-        pass
-
     def insert_from_current_rows(self,
                                  dataframe: polars.DataFrame,
                                  vflags:    polars.Series = None,
@@ -997,7 +993,9 @@ class SheetDocument(GObject.Object):
                     row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
                 self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
-            self.cancel_cutcopy_operation()
+            if not self.is_expanding_cells:
+                self.cancel_cutcopy_operation()
+
             self.auto_adjust_selections_by_crud(0, 0 if not above else row_span, False)
 
             # TODO: clear only for the related columns
@@ -1152,7 +1150,9 @@ class SheetDocument(GObject.Object):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
                 self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
-            self.cancel_cutcopy_operation()
+            if not self.is_expanding_cells:
+                self.cancel_cutcopy_operation()
+
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
             self.repopulate_auto_filter_widgets()
 
@@ -1639,7 +1639,24 @@ class SheetDocument(GObject.Object):
 
         return False
 
-    def update_current_cells_from_range(self, crange: Any) -> bool:
+    def update_current_cells_from_datatable(self, datatable: polars.DataFrame = None) -> bool:
+        if datatable is None:
+            if self.clipboard is None:
+                return False
+            datatable = self.clipboard.datatable
+            crange = self.clipboard.crange
+
+        # Create a dummy crange
+        else:
+            from .sheet_data import SheetCellMetadata
+            from .sheet_selection import SheetCell
+            column_span = datatable.width
+            row_span = datatable.height
+            metadata = SheetCellMetadata(-1, -1, -1)
+            crange = SheetCell(-1, -1, -1, -1, -1, -1,
+                               column_span, row_span,
+                               metadata)
+
         arange = self.selection.current_active_range
         active = self.selection.current_active_cell
         cursor = self.selection.current_cursor_cell
@@ -1689,6 +1706,8 @@ class SheetDocument(GObject.Object):
         if should_expand and collision_info['direction'] == 'right-below':
             return False
 
+        self.is_expanding_cells = True
+
         # Automatically expand the dataframe if needed
         # FIXME: expansion should happen at the actual edge of the dataframe,
         #        not at the edge of the visual bounding box which will cause
@@ -1708,6 +1727,8 @@ class SheetDocument(GObject.Object):
             column_span = collision_info['nonov_column_span']
             self.insert_blank_from_current_columns(True, column_span)
 
+        self.is_expanding_cells = False
+
         # Restore the selection range
         if should_expand:
             self.update_selection_from_position(active.column,
@@ -1719,7 +1740,6 @@ class SheetDocument(GObject.Object):
                                                 auto_scroll=True)
             arange = self.selection.current_active_range
 
-        # FIXME: buggy when the crange `rtl` or `btt`
         mcolumn = arange.metadata.column
         mrow = arange.metadata.row
         column_span = crange.column_span
@@ -1758,32 +1778,40 @@ class SheetDocument(GObject.Object):
 
         # Prepare for snapshot
         if not globals.is_changing_state:
-            from .history_manager import UpdateDataFromRangeState
+            from .history_manager import UpdateDataFromDataTableState
             content = self.data.read_cell_data_block_from_metadata(mcolumn,
                                                                    mrow,
                                                                    column_span,
                                                                    row_span,
                                                                    mdfi,
                                                                    include_header)
-            state = UpdateDataFromRangeState(mcolumn,
-                                             mrow,
-                                             column_span,
-                                             row_span,
-                                             mdfi,
-                                             content,
-                                             include_header,
-                                             crange)
+            state = UpdateDataFromDataTableState(mcolumn,
+                                                 mrow,
+                                                 column_span,
+                                                 row_span,
+                                                 mdfi,
+                                                 include_header,
+                                                 content,   # before
+                                                 datatable) # after
+
+        column_span = crange.column_span
+        row_span = crange.row_span
+
+        # Move the first row to the header row
+        if include_header:
+            first_row = datatable[0].cast(polars.String).row(0)
+            for column_index, column_name in enumerate(datatable.columns):
+                datatable = datatable.rename({column_name: first_row[column_index]})
+            datatable = datatable[1:]
 
         # Update data
-        if self.data.update_cell_data_block_with_range_from_metadata(mcolumn,
-                                                                     mrow,
-                                                                     crange.column_span,
-                                                                     crange.row_span,
-                                                                     mdfi,
-                                                                     include_header,
-                                                                     crange,
-                                                                     self.display.column_visible_series,
-                                                                     self.display.row_visible_series):
+        if self.data.update_cell_data_block_from_metadata(mcolumn,
+                                                          mrow,
+                                                          column_span,
+                                                          row_span,
+                                                          mdfi,
+                                                          include_header,
+                                                          datatable):
             from .sheet_selection import SheetLocatorCell
 
             # Update selection to fit the size of the dataframe being updated
@@ -1961,7 +1989,6 @@ class SheetDocument(GObject.Object):
         arange = self.selection.current_active_range
         active = self.selection.current_active_cell
 
-        mdfi = arange.metadata.dfi
         mrow = arange.metadata.row
         row_span = arange.row_span
 
@@ -2977,6 +3004,68 @@ class SheetDocument(GObject.Object):
         self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 
+    def use_first_row_as_headers(self) -> None:
+        if len(self.data.dfs) == 0:
+            return
+
+        if not self.data.has_main_dataframe:
+            return
+
+        if self.data.bbs[0].row_span <= 1:
+            return # skip if no visible rows
+
+        mcolumn = self.data.bbs[0].column
+        mrow = self.data.bbs[0].row
+        column_span = self.data.bbs[0].column_span
+
+        self.update_selection_from_position(mcolumn, mrow, column_span, mrow)
+
+        first_row = self.data.dfs[0][0]
+        self.update_current_cells_from_datatable(first_row)
+
+        self.update_selection_from_position(mcolumn, mrow + 1, column_span, mrow + 1)
+        self.delete_current_rows()
+
+        self.update_selection_from_position(mcolumn, mrow, column_span, mrow, auto_scroll=False)
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
+        # TODO: clear only for the related columns
+        self.data.clear_cell_data_unique_cache(0)
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+    def use_headers_as_first_row(self) -> None:
+        if len(self.data.dfs) == 0:
+            return
+
+        if not self.data.has_main_dataframe:
+            return
+
+        mcolumn = self.data.bbs[0].column
+        mrow = self.data.bbs[0].row
+        column_span = self.data.bbs[0].column_span
+
+        self.update_selection_from_position(mcolumn, mrow, column_span, mrow)
+        self.insert_blank_from_current_rows()
+
+        self.update_selection_from_position(mcolumn, mrow + 1, column_span, mrow + 1)
+
+        header_row = polars.DataFrame({cname: [cname] for cname in self.data.dfs[0].columns})
+        self.update_current_cells_from_datatable(header_row)
+
+        self.update_selection_from_position(mcolumn, mrow, column_span, mrow)
+        self.update_current_cells_from_literal('')
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
+        # TODO: clear only for the related columns
+        self.data.clear_cell_data_unique_cache(0)
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
     #
     # Clipboard
     #
@@ -2996,6 +3085,7 @@ class SheetDocument(GObject.Object):
         arange = self.selection.current_active_range
         mdfi = arange.metadata.dfi
 
+        # TODO: support multiple dataframes?
         if mdfi < 0:
             return # TODO: do something
 
@@ -3040,12 +3130,12 @@ class SheetDocument(GObject.Object):
         hidden_column_names = []
         for col_index, is_visible in enumerate(self.display.column_visibility_flags):
             if not is_visible:
-                hidden_column_names.append(self.data.dfs[0].columns[col_index])
+                hidden_column_names.append(self.data.dfs[mdfi].columns[col_index])
 
         select_expression = polars.all().exclude(hidden_column_names)
 
         # Collect column names within the selection
-        selected_column_names = self.data.dfs[0].columns[mcolumn:mcolumn + column_span]
+        selected_column_names = self.data.dfs[mdfi].columns[mcolumn:mcolumn + column_span]
 
         # Reset the select expression
         select_expression = polars.col(selected_column_names).exclude(hidden_column_names)
@@ -3062,20 +3152,42 @@ class SheetDocument(GObject.Object):
                                   if len(self.display.row_visible_series) else polars.lit(True)
 
         # Get selected cell contents
-        # TODO: support multiple dataframes?
-        cell_contents = self.data.dfs[0].select(select_expression) \
-                                        .with_row_index('$ridx') \
-                                        .filter(selected_rows_expression & visible_rows_expression) \
-                                        .drop('$ridx')
+        datatable = self.data.dfs[mdfi].select(select_expression) \
+                                       .with_row_index('$ridx') \
+                                       .filter(selected_rows_expression & visible_rows_expression) \
+                                       .drop('$ridx')
+
+        last_selected_row_number = mrow + row_span
+        last_selected_column_number = mcolumn + column_span
+
+        table_height = self.data.dfs[mdfi].height + 1
+        table_width = self.data.dfs[mdfi].width
+
+        # Expand the datatable with nulls if the user selects out of bounds.
+        # Because as of now we don't support multiple dataframes and the main dataframe
+        # always start at the (1, 1) position, so we only need to handle the expansion
+        # to the right and bottom.
+        if surplus_rows := last_selected_row_number - table_height:
+            datatable = datatable.vstack(polars.DataFrame({column_name: [None] * surplus_rows
+                                                                        for column_name in datatable.columns}))
+
+        if surplus_columns := last_selected_column_number - table_width:
+            datatable = datatable.hstack(polars.DataFrame([[None] * datatable.height] * surplus_columns))
 
         # By now header is always in the first row
         include_header = mrow == 0
 
         # Transform contents to tab-separated values
-        cell_contents = cell_contents.write_csv(include_header=include_header, separator='\t').strip('\n')
+        text_contents = datatable.write_csv(include_header=include_header, separator='\t').strip('\n')
+        clipboard.set_text(text_contents)
 
-        clipboard.set_text(cell_contents)
-        clipboard.range = arange
+        # Move the header row to the first row
+        if include_header:
+            header_row = polars.DataFrame({cname: [cname] for cname in datatable.columns})
+            datatable = polars.concat([header_row, datatable.cast(polars.String)])
+
+        clipboard.crange = arange
+        clipboard.datatable = datatable
 
         self.clipboard = clipboard
 
@@ -3088,10 +3200,9 @@ class SheetDocument(GObject.Object):
         if self.focused_widget is not None:
             return # TODO: do something
 
-        crange = clipboard.range
+        crange = clipboard.crange
 
-        is_cutting_cells = self.is_cutting_cells
-
+        # Clear the source area if it's a cut operation
         def post_cutting_cells_action() -> None:
             arange = self.selection.current_active_range
 
@@ -3114,8 +3225,34 @@ class SheetDocument(GObject.Object):
 
             self.notify_selection_changed(arange.column, arange.row, arange.metadata)
 
-        if crange is not None:
-            self.update_current_cells_from_range(crange)
+        is_cutting_cells = self.is_cutting_cells
+        is_content_tabular = clipboard.datatable is not None
+
+        # Try to read the content with CSV reader
+        if not is_content_tabular:
+            try:
+                datatable = polars.read_csv(content, has_header=False)
+                is_content_tabular = True
+            except Exception as e:
+                print(e)
+
+        # Retry by ignoring any errors
+        if not is_content_tabular:
+            try:
+                datatable = polars.read_csv(content,
+                                            has_header=False,
+                                            ignore_errors=True,
+                                            infer_schema=False)
+                is_content_tabular = True
+            except Exception as e:
+                print(e)
+
+        # Set the clipboard datatable if it's not already set
+        if is_content_tabular and clipboard.datatable is None:
+            clipboard.datatable = datatable
+
+        if is_content_tabular:
+            self.update_current_cells_from_datatable()
 
             if is_cutting_cells:
                 post_cutting_cells_action()

@@ -58,7 +58,9 @@ class SheetCellMenu(Gtk.PopoverMenu):
                                              n_hidden_columns,
                                              n_all_hidden_columns,
                                              ctype)
+            self.create_table_section(main_menu)
 
+        # General section
         other_section = Gio.Menu.new()
         other_section.append(_('Command Palette...'), 'app.open-command-palette')
         main_menu.append_section(None, other_section)
@@ -436,3 +438,9 @@ class SheetCellMenu(Gtk.PopoverMenu):
         else:
             transform_menu_item.set_submenu(transform_cell_menu)
         convert_transform_section.append_item(transform_menu_item)
+
+    def create_table_section(self, main_menu: Gio.Menu) -> None:
+        header_section = Gio.Menu.new()
+        header_section.append(_('Use First Row as Headers'), 'app.use-first-row-as-headers')
+        header_section.append(_('Use Headers as First Row'), 'app.use-headers-as-first-row')
+        main_menu.append_section(None, header_section)

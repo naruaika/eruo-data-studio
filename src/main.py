@@ -832,6 +832,12 @@ class Application(Adw.Application):
         self.create_action('trim-column-end-whitespace',                                    _('Column: Trim Trailing Whitespace'),
                                                                                             self.on_trim_column_end_whitespace_action,
                                                                                             when_expression="document == 'worksheet'")
+        self.create_action('use-first-row-as-headers',                                      _('Sheet: Use First Row as Headers'),
+                                                                                            self.on_use_first_row_as_headers_action,
+                                                                                            when_expression="document == 'worksheet'")
+        self.create_action('use-headers-as-first-row',                                      _('Sheet: Use Headers as First Row'),
+                                                                                            self.on_use_headers_as_first_row_action,
+                                                                                            when_expression="document == 'worksheet'")
         self.create_action('wrap-cell-with-text-different',                                 _('Cell: Wrap with Text (Different Prefix and Suffix)...'),
                                                                                             self.on_wrap_cell_with_text_different_action,
                                                                                             will_prompt=True,
@@ -3164,6 +3170,22 @@ Options:
         if not isinstance(document, SheetDocument):
             return
         document.update_current_cells_from_operator('trim-end-whitespace', on_column=True)
+
+    def on_use_first_row_as_headers_action(self,
+                                           action: Gio.SimpleAction,
+                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.use_first_row_as_headers()
+
+    def on_use_headers_as_first_row_action(self,
+                                           action: Gio.SimpleAction,
+                                           *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+        document.use_headers_as_first_row()
 
     def on_wrap_cell_with_text_different_action(self,
                                                 action: Gio.SimpleAction,

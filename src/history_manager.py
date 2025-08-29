@@ -43,7 +43,7 @@ class State(GObject.Object):
     scroll_y: int
 
     # Optionals
-    range: SheetCell
+    arange: SheetCell
     active: SheetCell
     cursor: SheetCell
 
@@ -62,7 +62,7 @@ class State(GObject.Object):
     def save_selection(self, should_restore: bool = False) -> None:
         document = globals.history.document
 
-        self.range = document.selection.current_active_range
+        self.arange = document.selection.current_active_range
         self.active = document.selection.current_active_cell
         self.cursor = document.selection.current_cursor_cell
 
@@ -74,7 +74,7 @@ class State(GObject.Object):
         document = globals.history.document
 
         # TODO: in some conditions, no senses to restore the selection
-        document.selection.current_active_range = self.range
+        document.selection.current_active_range = self.arange
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
 
@@ -160,20 +160,28 @@ class InsertBlankRowState(State):
     def undo(self) -> None:
         document = globals.history.document
 
+        arange = document.selection.current_active_range
+
+        row_span = arange.row_span
+        mrow = arange.metadata.row
+
         if self.auto_range:
-            prow_span, self.range.row_span = self.range.row_span, self.row_span
+            prow_span, self.arange.row_span = self.arange.row_span, self.row_span
             if not self.above:
-                document.selection.current_active_range.metadata.row += self.range.row_span
+                document.selection.current_active_range.metadata.row += self.arange.row_span
             else:
-                document.selection.current_active_range = self.range
+                document.selection.current_active_range = self.arange
         else:
-            document.selection.current_active_range.metadata.row = self.range.row
+            document.selection.current_active_range.metadata.row = self.arange.metadata.row
             document.selection.current_active_range.row_span = self.row_span
 
         document.delete_current_rows()
 
         if self.auto_range:
-            self.range.row_span = prow_span
+            self.arange.row_span = prow_span
+
+        arange.metadata.row = mrow
+        arange.row_span = row_span
 
         self.restore_selection()
 
@@ -206,20 +214,28 @@ class InsertBlankColumnState(State):
     def undo(self) -> None:
         document = globals.history.document
 
+        arange = document.selection.current_active_range
+
+        column_span = arange.column_span
+        mcolumn = arange.metadata.column
+
         if self.auto_range:
-            pcolumn_span, self.range.column_span = self.range.column_span, self.column_span
+            pcolumn_span, self.arange.column_span = self.arange.column_span, self.column_span
             if not self.left:
-                document.selection.current_active_range.metadata.column += self.range.column_span
+                document.selection.current_active_range.metadata.column += self.arange.column_span
             else:
-                document.selection.current_active_range = self.range
+                document.selection.current_active_range = self.arange
         else:
-            document.selection.current_active_range.metadata.column = self.range.column
+            document.selection.current_active_range.metadata.column = self.arange.metadata.column
             document.selection.current_active_range.column_span = self.column_span
 
         document.delete_current_columns()
 
         if self.auto_range:
-            self.range.column_span = pcolumn_span
+            self.arange.column_span = pcolumn_span
+
+        arange.metadata.column = mcolumn
+        arange.column_span = column_span
 
         self.restore_selection()
 
@@ -465,8 +481,8 @@ class UpdateDataFromOperatorState(State):
 
 
 
-class UpdateDataFromRangeState(State):
-    __gtype_name__ = 'UpdateDataFromRangeState'
+class UpdateDataFromDataTableState(State):
+    __gtype_name__ = 'UpdateDataFromDataTableState'
 
     column: int
     row: int
@@ -474,10 +490,10 @@ class UpdateDataFromRangeState(State):
     row_span: int
     dfi: int
 
-    file_path: str
-    include_header: bool
+    before_path: str
+    after_path: str
 
-    crange: SheetCell
+    include_header: bool
 
     def __init__(self,
                  column:         int,
@@ -485,9 +501,9 @@ class UpdateDataFromRangeState(State):
                  column_span:    int,
                  row_span:       int,
                  dfi:            int,
-                 content:        Any,
                  include_header: bool,
-                 crange:         SheetCell) -> None:
+                 before:         polars.DataFrame,
+                 after:          polars.DataFrame) -> None:
         super().__init__()
 
         self.save_selection(True)
@@ -498,10 +514,10 @@ class UpdateDataFromRangeState(State):
         self.row_span = row_span
         self.dfi = dfi
 
-        self.file_path = self.write_snapshot(content)
-        self.include_header = include_header
+        self.before_path = self.write_snapshot(before)
+        self.after_path = self.write_snapshot(after)
 
-        self.crange = crange
+        self.include_header = include_header
 
     def undo(self) -> None:
         document = globals.history.document
@@ -511,13 +527,13 @@ class UpdateDataFromRangeState(State):
                                                            self.row_span,
                                                            self.dfi,
                                                            self.include_header,
-                                                           polars.read_parquet(self.file_path))
+                                                           polars.read_parquet(self.before_path))
 
         self.restore_selection()
 
     def redo(self) -> None:
         document = globals.history.document
-        document.update_current_cells_from_range(self.crange)
+        document.update_current_cells_from_datatable(polars.read_parquet(self.after_path))
 
 
 
@@ -540,16 +556,16 @@ class DuplicateRowState(State):
     def undo(self) -> None:
         document = globals.history.document
 
-        prow_span, self.range.row_span = self.range.row_span, self.row_span
+        prow_span, self.arange.row_span = self.arange.row_span, self.row_span
 
         if not self.above:
-            document.selection.current_active_range.metadata.row += self.range.row_span
+            document.selection.current_active_range.metadata.row += self.arange.row_span
         else:
-            document.selection.current_active_range = self.range
+            document.selection.current_active_range = self.arange
 
         document.delete_current_rows()
 
-        self.range.row_span = prow_span
+        self.arange.row_span = prow_span
 
         self.restore_selection()
 
@@ -578,16 +594,16 @@ class DuplicateColumnState(State):
     def undo(self) -> None:
         document = globals.history.document
 
-        pcolumn_span, self.range.column_span = self.range.column_span, self.column_span
+        pcolumn_span, self.arange.column_span = self.arange.column_span, self.column_span
 
         if not self.left:
-            document.selection.current_active_range.metadata.column += self.range.column_span
+            document.selection.current_active_range.metadata.column += self.arange.column_span
         else:
-            document.selection.current_active_range = self.range
+            document.selection.current_active_range = self.arange
 
         document.delete_current_columns()
 
-        self.range.column_span = pcolumn_span
+        self.arange.column_span = pcolumn_span
 
         self.restore_selection()
 
@@ -710,14 +726,14 @@ class UnhideColumnState(State):
 
     def undo(self) -> None:
         document = globals.history.document
-        mcolumn = self.range.metadata.column
+        mcolumn = self.arange.metadata.column
 
         # Update column visibility flags
         document.display.column_visibility_flags = polars.concat([document.display.column_visibility_flags[:mcolumn],
                                                                   polars.read_parquet(self.vflags_path).to_series(),
                                                                   document.display.column_visibility_flags[mcolumn + self.column_span:]])
         document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
-        document.data.bbs[self.range.metadata.dfi].column_span = len(document.display.column_visible_series)
+        document.data.bbs[self.arange.metadata.dfi].column_span = len(document.display.column_visible_series)
 
         document.repopulate_auto_filter_widgets()
 
@@ -760,7 +776,7 @@ class UnhideAllColumnState(State):
 
         self.restore_selection()
 
-        document.emit('columns-changed', self.range.metadata.dfi)
+        document.emit('columns-changed', self.arange.metadata.dfi)
 
     def redo(self) -> None:
         document = globals.history.document
@@ -807,11 +823,11 @@ class FilterRowState(State):
         if self.vflags_path is not None:
             document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series()
             document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
-            document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
+            document.data.bbs[self.arange.metadata.dfi].row_span = len(document.display.row_visible_series)
         else:
             document.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
             document.display.row_visible_series = polars.Series(dtype=polars.UInt32)
-            document.data.bbs[self.range.metadata.dfi].row_span = document.data.dfs[self.range.metadata.dfi].height + 1
+            document.data.bbs[self.arange.metadata.dfi].row_span = document.data.dfs[self.arange.metadata.dfi].height + 1
 
         # Update row heights
         if self.rheights_path is not None:
@@ -824,7 +840,7 @@ class FilterRowState(State):
             document.display.row_heights = polars.Series(dtype=polars.UInt32)
             document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
 
-        document.emit('filters-changed', self.range.metadata.dfi)
+        document.emit('filters-changed', self.arange.metadata.dfi)
 
         self.restore_selection()
 
@@ -873,11 +889,11 @@ class ResetFilterRowState(State):
         if self.vflags_path is not None:
             document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series()
             document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
-            document.data.bbs[self.range.metadata.dfi].row_span = len(document.display.row_visible_series)
+            document.data.bbs[self.arange.metadata.dfi].row_span = len(document.display.row_visible_series)
         else:
             document.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
             document.display.row_visible_series = polars.Series(dtype=polars.UInt32)
-            document.data.bbs[self.range.metadata.dfi].row_span = document.data.dfs[self.range.metadata.dfi].height + 1
+            document.data.bbs[self.arange.metadata.dfi].row_span = document.data.dfs[self.arange.metadata.dfi].height + 1
 
         # Update row heights
         if self.rheights_path is not None:
