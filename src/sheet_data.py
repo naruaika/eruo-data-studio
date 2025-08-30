@@ -600,7 +600,6 @@ FROM indexed_self
         for _ in range(column_span):
             column_name = f'column_{column_number}'
             self.dfs[dfi] = self.dfs[dfi].insert_column(column, polars.lit(None).alias(column_name))
-            self.bbs[dfi].column_span += 1
 
             if not left:
                 column += 1

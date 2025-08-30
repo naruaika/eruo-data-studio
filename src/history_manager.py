@@ -55,11 +55,13 @@ class State(GObject.Object):
         self.timestamp = time.time()
 
         document = globals.history.document
+
         self.scroll_x = document.display.scroll_x_position
         self.scroll_y = document.display.scroll_y_position
-        self.should_restore_scroll_position = False
 
-    def save_selection(self, should_restore: bool = False) -> None:
+        self.restore_scroll = False
+
+    def save_selection(self, restore_scroll: bool = False) -> None:
         document = globals.history.document
 
         self.arange = document.selection.current_active_range
@@ -68,12 +70,12 @@ class State(GObject.Object):
 
         self.search_range = document.selection.current_search_range
 
-        self.should_restore_scroll_position = should_restore
+        self.restore_scroll = restore_scroll
 
     def restore_selection(self, notify: bool = True) -> None:
         document = globals.history.document
 
-        # TODO: in some conditions, no senses to restore the selection
+        # TODO: in some cases, no senses to restore the selection
         document.selection.current_active_range = self.arange
         document.selection.current_active_cell = self.active
         document.selection.current_cursor_cell = self.cursor
@@ -81,7 +83,9 @@ class State(GObject.Object):
         document.selection.current_search_range = self.search_range
 
         if notify:
-            document.notify_selection_changed(self.active.column, self.active.row, self.active.metadata)
+            document.notify_selection_changed(self.active.column,
+                                              self.active.row,
+                                              self.active.metadata)
 
     def write_snapshot(self, dataframe: polars.DataFrame) -> str:
         with NamedTemporaryFile(suffix='.ersnap', delete=False) as file_path:
@@ -114,7 +118,7 @@ class SelectionState(State):
                  auto_scroll:   bool) -> None:
         super().__init__()
 
-        self.save_selection(True)
+        self.save_selection(restore_scroll=True)
 
         self.col_1 = col_1
         self.row_1 = row_1
@@ -265,7 +269,7 @@ class UpdateColumnDataFromDaxState(State):
                  query:          str) -> None:
         super().__init__()
 
-        self.save_selection(True)
+        self.save_selection(restore_scroll=True)
 
         if content is not None:
             self.file_path = self.write_snapshot(content)
@@ -321,7 +325,7 @@ class UpdateColumnDataFromSqlState(State):
                  query:          str) -> None:
         super().__init__()
 
-        self.save_selection(True)
+        self.save_selection(restore_scroll=True)
 
         if content is not None:
             self.file_path = self.write_snapshot(content)
@@ -385,7 +389,7 @@ class UpdateDataState(State):
                  include_header: bool) -> None:
         super().__init__()
 
-        self.save_selection(True)
+        self.save_selection(restore_scroll=True)
 
         self.column = column
         self.row = row
@@ -446,7 +450,7 @@ class UpdateDataFromOperatorState(State):
                  on_column:      bool) -> None:
         super().__init__()
 
-        self.save_selection(True)
+        self.save_selection(restore_scroll=True)
 
         self.column = column
         self.row = row
@@ -506,7 +510,7 @@ class UpdateDataFromDataTableState(State):
                  after:          polars.DataFrame) -> None:
         super().__init__()
 
-        self.save_selection(True)
+        self.save_selection(restore_scroll=True)
 
         self.column = column
         self.row = row
@@ -791,6 +795,8 @@ class FilterRowState(State):
     rheights_path: str
 
     multiple: bool
+    inverse: bool
+
     cfilters: dict
     pfilters: dict
 
@@ -798,6 +804,7 @@ class FilterRowState(State):
                  vflags:   polars.Series,
                  rheights: polars.Series,
                  multiple: bool,
+                 inverse:  bool,
                  cfilters: dict,
                  pfilters: dict) -> None:
         super().__init__()
@@ -809,6 +816,8 @@ class FilterRowState(State):
         self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None else None
 
         self.multiple = multiple
+        self.inverse = inverse
+
         self.cfilters = cfilters
         self.pfilters = pfilters
 
@@ -840,19 +849,17 @@ class FilterRowState(State):
             document.display.row_heights = polars.Series(dtype=polars.UInt32)
             document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
 
-        document.emit('filters-changed', self.arange.metadata.dfi)
-
         self.restore_selection()
+
+        document.emit('filters-changed', self.arange.metadata.dfi)
 
     def redo(self) -> None:
         document = globals.history.document
 
-        self.restore_selection(False)
-
         document.current_filters = copy.deepcopy(self.cfilters)
         document.pending_filters = copy.deepcopy(self.pfilters)
 
-        document.filter_current_rows(self.multiple)
+        document.filter_current_rows(self.multiple, self.inverse)
 
 
 
@@ -1062,7 +1069,7 @@ class FindReplaceDataState(State):
                  match_case:     bool) -> None:
         super().__init__()
 
-        self.save_selection(True)
+        self.save_selection(restore_scroll=True)
 
         self.content = content
         self.replace_with = replace_with
@@ -1076,7 +1083,9 @@ class FindReplaceDataState(State):
 
     def redo(self) -> None:
         document = globals.history.document
-        document.find_replace_in_current_cells(self.replace_with, self.search_pattern, self.match_case)
+        document.find_replace_in_current_cells(self.replace_with,
+                                               self.search_pattern,
+                                               self.match_case)
 
 
 
@@ -1111,7 +1120,7 @@ class FindReplaceAllDataState(State):
                  use_regexp:       bool) -> None:
         super().__init__()
 
-        self.save_selection(True)
+        self.save_selection(restore_scroll=True)
 
         self.file_path = self.write_snapshot(content)
 
@@ -1305,8 +1314,8 @@ class HistoryManager(GObject.Object):
         scroll_y_position = self.undo_stack[-1].scroll_y
         scroll_x_position = self.undo_stack[-1].scroll_x
 
-        if self.undo_stack[-1].should_restore_scroll_position:
-            self.restore_scroll_position(scroll_y_position, scroll_x_position)
+        if self.undo_stack[-1].restore_scroll:
+            self.restore_scroll(scroll_y_position, scroll_x_position)
 
         self.redraw_main_canvas()
 
@@ -1322,14 +1331,14 @@ class HistoryManager(GObject.Object):
         state.redo()
         self.undo_stack.append(state)
 
-        if state.should_restore_scroll_position:
-            self.restore_scroll_position(state.scroll_y, state.scroll_x)
+        if state.restore_scroll:
+            self.restore_scroll(state.scroll_y, state.scroll_x)
 
         self.redraw_main_canvas()
 
         globals.is_changing_state = False
 
-    def restore_scroll_position(self,
+    def restore_scroll(self,
                                 scroll_y: float,
                                 scroll_x: float) -> None:
         if isinstance(self.document, SheetDocument):
@@ -1337,11 +1346,14 @@ class HistoryManager(GObject.Object):
             canvas_height = self.document.view.main_canvas.get_height()
             canvas_width = self.document.view.main_canvas.get_width()
 
-            self.document.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y + canvas_height)
-            self.document.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x + canvas_width)
+            vadjustment = self.document.view.vertical_scrollbar.get_adjustment()
+            hadjustment = self.document.view.horizontal_scrollbar.get_adjustment()
 
-            self.document.view.vertical_scrollbar.get_adjustment().set_value(scroll_y)
-            self.document.view.horizontal_scrollbar.get_adjustment().set_value(scroll_x)
+            vadjustment.set_upper(scroll_y + canvas_height)
+            hadjustment.set_upper(scroll_x + canvas_width)
+
+            vadjustment.set_value(scroll_y)
+            hadjustment.set_value(scroll_x)
 
             # Make sure that the cursor is visible in case the user has toggled some
             # UI elements causing the cursor to be hidden, for example the sidebar.

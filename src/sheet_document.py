@@ -593,6 +593,42 @@ class SheetDocument(GObject.Object):
                                             follow_cursor=False,
                                             auto_scroll=False)
 
+    def try_to_select_entire_content_rows(self, include_header: bool = False) -> None:
+        arange = self.selection.current_active_range
+
+        if arange.row_span > 0:
+            return
+
+        mdfi = arange.metadata.dfi
+        mrow = arange.metadata.row
+
+        if mdfi < 0 or len(self.data.dfs) <= mdfi:
+            return
+
+        column = 1
+        row_1 = mrow if include_header else (mrow + 1)
+        row_2 = (row_1 - 1) + self.data.bbs[mdfi].row_span - (0 if include_header else 1)
+
+        self.update_selection_from_position(column, row_1, column, row_2, auto_scroll=False)
+
+    def try_to_select_entire_content_columns(self) -> None:
+        arange = self.selection.current_active_range
+
+        if arange.column_span > 0:
+            return
+
+        mdfi = arange.metadata.dfi
+        mcolumn = arange.metadata.column
+
+        if mdfi < 0 or len(self.data.dfs) <= mdfi:
+            return
+
+        column_1 = mcolumn
+        column_2 = (column_1 - 1) + self.data.bbs[mdfi].column_span
+        row = 1
+
+        self.update_selection_from_position(column_1, row, column_2, row, auto_scroll=False)
+
     def update_selection_from_name(self, name: str) -> None:
         vcol_1, vrow_1, vcol_2, vrow_2 = self.display.get_cell_range_from_name(name)
 
@@ -852,25 +888,17 @@ class SheetDocument(GObject.Object):
                                  dataframe: polars.DataFrame,
                                  vflags:    polars.Series = None,
                                  rheights:  polars.Series = None) -> bool:
+        self.try_to_select_entire_content_rows()
         arange = self.selection.current_active_range
-        active = self.selection.current_active_cell
-
-        mrow = arange.metadata.row
-        row_span = arange.row_span
 
         mdfi = arange.metadata.dfi
-        bbox = self.data.bbs[mdfi]
-
-        if arange.row_span < 0:
-            row_span = bbox.row_span + 2
+        mrow = arange.metadata.row
+        row_span = arange.row_span
 
         # Take hidden row(s) into account
         start_vrow = self.display.get_vrow_from_row(arange.row)
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
-
-        if arange.row_span < 0:
-            row_span -= 3
 
         if arange.btt:
             mrow = mrow - row_span + 1
@@ -887,9 +915,9 @@ class SheetDocument(GObject.Object):
                                                                        polars.Series([True] * dataframe.height),
                                                                        self.display.row_visibility_flags[mrow:]])
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
-                self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+                self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
             else:
-                self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
+                self.data.bbs[mdfi].row_span = self.data.dfs[mdfi].height + 1
 
             # Update row heights
             if len(self.display.row_heights):
@@ -899,7 +927,8 @@ class SheetDocument(GObject.Object):
                                                               self.display.row_heights[mrow:]])
                 else:
                     self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
-                                                              polars.Series([self.display.DEFAULT_CELL_HEIGHT] * dataframe.height, dtype=polars.Int32),
+                                                              polars.Series([self.display.DEFAULT_CELL_HEIGHT] * dataframe.height,
+                                                                            dtype=polars.Int32),
                                                               self.display.row_heights[mrow:]])
                 row_heights_visible_only = self.display.row_heights
                 if len(self.display.row_visibility_flags):
@@ -922,13 +951,11 @@ class SheetDocument(GObject.Object):
     def insert_blank_from_current_rows(self,
                                        above:    bool = False,
                                        row_span: int = -1) -> bool:
+        self.try_to_select_entire_content_rows()
         arange = self.selection.current_active_range
-        active = self.selection.current_active_cell
 
         mrow = arange.metadata.row
-
         mdfi = arange.metadata.dfi
-        bbox = self.data.bbs[mdfi]
 
         auto_range = False
 
@@ -940,18 +967,10 @@ class SheetDocument(GObject.Object):
         else:
             auto_range = True
 
-            row_span = arange.row_span
-
-            if arange.row_span < 0:
-                row_span = bbox.row_span + 2
-
             # Take hidden row(s) into account
             start_vrow = self.display.get_vrow_from_row(arange.row)
-            end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
+            end_vrow = self.display.get_vrow_from_row(arange.row + arange.row_span - 1)
             row_span = end_vrow - start_vrow + 1
-
-            if arange.row_span < 0:
-                row_span -= 3
 
             if not above:
                 mrow = mrow + row_span
@@ -971,17 +990,20 @@ class SheetDocument(GObject.Object):
             if not globals.is_changing_state:
                 globals.history.save(state)
 
+            mrow = arange.metadata.row
+
+            if not above:
+                mrow += row_span
+
             # Update row visibility flags
             if len(self.display.row_visibility_flags):
-                if above:
-                    mrow = mrow + 1
                 self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:mrow],
                                                                    polars.Series([True] * row_span),
                                                                    self.display.row_visibility_flags[mrow:]])
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
-                self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+                self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
             else:
-                self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
+                self.data.bbs[mdfi].row_span = self.data.dfs[mdfi].height + 1
 
             # Update row heights
             if len(self.display.row_heights):
@@ -1012,25 +1034,17 @@ class SheetDocument(GObject.Object):
                                     dataframe: polars.DataFrame,
                                     vflags:    polars.Series = None,
                                     cwidths:   polars.Series = None) -> bool:
+        self.try_to_select_entire_content_rows()
         arange = self.selection.current_active_range
-        active = self.selection.current_active_cell
-
-        mcolumn = arange.metadata.column
-        column_span = arange.column_span
 
         mdfi = arange.metadata.dfi
-        bbox = self.data.bbs[mdfi]
-
-        if arange.column_span < 0:
-            column_span = bbox.column_span + 1
+        mcolumn = arange.metadata.column
+        column_span = arange.column_span
 
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
-
-        if arange.column_span < 0:
-            column_span -= 1
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
@@ -1047,7 +1061,9 @@ class SheetDocument(GObject.Object):
                                                                           polars.Series([True] * dataframe.height),
                                                                           self.display.column_visibility_flags[mcolumn:]])
                 self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
-                self.data.bbs[active.metadata.dfi].column_span = len(self.display.column_visible_series)
+                self.data.bbs[mdfi].column_span = len(self.display.column_visible_series)
+            else:
+                self.data.bbs[mdfi].column_span = self.data.dfs[mdfi].width
 
             # Update column widths
             if len(self.display.column_widths):
@@ -1057,7 +1073,8 @@ class SheetDocument(GObject.Object):
                                                                 self.display.column_widths[mcolumn:]])
                 else:
                     self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
-                                                                polars.Series([self.display.DEFAULT_CELL_WIDTH] * dataframe.width, dtype=polars.Int32),
+                                                                polars.Series([self.display.DEFAULT_CELL_WIDTH] * dataframe.width,
+                                                                              dtype=polars.Int32),
                                                                 self.display.column_widths[mcolumn:]])
                 column_widths_visible_only = self.display.column_widths
                 if len(self.display.column_visibility_flags):
@@ -1083,13 +1100,11 @@ class SheetDocument(GObject.Object):
     def insert_blank_from_current_columns(self,
                                           left:        bool = False,
                                           column_span: int = -1) -> bool:
+        self.try_to_select_entire_content_columns()
         arange = self.selection.current_active_range
-        active = self.selection.current_active_cell
 
         mcolumn = arange.metadata.column
-
         mdfi = arange.metadata.dfi
-        bbox = self.data.bbs[mdfi]
 
         auto_range = False
 
@@ -1101,18 +1116,10 @@ class SheetDocument(GObject.Object):
         else:
             auto_range = True
 
-            column_span = arange.column_span
-
-            if arange.column_span < 0:
-                column_span = bbox.column_span + 1
-
             # Take hidden column(s) into account
             start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
-            end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+            end_vcolumn = self.display.get_vcolumn_from_column(arange.column + arange.column_span - 1)
             column_span = end_vcolumn - start_vcolumn + 1
-
-            if arange.column_span < 0:
-                column_span -= 1
 
             if not left:
                 mcolumn = mcolumn + column_span
@@ -1127,10 +1134,15 @@ class SheetDocument(GObject.Object):
             from .history_manager import InsertBlankColumnState
             state = InsertBlankColumnState(left, column_span, auto_range)
 
-        if self.data.insert_columns_from_metadata(mcolumn, column_span, arange.metadata.dfi, left):
+        if self.data.insert_columns_from_metadata(mcolumn, column_span, mdfi, left):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
+
+            mcolumn = arange.metadata.column
+
+            if not left:
+                mcolumn += column_span
 
             # Update column visibility flags
             if len(self.display.column_visibility_flags):
@@ -1138,12 +1150,13 @@ class SheetDocument(GObject.Object):
                                                                       polars.Series([True] * column_span),
                                                                       self.display.column_visibility_flags[mcolumn:]])
                 self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
-                self.data.bbs[active.metadata.dfi].column_span = len(self.display.column_visible_series)
+                self.data.bbs[mdfi].column_span = len(self.display.column_visible_series)
 
             # Update column widths
             if len(self.display.column_widths):
                 self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
-                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH] * column_span, dtype=polars.UInt32),
+                                                            polars.Series([self.display.DEFAULT_CELL_WIDTH] * column_span,
+                                                                          dtype=polars.UInt32),
                                                             self.display.column_widths[mcolumn:]])
                 column_widths_visible_only = self.display.column_widths
                 if len(self.display.column_visibility_flags):
@@ -1162,7 +1175,7 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            self.emit('columns-changed', arange.metadata.dfi)
+            self.emit('columns-changed', mdfi)
 
             return True
 
@@ -1845,25 +1858,16 @@ class SheetDocument(GObject.Object):
         return False
 
     def duplicate_from_current_rows(self, above: bool = False) -> bool:
+        self.try_to_select_entire_content_rows()
         arange = self.selection.current_active_range
-        active = self.selection.current_active_cell
-
-        mrow = arange.metadata.row
-        row_span = arange.row_span
 
         mdfi = arange.metadata.dfi
-        bbox = self.data.bbs[mdfi]
-
-        if arange.row_span < 0:
-            row_span = bbox.row_span + 2
+        mrow = arange.metadata.row
 
         # Take hidden row(s) into account
         start_vrow = self.display.get_vrow_from_row(arange.row)
-        end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
+        end_vrow = self.display.get_vrow_from_row(arange.row + arange.row_span - 1)
         row_span = end_vrow - start_vrow + 1
-
-        if arange.row_span < 0:
-            row_span -= 3
 
         if arange.btt:
             mrow = mrow - row_span + 1
@@ -1878,23 +1882,29 @@ class SheetDocument(GObject.Object):
             if not globals.is_changing_state:
                 globals.history.save(state)
 
+            if not above:
+                mrow += row_span
+
             # Update row visibility flags
             if len(self.display.row_visibility_flags):
-                if not above:
-                    mrow = mrow + row_span
                 self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:mrow],
                                                                    polars.Series([True] * row_span),
                                                                    self.display.row_visibility_flags[mrow:]])
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
-                self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+                self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
             else:
-                self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
+                self.data.bbs[mdfi].row_span = self.data.dfs[mdfi].height + 1
+
+            srow = mrow
+
+            if not above:
+                srow -= row_span
 
             # Update row heights
             if len(self.display.row_heights):
-                self.display.row_heights = polars.concat([self.display.row_heights[:mrow - 1],
-                                                          self.display.row_heights[mrow - 1:mrow - 1 + row_span],
-                                                          self.display.row_heights[mrow - 1:]])
+                self.display.row_heights = polars.concat([self.display.row_heights[:mrow],
+                                                          self.display.row_heights[srow:srow + row_span],
+                                                          self.display.row_heights[mrow:]])
                 row_heights_visible_only = self.display.row_heights
                 if len(self.display.row_visibility_flags):
                     row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
@@ -1914,25 +1924,16 @@ class SheetDocument(GObject.Object):
         return False
 
     def duplicate_from_current_columns(self, left: bool = False) -> bool:
+        self.try_to_select_entire_content_columns()
         arange = self.selection.current_active_range
-        active = self.selection.current_active_cell
-
-        mcolumn = arange.metadata.column
-        column_span = arange.column_span
 
         mdfi = arange.metadata.dfi
-        bbox = self.data.bbs[mdfi]
-
-        if arange.column_span < 0:
-            column_span = bbox.column_span + 1
+        mcolumn = arange.metadata.column
 
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
-        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
+        end_vcolumn = self.display.get_vcolumn_from_column(arange.column + arange.column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
-
-        if arange.column_span < 0:
-            column_span -= 1
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
@@ -1942,13 +1943,13 @@ class SheetDocument(GObject.Object):
             from .history_manager import DuplicateColumnState
             state = DuplicateColumnState(column_span, left)
 
-        if self.data.duplicate_columns_from_metadata(mcolumn, column_span, arange.metadata.dfi, left):
+        if self.data.duplicate_columns_from_metadata(mcolumn, column_span, mdfi, left):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
 
             if not left:
-                mcolumn = mcolumn + column_span
+                mcolumn += column_span
 
             # Update column visibility flags
             if len(self.display.column_visibility_flags):
@@ -1956,13 +1957,18 @@ class SheetDocument(GObject.Object):
                                                                       polars.Series([True] * column_span),
                                                                       self.display.column_visibility_flags[mcolumn:]])
                 self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
-                self.data.bbs[active.metadata.dfi].column_span = len(self.display.column_visible_series)
+                self.data.bbs[mdfi].column_span = len(self.display.column_visible_series)
+
+            scolumn = mcolumn
+
+            if not left:
+                scolumn -= column_span
 
             # Update column widths
             if len(self.display.column_widths):
-                self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn - 1],
-                                                            self.display.column_widths[mcolumn - 1:mcolumn - 1 + column_span],
-                                                            self.display.column_widths[mcolumn - 1:]])
+                self.display.column_widths = polars.concat([self.display.column_widths[:mcolumn],
+                                                            self.display.column_widths[scolumn:scolumn + column_span],
+                                                            self.display.column_widths[mcolumn:]])
                 column_widths_visible_only = self.display.column_widths
                 if len(self.display.column_visibility_flags):
                     column_widths_visible_only = column_widths_visible_only.filter(self.display.column_visibility_flags)
@@ -1978,32 +1984,24 @@ class SheetDocument(GObject.Object):
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
 
-            self.emit('columns-changed', arange.metadata.dfi)
+            self.emit('columns-changed', mdfi)
 
             return True
 
         return False
 
     def delete_current_rows(self) -> bool:
+        self.try_to_select_entire_content_rows()
         arange = self.selection.current_active_range
-        active = self.selection.current_active_cell
-
-        mrow = arange.metadata.row
-        row_span = arange.row_span
 
         mdfi = arange.metadata.dfi
-        bbox = self.data.bbs[mdfi]
-
-        if arange.row_span < 0:
-            row_span = bbox.row_span + 2
+        mrow = arange.metadata.row
+        row_span = arange.row_span
 
         # Take hidden row(s) into account
         start_vrow = self.display.get_vrow_from_row(arange.row)
         end_vrow = self.display.get_vrow_from_row(arange.row + row_span - 1)
         row_span = end_vrow - start_vrow + 1
-
-        if arange.row_span < 0:
-            row_span -= 3
 
         if arange.btt:
             mrow = mrow - row_span + 1
@@ -2011,10 +2009,12 @@ class SheetDocument(GObject.Object):
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import DeleteRowState
-            column_count = self.data.bbs[mdfi].column_span
+            column_count = self.data.dfs[mdfi].width
             state = DeleteRowState(self.data.read_cell_data_block_from_metadata(0, mrow, column_count, row_span, mdfi),
-                                   self.display.row_visibility_flags[mrow:mrow + row_span] if len(self.display.row_visibility_flags) else None,
-                                   self.display.row_heights[mrow:mrow + row_span] if len(self.display.row_heights) else None)
+                                   self.display.row_visibility_flags[mrow:mrow + row_span] if len(self.display.row_visibility_flags)
+                                                                                           else None,
+                                   self.display.row_heights[mrow:mrow + row_span] if len(self.display.row_heights)
+                                                                                  else None)
 
         if self.data.delete_rows_from_metadata(mrow, row_span, mdfi):
             # Save snapshot
@@ -2026,9 +2026,9 @@ class SheetDocument(GObject.Object):
                 self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:mrow],
                                                                    self.display.row_visibility_flags[mrow + row_span:]])
                 self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
-                self.data.bbs[active.metadata.dfi].row_span = len(self.display.row_visible_series)
+                self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
             else:
-                self.data.bbs[active.metadata.dfi].row_span = self.data.dfs[active.metadata.dfi].height + 1
+                self.data.bbs[mdfi].row_span = self.data.dfs[mdfi].height + 1
 
             # Update row heights
             if len(self.display.row_heights):
@@ -2053,26 +2053,17 @@ class SheetDocument(GObject.Object):
         return False
 
     def delete_current_columns(self) -> bool:
+        self.try_to_select_entire_content_columns()
         arange = self.selection.current_active_range
-        active = self.selection.current_active_cell
 
         mdfi = arange.metadata.dfi
         mcolumn = arange.metadata.column
         column_span = arange.column_span
 
-        mdfi = arange.metadata.dfi
-        bbox = self.data.bbs[mdfi]
-
-        if arange.column_span < 0:
-            column_span = bbox.column_span + 1
-
         # Take hidden column(s) into account
         start_vcolumn = self.display.get_vcolumn_from_column(arange.column)
         end_vcolumn = self.display.get_vcolumn_from_column(arange.column + column_span - 1)
         column_span = end_vcolumn - start_vcolumn + 1
-
-        if arange.column_span < 0:
-            column_span -= 1
 
         if arange.rtl:
             mcolumn = mcolumn - column_span + 1
@@ -2080,10 +2071,12 @@ class SheetDocument(GObject.Object):
         # Prepare for snapshot
         if not globals.is_changing_state:
             from .history_manager import DeleteColumnState
-            row_count = self.data.bbs[mdfi].row_span - 1
+            row_count = self.data.dfs[mdfi].height - 1
             state = DeleteColumnState(self.data.read_cell_data_block_from_metadata(mcolumn, 1, column_span, row_count, mdfi),
-                                      self.display.column_visibility_flags[mcolumn:mcolumn + column_span] if len(self.display.column_visibility_flags) else None,
-                                      self.display.column_widths[mcolumn:mcolumn + column_span] if len(self.display.column_widths) else None)
+                                      self.display.column_visibility_flags[mcolumn:mcolumn + column_span] if len(self.display.column_visibility_flags)
+                                                                                                          else None,
+                                      self.display.column_widths[mcolumn:mcolumn + column_span] if len(self.display.column_widths)
+                                                                                                else None)
 
         if self.data.delete_columns_from_metadata(mcolumn, column_span, mdfi):
             # Save snapshot
@@ -2095,7 +2088,9 @@ class SheetDocument(GObject.Object):
                 self.display.column_visibility_flags = polars.concat([self.display.column_visibility_flags[:mcolumn],
                                                                       self.display.column_visibility_flags[mcolumn + column_span:]])
                 self.display.column_visible_series = self.display.column_visibility_flags.arg_true()
-                self.data.bbs[active.metadata.dfi].column_span = len(self.display.column_visible_series)
+                self.data.bbs[mdfi].column_span = len(self.display.column_visible_series)
+            else:
+                self.data.bbs[mdfi].column_span = self.data.dfs[mdfi].width
 
             # Update column widths
             if len(self.display.column_widths):
@@ -2115,9 +2110,6 @@ class SheetDocument(GObject.Object):
 
             self.renderer.render_caches = {}
             self.view.main_canvas.queue_draw()
-
-            # TODO: clear only for the related columns
-            self.data.clear_cell_data_unique_cache(mdfi)
 
             if not self.is_refreshing_uis:
                 # FIXME: remove incompatible filters?
@@ -2307,9 +2299,11 @@ class SheetDocument(GObject.Object):
         # Save snapshot
         if not globals.is_changing_state:
             from .history_manager import FilterRowState
-            globals.history.save(FilterRowState(self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None,
-                                                self.display.row_heights if len(self.display.row_heights) else None,
-                                                multiple,
+            globals.history.save(FilterRowState(self.display.row_visibility_flags if len(self.display.row_visibility_flags)
+                                                                                  else None,
+                                                self.display.row_heights if len(self.display.row_heights)
+                                                                         else None,
+                                                multiple, inverse,
                                                 copy.deepcopy(self.current_filters),
                                                 copy.deepcopy(self.pending_filters)))
 
@@ -2377,8 +2371,10 @@ class SheetDocument(GObject.Object):
         # Save snapshot
         if not globals.is_changing_state:
             from .history_manager import ResetFilterRowState
-            globals.history.save(ResetFilterRowState(self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None,
-                                                     self.display.row_heights if len(self.display.row_heights) else None,
+            globals.history.save(ResetFilterRowState(self.display.row_visibility_flags if len(self.display.row_visibility_flags)
+                                                                                       else None,
+                                                     self.display.row_heights if len(self.display.row_heights)
+                                                                              else None,
                                                      copy.deepcopy(self.current_filters)))
 
         # Update current filters
