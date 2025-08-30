@@ -215,19 +215,18 @@ class SheetView(Gtk.Box):
                                    n_press: int,
                                    x:       float,
                                    y:       float) -> None:
-        pass
+        if not self.document.check_selection_contains_point(x, y):
+            self.document.select_element_from_point(x, y)
+
+        self.emit('pointer-released', x, y)
+        self.emit('open-context-menu', x, y, 'cell')
 
     def on_main_canvas_rmb_released(self,
                                     event:   Gtk.GestureClick,
                                     n_press: int,
                                     x:       float,
                                     y:       float) -> None:
-        if not self.document.check_selection_contains_point(x, y):
-            self.document.select_element_from_point(x, y)
-            self.main_canvas.queue_draw()
-
-        self.emit('pointer-released', x, y)
-        self.emit('open-context-menu', x, y, 'cell')
+        pass
 
     def on_main_canvas_key_pressed(self,
                                    event:   Gtk.EventControllerKey,
@@ -264,6 +263,18 @@ class SheetView(Gtk.Box):
 
         if keyval == Gdk.KEY_BackSpace:
             self.emit('open-inline-formula', '')
+            return
+
+        if keyval == Gdk.KEY_Menu:
+            # We assume that the user also navigates with the keyboard, which will make the cell
+            # completely in the viewport (unless the cell is too big). With this, we don't want to
+            # make a complicated calculation to find out whether the center of the cell is in the
+            # viewport or not.
+            active = self.document.selection.current_active_range
+            x = active.x + active.width / 2
+            y = active.y + active.height / 2
+            self.emit('pointer-released', x, y)
+            self.emit('open-context-menu', x, y, 'cell')
             return
 
     def on_scrollbar_entered(self,
