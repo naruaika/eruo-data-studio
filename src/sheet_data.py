@@ -1147,8 +1147,20 @@ FROM indexed_self
 
         # We don't do the actual filtering on the original dataframe here, instead
         # we just want to get the boolean series to flag which rows should be visible.
-        return polars.concat([polars.Series([True]), # for header row
-                              self.dfs[dfi].with_columns(expression.alias('$vrow'))['$vrow']])
+        try:
+            return polars.concat([polars.Series([True]), # for header row
+                                  self.dfs[dfi].with_columns(expression.alias('$vrow'))['$vrow']])
+        except Exception as e:
+            print(e)
+
+            message = 'Cannot apply filter. Check for incompatible filters?'
+
+            action_name = 'app.open-sort-filter'
+            action = ('Check', action_name)
+
+            globals.send_notification(message, action)
+
+        return polars.Series(dtype=polars.Boolean)
 
     def materialize_view(self,
                          filters:      list,
@@ -1246,7 +1258,7 @@ FROM indexed_self
             print(e)
 
         dtype = utils.get_dtype_symbol(dtype, False)
-        globals.send_notification(f'Cannot be converted to: {dtype}')
+        globals.send_notification(f'Cannot change type to: {dtype}')
 
         return False
 

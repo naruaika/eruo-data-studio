@@ -2081,7 +2081,6 @@ class SheetDocument(GObject.Object):
             self.view.main_canvas.queue_draw()
 
             if not self.is_refreshing_uis:
-                # FIXME: remove incompatible filters?
                 self.emit('columns-changed', mdfi)
 
             return True
@@ -2219,7 +2218,7 @@ class SheetDocument(GObject.Object):
 
     def filter_current_rows(self,
                             multiple: bool = False,
-                            inverse:  bool = False) -> None:
+                            inverse:  bool = False) -> bool:
         active = self.selection.current_active_cell
 
         metadata = active.metadata
@@ -2300,35 +2299,42 @@ class SheetDocument(GObject.Object):
         self.current_filters += self.pending_filters
         self.pending_filters = []
 
-        # Update row visibility flags
-        self.display.row_visibility_flags = self.data.filter_rows_from_metadata(self.current_filters, mdfi)
-        self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
-        self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
+        row_visibility_flags = self.data.filter_rows_from_metadata(self.current_filters, mdfi)
 
-        # Update row heights
-        if len(self.display.row_heights):
-            row_heights_visible_only = self.display.row_heights.filter(self.display.row_visibility_flags)
-            self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
+        if len(row_visibility_flags):
+            # Update row visibility flags
+            self.display.row_visibility_flags = row_visibility_flags
+            self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+            self.data.bbs[mdfi].row_span = len(self.display.row_visible_series)
 
-        self.cancel_cutcopy_operation()
-        self.auto_adjust_locators_size_by_scroll()
-        self.auto_adjust_selections_by_crud(0, 0, True)
-        self.repopulate_auto_filter_widgets()
+            # Update row heights
+            if len(self.display.row_heights):
+                row_heights_visible_only = self.display.row_heights.filter(self.display.row_visibility_flags)
+                self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
 
-        active = self.selection.current_active_cell
-        mdfi = active.metadata.dfi
+            self.cancel_cutcopy_operation()
+            self.auto_adjust_locators_size_by_scroll()
+            self.auto_adjust_selections_by_crud(0, 0, True)
+            self.repopulate_auto_filter_widgets()
 
-        # Automatically adjust when the cursor is outside the current dataframe bounding box
-        if mdfi < 0:
-            row = self.display.row_visible_series[-1] + 1
-            cell_name = self.display.get_cell_name_from_position(active.column, row)
-            self.update_selection_from_name(cell_name)
+            active = self.selection.current_active_cell
+            mdfi = active.metadata.dfi
 
-        self.renderer.render_caches = {}
-        self.view.main_canvas.queue_draw()
+            # Automatically adjust when the cursor is outside the current dataframe bounding box
+            if mdfi < 0:
+                row = self.display.row_visible_series[-1] + 1
+                cell_name = self.display.get_cell_name_from_position(active.column, row)
+                self.update_selection_from_name(cell_name)
 
-        if not self.is_refreshing_uis:
-            self.emit('filters-changed', mdfi)
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
+
+            if not self.is_refreshing_uis:
+                self.emit('filters-changed', mdfi)
+
+            return True
+
+        return False
 
     def reset_all_filters(self) -> None:
         # Save snapshot
@@ -2481,7 +2487,6 @@ class SheetDocument(GObject.Object):
     def convert_current_columns_dtype(self, dtype: polars.DataType) -> bool:
         arange = self.selection.current_active_range
         column_span = arange.column_span
-        metadata = arange.metadata
 
         mdfi = arange.metadata.dfi
         bbox = self.data.bbs[mdfi]
@@ -2499,12 +2504,12 @@ class SheetDocument(GObject.Object):
             from .history_manager import ConvertColumnDataTypeState
             # FIXME: this doesn't handle different data types well when multiple columns are selected,
             #        even though usually they are the same. Should we disable multiple selection?
-            ndtype = self.data.read_column_dtype_from_metadata(metadata.column, metadata.dfi)
+            ndtype = self.data.read_column_dtype_from_metadata(arange.metadata.column, mdfi)
             state = ConvertColumnDataTypeState(ndtype, dtype)
 
         # FIXME: datetime to string conversion doesn't recover the original content.
         # Maybe for numerical and temporal data, we should store the entire content? Or just the string format?
-        if self.data.convert_columns_dtype_from_metadata(metadata.column, column_span, metadata.dfi, dtype):
+        if self.data.convert_columns_dtype_from_metadata(arange.metadata.column, column_span, mdfi, dtype):
             # Save snapshot
             if not globals.is_changing_state:
                 globals.history.save(state)
@@ -2518,9 +2523,7 @@ class SheetDocument(GObject.Object):
             self.view.main_canvas.queue_draw()
 
             if not self.is_refreshing_uis:
-                # FIXME: should we remove incompatible filters?
-                self.emit('columns-changed', metadata.dfi)
-                self.emit('filters-changed', metadata.dfi)
+                self.emit('columns-changed', mdfi)
 
             return True
 
