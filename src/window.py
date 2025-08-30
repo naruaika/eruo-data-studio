@@ -415,6 +415,7 @@ class Window(Adw.ApplicationWindow):
 
             # Update the current cells
             if not self.execute_pending_formula(text):
+                self.show_toast_message('Cannot edit out of bound cells')
                 return True
 
             self.close_inline_formula()
