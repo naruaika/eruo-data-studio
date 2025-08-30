@@ -424,8 +424,9 @@ class FileManager(GObject.Object):
             if self.write_file(window, file_path, **kwargs):
                 GLib.idle_add(self.emit, 'file-saved', file_path)
 
-        # FIXME: Using a thread to write the file to avoid blocking the main thread,
-        #        but potentially it can introduce to some race conditions.
+        # FIXME: using a thread to write the file to avoid blocking the main thread,
+        #        but potentially it can introduce to some race conditions especially
+        #        for big files.
         threading.Thread(target=write_file, daemon=True).start()
 
     def export_file(self,
@@ -437,8 +438,9 @@ class FileManager(GObject.Object):
             if self.write_file(window, file_path, export=True, **kwargs):
                 GLib.idle_add(self.emit, 'file-exported', file_path)
 
-        # FIXME: Using a thread to write the file to avoid blocking the main thread,
-        #        but potentially it can introduce to some race conditions.
+        # FIXME: using a thread to write the file to avoid blocking the main thread,
+        #        but potentially it can introduce to some race conditions especially
+        #        for big files.
         threading.Thread(target=write_file, daemon=True).start()
 
     def show_save_as_is_confirmation(self,

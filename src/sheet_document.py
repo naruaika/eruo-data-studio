@@ -817,8 +817,8 @@ class SheetDocument(GObject.Object):
             self.notify_selection_changed(start_column, start_row, cell_metadata)
 
         # Reset the current search range
-        # FIXME: don't reset the range when resizing columns
-        if self.selection.current_search_range is not None:
+        if not globals.is_changing_state \
+                and self.selection.current_search_range is not None:
             arange = self.selection.current_active_range
             self.selection.current_search_range = arange
 
@@ -2996,6 +2996,23 @@ class SheetDocument(GObject.Object):
             if ccrange.row_span > 0:
                 ccrange.y = y
                 ccrange.height = end_y - y
+
+        # Update the current search range
+        if self.selection.current_search_range is not None:
+            srange = self.selection.current_search_range
+
+            x = self.display.get_cell_x_from_column(srange.column)
+            y = self.display.get_cell_y_from_row(srange.row)
+            end_x = self.display.get_cell_x_from_column(srange.column + srange.column_span)
+            end_y = self.display.get_cell_y_from_row(srange.row + srange.row_span)
+
+            if srange.column_span > 0:
+                srange.x = x
+                srange.width = end_x - x
+
+            if srange.row_span > 0:
+                srange.y = y
+                srange.height = end_y - y
 
         self.auto_adjust_selections_by_crud(0, 0, False)
         self.repopulate_column_resizer_widgets()

@@ -428,7 +428,7 @@ class Window(Adw.ApplicationWindow):
             return # inline formula should be closed when there's no active view,
                    # but this is for completeness.
 
-        self.close_inline_formula() # TODO: should hide instead
+        self.close_inline_formula() # TODO: should hide instead of resetting all?
 
     def on_content_overlay_get_child_position(self,
                                               overlay:    Gtk.Overlay,

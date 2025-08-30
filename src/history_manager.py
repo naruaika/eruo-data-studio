@@ -1332,13 +1332,13 @@ class HistoryManager(GObject.Object):
         self.undo_stack.append(state)
 
         if state.restore_scroll:
-            self.restore_scroll(state.scroll_y, state.scroll_x)
+            self.restore_scroll_position(state.scroll_y, state.scroll_x)
 
         self.redraw_main_canvas()
 
         globals.is_changing_state = False
 
-    def restore_scroll(self,
+    def restore_scroll_position(self,
                                 scroll_y: float,
                                 scroll_x: float) -> None:
         if isinstance(self.document, SheetDocument):
