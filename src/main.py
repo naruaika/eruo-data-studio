@@ -975,6 +975,15 @@ Options:
 
         window.present()
 
+        def auto_adjust_locators_size() -> None:
+            if not isinstance(sheet_document, SheetDocument):
+                return
+            sheet_document.auto_adjust_locators_size_by_scroll()
+            sheet_document.setup_document()
+            sheet_document.view.main_canvas.queue_draw()
+
+        GLib.timeout_add(50, auto_adjust_locators_size)
+
     def on_about_action(self,
                         action: Gio.SimpleAction,
                         *args) -> None:

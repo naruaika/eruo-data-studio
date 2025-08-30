@@ -78,18 +78,8 @@
 
 /* POPOVER */
 
-popover {
-    font-size: 14px;
-}
-popover entry,
-popover button,
-popover modelbutton,
 popover .text-button {
-    min-height: 28px;
-    padding: 0 8px;
-}
-popover button.inline {
-    padding: 0 4px;
+    padding: 4px 10px;
 }
 
 popover listview {

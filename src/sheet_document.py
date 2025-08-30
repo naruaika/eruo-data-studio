@@ -3306,8 +3306,8 @@ class SheetDocument(GObject.Object):
         # an operation that returned an object, we want to show it properly in minimal.
         # FIXME: we should prevent this from happening in the first place, maybe spread
         #        it to multiple columns. A use case would be the user executing SQL query
-        #        that involves a function that do similar to split_part().
-        # See https://duckdb.org/docs/stable/sql/functions/text#splitstring-separator
+        #        that involves a function that do similar to split_part(). See this API:
+        #        https://duckdb.org/docs/stable/sql/functions/text#splitstring-separator
         if isinstance(self.selection.cell_data, polars.Series):
             self.selection.cell_data = self.selection.cell_data.to_list()
 
@@ -3368,7 +3368,6 @@ class SheetDocument(GObject.Object):
         from .sheet_widget import SheetAutoFilter
 
         # Remove existing auto filter widgets
-        # FIXME: do not repopulate if not hide/unhide/delete/insert/resizing rows/columns
         self.widgets = [widget for widget in self.widgets if not isinstance(widget, SheetAutoFilter)]
 
         icon_size = self.display.ICON_SIZE

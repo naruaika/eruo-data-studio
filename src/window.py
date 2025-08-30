@@ -968,8 +968,10 @@ class Window(Adw.ApplicationWindow):
         self.context_menu.popup()
 
     def add_new_tab(self, sheet_view: SheetView | SheetNotebookView) -> None:
+        sheet_document = sheet_view.document
+
         tab_page = self.tab_view.append(sheet_view)
-        tab_page.set_title(sheet_view.document.title)
+        tab_page.set_title(sheet_document.title)
 
         if isinstance(sheet_view, SheetView):
             tab_page.set_indicator_icon(Gio.ThemedIcon.new('table-symbolic'))
@@ -982,25 +984,25 @@ class Window(Adw.ApplicationWindow):
         #             .set_halign(Gtk.Align.START)
 
         # Setup proper handling of signals and bindings
-        tab_page.bind_property('title', sheet_view.document,
+        tab_page.bind_property('title', sheet_document,
                                'title', GObject.BindingFlags.BIDIRECTIONAL)
 
         from .sheet_document import SheetDocument
 
-        if isinstance(sheet_view.document, SheetDocument):
-            sheet_view.document.connect('cancel-operation', self.on_operation_cancelled)
-            sheet_view.document.connect('selection-changed', self.on_selection_changed)
-            sheet_view.document.connect('columns-changed', self.on_columns_changed)
-            sheet_view.document.connect('sorts-changed', self.on_sorts_changed)
-            sheet_view.document.connect('filters-changed', self.on_filters_changed)
-            sheet_view.document.connect('open-context-menu', self.on_context_menu_opened)
-            sheet_view.document.view.connect('open-inline-formula', self.on_inline_formula_opened)
-            sheet_view.document.view.connect('open-context-menu', self.on_context_menu_opened)
+        if isinstance(sheet_document, SheetDocument):
+            sheet_document.connect('cancel-operation', self.on_operation_cancelled)
+            sheet_document.connect('selection-changed', self.on_selection_changed)
+            sheet_document.connect('columns-changed', self.on_columns_changed)
+            sheet_document.connect('sorts-changed', self.on_sorts_changed)
+            sheet_document.connect('filters-changed', self.on_filters_changed)
+            sheet_document.connect('open-context-menu', self.on_context_menu_opened)
+            sheet_document.view.connect('open-inline-formula', self.on_inline_formula_opened)
+            sheet_document.view.connect('open-context-menu', self.on_context_menu_opened)
 
         # Switch to the new tab automatically
         self.tab_view.set_selected_page(tab_page)
 
-        if isinstance(sheet_view.document, SheetDocument):
+        if isinstance(sheet_document, SheetDocument):
             # Re-enable the input bar
             self.name_box.set_sensitive(True)
             self.formula_bar.set_sensitive(True)
