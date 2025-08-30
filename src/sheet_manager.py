@@ -79,6 +79,7 @@ class SheetManager(GObject.Object):
             sheet = SheetDocument(self, document_id, title, dataframe, configs)
 
         self.sheets[document_id] = sheet
+
         return sheet.view
 
     def duplicate_sheet(self, document_id: str) -> SheetView:

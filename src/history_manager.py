@@ -147,11 +147,15 @@ class InsertBlankRowState(State):
 
     row_span: int
     above: bool
+    on_border: int
+    dfi: bool
     auto_range: bool
 
     def __init__(self,
                  above:      bool,
                  row_span:   int,
+                 on_border:  bool,
+                 dfi:        int,
                  auto_range: bool) -> None:
         super().__init__()
 
@@ -159,6 +163,8 @@ class InsertBlankRowState(State):
 
         self.above = above
         self.row_span = row_span
+        self.on_border = on_border
+        self.dfi = dfi
         self.auto_range = auto_range
 
     def undo(self) -> None:
@@ -169,6 +175,7 @@ class InsertBlankRowState(State):
         row_span = arange.row_span
         mrow = arange.metadata.row
 
+        # This block won't affect anything if on_border set to True
         if self.auto_range:
             prow_span, self.arange.row_span = self.arange.row_span, self.row_span
             if not self.above:
@@ -179,7 +186,7 @@ class InsertBlankRowState(State):
             document.selection.current_active_range.metadata.row = self.arange.metadata.row
             document.selection.current_active_range.row_span = self.row_span
 
-        document.delete_current_rows()
+        document.delete_current_rows(self.above, self.row_span, self.on_border, self.dfi)
 
         if self.auto_range:
             self.arange.row_span = prow_span
@@ -192,7 +199,9 @@ class InsertBlankRowState(State):
     def redo(self) -> None:
         document = globals.history.document
         document.insert_blank_from_current_rows(self.above,
-                                                self.row_span if not self.auto_range else -1)
+                                                self.row_span if not self.auto_range else -1,
+                                                self.on_border,
+                                                self.dfi)
 
 
 
@@ -201,11 +210,15 @@ class InsertBlankColumnState(State):
 
     left: bool
     column_span: int
+    on_border: bool
+    dfi: int
     auto_range: bool
 
     def __init__(self,
                  left:        bool,
                  column_span: int,
+                 on_border:   bool,
+                 dfi:         int,
                  auto_range:  bool) -> None:
         super().__init__()
 
@@ -213,6 +226,8 @@ class InsertBlankColumnState(State):
 
         self.left = left
         self.column_span = column_span
+        self.on_border = on_border
+        self.dfi = dfi
         self.auto_range = auto_range
 
     def undo(self) -> None:
@@ -223,6 +238,7 @@ class InsertBlankColumnState(State):
         column_span = arange.column_span
         mcolumn = arange.metadata.column
 
+        # This block won't affect anything if on_border set to True
         if self.auto_range:
             pcolumn_span, self.arange.column_span = self.arange.column_span, self.column_span
             if not self.left:
@@ -233,7 +249,7 @@ class InsertBlankColumnState(State):
             document.selection.current_active_range.metadata.column = self.arange.metadata.column
             document.selection.current_active_range.column_span = self.column_span
 
-        document.delete_current_columns()
+        document.delete_current_columns(self.left, self.column_span, self.on_border, self.dfi)
 
         if self.auto_range:
             self.arange.column_span = pcolumn_span
@@ -246,7 +262,9 @@ class InsertBlankColumnState(State):
     def redo(self) -> None:
         document = globals.history.document
         document.insert_blank_from_current_columns(self.left,
-                                                   self.column_span if not self.auto_range else -1)
+                                                   self.column_span if not self.auto_range else -1,
+                                                   self.on_border,
+                                                   self.dfi)
 
 
 
@@ -1315,7 +1333,7 @@ class HistoryManager(GObject.Object):
         scroll_x_position = self.undo_stack[-1].scroll_x
 
         if self.undo_stack[-1].restore_scroll:
-            self.restore_scroll(scroll_y_position, scroll_x_position)
+            self.restore_scroll_position(scroll_y_position, scroll_x_position)
 
         self.redraw_main_canvas()
 
