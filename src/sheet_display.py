@@ -40,6 +40,7 @@ class SheetDisplay(GObject.Object):
     left_locator_width: int = 40
     top_locator_height: int = 20
 
+    pan_increment: int = 0.05
     scroll_increment: int = 3
     page_increment: int = 20
 

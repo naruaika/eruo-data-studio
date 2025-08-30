@@ -101,6 +101,7 @@ class SheetDocument(GObject.Object):
         self.is_selecting_cells: bool = False
         self.is_cutting_cells: bool = False
         self.is_copying_cells: bool = False
+        self.is_panning_canvas: bool = False
 
         self.is_searching_cells: bool = False
         # Basically we want to know which widget is currently performing
@@ -182,11 +183,8 @@ class SheetDocument(GObject.Object):
         if self.is_refreshing_uis:
             return
 
-        vscrollbar = self.view.vertical_scrollbar
-        hscrollbar = self.view.horizontal_scrollbar
-
-        vadjustment = vscrollbar.get_adjustment()
-        hadjustment = hscrollbar.get_adjustment()
+        vadjustment = self.view.vertical_scrollbar.get_adjustment()
+        hadjustment = self.view.horizontal_scrollbar.get_adjustment()
 
         self.display.scroll_y_position = int(vadjustment.get_value())
         self.display.scroll_x_position = int(hadjustment.get_value())
@@ -3442,23 +3440,32 @@ class SheetDocument(GObject.Object):
         content_width = canvas_width
 
         if len(self.data.bbs):
-            content_height = (self.data.bbs[0].row_span + 3) * self.display.DEFAULT_CELL_HEIGHT
-            content_width = (self.data.bbs[0].column_span + 1) * self.display.DEFAULT_CELL_WIDTH
+            content_height = self.data.bbs[0].row_span * self.display.DEFAULT_CELL_HEIGHT
+            content_width = self.data.bbs[0].column_span * self.display.DEFAULT_CELL_WIDTH
 
             if len(self.display.cumulative_row_heights):
-                content_height = self.display.cumulative_row_heights[-1] + self.display.DEFAULT_CELL_HEIGHT * 3
+                content_height = self.display.cumulative_row_heights[-1]
+
             if len(self.display.cumulative_column_widths):
-                content_width = self.display.cumulative_column_widths[-1] + self.display.DEFAULT_CELL_WIDTH * 1
+                content_width = self.display.cumulative_column_widths[-1]
 
-        scroll_y_upper = max(content_height + self.display.top_locator_height,
-                             self.display.scroll_y_position + canvas_height)
-        self.view.vertical_scrollbar.get_adjustment().set_upper(scroll_y_upper)
+            content_height += canvas_height - self.display.DEFAULT_CELL_HEIGHT * 3
+            content_width += canvas_width - self.display.DEFAULT_CELL_WIDTH * 1
+
+        if self.is_panning_canvas:
+            new_y_upper = max(content_height, self.display.scroll_y_position + canvas_height)
+            new_x_upper = max(content_width, self.display.scroll_x_position + canvas_width)
+        else:
+            new_y_upper = max(self.display.scroll_y_position + canvas_height, content_height)
+            new_x_upper = max(self.display.scroll_x_position + canvas_width, content_width)
+
+        self.view.vertical_scrollbar.get_adjustment().set_upper(new_y_upper)
+        self.view.horizontal_scrollbar.get_adjustment().set_upper(new_x_upper)
+
         self.view.vertical_scrollbar.get_adjustment().set_page_size(canvas_height)
-
-        scroll_x_upper = max(content_width + self.display.left_locator_width,
-                             self.display.scroll_x_position + canvas_width)
-        self.view.horizontal_scrollbar.get_adjustment().set_upper(scroll_x_upper)
         self.view.horizontal_scrollbar.get_adjustment().set_page_size(canvas_width)
+
+        self.is_panning_canvas = False
 
     def auto_adjust_selections_by_scroll(self) -> None:
         self.selection.current_active_range.x = self.display.get_cell_x_from_column(self.selection.current_active_range.column)

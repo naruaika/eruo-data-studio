@@ -128,30 +128,49 @@ class SheetView(Gtk.Box):
             return False
 
         # Change direction of scroll based on shift key
-        shift_key_pressed = current_event_state == Gdk.ModifierType.SHIFT_MASK or \
-                            current_event_state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK)
-        if shift_key_pressed and (dy < 0 or 0 < dy):
-            dx, dy = dy, 0
-        elif shift_key_pressed and (dx < 0 or 0 < dx):
-            dy, dx = dx, 0
+        if event.get_unit() == Gdk.ScrollUnit.WHEEL:
+            shift_key_pressed = current_event_state == Gdk.ModifierType.SHIFT_MASK or \
+                                current_event_state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK)
+            if shift_key_pressed and (dy < 0 or 0 < dy):
+                dx, dy = dy, 0
+            elif shift_key_pressed and (dx < 0 or 0 < dx):
+                dy, dx = dx, 0
 
         # Convert to scroll unit (in pixels)
-        dx = int(dx * self.document.display.DEFAULT_CELL_WIDTH) # cell width is usually 2-3x the cell height
         dy = int(dy * self.document.display.DEFAULT_CELL_HEIGHT * self.document.display.scroll_increment)
+        dx = int(dx * self.document.display.DEFAULT_CELL_WIDTH) # cell width is usually greater than the cell height
 
-        scroll_y_position = self.vertical_scrollbar.get_adjustment().get_value()
-        scroll_x_position = self.horizontal_scrollbar.get_adjustment().get_value()
+        # Make panning experience with touchpad more friendly
+        if event.get_unit() == Gdk.ScrollUnit.SURFACE:
+            dy *= self.document.display.pan_increment
+            dx *= self.document.display.pan_increment
 
-        if dy < 0 and scroll_y_position == 0:
-            return False
-        if dx < 0 and scroll_x_position == 0:
-            return False
+        self.document.is_panning_canvas = True
+        self.document.is_refreshing_uis = True
 
-        self.vertical_scrollbar.get_adjustment().set_upper(scroll_y_position + dy + self.main_canvas_height)
-        self.horizontal_scrollbar.get_adjustment().set_upper(scroll_x_position + dx + self.main_canvas_width)
+        vertical_adjustment = self.vertical_scrollbar.get_adjustment()
+        horizontal_adjustment = self.horizontal_scrollbar.get_adjustment()
 
-        self.vertical_scrollbar.get_adjustment().set_value(max(0, scroll_y_position + dy))
-        self.horizontal_scrollbar.get_adjustment().set_value(max(0, scroll_x_position + dx))
+        scroll_y_position = vertical_adjustment.get_value()
+        scroll_x_position = horizontal_adjustment.get_value()
+
+        scroll_y_upper = max(0, scroll_y_position + dy + self.main_canvas_height)
+        scroll_x_upper = max(0, scroll_x_position + dx + self.main_canvas_width)
+
+        vertical_adjustment.set_upper(scroll_y_upper)
+        horizontal_adjustment.set_upper(scroll_x_upper)
+
+        vertical_adjustment.set_value(max(0, scroll_y_position + dy))
+        horizontal_adjustment.set_value(max(0, scroll_x_position + dx))
+
+        self.document.is_refreshing_uis = False
+
+        # We currently don't support scrolling in diagonal axis,
+        # so we force clear the entire cache instead.
+        if dx != 0 and dy != 0:
+            self.document.renderer.render_caches = {}
+
+        self.document.on_sheet_view_scrolled(None)
 
         return True
 
@@ -320,7 +339,7 @@ class SheetView(Gtk.Box):
                     self.document.renderer.render_caches['content']['y_trans'] = y_offset
 
                 # We currently don't support resizing in diagonal axis,
-                # so we force clear the entire cache instead
+                # so we force clear the entire cache instead.
                 if x_offset != 0 and y_offset != 0:
                     self.document.renderer.render_caches = {}
 
