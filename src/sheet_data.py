@@ -211,8 +211,9 @@ class SheetData(GObject.Object):
                              dataframe: polars.DataFrame,
                              column:    int = 1,
                              row:       int = 1) -> None:
+        # Create a placeholder dataframe if needed
         if dataframe is None:
-            return
+            dataframe = polars.DataFrame({'column_1': ['Double click to edit...']})
 
         width = dataframe.width
         height = dataframe.height + 1 # +1 for the header

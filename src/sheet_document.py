@@ -3193,7 +3193,9 @@ class SheetDocument(GObject.Object):
         # Try to read the content with CSV reader
         if not is_content_tabular:
             try:
-                datatable = polars.read_csv(content, has_header=False)
+                from io import BytesIO
+                content_bytes = BytesIO(content.encode('utf-8'))
+                datatable = polars.read_csv(content_bytes, has_header=False)
                 is_content_tabular = True
             except Exception as e:
                 print(e)
@@ -3201,7 +3203,7 @@ class SheetDocument(GObject.Object):
         # Retry by ignoring any errors
         if not is_content_tabular:
             try:
-                datatable = polars.read_csv(content,
+                datatable = polars.read_csv(content_bytes,
                                             has_header=False,
                                             ignore_errors=True,
                                             infer_schema=False)
@@ -3209,12 +3211,8 @@ class SheetDocument(GObject.Object):
             except Exception as e:
                 print(e)
 
-        # Set the clipboard datatable if it's not already set
-        if is_content_tabular and clipboard.datatable is None:
-            clipboard.datatable = datatable
-
         if is_content_tabular:
-            self.update_current_cells_from_datatable()
+            self.update_current_cells_from_datatable(datatable if not self.clipboard else None)
 
             if is_cutting_cells:
                 post_cutting_cells_action()
