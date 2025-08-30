@@ -3189,25 +3189,30 @@ class SheetDocument(GObject.Object):
 
         is_cutting_cells = self.is_cutting_cells
         is_content_tabular = clipboard.datatable is not None
+        is_content_parsable = clipboard.datatable is not None
 
         # Try to read the content with CSV reader
         if not is_content_tabular:
+            if not content:
+                return
+
             try:
                 from io import BytesIO
-                content_bytes = BytesIO(content.encode('utf-8'))
+                content_bytes = BytesIO(str(content).encode('utf-8'))
                 datatable = polars.read_csv(content_bytes, has_header=False)
-                is_content_tabular = True
+                is_content_tabular = datatable.width + datatable.height > 2
+                is_content_parsable = True
             except Exception as e:
                 print(e)
 
         # Retry by ignoring any errors
-        if not is_content_tabular:
+        if not (is_content_parsable):
             try:
                 datatable = polars.read_csv(content_bytes,
                                             has_header=False,
                                             ignore_errors=True,
                                             infer_schema=False)
-                is_content_tabular = True
+                is_content_tabular = datatable.width + datatable.height > 2
             except Exception as e:
                 print(e)
 
