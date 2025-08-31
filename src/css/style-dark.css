@@ -26,10 +26,6 @@
     background-color: rgb(78, 78, 81);
 }
 
-.main-canvas {
-    background-color: rgb(25, 25, 25);
-}
-
 .floating-sheet {
     background-color: color(srgb 0 0 0.0235294 / 0.5);
 }

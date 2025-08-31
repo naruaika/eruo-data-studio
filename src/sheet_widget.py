@@ -137,7 +137,7 @@ class SheetAutoFilter(SheetWidget):
         return self.get_rx() <= x <= self.get_rx() + self.width and \
                self.get_ry() <= y <= self.get_ry() + self.height
 
-    def do_on_pressed(self, x: int, y: int) -> None:
+    def do_on_pressed(self, x: int, y: int) -> bool:
         self.on_clicked(x, y)
         return False
 
@@ -153,9 +153,9 @@ class SheetAutoFilter(SheetWidget):
         x = self.get_rx()
         y = self.get_ry()
 
-        background_color = (0.0, 0.0, 0.0)
+        background_color = (1.0, 1.0, 1.0)
         if prefers_dark:
-            background_color = (1.0, 1.0, 1.0)
+            background_color = (0.13, 0.13, 0.15)
 
         context.set_source_rgb(*background_color)
 
@@ -163,30 +163,41 @@ class SheetAutoFilter(SheetWidget):
         context.rectangle(x, y, self.width, self.height)
         context.fill()
 
-        stroke_color = (1.0, 1.0, 1.0)
+        stroke_color = (0.0, 0.0, 0.0)
         if prefers_dark:
-            stroke_color = (0.0, 0.0, 0.0)
+            stroke_color = (1.0, 1.0, 1.0)
 
         context.set_source_rgb(*stroke_color)
         context.set_hairline(True)
 
         # Draw the left diagonal line
-        start_x = x + 4
-        start_y = y + 5
+        start_x = x + 5
+        start_y = y + 7
         end_x = x + self.width / 2
-        end_y = y + self.height - 5
+        end_y = y + self.height - 7
         context.move_to(start_x, start_y)
         context.line_to(end_x, end_y)
 
         # Draw the right diagonal line
         start_x = x + self.width / 2
-        start_y = y + self.height - 5
-        end_x = x + self.width - 4
-        end_y = y + 5
+        start_y = y + self.height - 7
+        end_x = x + self.width - 5
+        end_y = y + 7
         context.move_to(start_x, start_y)
         context.line_to(end_x, end_y)
 
         context.stroke()
+
+        # stroke_color = (0.75, 0.75, 0.75)
+        # if prefers_dark:
+        #     stroke_color = (0.25, 0.25, 0.25)
+
+        # context.set_source_rgb(*stroke_color)
+        # context.set_antialias(cairo.Antialias.NONE)
+
+        # # Draw the border line
+        # context.rectangle(x, y, self.width, self.height)
+        # context.stroke()
 
 
 
@@ -262,7 +273,7 @@ class SheetColumnResizer(SheetWidget):
         return (left_hovered or right_hovered) and \
                0 <= y <= self.display.top_locator_height
 
-    def do_on_enter(self, x: int, y: int) -> None:
+    def do_on_enter(self, x: int, y: int) -> bool:
         if self.is_clicked:
             return False
 
@@ -274,7 +285,7 @@ class SheetColumnResizer(SheetWidget):
 
         return False
 
-    def do_on_leave(self, x: int, y: int) -> None:
+    def do_on_leave(self, x: int, y: int) -> bool:
         self.is_hovered = False
 
         if self.is_clicked:
@@ -283,13 +294,13 @@ class SheetColumnResizer(SheetWidget):
         self.on_hovered()
         return False
 
-    def do_on_pressed(self, x: int, y: int) -> None:
+    def do_on_pressed(self, x: int, y: int) -> bool:
         self.is_hovered = False
         self.is_clicked = True
         self.on_hovered()
         return True
 
-    def do_on_released(self, x: int, y: int) -> None:
+    def do_on_released(self, x: int, y: int) -> bool:
         self.is_clicked = False
         self.on_released(self.target_column, self.new_cell_width)
         return True
@@ -419,7 +430,7 @@ class SheetColumnResizer(SheetWidget):
         # Flag this as a TODO for now following the sheet_renderer,
         # as this code is copied from there.
         if prefers_dark:
-            context.set_source_rgb(0.11, 0.11, 0.13)
+            context.set_source_rgb(0.13, 0.13, 0.15)
         else:
             context.set_source_rgb(1.0, 1.0, 1.0)
 

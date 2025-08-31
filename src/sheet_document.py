@@ -3362,24 +3362,25 @@ class SheetDocument(GObject.Object):
         # Remove existing auto filter widgets
         self.widgets = [widget for widget in self.widgets if not isinstance(widget, SheetAutoFilter)]
 
+        def on_clicked(x: int, y: int) -> None:
+            GLib.idle_add(self.emit, 'open-context-menu', x, y, 'header')
+
         icon_size = self.display.ICON_SIZE
 
         cell_y = self.display.get_cell_y_from_row(1)
         cell_height = self.display.get_cell_height_from_row(1)
         y = cell_y + (cell_height - icon_size) / 2 + self.display.scroll_y_position
 
-        def on_clicked(x: int, y: int) -> None:
-            GLib.idle_add(self.emit, 'open-context-menu', x, y, 'header')
-
         # TODO: support multiple dataframes?
         n_columns = self.data.dfs[0].width
         if len(self.display.column_visible_series):
             n_columns = len(self.display.column_visible_series)
+
         for column in range(n_columns):
             cell_x = self.display.get_cell_x_from_column(column + 1)
             cell_width = self.display.get_cell_width_from_column(column + 1)
-            x = cell_x + self.display.scroll_x_position + cell_width - icon_size - 3
-            auto_filter = SheetAutoFilter(x, y,  icon_size, icon_size, self.display, on_clicked)
+            x = cell_x + self.display.scroll_x_position + cell_width - icon_size - 1
+            auto_filter = SheetAutoFilter(x, y,  icon_size, icon_size - 1, self.display, on_clicked)
             self.widgets.insert(0, auto_filter)
 
     def auto_adjust_column_widths(self) -> None:

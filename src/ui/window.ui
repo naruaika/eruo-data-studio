@@ -175,7 +175,6 @@
                                 <property name="hexpand">true</property>
                                 <style>
                                   <class name="toolbar-view"/>
-                                  <class name="card"/>
                                 </style>
                               </object>
                             </child>

@@ -71,9 +71,9 @@ class SheetRenderer(GObject.Object):
         if not edit_mode_enabled:
             self.draw_selection_overlay(context, width, height, display, selection)
         self.draw_cells_borders(context, width, height, display)
+        self.draw_virtual_widgets(context, width, height, display, widgets)
         if not edit_mode_enabled:
             self.draw_selection_borders(context, width, height, display, selection)
-        self.draw_virtual_widgets(context, width, height, display, widgets)
 
     def setup_cairo_context(self, context: cairo.Context) -> None:
         # We want that the canvas color scheme respects the system color scheme
@@ -105,7 +105,7 @@ class SheetRenderer(GObject.Object):
         # I do agree that it's not always good to hardcode like this, so let's flag it
         # as a TODO for now.
         if self.prefers_dark:
-            context.set_source_rgb(0.11, 0.11, 0.13)
+            context.set_source_rgb(0.13, 0.13, 0.15)
         else:
             context.set_source_rgb(1.0, 1.0, 1.0)
 
