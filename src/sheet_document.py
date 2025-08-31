@@ -397,9 +397,7 @@ class SheetDocument(GObject.Object):
 
         self.update_selection_from_position(col_1, row_1,
                                             col_2, row_2,
-                                            keep_order=True,
-                                            follow_cursor=True,
-                                            auto_scroll=True)
+                                            keep_order=True)
 
         self.view.main_canvas.queue_draw()
 
@@ -481,10 +479,7 @@ class SheetDocument(GObject.Object):
                                             end_column,
                                             end_row,
                                             keep_order=True,
-                                            follow_cursor=True,
-                                            auto_scroll=True,
                                             scroll_axis=scroll_axis,
-                                            with_offset=False,
                                             smooth_scroll=True)
 
         self.view.main_canvas.queue_draw()
@@ -565,7 +560,6 @@ class SheetDocument(GObject.Object):
                                             end_column,
                                             end_row,
                                             keep_order=True,
-                                            follow_cursor=False,
                                             auto_scroll=False)
 
         self.view.main_canvas.queue_draw()
@@ -618,9 +612,7 @@ class SheetDocument(GObject.Object):
 
         self.update_selection_from_position(col_1, row_1,
                                             col_2, row_2,
-                                            keep_order=False,
-                                            follow_cursor=False,
-                                            auto_scroll=True)
+                                            follow_cursor=False)
 
         self.view.main_canvas.queue_draw()
 
@@ -921,6 +913,7 @@ class SheetDocument(GObject.Object):
                                        row_span:  int = -1,
                                        on_border: bool = False,
                                        dfi:       int = -1) -> bool:
+        # FIXME: undefined behaviour when adding row(s) above the header
         self.try_to_select_entire_content_rows()
         arange = self.selection.current_active_range
 
@@ -1538,8 +1531,7 @@ class SheetDocument(GObject.Object):
                                                 cursor.column,
                                                 cursor.row,
                                                 keep_order=True,
-                                                follow_cursor=True,
-                                                auto_scroll=True)
+                                                auto_scroll=False)
             arange = self.selection.current_active_range
 
         mcolumn = arange.metadata.column
@@ -1720,8 +1712,7 @@ class SheetDocument(GObject.Object):
                                                 cursor.column,
                                                 cursor.row,
                                                 keep_order=True,
-                                                follow_cursor=True,
-                                                auto_scroll=True)
+                                                auto_scroll=False)
             arange = self.selection.current_active_range
 
         mcolumn = arange.metadata.column
@@ -1797,7 +1788,6 @@ class SheetDocument(GObject.Object):
                                                     arange.column + crange.column_span - 1,
                                                     arange.row + crange.row_span - 1,
                                                     keep_order=True,
-                                                    follow_cursor=False,
                                                     auto_scroll=False)
 
             # Save snapshot
@@ -2989,10 +2979,10 @@ class SheetDocument(GObject.Object):
         row_index = self.display.get_vrow_from_row(mrow + 1)
         first_row = self.data.read_cell_data_block_from_metadata(0, row_index - 1, table_width, 1, 0)
 
-        self.update_selection_from_position(mcolumn, mrow, column_span, mrow)
+        self.update_selection_from_position(mcolumn, mrow, column_span, mrow, auto_scroll=False)
         self.update_current_cells_from_datatable(first_row)
 
-        self.update_selection_from_position(mcolumn, mrow + 1, column_span, mrow + 1)
+        self.update_selection_from_position(mcolumn, mrow + 1, column_span, mrow + 1, auto_scroll=False)
         self.delete_current_rows()
 
         self.update_selection_from_position(mcolumn, mrow, column_span, mrow, auto_scroll=False)
@@ -3016,15 +3006,15 @@ class SheetDocument(GObject.Object):
         mrow = self.data.bbs[0].row
         column_span = self.data.bbs[0].column_span
 
-        self.update_selection_from_position(mcolumn, mrow, column_span, mrow)
+        self.update_selection_from_position(mcolumn, mrow, column_span, mrow, auto_scroll=False)
         self.insert_blank_from_current_rows()
 
-        self.update_selection_from_position(mcolumn, mrow + 1, column_span, mrow + 1)
+        self.update_selection_from_position(mcolumn, mrow + 1, column_span, mrow + 1, auto_scroll=False)
 
         header_row = polars.DataFrame({cname: [cname] for cname in self.data.dfs[0].columns})
         self.update_current_cells_from_datatable(header_row)
 
-        self.update_selection_from_position(mcolumn, mrow, column_span, mrow)
+        self.update_selection_from_position(mcolumn, mrow, column_span, mrow, auto_scroll=False)
         self.update_current_cells_from_literal('')
 
         self.auto_adjust_selections_by_crud(0, 0, False)
@@ -3173,7 +3163,6 @@ class SheetDocument(GObject.Object):
                                                 crange.column + crange.column_span - 1,
                                                 crange.row + crange.row_span - 1,
                                                 keep_order=True,
-                                                follow_cursor=False,
                                                 auto_scroll=False)
             self.update_current_cells_from_literal('')
 
@@ -3182,7 +3171,6 @@ class SheetDocument(GObject.Object):
                                                 arange.column + arange.column_span - 1,
                                                 arange.row + arange.row_span - 1,
                                                 keep_order=True,
-                                                follow_cursor=False,
                                                 auto_scroll=False)
 
             self.notify_selection_changed(arange.column, arange.row, arange.metadata)
@@ -3206,7 +3194,7 @@ class SheetDocument(GObject.Object):
                 print(e)
 
         # Retry by ignoring any errors
-        if not (is_content_parsable):
+        if not is_content_parsable:
             try:
                 datatable = polars.read_csv(content_bytes,
                                             has_header=False,
@@ -3567,7 +3555,6 @@ class SheetDocument(GObject.Object):
         self.update_selection_from_position(col_1, row_1,
                                             col_2, row_2,
                                             keep_order=True,
-                                            follow_cursor=True,
                                             auto_scroll=False)
 
         globals.is_changing_state = cstate
