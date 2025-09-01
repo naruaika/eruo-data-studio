@@ -42,6 +42,7 @@
     <file preprocess="xml-stripblanks">edit-copy-symbolic.svg</file>
     <file preprocess="xml-stripblanks">edit-find-replace-symbolic.svg</file>
     <file preprocess="xml-stripblanks">edit-find-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">folder-symbolic.svg</file>
     <file preprocess="xml-stripblanks">go-down-symbolic.svg</file>
     <file preprocess="xml-stripblanks">go-next-symbolic.svg</file>
     <file preprocess="xml-stripblanks">history-undo-symbolic.svg</file>

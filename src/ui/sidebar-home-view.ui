@@ -102,7 +102,7 @@
             <child>
               <object class="AdwPreferencesGroup" id="fields_section">
                 <child>
-                  <object class="AdwExpanderRow">
+                  <object class="AdwExpanderRow" id="fields_expander">
                     <property name="title">Fields</property>
                     <property name="subtitle">Manage which fields are visible</property>
                     <child>

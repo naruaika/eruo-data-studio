@@ -323,6 +323,7 @@ class SheetNotebookView(Gtk.Box):
                     return False
                 on_run_button_clicked(run_button)
                 return True
+            return False
 
         run_button.connect('clicked', on_run_button_clicked)
         run_above_button.connect('clicked', on_run_above_button_clicked)

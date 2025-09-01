@@ -251,10 +251,10 @@ class SheetView(Gtk.Box):
                                    event:   Gtk.EventControllerKey,
                                    keyval:  int,
                                    keycode: int,
-                                   state:   Gdk.ModifierType) -> None:
+                                   state:   Gdk.ModifierType) -> bool:
         if keyval == Gdk.KEY_Escape:
             self.emit('cancel-operation')
-            return
+            return False
 
         if keyval in [
             Gdk.KEY_Tab,
@@ -266,7 +266,7 @@ class SheetView(Gtk.Box):
             Gdk.KEY_Down,
         ]:
             self.emit('select-by-keypress', keyval, state)
-            return
+            return True
 
         # Prevent from interrupting any application actions
         if state == (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK) \
@@ -274,15 +274,15 @@ class SheetView(Gtk.Box):
                 or state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK) \
                 or state == Gdk.ModifierType.CONTROL_MASK \
                 or state == Gdk.ModifierType.ALT_MASK:
-            return
+            return True
 
         if Gdk.KEY_space <= keyval <= Gdk.KEY_asciitilde:
             self.emit('open-inline-formula', chr(keyval))
-            return
+            return True
 
         if keyval == Gdk.KEY_BackSpace:
             self.emit('open-inline-formula', '')
-            return
+            return True
 
         if keyval == Gdk.KEY_Menu:
             # We assume that the user also navigates with the keyboard, which will make the cell
@@ -294,7 +294,9 @@ class SheetView(Gtk.Box):
             y = active.y + active.height / 2
             self.emit('pointer-released', x, y)
             self.emit('open-context-menu', x, y, 'cell')
-            return
+            return True
+
+        return False
 
     def on_scrollbar_entered(self,
                              event: Gtk.EventControllerMotion,

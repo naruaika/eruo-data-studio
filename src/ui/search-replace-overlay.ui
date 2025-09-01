@@ -17,6 +17,7 @@
             <property name="margin-bottom">4</property>
             <property name="margin-start">44</property>
             <property name="halign">start</property>
+            <property name="use-markup">true</property>
             <property name="label">Showing 0 of 0</property>
             <style>
               <class name="status-text"/>

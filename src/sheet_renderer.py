@@ -71,9 +71,9 @@ class SheetRenderer(GObject.Object):
         if not edit_mode_enabled:
             self.draw_selection_overlay(context, width, height, display, selection)
         self.draw_cells_borders(context, width, height, display)
-        self.draw_virtual_widgets(context, width, height, display, widgets)
         if not edit_mode_enabled:
             self.draw_selection_borders(context, width, height, display, selection)
+        self.draw_virtual_widgets(context, width, height, display, widgets)
 
     def setup_cairo_context(self, context: cairo.Context) -> None:
         # We want that the canvas color scheme respects the system color scheme
@@ -289,7 +289,7 @@ class SheetRenderer(GObject.Object):
                 cname = data.dfs[0].columns[vcol_index - 1]
                 dtype = utils.get_dtype_symbol(data.dfs[0].dtypes[vcol_index - 1])
                 layout.set_font_description(body_font_desc)
-                layout.set_text(f'{cname} [{dtype}]', -1)
+                layout.set_text(f'{cname} ({dtype})', -1)
                 x_text = x + display.DEFAULT_CELL_PADDING
 
             # Draw column name
@@ -301,7 +301,7 @@ class SheetRenderer(GObject.Object):
                 x_text = x + (cell_width - text_width) / 2
 
             context.save()
-            context.rectangle(x, 0, cell_width - 1, display.top_locator_height)
+            context.rectangle(x, 0, cell_width - 2, display.top_locator_height)
             context.clip()
             context.move_to(x_text, 2)
             PangoCairo.show_layout(context, layout)
@@ -490,7 +490,7 @@ class SheetRenderer(GObject.Object):
             layout.set_font_description(body_font_desc)
 
             ccontext.save()
-            ccontext.rectangle(x, display.top_locator_height, cell_width - 1, height)
+            ccontext.rectangle(x, display.top_locator_height, cell_width - 2, height)
             ccontext.clip()
 
             row_index = display.get_starting_row()
@@ -533,8 +533,7 @@ class SheetRenderer(GObject.Object):
                     cname = data.dfs[0].columns[vcol_index - 1]
                     cname = cname.split('\n', 1)[0]
                     dtype = utils.get_dtype_symbol(col_dtype)
-                    cell_text = f'{cname} [{dtype}]'
-                    layout.set_text(cell_text, -1)
+                    layout.set_text(f'{cname} ({dtype})', -1)
 
                 # Draw dataframe content
                 else:

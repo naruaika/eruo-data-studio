@@ -241,9 +241,9 @@
                                         </child>
                                         <child>
                                           <object class="GtkToggleButton" id="formula_bar_toggle_button">
+                                            <property name="valign">start</property>
                                             <property name="icon-name">view-fullscreen-symbolic</property>
                                             <property name="tooltip-text" translatable="yes">Toggle Formula Bar</property>
-                                            <property name="valign">start</property>
                                             <signal name="toggled" handler="on_toggle_formula_bar_toggled" swapped="no" />
                                           </object>
                                         </child>
@@ -327,7 +327,7 @@
                               <object class="AdwTabBar" id="tab_bar">
                                 <property name="valign">end</property>
                                 <property name="autohide">false</property>
-                                <property name="expand_tabs">false</property>
+                                <property name="expand-tabs">false</property>
                                 <property name="view">tab_view</property>
                                 <property name="end-action-widget">
                                   <object class="AdwSplitButton">

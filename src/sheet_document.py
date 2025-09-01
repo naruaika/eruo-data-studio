@@ -2396,7 +2396,8 @@ class SheetDocument(GObject.Object):
         if not globals.is_changing_state:
             from .history_manager import SortRowState
             globals.history.save(SortRowState(self.data.dfs[mdfi]['$ridx'],
-                                              self.display.row_visibility_flags if len(self.display.row_visibility_flags) else None,
+                                              self.display.row_visibility_flags if len(self.display.row_visibility_flags)
+                                                                                else None,
                                               mdfi, descending, multiple,
                                               csorts, psorts))
 
@@ -2520,9 +2521,6 @@ class SheetDocument(GObject.Object):
         return False
 
     def materialize_view(self) -> None:
-        if len(self.data.dfs) == 0:
-            return
-
         if not self.data.has_main_dataframe:
             return
 
@@ -2538,40 +2536,159 @@ class SheetDocument(GObject.Object):
         if len(visible_column_names) == 0:
             self.data.bbs = []
             self.data.dfs = []
+
+            self.auto_adjust_selections_by_crud(0, 0, False)
+            self.repopulate_auto_filter_widgets()
+
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
+
+            self.emit('columns-changed', 0)
+
             return
 
         # Discards all dataframes but the main one
         self.data.materialize_view(self.current_filters, visible_column_names)
 
-        # Update column widths and visibility flags
-        if len(self.display.column_visibility_flags):
-            if len(self.display.column_widths):
-                self.display.column_widths = self.display.column_widths.filter(self.display.column_visibility_flags)
-            self.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
-            self.display.column_visible_series = polars.Series(dtype=polars.UInt32)
-
-        # Update row heights and visibility flags
-        if len(self.display.row_visibility_flags):
-            if len(self.display.row_heights):
-                self.display.row_heights = self.display.row_heights.filter(self.display.row_visibility_flags)
-            self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
-            self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
-
-        self.auto_adjust_selections_by_crud(0, 0, False)
-        self.repopulate_auto_filter_widgets()
-
-        self.renderer.render_caches = {}
-        self.view.main_canvas.queue_draw()
-
         # Reset these as they're no longer relevant
         self.current_sorts = []
         self.current_filters = []
 
+        # Update visibility flags and column widths
+        if len(self.display.column_visibility_flags):
+            self.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
+            self.display.column_visible_series = polars.Series(dtype=polars.UInt32)
+
+            if len(self.display.column_widths):
+                self.display.column_widths = self.display.column_widths.filter(self.display.column_visibility_flags)
+                self.display.cumulative_column_widths = polars.Series('ccwidths', self.display.column_widths).cum_sum()
+
+        # Update visibility flags and row heights
+        if len(self.display.row_visibility_flags):
+            self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+            self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+
+            if len(self.display.row_heights):
+                self.display.row_heights = self.display.row_heights.filter(self.display.row_visibility_flags)
+                self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+        self.repopulate_auto_filter_widgets()
+
+        # TODO: clear only for the related columns
+        self.data.clear_cell_data_unique_cache(0)
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        self.emit('columns-changed', 0)
+
     def rechunk_table(self) -> None:
-        # TODO: support multiple dataframes?
         if not self.data.has_main_dataframe:
             return
         self.data.dfs[0] = self.data.dfs[0].rechunk()
+
+    def keep_n_rows(self,
+                    strategy:  str = 'first',
+                    no_rows:   int = -1,
+                    first_row: int = -1) -> None:
+        if not self.data.has_main_dataframe:
+            return
+
+        # Discard all dataframes
+        if no_rows == 0:
+            self.data.bbs = []
+            self.data.dfs = []
+
+            self.auto_adjust_selections_by_crud(0, 0, False)
+            self.repopulate_auto_filter_widgets()
+
+            self.renderer.render_caches = {}
+            self.view.main_canvas.queue_draw()
+
+            self.emit('columns-changed', 0)
+
+            return
+
+        start = 0
+        end = None
+
+        if strategy == 'first':
+            end = no_rows
+
+        if strategy == 'last':
+            start = -no_rows
+
+        if strategy == 'range':
+            start = first_row - 1
+            end = start + no_rows
+
+        if strategy == 'inverse-first':
+            start = no_rows
+
+        if strategy == 'inverse-last':
+            end = no_rows
+
+        if strategy == 'inverse-range':
+            end = first_row - 1
+            start = end + no_rows
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import KeepRowState
+            state = KeepRowState(self.data.dfs[0],
+                                 self.display.row_visibility_flags if len(self.display.row_visibility_flags)
+                                                                   else None,
+                                 self.display.row_heights if len(self.display.row_heights)
+                                                          else None,
+                                 strategy,
+                                 no_rows,
+                                 first_row)
+            globals.history.save(state)
+
+        if strategy != 'inverse-range':
+            self.data.dfs[0] = self.data.dfs[0][start:end]
+        else:
+            self.data.dfs[0] = polars.concat([self.data.dfs[0][:end],
+                                              self.data.dfs[0][start:]])
+
+        # Discards all dataframes but the main one
+        self.data.dfs = [self.data.dfs[0]]
+        self.data.bbs = [self.data.bbs[0]]
+
+        # Update row visibility flags
+        if len(self.display.row_visibility_flags):
+            if strategy != 'inverse-range':
+                self.display.row_visibility_flags = self.display.row_visibility_flags[start:end]
+            else:
+                self.display.row_visibility_flags = polars.concat([self.display.row_visibility_flags[:end],
+                                                                   self.display.row_visibility_flags[start:]])
+            self.display.row_visible_series = self.display.row_visibility_flags.arg_true()
+            self.data.bbs[0].row_span = len(self.display.row_visible_series)
+        else:
+            self.data.bbs[0].row_span = self.data.dfs[0].height + 1
+
+        # Update row heights
+        if len(self.display.row_heights):
+            if strategy != 'inverse-range':
+                self.display.row_heights = self.display.row_heights[start:end]
+            else:
+                self.display.row_heights = polars.concat([self.display.row_heights[:end],
+                                                          self.display.row_heights[start:]])
+            row_heights_visible_only = self.display.row_heights
+            if len(self.display.row_visibility_flags):
+                row_heights_visible_only = row_heights_visible_only.filter(self.display.row_visibility_flags)
+            self.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
+        # TODO: clear only for the related columns
+        self.data.clear_cell_data_unique_cache(0)
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        self.emit('columns-changed', 0)
 
     def find_in_current_cells(self,
                               text_value:       str,
@@ -2962,9 +3079,6 @@ class SheetDocument(GObject.Object):
         self.repopulate_auto_filter_widgets()
 
     def use_first_row_as_headers(self) -> None:
-        if len(self.data.dfs) == 0:
-            return
-
         if not self.data.has_main_dataframe:
             return
 
@@ -2996,9 +3110,6 @@ class SheetDocument(GObject.Object):
         self.view.main_canvas.queue_draw()
 
     def use_headers_as_first_row(self) -> None:
-        if len(self.data.dfs) == 0:
-            return
-
         if not self.data.has_main_dataframe:
             return
 
@@ -3175,9 +3286,11 @@ class SheetDocument(GObject.Object):
 
             self.notify_selection_changed(arange.column, arange.row, arange.metadata)
 
+        datatable = clipboard.datatable
+
         is_cutting_cells = self.is_cutting_cells
-        is_content_tabular = clipboard.datatable is not None
-        is_content_parsable = clipboard.datatable is not None
+        is_content_tabular = datatable is not None
+        is_content_parsable = datatable is not None
 
         # Try to read the content with CSV reader
         if not is_content_tabular:
@@ -3205,7 +3318,8 @@ class SheetDocument(GObject.Object):
                 print(e)
 
         if is_content_tabular:
-            self.update_current_cells_from_datatable(datatable if not self.clipboard else None)
+            self.update_current_cells_from_datatable(datatable if not self.clipboard
+                                                               else None)
 
             if is_cutting_cells:
                 post_cutting_cells_action()
@@ -3304,7 +3418,8 @@ class SheetDocument(GObject.Object):
             self.selection.cell_data = self.selection.cell_data.to_list()
 
         cell_dtype = self.data.read_column_dtype_from_metadata(mcolumn, mdfi)
-        self.selection.cell_dtype = utils.get_dtype_symbol(cell_dtype) if cell_dtype is not None else None
+        self.selection.cell_dtype = utils.get_dtype_symbol(cell_dtype) if cell_dtype is not None \
+                                                                       else None
 
         # Request to update the input bar with the selected cell data
         self.emit('selection-changed')
@@ -3354,13 +3469,12 @@ class SheetDocument(GObject.Object):
         if not self.configs['show-auto-filters']:
             return
 
+        # Remove existing auto filter widgets
+        from .sheet_widget import SheetAutoFilter
+        self.widgets = [widget for widget in self.widgets if not isinstance(widget, SheetAutoFilter)]
+
         if len(self.data.dfs) == 0:
             return
-
-        from .sheet_widget import SheetAutoFilter
-
-        # Remove existing auto filter widgets
-        self.widgets = [widget for widget in self.widgets if not isinstance(widget, SheetAutoFilter)]
 
         def on_clicked(x: int, y: int) -> None:
             GLib.idle_add(self.emit, 'open-context-menu', x, y, 'header')
@@ -3379,7 +3493,7 @@ class SheetDocument(GObject.Object):
         for column in range(n_columns):
             cell_x = self.display.get_cell_x_from_column(column + 1)
             cell_width = self.display.get_cell_width_from_column(column + 1)
-            x = cell_x + self.display.scroll_x_position + cell_width - icon_size - 1
+            x = cell_x + self.display.scroll_x_position + cell_width - icon_size - 2
             auto_filter = SheetAutoFilter(x, y,  icon_size, icon_size - 1, self.display, on_clicked)
             self.widgets.insert(0, auto_filter)
 

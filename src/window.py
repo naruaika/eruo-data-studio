@@ -346,7 +346,12 @@ class Window(Adw.ApplicationWindow):
                 and sheet_view.main_canvas.has_focus():
             return False
 
-        self.grab_focus()
+        # To handle a weird behaviour where the window doesn't received
+        # a focus on its first launch. We should wrap with the if-block
+        # otherwise it'll reset the focus to the first focusable element
+        # on the window.
+        if globals.history is None:
+            self.grab_focus()
 
         # Otherwise, let the default behavior happen. Usually,
         # cycling focus between widgets, excluding the main canvas,
@@ -419,8 +424,9 @@ class Window(Adw.ApplicationWindow):
                 return True
 
             self.close_inline_formula()
-
             return True
+
+        return False
 
     def on_inline_formula_unfocused(self, event: Gtk.EventControllerFocus) -> None:
         sheet_view = self.get_current_active_view()
@@ -616,7 +622,7 @@ class Window(Adw.ApplicationWindow):
         # applications don't do this, but I prefer this for consistency.
         if keyval == Gdk.KEY_Tab:
             self.reset_inputbar()
-            return True
+            return False
 
         # Pressing escape key will reset the input bar and
         # return the focus to the main canvas back.
@@ -629,6 +635,8 @@ class Window(Adw.ApplicationWindow):
             sheet_view.main_canvas.set_focusable(True)
             sheet_view.main_canvas.grab_focus()
             return True
+
+        return False
 
     def on_formula_bar_key_pressed(self,
                                    event:   Gtk.EventControllerKey,
@@ -686,6 +694,8 @@ class Window(Adw.ApplicationWindow):
                 return True
 
             return True
+
+        return False
 
     def on_selected_page_changed(self,
                                  tab_view: Adw.TabView,

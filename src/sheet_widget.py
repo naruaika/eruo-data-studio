@@ -153,9 +153,9 @@ class SheetAutoFilter(SheetWidget):
         x = self.get_rx()
         y = self.get_ry()
 
-        background_color = (1.0, 1.0, 1.0)
+        background_color = (0.75, 0.75, 0.75)
         if prefers_dark:
-            background_color = (0.13, 0.13, 0.15)
+            background_color = (0.25, 0.25, 0.25)
 
         context.set_source_rgb(*background_color)
 
@@ -172,32 +172,21 @@ class SheetAutoFilter(SheetWidget):
 
         # Draw the left diagonal line
         start_x = x + 5
-        start_y = y + 7
+        start_y = y + 6
         end_x = x + self.width / 2
-        end_y = y + self.height - 7
+        end_y = y + self.height - 6
         context.move_to(start_x, start_y)
         context.line_to(end_x, end_y)
 
         # Draw the right diagonal line
         start_x = x + self.width / 2
-        start_y = y + self.height - 7
+        start_y = y + self.height - 6
         end_x = x + self.width - 5
-        end_y = y + 7
+        end_y = y + 6
         context.move_to(start_x, start_y)
         context.line_to(end_x, end_y)
 
         context.stroke()
-
-        # stroke_color = (0.75, 0.75, 0.75)
-        # if prefers_dark:
-        #     stroke_color = (0.25, 0.25, 0.25)
-
-        # context.set_source_rgb(*stroke_color)
-        # context.set_antialias(cairo.Antialias.NONE)
-
-        # # Draw the border line
-        # context.rectangle(x, y, self.width, self.height)
-        # context.stroke()
 
 
 

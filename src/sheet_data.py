@@ -208,7 +208,7 @@ class SheetData(GObject.Object):
         self.setup_main_dataframe(dataframe, column, row)
 
     def setup_main_dataframe(self,
-                             dataframe: polars.DataFrame,
+                             dataframe: polars.DataFrame = None,
                              column:    int = 1,
                              row:       int = 1) -> None:
         # Create a placeholder dataframe if needed
@@ -239,12 +239,6 @@ class SheetData(GObject.Object):
             self.dfs = [dataframe]
 
         self.has_main_dataframe = True
-
-    def insert_blank_dataframe(self,
-                               column: int = 1,
-                               row:    int = 1) -> polars.DataFrame:
-        self.bbs.append(SheetCellBoundingBox(column, row, 0, 0))
-        self.dfs.append(polars.DataFrame())
 
     def get_cell_metadata_from_position(self,
                                         column: int,
@@ -705,7 +699,7 @@ FROM indexed_self
             if message.startswith('unable to add a column of length '):
                 message = 'Column length mismatch. Create a new table?'
 
-                action_data_id = utils.generate_ulid()
+                action_data_id = str(utils.generate_ulid())
                 action_name = f"app.apply-pending-table('{action_data_id}')"
                 action = ('Create', action_name, action_data_id)
 

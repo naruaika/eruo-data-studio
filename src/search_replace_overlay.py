@@ -76,36 +76,43 @@ class SearchReplaceOverlay(Adw.Bin):
                        event:   Gtk.EventControllerKey,
                        keyval:  int,
                        keycode: int,
-                       state:   Gdk.ModifierType) -> None:
+                       state:   Gdk.ModifierType) -> bool:
         if keyval == Gdk.KEY_Escape:
             self.close_search_overlay()
-            return
+            return False
+
+        return False
 
     def on_search_entry_key_pressed(self,
                                     event:   Gtk.EventControllerKey,
                                     keyval:  int,
                                     keycode: int,
-                                    state:   Gdk.ModifierType) -> None:
+                                    state:   Gdk.ModifierType) -> bool:
         # Pressing enter/return key while holding shift key will
         # search for the previous search occurrence.
         if keyval == Gdk.KEY_Return and state == Gdk.ModifierType.SHIFT_MASK:
             if self.search_results_length == 0:
                 self.on_search_entry_activated(self.search_entry)
-                return
+                return True
 
             self.find_previous_search_occurrence()
-            return
+            return True
+
+        return False
 
     def on_replace_entry_key_pressed(self,
                                      event:   Gtk.EventControllerKey,
                                      keyval:  int,
                                      keycode: int,
-                                     state:   Gdk.ModifierType) -> None:
+                                     state:   Gdk.ModifierType) -> bool:
         # Pressing enter/return key while holding shift key will
         # search for the previous search occurrence.
         if keyval == Gdk.KEY_Return \
                 and state == (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK):
             self.on_replace_all_button_clicked(self.replace_all_button)
+            return True
+
+        return False
 
     @Gtk.Template.Callback()
     def on_search_entry_activated(self, widget: Gtk.Widget) -> None:

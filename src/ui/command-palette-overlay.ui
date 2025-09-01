@@ -28,20 +28,6 @@
               </object>
             </child>
             <child>
-              <object class="GtkLabel" id="prompt_text">
-                <property name="max-width-chars">0</property>
-                <property name="width-request">584</property>
-                <property name="margin-start">2</property>
-                <property name="margin-end">2</property>
-                <property name="halign">start</property>
-                <property name="xalign">0</property>
-                <property name="wrap">true</property>
-                <property name="wrap-mode">word-char</property>
-                <property name="label">Press 'Enter' to confirm or 'Escape' to cancel</property>
-                <property name="visible">false</property>
-              </object>
-            </child>
-            <child>
               <object class="GtkScrolledWindow" id="scrolled_window">
                 <property name="halign">fill</property>
                 <property name="hexpand">true</property>
@@ -60,6 +46,23 @@
                     </property>
                   </object>
                 </child>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel" id="prompt_text">
+                <property name="max-width-chars">0</property>
+                <property name="width-request">584</property>
+                <property name="margin-start">9</property>
+                <property name="margin-end">9</property>
+                <property name="halign">start</property>
+                <property name="xalign">0</property>
+                <property name="wrap">true</property>
+                <property name="wrap-mode">word-char</property>
+                <property name="use-markup">true</property>
+                <property name="label">Press 'Enter' to confirm or 'Escape' to cancel</property>
+                <style>
+                  <class name="caption"/>
+                </style>
               </object>
             </child>
           </object>

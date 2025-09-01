@@ -459,6 +459,7 @@ class SidebarHomeView(Adw.Bin):
 
     connections_section = Gtk.Template.Child()
     fields_section = Gtk.Template.Child()
+    fields_expander = Gtk.Template.Child()
     sorts_section = Gtk.Template.Child()
     sorts_expander = Gtk.Template.Child()
     filters_section = Gtk.Template.Child()
@@ -1760,3 +1761,9 @@ class SidebarHomeView(Adw.Bin):
 
         viewport = self.scrolled_window.get_first_child()
         GLib.timeout_add(50, viewport.scroll_to, self.filters_section, None)
+
+    def open_field_sections(self) -> None:
+        self.fields_expander.set_expanded(True)
+
+        viewport = self.scrolled_window.get_first_child()
+        GLib.timeout_add(50, viewport.scroll_to, self.fields_expander, None)

@@ -12,21 +12,19 @@
           </object>
         </child>
         <child>
-          <object class="AdwActionRow" id="save_to">
+          <object class="AdwEntryRow" id="save_to">
             <property name="title">Save To</property>
-            <property name="subtitle">~/Documents</property>
-            <property name="activatable">true</property>
-            <signal name="activated" handler="on_save_to_activated" swapped="no"/>
+            <property name="text">~/Documents</property>
             <child>
-              <object class="GtkImage">
-                <property name="margin-start">8</property>
-                <property name="margin-end">8</property>
-                <property name="icon-name">go-next-symbolic</property>
+              <object class="GtkButton">
+                <property name="valign">center</property>
+                <property name="icon-name">folder-symbolic</property>
+                <signal name="clicked" handler="on_save_to_clicked" swapped="no"/>
+                <style>
+                  <class name="flat"/>
+                </style>
               </object>
             </child>
-            <style>
-              <class name="property"/>
-            </style>
           </object>
         </child>
       </object>

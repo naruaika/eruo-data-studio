@@ -41,10 +41,10 @@ class FileSaveAsJsonView(Adw.PreferencesPage):
             self.save_as.set_text(file_name)
 
         if folder_path is not None:
-            self.save_to.set_subtitle(folder_path)
+            self.save_to.set_text(folder_path)
 
     @Gtk.Template.Callback()
-    def on_save_to_activated(self, button: Gtk.Button) -> None:
+    def on_save_to_clicked(self, button: Gtk.Button) -> None:
         dialog = Gtk.FileDialog()
         dialog.set_title('Save To')
         dialog.set_modal(True)
@@ -63,4 +63,4 @@ class FileSaveAsJsonView(Adw.PreferencesPage):
             return
 
         folder = dialog.select_folder_finish(result)
-        self.save_to.set_subtitle(folder.get_path())
+        self.save_to.set_text(folder.get_path())

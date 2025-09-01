@@ -228,7 +228,6 @@ class CommandPaletteOverlay(Adw.Bin):
 
             self.scrolled_window.get_vscrollbar().set_visible(True)
             self.scrolled_window.set_visible(True)
-            self.prompt_text.set_visible(False)
 
             # Show all items if the query is empty
             self.selection.set_model(self.eligible_list_store)
@@ -261,11 +260,10 @@ class CommandPaletteOverlay(Adw.Bin):
         self.scrolled_window.get_vscrollbar().set_visible(n_list_items > 3)
         self.scrolled_window.set_visible(n_list_items > 0)
 
-        self.prompt_text.set_label('No matching commands')
-        self.prompt_text.set_visible(n_list_items == 0)
-
         if n_list_items == 0:
+            self.prompt_text.set_label('No matching commands')
             return
+        self.prompt_text.set_label("Press <b>Up/Down</b> to navigate, <b>Enter</b> to select, or <b>Escape</b> to cancel")
 
         self.list_view.set_single_click_activate(False)
         self.list_view.scroll_to(0, Gtk.ListScrollFlags.SELECT, None)
@@ -358,6 +356,7 @@ class CommandPaletteOverlay(Adw.Bin):
                 position %= n_items
 
             self.list_view.scroll_to(position, Gtk.ListScrollFlags.SELECT, None)
+
             return True
 
         return False
@@ -391,8 +390,11 @@ class CommandPaletteOverlay(Adw.Bin):
         self.will_prompt_again = more_prompt
 
         self.command_entry.set_placeholder_text(f"{prompt_text or 'Type a command or search'}...")
-        self.prompt_text.set_label("Press 'Enter' to confirm or 'Escape' to cancel")
-        self.prompt_text.set_visible(as_prompt)
+
+        if not as_prompt:
+            self.prompt_text.set_label("Press <b>Up/Down</b> to navigate, <b>Enter</b> to select, or <b>Escape</b> to cancel")
+        else:
+            self.prompt_text.set_label("Press <b>Enter</b> to confirm or <b>Escape</b> to cancel")
 
         self.scrolled_window.set_visible(not as_prompt)
         self.list_view.set_single_click_activate(False)
@@ -418,7 +420,6 @@ class CommandPaletteOverlay(Adw.Bin):
         self.command_entry.grab_focus()
 
         if not as_prompt:
-            self.prompt_text.set_visible(False)
             self.scrolled_window.set_visible(True)
 
         if self.get_visible():

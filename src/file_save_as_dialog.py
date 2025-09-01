@@ -77,11 +77,11 @@ class FileSaveAsDialog(Adw.Dialog):
         view = self.view_stack.get_visible_child()
 
         save_as_value = self.visible_view.save_as.get_text()
-        save_to_value = self.visible_view.save_to.get_subtitle()
+        save_to_value = self.visible_view.save_to.get_text()
 
-        # Copy the text and subtitle from the previous view
+        # Copy the save-as and save-to from the previous view
         view.save_as.set_text(save_as_value)
-        view.save_to.set_subtitle(save_to_value)
+        view.save_to.set_text(save_to_value)
 
         self.visible_view = view
 
@@ -108,7 +108,7 @@ class FileSaveAsDialog(Adw.Dialog):
                 file_format = '.parquet'
 
         file_name = view.save_as.get_text()
-        folder_path = view.save_to.get_subtitle()
+        folder_path = view.save_to.get_text()
 
         file_path = f'{folder_path}/{file_name}{file_format}'
         file_path = file_path.replace('~', str(Path.home()))
@@ -128,13 +128,13 @@ class FileSaveAsDialog(Adw.Dialog):
 
     def save_as_erbook(self, view: FileSaveAsErbookView) -> None:
         file_name = view.save_as.get_text()
-        folder_path = view.save_to.get_subtitle()
+        folder_path = view.save_to.get_text()
         file_path = f'{folder_path}/{file_name}.erbook'
         self.write_file(file_path)
 
     def save_as_csv(self, view: FileSaveAsCsvView) -> None:
         file_name = view.save_as.get_text()
-        folder_path = view.save_to.get_subtitle()
+        folder_path = view.save_to.get_text()
         file_path = f'{folder_path}/{file_name}.csv'
 
         include_header = view.include_header.get_active()
@@ -174,13 +174,13 @@ class FileSaveAsDialog(Adw.Dialog):
 
     def save_as_json(self, view: FileSaveAsJsonView) -> None:
         file_name = view.save_as.get_text()
-        folder_path = view.save_to.get_subtitle()
+        folder_path = view.save_to.get_text()
         file_path = f'{folder_path}/{file_name}.json'
         self.write_file(file_path)
 
     def save_as_parquet(self, view: FileSaveAsParquetView) -> None:
         file_name = view.save_as.get_text()
-        folder_path = view.save_to.get_subtitle()
+        folder_path = view.save_to.get_text()
         file_path = f'{folder_path}/{file_name}.parquet'
 
         statistics = view.statistics.get_active()

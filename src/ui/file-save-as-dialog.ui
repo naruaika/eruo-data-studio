@@ -40,8 +40,10 @@
         <child type="bottom">
           <object class="GtkCenterBox">
             <property name="orientation">horizontal</property>
-            <property name="margin-start">6</property>
-            <property name="margin-end">6</property>
+            <property name="margin-top">10</property>
+            <property name="margin-bottom">10</property>
+            <property name="margin-start">10</property>
+            <property name="margin-end">10</property>
             <property name="end-widget">
               <object class="GtkButton" id="save_button">
                 <property name="label">Save</property>
@@ -51,9 +53,6 @@
                 </style>
               </object>
             </property>
-            <style>
-              <class name="toolbar"/>
-            </style>
           </object>
         </child>
       </object>

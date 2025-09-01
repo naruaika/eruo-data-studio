@@ -26,8 +26,8 @@
             </child>
             <child>
               <object class="GtkButton">
-                <property name="halign">end</property>
-                <property name="hexpand">false</property>
+                <property name="halign">fill</property>
+                <property name="hexpand">true</property>
                 <property name="label">Rename</property>
                 <signal name="clicked" handler="on_rename_button_clicked" swapped="no"/>
                 <style>
