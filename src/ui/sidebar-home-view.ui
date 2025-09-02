@@ -233,7 +233,7 @@
                                 <signal name="clicked" handler="on_apply_sort_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>
-                                  <class name="success"/>
+                                  <class name="accent"/>
                                 </style>
                               </object>
                             </child>
@@ -246,7 +246,6 @@
                                 <signal name="clicked" handler="on_delete_all_sort_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>
-                                  <class name="destructive-action"/>
                                   <class name="flat"/>
                                 </style>
                               </object>
@@ -356,7 +355,7 @@
                                 <signal name="clicked" handler="on_apply_filter_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>
-                                  <class name="success"/>
+                                  <class name="accent"/>
                                 </style>
                               </object>
                             </child>
@@ -369,7 +368,6 @@
                                 <signal name="clicked" handler="on_delete_all_filter_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>
-                                  <class name="destructive-action"/>
                                   <class name="flat"/>
                                 </style>
                               </object>
