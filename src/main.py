@@ -704,7 +704,7 @@ class Application(Adw.Application):
                                                             self.on_encode_url_column_text_action,
                                                             when_expression="document == 'worksheet'")
         self.create_action('pad-end-cell-with-' \
-                           'custom-string',                 _('Cell: Pad End (Right) with Custom Character...'),
+                           'custom-string',                 _('Cell: Pad End (Right) with Character...'),
                                                             self.on_pad_end_cell_with_custom_string_action,
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
@@ -713,7 +713,7 @@ class Application(Adw.Application):
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
         self.create_action('pad-end-column-with-' \
-                           'custom-string',                 _('Column: Pad End (Right) with Custom Character...'),
+                           'custom-string',                 _('Column: Pad End (Right) with Character...'),
                                                             self.on_pad_end_column_with_custom_string_action,
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
@@ -722,7 +722,7 @@ class Application(Adw.Application):
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
         self.create_action('pad-start-cell-with-' \
-                           'custom-string',                 _('Cell: Pad Start (Left) with Custom Character...'),
+                           'custom-string',                 _('Cell: Pad Start (Left) with Character...'),
                                                             self.on_pad_start_cell_with_custom_string_action,
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
@@ -731,7 +731,7 @@ class Application(Adw.Application):
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
         self.create_action('pad-start-column-with-' \
-                           'custom-string',                 _('Column: Pad Start (Left) with Custom Character...'),
+                           'custom-string',                 _('Column: Pad Start (Left) with Character...'),
                                                             self.on_pad_start_column_with_custom_string_action,
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
@@ -944,20 +944,20 @@ class Application(Adw.Application):
                                                             self.on_trim_column_end_whitespace_action,
                                                             when_expression="document == 'worksheet'")
         self.create_action('wrap-cell-with-text-' \
-                           'different',                     _('Cell: Wrap with Text (Different Prefix and Suffix)...'),
+                           'different',                     _('Cell: Wrap with Different Affixes...'),
                                                             self.on_wrap_cell_with_text_different_action,
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
-        self.create_action('wrap-cell-with-text-same',      _('Cell: Wrap with Text (Same Prefix and Suffix)...'),
+        self.create_action('wrap-cell-with-text-same',      _('Cell: Wrap with Same Affixes...'),
                                                             self.on_wrap_cell_with_text_same_action,
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
         self.create_action('wrap-column-with-text-' \
-                           'different',                     _('Column: Wrap with Text (Different Prefix and Suffix)...'),
+                           'different',                     _('Column: Wrap with Different Affixes...'),
                                                             self.on_wrap_column_with_text_different_action,
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
-        self.create_action('wrap-column-with-text-same',    _('Column: Wrap with Text (Same Prefix and Suffix)...'),
+        self.create_action('wrap-column-with-text-same',    _('Column: Wrap with Same Affixes...'),
                                                             self.on_wrap_column_with_text_same_action,
                                                             will_prompt=True,
                                                             when_expression="document == 'worksheet'")
