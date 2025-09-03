@@ -35,7 +35,9 @@ class SearchResultListItem(GObject.Object):
     cname = GObject.Property(type=str, default='A1')
     cvalue = GObject.Property(type=str, default='[Blank]')
 
-    def __init__(self, cname: str, cvalue: str):
+    def __init__(self,
+                 cname:  str,
+                 cvalue: str):
         super().__init__()
 
         self.cname = cname

@@ -891,7 +891,7 @@ class SidebarHomeView(Adw.Bin):
         self.field_list_status.get_parent().set_visible(is_empty)
 
         if self.field_list_store.get_n_items() == 0:
-            self.field_list_status.set_text('No fields found')
+            self.field_list_status.set_text('No fields created')
 
         self.repopulate_sort_list(dfi)
         self.repopulate_filter_list(dfi)
@@ -1009,7 +1009,7 @@ class SidebarHomeView(Adw.Bin):
         if self.sort_list_store.get_n_items() == 0:
             self.sort_list_view_box.get_parent().set_visible(False)
             self.sort_list_status.get_parent().set_visible(True)
-            self.sort_list_status_label.set_text('No sorts found')
+            self.sort_list_status_label.set_text('No sorts created')
 
     @Gtk.Template.Callback()
     def on_add_sort_button_clicked(self, button: Gtk.Button) -> None:
@@ -1035,7 +1035,7 @@ class SidebarHomeView(Adw.Bin):
 
         self.sort_list_view_box.get_parent().set_visible(False)
         self.sort_list_status.get_parent().set_visible(True)
-        self.sort_list_status_label.set_text('No sorts found')
+        self.sort_list_status_label.set_text('No sorts created')
 
     @Gtk.Template.Callback()
     def on_apply_sort_button_clicked(self, button: Gtk.Button) -> None:
@@ -1083,7 +1083,7 @@ class SidebarHomeView(Adw.Bin):
         self.sort_list_status.get_parent().set_visible(is_empty)
 
         if self.sort_list_store.get_n_items() == 0:
-            self.sort_list_status_label.set_text('No sorts found')
+            self.sort_list_status_label.set_text('No sorts created')
 
     #
     # Filter section
@@ -1245,7 +1245,7 @@ class SidebarHomeView(Adw.Bin):
         if self.filter_list_store.get_n_items() == 0:
             self.filter_list_view_box.get_parent().set_visible(False)
             self.filter_list_status.get_parent().set_visible(True)
-            self.filter_list_status_label.set_text('No filters found')
+            self.filter_list_status_label.set_text('No filters created')
 
     @Gtk.Template.Callback()
     def on_add_filter_button_clicked(self, button: Gtk.Button) -> None:
@@ -1274,7 +1274,7 @@ class SidebarHomeView(Adw.Bin):
 
         self.filter_list_view_box.get_parent().set_visible(False)
         self.filter_list_status.get_parent().set_visible(True)
-        self.filter_list_status_label.set_text('No filters found')
+        self.filter_list_status_label.set_text('No filters created')
 
     @Gtk.Template.Callback()
     def on_apply_filter_button_clicked(self, button: Gtk.Button) -> None:
@@ -1329,7 +1329,7 @@ class SidebarHomeView(Adw.Bin):
 
         self.filter_list_view_box.get_parent().set_visible(not is_empty)
         self.filter_list_status.get_parent().set_visible(is_empty)
-        self.filter_list_status_label.set_text('No filters found')
+        self.filter_list_status_label.set_text('No filters created')
 
     def refresh_filter_list_item(self,
                                  position: int,
@@ -1745,7 +1745,6 @@ class SidebarHomeView(Adw.Bin):
         delete_button.set_icon_name('user-trash-symbolic')
         delete_button.set_tooltip_text('Delete item')
         delete_button.add_css_class('flat')
-        delete_button.set_margin_end(2)
         return delete_button
 
     def open_home_view(self) -> None:

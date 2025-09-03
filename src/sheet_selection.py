@@ -131,7 +131,8 @@ class SheetSelection(GObject.Object):
         self.cell_data = None
         self.cell_dtype = None
 
-        self.current_active_range = SheetCell(0, 0, 0, 0, 0, 0, 0, 0, SheetCellMetadata(0, 0, 0))
+        self.current_active_range = SheetCell(0, 0, 0, 0, 0, 0, 0, 0,
+                                              SheetCellMetadata(0, 0, 0))
         self.previous_active_range = self.current_active_range
 
         self.current_active_cell = self.current_active_range

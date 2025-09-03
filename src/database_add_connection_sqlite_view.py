@@ -41,7 +41,7 @@ class DatabaseAddConnectionSqliteView(Adw.PreferencesPage):
         self.window = window
 
     @Gtk.Template.Callback()
-    def on_database_activated(self, button: Gtk.Button) -> None:
+    def on_database_clicked(self, button: Gtk.Button) -> None:
         FILTER_SQLITE = Gtk.FileFilter()
         FILTER_SQLITE.set_name('SQLite Database')
         FILTER_SQLITE.add_pattern('*.sqlite')
@@ -67,7 +67,7 @@ class DatabaseAddConnectionSqliteView(Adw.PreferencesPage):
                 return
 
             file = dialog.open_finish(result)
-            self.database.set_subtitle(file.get_path())
+            self.database.set_text(file.get_path())
 
             if self.name.get_text() == 'New Connection':
                 basename = os.path.basename(file.get_path())

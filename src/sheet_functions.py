@@ -118,94 +118,94 @@ FUNCTION_CONSTANTS = [
 # Operations Expression Builder
 #
 
-def _get_operation_expression(left_expr:      polars.Expr,
-                              operator_name:  str,
-                              right_expr:     polars.Expr = None,
-                              operation_args: list = []) -> polars.Expr | str:
-    match operator_name:
+def _get_operation_expression(left:   polars.Expr,
+                              opname: str,
+                              right:  polars.Expr = None,
+                              args:   List[Any] = []) -> polars.Expr | str:
+    match opname:
         # Comparisons
-        case '>='                                     : return left_expr.ge(right_expr)
-        case '<='                                     : return left_expr.le(right_expr)
-        case '=='                                     : return left_expr.eq(right_expr)
-        case '='                                      : return left_expr.eq(right_expr)
-        case '!='                                     : return left_expr.eq(right_expr).not_()
-        case '<>'                                     : return left_expr.eq(right_expr).not_()
-        case '>'                                      : return left_expr.gt(right_expr)
-        case '<'                                      : return left_expr.lt(right_expr)
+        case '>='                                     : return left.ge(right)
+        case '<='                                     : return left.le(right)
+        case '=='                                     : return left.eq(right)
+        case '='                                      : return left.eq(right)
+        case '!='                                     : return left.eq(right).not_()
+        case '<>'                                     : return left.eq(right).not_()
+        case '>'                                      : return left.gt(right)
+        case '<'                                      : return left.lt(right)
 
         # Bitwise
-        case 'AND'                                    : return left_expr.and_(right_expr)
-        case 'OR'                                     : return left_expr.or_(right_expr)
-        case 'XOR'                                    : return left_expr.xor(right_expr)
-        case 'XAND'                                   : return (left_expr.and_(right_expr)).or_(left_expr.not_().and_(right_expr.not_()))
-        case 'XNOR'                                   : return (left_expr.and_(right_expr)).or_(left_expr.not_().and_(right_expr.not_()))
-        case '&'                                      : return left_expr.and_(right_expr) # TODO: add support for string concatenation
-        case '|'                                      : return left_expr.or_(right_expr)
-        case '^'                                      : return left_expr.xor(right_expr)  # TODO: add support as math power() function
+        case 'AND'                                    : return left.and_(right)
+        case 'OR'                                     : return left.or_(right)
+        case 'XOR'                                    : return left.xor(right)
+        case 'XAND'                                   : return left.and_(right) | left.not_().and_(right.not_())
+        case 'XNOR'                                   : return left.and_(right) | left.not_().and_(right.not_())
+        case '&'                                      : return left.and_(right) # TODO: add support for string concatenation
+        case '|'                                      : return left.or_(right)
+        case '^'                                      : return left.xor(right)  # TODO: add support as math power() function
 
         # Numeric
-        case '+'                                      : return left_expr.add(right_expr)  # TODO: add support for string concatenation
-        case '-'                                      : return left_expr.sub(right_expr)
-        case '*'                                      : return left_expr.mul(right_expr)
-        case '/'                                      : return left_expr.truediv(right_expr)
-        case '//'                                     : return left_expr.floordiv(right_expr)
-        case '%'                                      : return left_expr.mod(right_expr)
-        case '**'                                     : return left_expr.pow(right_expr)
+        case '+'                                      : return left.add(right)  # TODO: add support for string concatenation
+        case '-'                                      : return left.sub(right)
+        case '*'                                      : return left.mul(right)
+        case '/'                                      : return left.truediv(right)
+        case '//'                                     : return left.floordiv(right)
+        case '%'                                      : return left.mod(right)
+        case '**'                                     : return left.pow(right)
 
         # String
-        case 'append-prefix'                          : return operation_args[0] + left_expr
-        case 'append-suffix'                          : return left_expr + operation_args[0]
-        case 'camel-case'                             : return _get_change_case_to_camel_case_expression(left_expr)
-        case 'constant-case'                          : return _get_change_case_to_constant_case_expression(left_expr)
-        case 'dot-case'                               : return _get_change_case_to_dot_case_expression(left_expr)
-        case 'decode-base64'                          : return left_expr.str.decode('base64', strict=False)
-        case 'decode-hexadecimal'                     : return left_expr.str.decode('hex', strict=False)
+        case 'append-affixes'                         : return args[0] + left + args[1]
+        case 'append-prefix'                          : return args[0] + left
+        case 'append-suffix'                          : return left + args[0]
+        case 'camel-case'                             : return _get_change_case_to_camel_case_expression(left)
+        case 'constant-case'                          : return _get_change_case_to_constant_case_expression(left)
+        case 'dot-case'                               : return _get_change_case_to_dot_case_expression(left)
+        case 'decode-base64'                          : return left.str.decode('base64', strict=False)
+        case 'decode-hexadecimal'                     : return left.str.decode('hex', strict=False)
         case 'decode-url'                             : return 'url_decode($0)'
-        case 'encode-base64'                          : return left_expr.str.encode('base64')
-        case 'encode-hexadecimal'                     : return left_expr.str.encode('hex')
+        case 'encode-base64'                          : return left.str.encode('base64')
+        case 'encode-hexadecimal'                     : return left.str.encode('hex')
         case 'encode-url'                             : return 'url_encode($0)'
-        case 'kebab-case'                             : return _get_change_case_to_kebab_case_expression(left_expr)
-        case 'lowercase'                              : return left_expr.str.to_lowercase()
-        case 'pascal-case'                            : return _get_change_case_to_pascal_case_expression(left_expr)
-        case 'pad-end-custom'                         : return left_expr.str.pad_end(operation_args[0], operation_args[1])
-        case 'pad-end-default'                        : return left_expr.str.pad_end(operation_args[0])
-        case 'pad-start-custom'                       : return left_expr.str.pad_start(operation_args[0], operation_args[1])
-        case 'pad-start-default'                      : return left_expr.str.pad_start(operation_args[0])
-        case 'remove-prefix-case-insensitive'         : return left_expr.str.replace(f'(?i)^{re.escape(operation_args[0])}', '')
-        case 'remove-prefix-case-sensitive'           : return left_expr.str.replace(f'^{re.escape(operation_args[0])}', '')
-        case 'remove-suffix-case-insensitive'         : return left_expr.str.replace(f'(?i){re.escape(operation_args[0])}$', '')
-        case 'remove-suffix-case-sensitive'           : return left_expr.str.replace(f'{re.escape(operation_args[0])}$', '')
-        case 'remove-whitespaces'                     : return left_expr.str.replace_all(r'\s+', '')
-        case 'remove-new-lines'                       : return left_expr.str.replace_all(r'\n+', '')
-        case 'replace-whitespace-with-a-single-space' : return left_expr.str.replace_all(r'\s+', ' ')
+        case 'kebab-case'                             : return _get_change_case_to_kebab_case_expression(left)
+        case 'lowercase'                              : return left.str.to_lowercase()
+        case 'pascal-case'                            : return _get_change_case_to_pascal_case_expression(left)
+        case 'pad-both-sides'                         : return left.str.pad_start(args[0], args[1] or ' ') \
+                                                                   .str.pad_end(args[2], args[3] or ' ')
+        case 'pad-end-custom'                         : return left.str.pad_end(args[0], args[1] or ' ')
+        case 'pad-end-default'                        : return left.str.pad_end(args[0])
+        case 'pad-start-custom'                       : return left.str.pad_start(args[0], args[1] or ' ')
+        case 'pad-start-default'                      : return left.str.pad_start(args[0])
+        case 'remove-affixes'                         : return _get_remove_affixes(left, args)
+        case 'remove-prefix-case-insensitive'         : return left.str.replace(f'(?i)^{re.escape(args[0])}', '')
+        case 'remove-prefix-case-sensitive'           : return left.str.replace(f'^{re.escape(args[0])}', '')
+        case 'remove-suffix-case-insensitive'         : return left.str.replace(f'(?i){re.escape(args[0])}$', '')
+        case 'remove-suffix-case-sensitive'           : return left.str.replace(f'{re.escape(args[0])}$', '')
+        case 'remove-whitespaces'                     : return left.str.replace_all(r'\s+', '')
+        case 'remove-new-lines'                       : return left.str.replace_all(r'\n+', '')
+        case 'replace-whitespace-with-a-single-space' : return left.str.replace_all(r'\s+', ' ')
         case 'replace-whitespace-and-new-lines-' \
-             'with-a-single-space'                    : return left_expr.str.replace_all(r'[\s\n]+', ' ')
-        case 'snake-case'                             : return _get_change_case_to_snake_case_expression(left_expr)
-        case 'sentence-case'                          : return left_expr.strx.to_sentence_case()
-        case 'slugify'                                : return _get_slugify_expression(left_expr)
-        case 'split-by-characters'                    : return left_expr.strx.split_by_chars(operation_args[0])
-        case 'sponge-case'                            : return left_expr.strx.to_sponge_case()
-        case 'title-case'                             : return left_expr.str.to_titlecase()
-        case 'unicode-normalization-nfc'              : return left_expr.str.normalize('NFC')
-        case 'unicode-normalization-nfd'              : return left_expr.str.normalize('NFD')
-        case 'unicode-normalization-nfkc'             : return left_expr.str.normalize('NFKC')
-        case 'unicode-normalization-nfkd'             : return left_expr.str.normalize('NFKD')
-        case 'unicode-normalization-nfc'              : return left_expr.str.normalize('NFC')
-        case 'unicode-normalization-nfd'              : return left_expr.str.normalize('NFD')
-        case 'unicode-normalization-nfkc'             : return left_expr.str.normalize('NFKC')
-        case 'unicode-normalization-nfkd'             : return left_expr.str.normalize('NFKD')
-        case 'pig-latinnify'                          : return left_expr.strx.pig_latinnify()
-        case 'uppercase'                              : return left_expr.str.to_uppercase()
-        case 'reverse-text'                           : return left_expr.str.reverse()
-        case 'swap-text-case'                         : return _get_swap_text_case_expression(left_expr)
-        case 'trim-whitespace'                        : return left_expr.str.strip_chars()
-        case 'trim-whitespace-and-remove-new-lines'   : return left_expr.str.strip_chars().str.replace_all('\n', '')
-        case 'trim-start-whitespace'                  : return left_expr.str.strip_chars_start()
-        case 'trim-end-whitespace'                    : return left_expr.str.strip_chars_end()
-        case 'wrap-with-text-different'               : return operation_args[0] + left_expr + operation_args[1]
-        case 'wrap-with-text-same'                    : return operation_args[0] + left_expr + operation_args[0]
+             'with-a-single-space'                    : return left.str.replace_all(r'[\s\n]+', ' ')
+        case 'snake-case'                             : return _get_change_case_to_snake_case_expression(left)
+        case 'sentence-case'                          : return left.strx.to_sentence_case()
+        case 'slugify'                                : return _get_slugify_expression(left)
+        case 'split-by-characters'                    : return left.strx.split_by_chars(args[0])
+        case 'sponge-case'                            : return left.strx.to_sponge_case()
+        case 'title-case'                             : return left.str.to_titlecase()
+        case 'unicode-normalization-nfc'              : return left.str.normalize('NFC')
+        case 'unicode-normalization-nfd'              : return left.str.normalize('NFD')
+        case 'unicode-normalization-nfkc'             : return left.str.normalize('NFKC')
+        case 'unicode-normalization-nfkd'             : return left.str.normalize('NFKD')
+        case 'pig-latinnify'                          : return left.strx.pig_latinnify()
+        case 'uppercase'                              : return left.str.to_uppercase()
+        case 'reverse-text'                           : return left.str.reverse()
+        case 'swap-case'                         : return _get_swap_text_case_expression(left)
+        case 'trim-whitespace'                        : return left.str.strip_chars()
+        case 'trim-whitespace-and-remove-new-lines'   : return left.str.strip_chars().str.replace_all('\n', '')
+        case 'trim-start-whitespace'                  : return left.str.strip_chars_start()
+        case 'trim-end-whitespace'                    : return left.str.strip_chars_end()
+        case 'wrap-with-text-different'               : return args[0] + left + args[1]
+        case 'wrap-with-text-same'                    : return args[0] + left + args[0]
 
-    raise ValueError(f'Unsupported operator: {operator_name}')
+    raise ValueError(f'Unsupported operator: {opname}')
 
 def _get_change_case_to_camel_case_expression(expr: polars.Expr) -> polars.Expr:
     pascal_cased = expr.pipe(_get_operation_expression, 'pascal-case')
@@ -245,6 +245,18 @@ def _get_change_case_to_snake_case_expression(expr: polars.Expr) -> polars.Expr:
                .str.to_lowercase() \
                .str.strip_chars('_')
 
+def _get_remove_affixes(expr: polars.Expr, args: list[Any]) -> polars.Expr:
+    prefix = f'^{args[0]}'
+    suffix = f'{args[1]}$'
+    if not args[3]: # not use regexp
+        prefix = f'^{re.escape(args[0])}'
+        suffix = f'{re.escape(args[1])}$'
+    if not args[2]: # not match case
+        prefix = f'(?i){prefix}'
+        suffix = f'(?i){suffix}'
+    return expr.str.replace(prefix, '') \
+               .str.replace(suffix, '')
+
 def _get_swap_text_case_expression(expr: polars.Expr) -> polars.Expr:
     def swap_text_case(series: polars.Series) -> polars.Series:
         return polars.Series(compute.utf8_swapcase(series.to_arrow()))
@@ -258,7 +270,7 @@ def _get_slugify_expression(expr: polars.Expr) -> polars.Expr:
 def build_operation(expression:     polars.Expr,
                     operator_name:  str,
                     operation_args: list = []) -> polars.Expr | str:
-    return _get_operation_expression(expression, operator_name, operation_args=operation_args)
+    return _get_operation_expression(expression, operator_name, args=operation_args)
 
 #
 # Formula Expression Builder

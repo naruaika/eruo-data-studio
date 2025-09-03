@@ -88,7 +88,7 @@ class Application(Adw.Application):
 
         # Register a file manager for handling document I/O
         self.file_manager = FileManager()
-        self.file_manager.connect('file-cancel', self.on_file_cancel)
+        self.file_manager.connect('file-cancelled', self.on_file_cancelled)
         self.file_manager.connect('file-opened', self.on_file_opened)
         self.file_manager.connect('file-saved', self.on_file_saved)
         self.file_manager.connect('file-exported', self.on_file_exported)
@@ -123,11 +123,11 @@ class Application(Adw.Application):
         #
         # Register create actions
         #
-        self.create_action('duplicate-selected-tab',        _('Create: Duplicate Sheet Into New Worksheet'),
+        self.create_action('duplicate-selected-tab',        _('Create: Duplicate Sheet to New Sheet'),
                                                             self.on_duplicate_selected_tab_action)
-        self.create_action('import-table',                  _('Create: Import Table Into New Worksheet'),
+        self.create_action('import-table',                  _('Create: Import Table to New Sheet'),
                                                             self.on_import_table_action)
-        self.create_action('new-worksheet-from-view',       _('Create: Materialize View Into New Worksheet'),
+        self.create_action('new-worksheet-from-view',       _('Create: Materialize View to New Sheet'),
                                                             self.on_new_worksheet_from_view_action,
                                                             when_expression="document == 'worksheet'")
         self.create_action('new-notebook',                  _('Create: New Blank Notebook'),
@@ -196,82 +196,109 @@ class Application(Adw.Application):
         #
         # Register worksheet actions
         #
+        self.create_action('append-affixes',                _('Append Affixes...'),
+                                                            self.on_append_affixes_action,
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('convert-to-unicode-' \
+                           'normalization',                 _('Convert to Unicode Normalization Form...'),
+                                                            self.on_convert_to_unicode_normalization_form_action,
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('remove-affixes',                _('Remove Affixes...'),
+                                                            self.on_remove_affixes_action,
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('change-case',                   _('Transform to Specific Case...'),
+                                                            self.on_change_case_action,
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('keep-rows-only',                _('Filter: Keep Rows Only...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('remove-rows',                   _('Filter: Remove Rows...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
+
         self.create_action('clear-contents',                _('Cell: Clear Contents'),
                                                             self.on_clear_contents_action,
                                                             shortcuts=['Delete'],
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-boolean',            _('Column: Change Type to Boolean'),
-                                                            lambda *_: self.on_convert_to(polars.Boolean),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Boolean),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-categorical',        _('Column: Change Type to Categorical'),
-                                                            lambda *_: self.on_convert_to(polars.Categorical),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Categorical),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-date',               _('Column: Change Type to Date'),
-                                                            lambda *_: self.on_convert_to(polars.Date),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Date),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-datetime',           _('Column: Change Type to Datetime'),
-                                                            lambda *_: self.on_convert_to(polars.Datetime),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Datetime),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-decimal',            _('Column: Change Type to Decimal Number'),
-                                                            lambda *_: self.on_convert_to(polars.Decimal),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Decimal),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-float32',            _('Column: Change Type to Float (32-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.Float32),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Float32),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-float64',            _('Column: Change Type to Float (64-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.Float64),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Float64),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-int8',               _('Column: Change Type to Integer (8-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.Int8),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Int8),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-int16',              _('Column: Change Type to Integer (16-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.Int16),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Int16),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-int32',              _('Column: Change Type to Integer (32-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.Int32),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Int32),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-int64',              _('Column: Change Type to Integer (64-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.Int64),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Int64),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-text',               _('Column: Change Type to Text'),
-                                                            lambda *_: self.on_convert_to(polars.Utf8),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.String),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-time',               _('Column: Change Type to Time'),
-                                                            lambda *_: self.on_convert_to(polars.Time),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Time),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-uint8',              _('Column: Change Type to Unsigned Integer (8-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.UInt8),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.UInt8),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-uint16',             _('Column: Change Type to Unsigned Integer (16-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.UInt16),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.UInt16),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-uint32',             _('Column: Change Type to Unsigned Integer (32-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.UInt32),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.UInt32),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-uint64',             _('Column: Change Type to Unsigned Integer (64-Bit)'),
-                                                            lambda *_: self.on_convert_to(polars.UInt64),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.UInt64),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-to-whole-number',       _('Column: Change Type to Whole Number'),
-                                                            lambda *_: self.on_convert_to(polars.Int64),
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *_: self.on_change_type_to_action(polars.Int64),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('delete-column',                 _('Column: Delete Columns'),
                                                             self.on_delete_column_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('delete-row',                    _('Row: Delete Rows'),
                                                             self.on_delete_row_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('duplicate-to-above',            _('Row: Duplicate Rows to Above'),
                                                             self.on_duplicate_to_above_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('duplicate-to-below',            _('Row: Duplicate Rows to Below'),
                                                             self.on_duplicate_to_below_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('duplicate-to-left',             _('Column: Duplicate Columns to Left'),
                                                             self.on_duplicate_to_left_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('duplicate-to-right',            _('Column: Duplicate Columns to Right'),
                                                             self.on_duplicate_to_right_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('go-to-cell',                    _('View: Go to Cell...'),
                                                             self.on_go_to_cell_action,
                                                             shortcuts=['<control>g'],
@@ -279,186 +306,240 @@ class Application(Adw.Application):
                                                             when_expression="document == 'worksheet'")
         self.create_action('hide-column',                   _('Column: Hide Columns'),
                                                             self.on_hide_column_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('insert-column-left',            _('Column: Insert Column to the Left'),
                                                             self.on_insert_column_left_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('insert-column-right',           _('Column: Insert Column to the Right'),
                                                             self.on_insert_column_right_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('insert-row-above',              _('Row: Insert Rows Above'),
                                                             self.on_insert_row_above_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('insert-row-below',              _('Row: Insert Rows Below'),
                                                             self.on_insert_row_below_action,
-                                                            when_expression="document == 'worksheet'")
-#       self.create_action('keep-duplicated-rows-only',     _('Filter: Keep Duplicated Rows Only'),
-#                                                           self.on_keep_duplicated_rows_only_action,
-#                                                           when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
+#       self.create_action('keep-duplicate-rows-only',      _('Filter: Keep Duplicate Rows Only'),
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-including-' \
-                           'selection',                     _('Filter: Keep Rows Only Including the Selection'),
-                                                            self.on_keep_rows_only_including_selection,
-                                                            when_expression="document == 'worksheet'")
+                           'selection',                     _('Filter: Keep Rows Only Including Selection'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=True,
+                                                                                                                new_worksheet=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-including-' \
-                           'selection-into-new-worksheet',  _('Filter: Keep Rows Only Including the Selection Into New Worksheet'),
-                                                            self.on_keep_rows_only_including_selection_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'selection-into-new-worksheet',  _('Filter: Keep Rows Only Including Selection to New Sheet'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=True,
+                                                                                                                new_worksheet=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-including-' \
                            'case-insensitive-string',       _('Filter: Keep Rows Only Including String (Case Insensitive)...'),
-                                                            self.on_keep_rows_only_including_case_insensitive_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-including-' \
                            'case-sensitive-string',         _('Filter: Keep Rows Only Including String (Case Sensitive)...'),
-                                                            self.on_keep_rows_only_including_case_sensitive_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=True,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-including-' \
                            'insensitive-string-into-' \
-                           'new-worksheet',                 _('Filter: Keep Rows Only Including String Into New Worksheet (Case Insensitive)...'),
-                                                            self.on_keep_rows_only_including_case_insensitive_string_into_new_worksheet_action_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Filter: Keep Rows Only Including String to New Sheet (Case Insensitive)...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-including-' \
                            'sensitive-string-into-' \
-                           'new-worksheet',                 _('Filter: Keep Rows Only Including String Into New Worksheet (Case Sensitive)...'),
-                                                            self.on_keep_rows_only_including_case_sensitive_string_into_new_worksheet_action_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Filter: Keep Rows Only Including String to New Sheet (Case Sensitive)...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=True,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-matching-' \
                            'regex-case-insensitive',        _('Filter: Keep Rows Only Matching Regex (Case Insensitive)...'),
-                                                            self.on_keep_rows_only_matching_regex_case_insensitive_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=True,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-matching-' \
                            'regex-case-sensitive',          _('Filter: Keep Rows Only Matching Regex (Case Sensitive)...'),
-                                                            self.on_keep_rows_only_matching_regex_case_sensitive_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=True,
+                                                                                                                match_case=True,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-matching-' \
                            'regex-insensitive-into-' \
-                           'new-worksheet',                 _('Filter: Keep Rows Only Matching Regex Into New Worksheet (Case Insensitive)...'),
-                                                            self.on_keep_rows_only_matching_regex_case_insensitive_string_into_new_worksheet_action_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Filter: Keep Rows Only Matching Regex to New Sheet (Case Insensitive)...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=True,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-matching-' \
                            'regex-sensitive-into-' \
-                           'new-worksheet',                 _('Filter: Keep Rows Only Matching Regex Into New Worksheet (Case Sensitive)...'),
-                                                            self.on_keep_rows_only_matching_regex_case_sensitive_string_into_new_worksheet_action_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('keep-first-rows',               _('Sheet: Keep Top (First) Rows Only...'),
-                                                            self.on_keep_first_rows_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('keep-last-rows',                _('Sheet: Keep Bottom (Last) Rows Only...'),
-                                                            self.on_keep_last_rows_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('keep-range-rows',               _('Sheet: Keep Range of Rows Only...'),
-                                                            self.on_keep_range_rows_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('rechunk-table',                 _('Sheet: Rechunk Table'),
+                           'new-worksheet',                 _('Filter: Keep Rows Only Matching Regex to New Sheet (Case Sensitive)...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=True,
+                                                                                                                match_case=True,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('keep-first-rows',               _('Filter: Keep Top (First) Rows Only...'),
+                                                            lambda *args: self.on_keep_rows_in_range_action('first',
+                                                                                                            _('Keep First Rows Only')),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('keep-last-rows',                _('Filter: Keep Bottom (Last) Rows Only...'),
+                                                            lambda *args: self.on_keep_rows_in_range_action('last',
+                                                                                                            _('Keep Last Rows Only')),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('keep-range-rows',               _('Filter: Keep Range of Rows Only...'),
+                                                            lambda *args: self.on_keep_rows_in_range_action('range',
+                                                                                                            _('Keep Range of Rows Only')),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('rechunk-table',                 _('Rechunk Table'),
                                                             self.on_rechunk_table_action,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('remove-alternate-rows',         _('Sheet: Remove Alternate Rows...'),
-                                                            self.on_remove_alternate_rows_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-#       self.create_action('remove-duplicate-rows',         _('Remove Duplicate Rows...'),
-#                                                           self.on_remove_duplicate_rows_action,
-#                                                           when_expression="document == 'worksheet'")
-        self.create_action('remove-first-rows',             _('Sheet: Remove Top (First) Rows...'),
-                                                            self.on_remove_first_rows_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('remove-last-rows',              _('Sheet: Remove Bottom (Last) Rows...'),
-                                                            self.on_remove_last_rows_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('remove-alternate-rows',         _('Filter: Remove Alternate Rows...'),
+                                                            lambda *args: self.on_keep_rows_in_range_action('inverse-range',
+                                                                                                            _('Remove Alternate Rows')),
+                                                            when_expression="document == 'worksheet' and table_focus")
+#       self.create_action('remove-duplicate-rows',         _('Filter: Remove Duplicate Rows...'),
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
+        self.create_action('remove-first-rows',             _('Filter: Remove Top (First) Rows...'),
+                                                            lambda *args: self.on_keep_rows_in_range_action('inverse-first',
+                                                                                                            _('Remove First Rows')),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('remove-last-rows',              _('Filter: Remove Bottom (Last) Rows...'),
+                                                            lambda *args: self.on_keep_rows_in_range_action('inverse-last',
+                                                                                                            _('Remove Last Rows')),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-including-' \
-                           'selection',                     _('Filter: Remove Rows Including the Selection'),
-                                                            self.on_remove_rows_including_selection,
-                                                            when_expression="document == 'worksheet'")
+                           'selection',                     _('Filter: Remove Rows Including Selection'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=True,
+                                                                                                                new_worksheet=False,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-including-' \
-                           'selection-into-new-worksheet',  _('Filter: Remove Rows Including the Selection Into New Worksheet'),
-                                                            self.on_remove_rows_including_selection_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'selection-into-new-worksheet',  _('Filter: Remove Rows Including Selection to New Sheet'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=True,
+                                                                                                                new_worksheet=True,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-including-' \
                            'case-insensitive-string',       _('Filter: Remove Rows Including String (Case Insensitive)...'),
-                                                            self.on_remove_rows_including_case_insensitive_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-including-' \
                            'case-sensitive-string',         _('Filter: Remove Rows Including String (Case Sensitive)...'),
-                                                            self.on_remove_rows_including_case_sensitive_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=True,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-including-' \
                            'insensitive-string-into-' \
-                           'new-worksheet',                 _('Filter: Remove Rows Including String Into New Worksheet (Case Insensitive)...'),
-                                                            self.on_remove_rows_including_case_insensitive_string_into_new_worksheet_action_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Filter: Remove Rows Including String to New Sheet (Case Insensitive)...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=True,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-including-' \
                            'sensitive-string-into-' \
-                           'new-worksheet',                 _('Filter: Remove Rows Including String Into New Worksheet (Case Sensitive)...'),
-                                                            self.on_remove_rows_including_case_sensitive_string_into_new_worksheet_action_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Filter: Remove Rows Including String to New Sheet (Case Sensitive)...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
+                                                                                                                match_case=True,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=True,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-matching-' \
                            'regex-case-insensitive',        _('Filter: Remove Rows Matching Regex (Case Insensitive)...'),
-                                                            self.on_remove_rows_matching_regex_case_insensitive_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=True,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-matching-' \
                            'regex-case-sensitive',          _('Filter: Remove Rows Matching Regex (Case Sensitive)...'),
-                                                            self.on_remove_rows_matching_regex_case_sensitive_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=True,
+                                                                                                                match_case=True,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=False,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-matching-' \
                            'regex-insensitive-into-' \
-                           'new-worksheet',                 _('Filter: Remove Rows Matching Regex Into New Worksheet (Case Insensitive)...'),
-                                                            self.on_remove_rows_matching_regex_case_insensitive_string_into_new_worksheet_action_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Filter: Remove Rows Matching Regex to New Sheet (Case Insensitive)...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=True,
+                                                                                                                match_case=False,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=True,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-rows-matching-' \
                            'regex-sensitive-into-' \
-                           'new-worksheet',                 _('Filter: Remove Rows Matching Regex Into New Worksheet (Case Sensitive)...'),
-                                                            self.on_remove_rows_matching_regex_case_sensitive_string_into_new_worksheet_action_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Filter: Remove Rows Matching Regex to New Sheet (Case Sensitive)...'),
+                                                            lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=True,
+                                                                                                                match_case=True,
+                                                                                                                use_selection=False,
+                                                                                                                new_worksheet=True,
+                                                                                                                inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
 #       self.create_action('remove-surplus-blank-rows',     _('Remove Surplus Blank Rows'),
-#                                                            self.on_remove_surplus_blank_rows_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
 #       self.create_action('remove-surplus-empty-rows',     _('Remove Surplus Empty Rows'),
-#                                                            self.on_remove_surplus_empty_rows_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
         self.create_action('reset-all-filters',             _('Filter: Reset All Rows Filters'),
                                                             self.on_reset_all_filters_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
 #       self.create_action('reverse-rows',                  _('Sort: Reverse Rows'),
-#                                                           self.on_reverse_rows_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
         self.create_action('sort-by-ascending',             _('Sort: Sort Rows by Ascending'),
                                                             self.on_sort_by_ascending_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('sort-by-descending',            _('Sort: Sort Rows by Descending'),
                                                             self.on_sort_by_descending_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('unhide-all-columns',            _('Column: Unhide All Columns'),
                                                             self.on_unhide_all_columns_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('unhide-column',                 _('Column: Unhide Columns'),
                                                             self.on_unhide_column_action,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('use-first-row-as-headers',      _('Sheet: Use First Row as Headers'),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('use-first-row-as-headers',      _('Use First Row as Headers'),
                                                             self.on_use_first_row_as_headers_action,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('use-headers-as-first-row',      _('Sheet: Use Headers as First Row'),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('use-headers-as-first-row',      _('Use Headers as First Row'),
                                                             self.on_use_headers_as_first_row_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('focus-on-formula-editor',       _('View: Focus on Formula Editor'),
                                                             self.on_focus_on_formula_editor_action,
                                                             shortcuts=['<shift>F2'],
@@ -468,9 +549,9 @@ class Application(Adw.Application):
                                                             self.on_focus_on_multiline_formula_editor_action,
                                                             steal_focus=True,
                                                             when_expression="document == 'worksheet'")
-        self.create_action('open-field-selector',           _('Sheet: Choose Columns...'),
+        self.create_action('open-field-selector',           _('View: Choose Columns...'),
                                                             self.on_open_field_selector_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('open-inline-formula',           _('View: Open Inline Formula Editor'),
                                                             self.on_open_inline_formula_action,
                                                             shortcuts=['F2'],
@@ -478,7 +559,7 @@ class Application(Adw.Application):
                                                             when_expression="document == 'worksheet'")
         self.create_action('open-sort-filter',              _('View: Open Sort and Filter Panel'),
                                                             self.on_open_sort_filter_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            when_expression="document == 'worksheet' and table_focus")
 
         #
         # Register application non-command actions
@@ -543,459 +624,670 @@ class Application(Adw.Application):
         # Register new advanced worksheet actions
         #
         # Inspired by https://github.com/qcz/vscode-text-power-tools
-        self.create_action('append-prefix-to-cell',         _('Cell: Append Text Prefix...'),
-                                                            self.on_append_prefix_to_cell_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('append-prefix-to-column',       _('Column: Append Text Prefix...'),
-                                                            self.on_append_prefix_to_column_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('append-suffix-to-cell',         _('Cell: Append Text Suffix...'),
-                                                            self.on_append_suffix_to_cell_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('append-suffix-to-column',       _('Column: Append Text Suffix...'),
-                                                            self.on_append_suffix_to_column_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+        self.create_action('append-prefix-to-cell',         _('Cell: Append Prefix...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'append-prefix',
+                                                                _('Append Prefix'),
+                                                                [(_('Prefix'), 'entry')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('append-prefix-to-column',       _('Column: Append Prefix...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'append-prefix',
+                                                                _('Append Prefix'),
+                                                                [(_('Prefix'), 'entry')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('append-suffix-to-cell',         _('Cell: Append Suffix...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'append-suffix',
+                                                                _('Append Suffix'),
+                                                                [(_('Suffix'), 'entry')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('append-suffix-to-column',       _('Column: Append Suffix...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'append-suffix',
+                                                                _('Append Suffix'),
+                                                                [(_('Suffix'), 'entry')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'camel-case',                    _('Cell: Transform to Camel Case (camelCase)'),
-                                                            self.on_change_case_cell_to_camel_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('camel-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'constant-case',                 _('Cell: Transform to Constant Case (CONSTANT_CASE)'),
-                                                            self.on_change_case_cell_to_constant_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('constant-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'dot-case',                      _('Cell: Transform to Dot Case (dot.case)'),
-                                                            self.on_change_case_cell_to_dot_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('dot-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'kebab-case',                    _('Cell: Transform to Kebab Case (kebab-case)'),
-                                                            self.on_change_case_cell_to_kebab_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('kebab-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'lowercase',                     _('Cell: Transform to Lowercase'),
-                                                            self.on_change_case_cell_to_lowercase_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('lowercase',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'pascal-case',                   _('Cell: Transform to Pascal Case (PascalCase)'),
-                                                            self.on_change_case_cell_to_pascal_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('pascal-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'snake-case',                    _('Cell: Transform to Snake Case (snake_case)'),
-                                                            self.on_change_case_cell_to_snake_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('snake-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'title-case',                    _('Cell: Transform to Title Case (Capitalize Each Word)'),
-                                                            self.on_change_case_cell_to_title_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('title-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-cell-case-to-' \
                            'uppercase',                     _('Cell: Transform to Uppercase'),
-                                                            self.on_change_case_cell_to_uppercase_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('uppercase',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'camel-case',                    _('Column: Transform to Camel Case (camelCase)'),
-                                                            self.on_change_case_column_to_camel_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('camel-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'constant-case',                 _('Column: Transform to Constant Case (CONSTANT_CASE)'),
-                                                            self.on_change_case_column_to_constant_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('constant-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'dot-case',                      _('Column: Transform to Dot Case (dot.case)'),
-                                                            self.on_change_case_column_to_dot_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('dot-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'kebab-case',                    _('Column: Transform to Kebab Case (kebab-case)'),
-                                                            self.on_change_case_column_to_kebab_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('kebab-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'lowercase',                     _('Column: Transform to Lowercase'),
-                                                            self.on_change_case_column_to_lowercase_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('lowercase',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'pascal-case',                   _('Column: Transform to Pascal Case (PascalCase)'),
-                                                            self.on_change_case_column_to_pascal_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('pascal-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'snake-case',                    _('Column: Transform to Snake Case (snake_case)'),
-                                                            self.on_change_case_column_to_snake_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('snake-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'title-case',                    _('Column: Transform to Title Case (Capitalize Each Word)'),
-                                                            self.on_change_case_column_to_title_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('title-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('change-column-case-to-' \
                            'uppercase',                     _('Column: Transform to Uppercase'),
-                                                            self.on_change_case_column_to_uppercase_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('uppercase',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-cell-to-unicode-' \
                            'normalization-nfc',             _('Cell: Convert to NFC Unicode Normalization Form'),
-                                                            self.on_convert_cell_to_unicode_normalization_nfc_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('unicode-normalization-nfc',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-cell-to-unicode-' \
                            'normalization-nfd',             _('Cell: Convert to NFD Unicode Normalization Form'),
-                                                            self.on_convert_cell_to_unicode_normalization_nfd_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('unicode-normalization-nfd',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-cell-to-unicode-' \
                            'normalization-nfkc',            _('Cell: Convert to NFKC Unicode Normalization Form'),
-                                                            self.on_convert_cell_to_unicode_normalization_nfkc_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('unicode-normalization-nfkc',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-cell-to-unicode-' \
                            'normalization-nfkd',            _('Cell: Convert to NFKD Unicode Normalization Form'),
-                                                            self.on_convert_cell_to_unicode_normalization_nfkd_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('unicode-normalization-nfkd',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-column-to-unicode-' \
                            'normalization-nfc',             _('Column: Convert to NFC Unicode Normalization Form'),
-                                                            self.on_convert_column_to_unicode_normalization_nfc_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('unicode-normalization-nfc',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-column-to-unicode-' \
                            'normalization-nfd',             _('Column: Convert to NFD Unicode Normalization Form'),
-                                                            self.on_convert_column_to_unicode_normalization_nfd_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('unicode-normalization-nfd',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-column-to-unicode-' \
                            'normalization-nfkc',            _('Column: Convert to NFKC Unicode Normalization Form'),
-                                                            self.on_convert_column_to_unicode_normalization_nfkc_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('unicode-normalization-nfkc',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('convert-column-to-unicode-' \
                            'normalization-nfkd',            _('Column: Convert to NFKD Unicode Normalization Form'),
-                                                            self.on_convert_column_to_unicode_normalization_nfkd_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('unicode-normalization-nfkd',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('decode-base64-cell-text',       _('Cell: Decode Base64 Text'),
-                                                            self.on_decode_base64_cell_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('decode-base64',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('decode-base64-column-text',     _('Column: Decode Base64 Text'),
-                                                            self.on_decode_base64_column_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('decode-base64',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('decode-hexadecimal-' \
                            'cell-text',                     _('Cell: Decode Hexadecimal Text'),
-                                                            self.on_decode_hexadecimal_cell_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('decode-hexadecimal',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('decode-hexadecimal-' \
                            'column-text',                   _('Column: Decode Hexadecimal Text'),
-                                                            self.on_decode_hexadecimal_column_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('decode-hexadecimal',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('decode-url-cell-text',          _('Cell: Decode URL Text'),
-                                                            self.on_decode_url_cell_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('decode-url',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('decode-url-column-text',        _('Column: Decode URL Text'),
-                                                            self.on_decode_url_column_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('decode-url',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('encode-base64-cell-text',       _('Cell: Encode Base64 Text'),
-                                                            self.on_encode_base64_cell_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('encode-base64',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('encode-base64-column-text',     _('Column: Encode Base64 Text'),
-                                                            self.on_encode_base64_column_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('encode-base64',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('encode-hexadecimal-' \
                            'cell-text',                     _('Cell: Encode Hexadecimal Text'),
-                                                            self.on_encode_hexadecimal_cell_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('encode-hexadecimal',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('encode-hexadecimal-' \
                            'column-text',                   _('Column: Encode Hexadecimal Text'),
-                                                            self.on_encode_hexadecimal_column_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('encode-hexadecimal',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('encode-url-cell-text',          _('Cell: Encode URL Text'),
-                                                            self.on_encode_url_cell_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('encode-url',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('encode-url-column-text',        _('Column: Encode URL Text'),
-                                                            self.on_encode_url_column_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('encode-url',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('pad-end-cell-with-' \
                            'custom-string',                 _('Cell: Pad End (Right) with Character...'),
-                                                            self.on_pad_end_cell_with_custom_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('pad-end-cell',                  _('Cell: Pad End (Right) with Whitespace'),
-                                                            self.on_pad_end_cell_with_whitespace_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-end-custom',
+                                                                _('Pad Right with Character'),
+                                                                [
+                                                                    (_('Padding'), 'spin'),
+                                                                    (_('Character'), 'entry'),
+                                                                ],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('pad-both-sides',               _('Cell: Pad Both Sides with Character...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-both-sides',
+                                                                _('Pad with Character'),
+                                                                [
+                                                                    (_('Left Padding'), 'spin'),
+                                                                    (_('Left Character'), 'entry'),
+                                                                    (_('Right Padding'), 'spin'),
+                                                                    (_('Right Character'), 'entry'),
+                                                                ],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('pad-end-cell',                  _('Cell: Pad End (Right) with Whitespace...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-end-default',
+                                                                _('Pad Right with Spaces'),
+                                                                [(_('Padding'), 'spin')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('pad-end-column-with-' \
                            'custom-string',                 _('Column: Pad End (Right) with Character...'),
-                                                            self.on_pad_end_column_with_custom_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('pad-end-column',                _('Column: Pad End (Right) with Whitespace'),
-                                                            self.on_pad_end_column_with_whitespace_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-end-custom',
+                                                                _('Pad Right with Character'),
+                                                                [
+                                                                    (_('Padding'), 'spin'),
+                                                                    (_('Character'), 'entry'),
+                                                                ],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('pad-end-column',                _('Column: Pad End (Right) with Whitespace...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-end-default',
+                                                                _('Pad Right with Spaces'),
+                                                                [(_('Padding'), 'spin')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('pad-start-cell-with-' \
                            'custom-string',                 _('Cell: Pad Start (Left) with Character...'),
-                                                            self.on_pad_start_cell_with_custom_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('pad-start-cell',                _('Cell: Pad Start (Left) with Whitespace'),
-                                                            self.on_pad_start_cell_with_whitespace_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-start-custom',
+                                                                _('Pad Left with Character'),
+                                                                [
+                                                                    (_('Padding'), 'spin'),
+                                                                    (_('Character'), 'entry'),
+                                                                ],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('pad-start-cell',                _('Cell: Pad Start (Left) with Whitespace...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-start-default',
+                                                                _('Pad Left with Spaces'),
+                                                                [(_('Padding'), 'spin')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('pad-start-column-with-' \
                            'custom-string',                 _('Column: Pad Start (Left) with Character...'),
-                                                            self.on_pad_start_column_with_custom_string_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
-        self.create_action('pad-start-column',              _('Column: Pad Start (Left) with Whitespace'),
-                                                            self.on_pad_start_column_with_whitespace_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-start-custom',
+                                                                _('Pad Left with Character'),
+                                                                [
+                                                                    (_('Padding'), 'spin'),
+                                                                    (_('Character'), 'entry'),
+                                                                ],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
+        self.create_action('pad-start-column',              _('Column: Pad Start (Left) with Whitespace...'),
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'pad-start-default',
+                                                                _('Pad Left with Spaces'),
+                                                                [(_('Padding'), 'spin')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-prefix-from-cell-' \
                            'case-insensitive',              _('Cell: Remove Prefix (Case Insensitive)...'),
-                                                            self.on_remove_prefix_from_cell_case_insensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'remove-prefix-case-insensitive',
+                                                                _('Remove Prefix (Case Insensitive)'),
+                                                                [(_('Prefix'), 'entry')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-prefix-from-cell-' \
                            'case-sensitive',                _('Cell: Remove Prefix (Case Sensitive)...'),
-                                                            self.on_remove_prefix_from_cell_case_sensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'remove-prefix-case-sensitive',
+                                                                _('Remove Prefix (Case Sensitive)'),
+                                                                [(_('Prefix'), 'entry')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-prefix-from-column-' \
                            'case-insensitive',              _('Column: Remove Prefix (Case Insensitive)...'),
-                                                            self.on_remove_prefix_from_column_case_insensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'remove-prefix-case-insensitive',
+                                                                _('Remove Prefix (Case Insensitive)'),
+                                                                [(_('Prefix'), 'entry')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-prefix-from-column-' \
                            'case-sensitive',                _('Column: Remove Prefix (Case Sensitive)...'),
-                                                            self.on_remove_prefix_from_column_case_sensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'remove-prefix-case-sensitive',
+                                                                _('Remove Prefix (Case Sensitive)'),
+                                                                [(_('Prefix'), 'entry')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-suffix-from-cell-' \
                            'case-insensitive',              _('Cell: Remove Suffix (Case Insensitive)...'),
-                                                            self.on_remove_suffix_from_cell_case_insensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'remove-suffix-case-insensitive',
+                                                                _('Remove Suffix (Case Insensitive)'),
+                                                                [(_('Suffix'), 'entry')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-suffix-from-cell-' \
                            'case-sensitive',                _('Cell: Remove Suffix (Case Sensitive)...'),
-                                                            self.on_remove_suffix_from_cell_case_sensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'remove-suffix-case-sensitive',
+                                                                _('Remove Suffix (Case Sensitive)'),
+                                                                [(_('Suffix'), 'entry')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-suffix-from-column-' \
                            'case-insensitive',              _('Column: Remove Suffix (Case Insensitive)...'),
-                                                            self.on_remove_suffix_from_column_case_insensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'remove-suffix-case-insensitive',
+                                                                _('Remove Suffix (Case Insensitive)'),
+                                                                [(_('Suffix'), 'entry')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-suffix-from-column-' \
                            'case-sensitive',                _('Column: Remove Suffix (Case Sensitive)...'),
-                                                            self.on_remove_suffix_from_column_case_sensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'remove-suffix-case-sensitive',
+                                                                _('Remove Suffix (Case Sensitive)'),
+                                                                [(_('Suffix'), 'entry')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
 #       self.create_action('remove-cell-ansi-escape-codes', _('Cell: Remove ANSI Escape Codes'),
-#                                                           self.on_remove_cell_ansi_escape_codes_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
 #       self.create_action('remove-cell-control-' \
 #                          'characters',                    _('Cell: Remove Control Characters'),
-#                                                           self.on_remove_cell_control_characters_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-cell-new-lines-' \
-                           'characters',                    _('Cell: Remove Newlines Characters'),
-                                                            self.on_remove_cell_new_lines_characters_action,
-                                                            when_expression="document == 'worksheet'")
+                           'characters',                    _('Cell: Remove Newline Characters'),
+                                                            lambda *args: self.on_apply_operation_action('remove-new-lines',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-cell-whitespace-' \
                            'characters',                    _('Cell: Remove Whitespace Characters'),
-                                                            self.on_remove_cell_whitespace_characters_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('remove-whitespaces',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
 #       self.create_action('remove-column-ansi-' \
 #                          'escape-codes',                  _('Cell: Remove ANSI Escape Codes'),
-#                                                           self.on_remove_column_ansi_escape_codes_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
 #       self.create_action('remove-column-control-' \
 #                          'characters',                    _('Column: Remove Control Characters'),
-#                                                           self.on_remove_column_control_characters_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: None,
+#                                                           when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-column-new-lines-' \
-                           'characters',                    _('Column: Remove Newlines Characters'),
-                                                            self.on_remove_column_new_lines_characters_action,
-                                                            when_expression="document == 'worksheet'")
+                           'characters',                    _('Column: Remove Newline Characters'),
+                                                            lambda *args: self.on_apply_operation_action('remove-new-lines',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-column-whitespace-' \
                            'characters',                    _('Column: Remove Whitespace Characters'),
-                                                            self.on_remove_column_whitespace_characters_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('remove-whitespaces',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-cell-values-' \
-                           'case-insensitive',              _('Cell: Replace Text Value (Case Insensitive)...'),
-                                                            self.on_replace_cell_text_value_case_insensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'case-insensitive',              _('Cell: Replace Text (Case Insensitive)...'),
+                                                            lambda *args: self.on_replace_value_action(match_case=False,
+                                                                                                       use_regexp=False,
+                                                                                                       on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-cell-values-' \
-                           'case-insensitive-with-regex',   _('Cell: Replace Text Value with Regex (Case Insensitive)...'),
-                                                            self.on_replace_cell_text_value_case_insensitive_with_regex_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'case-insensitive-with-regex',   _('Cell: Replace Text with Regex (Case Insensitive)...'),
+                                                            lambda *args: self.on_replace_value_action(match_case=False,
+                                                                                                       use_regexp=True,
+                                                                                                       on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-cell-values-' \
-                           'case-sensitive',                _('Cell: Replace Text Value (Case Sensitive)...'),
-                                                            self.on_replace_cell_text_value_case_sensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'case-sensitive',                _('Cell: Replace Text (Case Sensitive)...'),
+                                                            lambda *args: self.on_replace_value_action(match_case=True,
+                                                                                                       use_regexp=False,
+                                                                                                       on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-cell-values-' \
-                           'case-sensitive-with-regex',     _('Cell: Replace Text Value with Regex (Case Sensitive)...'),
-                                                            self.on_replace_cell_text_value_case_sensitive_with_regex_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'case-sensitive-with-regex',     _('Cell: Replace Text with Regex (Case Sensitive)...'),
+                                                            lambda *args: self.on_replace_value_action(match_case=True,
+                                                                                                       use_regexp=True,
+                                                                                                       on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-cell-whitespace-' \
                            'with-a-single-space',           _('Cell: Replace Whitespace with Single Space'),
-                                                            self.on_replace_cell_whitespace_with_a_single_space_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'replace-whitespace-with-a-single-space',
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-cell-whitespace-and-' \
                            'new-lines-with-a-single-space', _('Cell: Replace Whitespace and Newlines with Single Space'),
-                                                            self.on_replace_cell_whitespace_and_new_lines_with_a_single_space_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'replace-whitespace-and-new-lines-with-a-single-space',
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-column-values-' \
-                           'case-insensitive',              _('Column: Replace Text Value (Case Insensitive)...'),
-                                                            self.on_replace_column_text_value_case_insensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'case-insensitive',              _('Column: Replace Text (Case Insensitive)...'),
+                                                            lambda *args: self.on_replace_value_action(match_case=False,
+                                                                                                       use_regexp=False,
+                                                                                                       on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-column-values-' \
-                           'case-insensitive-with-regex',   _('Column: Replace Text Value with Regex (Case Insensitive)...'),
-                                                            self.on_replace_column_text_value_case_insensitive_with_regex_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'case-insensitive-with-regex',   _('Column: Replace Text with Regex (Case Insensitive)...'),
+                                                            lambda *args: self.on_replace_value_action(match_case=False,
+                                                                                                       use_regexp=True,
+                                                                                                       on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-column-values-' \
-                           'case-sensitive',                _('Column: Replace Text Value (Case Sensitive)...'),
-                                                            self.on_replace_column_text_value_case_sensitive_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'case-sensitive',                _('Column: Replace Text (Case Sensitive)...'),
+                                                            lambda *args: self.on_replace_value_action(match_case=True,
+                                                                                                       use_regexp=False,
+                                                                                                       on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-column-values-' \
-                           'case-sensitive-with-regex',     _('Column: Replace Text Value with Regex (Case Sensitive)...'),
-                                                            self.on_replace_column_text_value_case_sensitive_with_regex_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                           'case-sensitive-with-regex',     _('Column: Replace Text with Regex (Case Sensitive)...'),
+                                                            lambda *args: self.on_replace_value_action(match_case=True,
+                                                                                                       use_regexp=True,
+                                                                                                       on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-column-whitespace-' \
                            'with-a-single-space',           _('Column: Replace Whitespace with Single Space'),
-                                                            self.on_replace_column_whitespace_with_a_single_space_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'replace-whitespace-with-a-single-space',
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('replace-column-whitespace-' \
                            'and-new-lines-with-a-' \
                            'single-space',                  _('Column: Replace Whitespace and Newlines with Single Space'),
-                                                            self.on_replace_column_whitespace_and_new_lines_with_a_single_space_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'replace-whitespace-and-new-lines-with-a-single-space',
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('reverse-text-cell',             _('Cell: Reverse Text'),
-                                                            self.on_reverse_cell_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('reverse-text',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('reverse-text-column',           _('Column: Reverse Text'),
-                                                            self.on_reverse_column_text_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('reverse-text',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('slugify-cell',                  _('Cell: Slugify'),
-                                                            self.on_slugify_cells_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('slugify',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('slugify-column',                _('Column: Slugify'),
-                                                            self.on_slugify_columns_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('slugify',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('split-cell-by-comma-into-' \
-                           'new-worksheet',                 _('Cell: Split by Comma Into New Worksheet'),
-                                                            self.on_split_cells_by_comma_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Cell: Split by Comma to New Sheet'),
+                                                            lambda *args: self.on_split_by_characters_action(',', on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('split-cell-by-pipe-into-' \
-                           'new-worksheet',                 _('Cell: Split by Pipe Into New Worksheet'),
-                                                            self.on_split_cells_by_pipe_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Cell: Split by Pipe to New Sheet'),
+                                                            lambda *args: self.on_split_by_characters_action('|', on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('split-cell-by-semicolon-' \
-                           'into-new-worksheet',            _('Cell: Split by Semicolon Into New Worksheet'),
-                                                            self.on_split_cells_by_semicolon_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'into-new-worksheet',            _('Cell: Split by Semicolon to New Sheet'),
+                                                            lambda *args: self.on_split_by_characters_action(';', on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('split-cell-by-space-into-' \
-                           'new-worksheet',                 _('Cell: Split by Whitespace Into New Worksheet'),
-                                                            self.on_split_cells_by_space_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Cell: Split by Whitespace to New Sheet'),
+                                                            lambda *args: self.on_split_by_characters_action(' ', on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('split-column-by-comma-into-' \
-                           'new-worksheet',                 _('Column: Split by Comma Into New Worksheet'),
-                                                            self.on_split_columns_by_comma_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Column: Split by Comma to New Sheet'),
+                                                            lambda *args: self.on_split_by_characters_action(',', on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('split-column-by-pipe-into-' \
-                           'new-worksheet',                 _('Column: Split by Pipe Into New Worksheet'),
-                                                            self.on_split_columns_by_pipe_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Column: Split by Pipe to New Sheet'),
+                                                            lambda *args: self.on_split_by_characters_action('|', on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('split-column-by-semicolon-' \
-                           'into-new-worksheet',            _('Column: Split by Semicolon Into New Worksheet'),
-                                                            self.on_split_columns_by_semicolon_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'into-new-worksheet',            _('Column: Split by Semicolon to New Sheet'),
+                                                            lambda *args: self.on_split_by_characters_action(';', on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('split-column-by-space-into-' \
-                           'new-worksheet',                 _('Column: Split by Whitespace Into New Worksheet'),
-                                                            self.on_split_columns_by_space_into_new_worksheet_action,
-                                                            when_expression="document == 'worksheet'")
+                           'new-worksheet',                 _('Column: Split by Whitespace to New Sheet'),
+                                                            lambda *args: self.on_split_by_characters_action(' ', on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('swap-cell-text-case',           _('Cell: Swap Text Case'),
-                                                            self.on_swap_cell_text_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('swap-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('swap-column-text-case',         _('Column: Swap Text Case'),
-                                                            self.on_swap_column_text_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('swap-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('trim-cell-whitespace',          _('Cell: Trim Leading and Trailing Whitespace'),
-                                                            self.on_trim_cell_whitespace_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('trim-whitespace',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('trim-cell-whitespace-and-' \
                            'remove-new-lines',              _('Cell: Trim Whitespace and Remove Newlines'),
-                                                            self.on_trim_cell_whitespace_and_remove_new_lines_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'trim-whitespace-and-remove-new-lines',
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('trim-cell-start-whitespace',    _('Cell: Trim Leading Whitespace'),
-                                                            self.on_trim_cell_start_whitespace_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('trim-start-whitespace',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('trim-cell-end-whitespace',      _('Cell: Trim Trailing Whitespace'),
-                                                            self.on_trim_cell_end_whitespace_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('trim-end-whitespace',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('trim-column-whitespace',        _('Column: Trim Leading and Trailing Whitespace'),
-                                                            self.on_trim_column_whitespace_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('trim-whitespace',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('trim-column-whitespace-and-' \
                            'remove-new-lines',              _('Column: Trim Whitespace and Remove Newlines'),
-                                                            self.on_trim_column_whitespace_and_remove_new_lines_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'trim-whitespace-and-remove-new-lines',
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('trim-column-start-whitespace',  _('Column: Trim Leading Whitespace'),
-                                                            self.on_trim_column_start_whitespace_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('trim-start-whitespace',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('trim-column-end-whitespace',    _('Column: Trim Trailing Whitespace'),
-                                                            self.on_trim_column_end_whitespace_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('trim-end-whitespace',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('wrap-cell-with-text-' \
                            'different',                     _('Cell: Wrap with Different Affixes...'),
-                                                            self.on_wrap_cell_with_text_different_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'wrap-with-text-different',
+                                                                _('Wrap with Different Affixes'),
+                                                                [
+                                                                    (_('Prefix'), 'entry'),
+                                                                    (_('Suffix'), 'entry'),
+                                                                ],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('wrap-cell-with-text-same',      _('Cell: Wrap with Same Affixes...'),
-                                                            self.on_wrap_cell_with_text_same_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'wrap-with-text-same',
+                                                                _('Wrap with Same Affixes'),
+                                                                [(_('Affix'), 'entry')],
+                                                                on_column=False,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('wrap-column-with-text-' \
                            'different',                     _('Column: Wrap with Different Affixes...'),
-                                                            self.on_wrap_column_with_text_different_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'wrap-with-text-different',
+                                                                _('Wrap with Different Affixes'),
+                                                                [
+                                                                    (_('Prefix'), 'entry'),
+                                                                    (_('Suffix'), 'entry'),
+                                                                ],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('wrap-column-with-text-same',    _('Column: Wrap with Same Affixes...'),
-                                                            self.on_wrap_column_with_text_same_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action(
+                                                                'wrap-with-text-same',
+                                                                _('Wrap with Same Affixes'),
+                                                                [(_('Affix'), 'entry')],
+                                                                on_column=True,
+                                                            ),
+                                                            when_expression="document == 'worksheet' and table_focus")
 
         try:
             import eruo_strutil as strx
 #           self.create_action('pig-latinnify-cell',        _('Cell: Pig Latinnify'),
-#                                                           self.on_pig_latinnify_cell_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: self.on_apply_operation_action('pig-latinnify',
+#                                                                                                        on_column=False),
+#                                                           when_expression="document == 'worksheet' and table_focus")
 #           self.create_action('pig-latinnify-column',      _('Column: Pig Latinnify'),
-#                                                           self.on_pig_latinnify_column_action,
-#                                                           when_expression="document == 'worksheet'")
+#                                                           lambda *args: self.on_apply_operation_action('pig-latinnify',
+#                                                                                                        on_column=True),
+#                                                           when_expression="document == 'worksheet' and table_focus")
             self.create_action('change-cell-case-to-' \
                                'sentence-case',             _('Cell: Transform to Sentence Case (Sentence case)'),
-                                                            self.on_change_case_cell_to_sentence_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('sentence-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
             self.create_action('change-cell-case-to-' \
                                'sponge-case',               _('Cell: Transform to Sponge Case (RANdoM CAPiTAlizAtiON)'),
-                                                            self.on_change_case_cell_to_sponge_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('sponge-case',
+                                                                                                         on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
             self.create_action('change-column-case-to-' \
                                'sentence-case',             _('Column: Transform to Sentence Case (Sentence case)'),
-                                                            self.on_change_case_column_to_sentence_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('sentence-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
             self.create_action('change-column-case-to-' \
                                'sponge-case',               _('Column: Transform to Sponge Case (RANdoM CAPiTAlizAtiON)'),
-                                                            self.on_change_case_column_to_sponge_case_action,
-                                                            when_expression="document == 'worksheet'")
+                                                            lambda *args: self.on_apply_operation_action('sponge-case',
+                                                                                                         on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
             self.create_action('split-cell-by-characters-' \
-                               'into-new-worksheet',        _('Cell: Split by Character Set Into New Worksheet...'),
-                                                            self.on_split_cells_by_characters_into_new_worksheet_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                               'into-new-worksheet',        _('Cell: Split by Character Set to New Sheet...'),
+                                                            lambda *args: self.on_split_by_characters_action(on_column=False),
+                                                            when_expression="document == 'worksheet' and table_focus")
             self.create_action('split-column-by-characters-' \
-                               'into-new-worksheet',        _('Column: Split by Character Set Into New Worksheet...'),
-                                                            self.on_split_columns_by_characters_into_new_worksheet_action,
-                                                            will_prompt=True,
-                                                            when_expression="document == 'worksheet'")
+                               'into-new-worksheet',        _('Column: Split by Character Set to New Sheet...'),
+                                                            lambda *args: self.on_split_by_characters_action(on_column=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         except ModuleNotFoundError:
             pass
 
@@ -1183,65 +1475,65 @@ Options:
         dialog = DatabaseAddConnectionDialog(window, _add_new_connection)
         dialog.present(window)
 
-    def on_append_prefix_to_cell_action(self,
-                                        action: Gio.SimpleAction,
-                                        *args) -> None:
+    def on_append_affixes_action(self,
+                                 action: Gio.SimpleAction,
+                                 *args) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
 
-        def proceed_to_append_prefix(prefix: str) -> None:
-            document.update_current_cells_from_operator('append-prefix', [prefix], on_column=False)
-
         window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the prefix for the cells'),
-                                                            callback=proceed_to_append_prefix)
 
-    def on_append_prefix_to_column_action(self,
-                                          action: Gio.SimpleAction,
-                                          *args) -> None:
+        def proceed_to_apply(args:      list,
+                             on_column: bool,
+                             **kwargs) -> None:
+            document.update_current_cells_from_operator('append-affixes', args, on_column)
+            self._return_focus_back(document)
+
+        layout = [
+            (_('Prefix'), 'entry'),
+            (_('Suffix'), 'entry'),
+        ]
+
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(_('Append Affixes'),
+                                      layout,
+                                      proceed_to_apply,
+                                      window,
+                                      on_column=False)
+        dialog.present(window)
+
+    def on_apply_operation_action(self,
+                                  name:      str,
+                                  title:     str = '',
+                                  layout:    list = [],
+                                  on_column: bool = False) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
 
-        def proceed_to_append_prefix(prefix: str) -> None:
-            document.update_current_cells_from_operator('append-prefix', [prefix], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the prefix for the columns'),
-                                                            callback=proceed_to_append_prefix)
-
-    def on_append_suffix_to_cell_action(self,
-                                        action: Gio.SimpleAction,
-                                        *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
+        if not layout:
+            document.update_current_cells_from_operator(name, [], on_column)
             return
 
-        def proceed_to_append_suffix(suffix: str) -> None:
-            document.update_current_cells_from_operator('append-suffix', [suffix], on_column=False)
-
         window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the suffix for the cells'),
-                                                            callback=proceed_to_append_suffix)
 
-    def on_append_suffix_to_column_action(self,
-                                          action: Gio.SimpleAction,
-                                          *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
+        def proceed_to_apply(args:      list,
+                             on_column: bool,
+                             **kwargs) -> None:
+            document.update_current_cells_from_operator(name, args, on_column)
+            self._return_focus_back(document)
 
-        def proceed_to_append_suffix(suffix: str) -> None:
-            document.update_current_cells_from_operator('append-suffix', [suffix], on_column=True)
+        if not isinstance(layout, list):
+            layout = [layout]
 
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the suffix for the columns'),
-                                                            callback=proceed_to_append_suffix)
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(title,
+                                      layout,
+                                      proceed_to_apply,
+                                      window,
+                                      on_column=on_column)
+        dialog.present(window)
 
     def on_apply_pending_table_action(self,
                                       action: Gio.SimpleAction,
@@ -1250,245 +1542,65 @@ Options:
         window = self.get_active_window()
         window.apply_pending_table(action_data_id)
 
-    def on_change_case_cell_to_camel_case_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
+    def on_change_case_action(self,
+                              action: Gio.SimpleAction,
+                              *args) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
-        document.update_current_cells_from_operator('camel-case', on_column=False)
 
-    def on_change_case_cell_to_constant_case_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('constant-case', on_column=False)
+        window = self.get_active_window()
 
-    def on_change_case_cell_to_dot_case_action(self,
-                                               action: Gio.SimpleAction,
-                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('dot-case', on_column=False)
+        def proceed_to_apply(args:      list,
+                             on_column: bool,
+                             **kwargs) -> None:
+            operator_name = args[0].lower().replace(' ', '-')
+            document.update_current_cells_from_operator(operator_name, [], on_column)
+            self._return_focus_back(document)
 
-    def on_change_case_cell_to_kebab_case_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('kebab-case', on_column=False)
+        def previewer(args: list) -> polars.DataFrame:
+            from .sheet_functions import build_operation
+            dataframe = polars.DataFrame({'before': ['camelCase',
+                                                     'CONSTANT_CASE',
+                                                     'dot.case',
+                                                     'kebab case',
+                                                     'lower case',
+                                                     'PascalCase',
+                                                     'snake_case',
+                                                     'Sentence case',
+                                                     'slug-ify',
+                                                     'spoNGE cAse',
+                                                     'Title Case',
+                                                     'UPPER CASE',
+                                                     'sWAP cASE']})
+            operator_name = args[0].lower().replace(' ', '-')
+            expression = build_operation(polars.col('before'), operator_name)
+            return dataframe.with_columns(expression.alias('after'))
 
-    def on_change_case_cell_to_lowercase_action(self,
-                                                action: Gio.SimpleAction,
-                                                *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('lowercase', on_column=False)
+        layout = [
+            (_('Transform To'), 'combo', [_('Camel Case'),
+                                          _('Constant Case'),
+                                          _('Dot Case'),
+                                          _('Kebab Case'),
+                                          _('Lowercase'),
+                                          _('Pascal Case'),
+                                          _('Snake Case'),
+                                          _('Sentence Case'),
+                                          _('Slugify'),
+                                          _('Sponge Case'),
+                                          _('Title Case'),
+                                          _('Uppercase'),
+                                          _('Swap Case')]),
+        ]
 
-    def on_change_case_cell_to_pascal_case_action(self,
-                                                  action: Gio.SimpleAction,
-                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('pascal-case', on_column=False)
-
-    def on_change_case_cell_to_snake_case_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('snake-case', on_column=False)
-
-    def on_change_case_cell_to_sentence_case_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('sentence-case', on_column=False)
-
-    def on_change_case_cell_to_sponge_case_action(self,
-                                                  action: Gio.SimpleAction,
-                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('sponge-case', on_column=False)
-
-    def on_change_case_cell_to_title_case_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('title-case', on_column=False)
-
-    def on_change_case_cell_to_uppercase_action(self,
-                                                action: Gio.SimpleAction,
-                                                *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('uppercase', on_column=False)
-
-    def on_change_case_column_to_camel_case_action(self,
-                                                   action: Gio.SimpleAction,
-                                                   *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('camel-case', on_column=True)
-
-    def on_change_case_column_to_dot_case_action(self,
-                                                      action: Gio.SimpleAction,
-                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('dot-case', on_column=True)
-
-    def on_change_case_column_to_constant_case_action(self,
-                                                      action: Gio.SimpleAction,
-                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('constant-case', on_column=True)
-
-    def on_change_case_column_to_kebab_case_action(self,
-                                                   action: Gio.SimpleAction,
-                                                   *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('kebab-case', on_column=True)
-
-    def on_change_case_column_to_lowercase_action(self,
-                                                  action: Gio.SimpleAction,
-                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('lowercase', on_column=True)
-
-    def on_change_case_column_to_pascal_case_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('pascal-case', on_column=True)
-
-    def on_change_case_column_to_snake_case_action(self,
-                                                   action: Gio.SimpleAction,
-                                                   *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('snake-case', on_column=True)
-
-    def on_change_case_column_to_sentence_case_action(self,
-                                                      action: Gio.SimpleAction,
-                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('sentence-case', on_column=True)
-
-    def on_change_case_column_to_sponge_case_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('sponge-case', on_column=True)
-
-    def on_change_case_column_to_title_case_action(self,
-                                                   action: Gio.SimpleAction,
-                                                   *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('title-case', on_column=True)
-
-    def on_change_case_column_to_uppercase_action(self,
-                                                  action: Gio.SimpleAction,
-                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('uppercase', on_column=True)
-
-    def on_convert_cell_to_unicode_normalization_nfc_action(self,
-                                                            action: Gio.SimpleAction,
-                                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('unicode-normalization-nfc', on_column=False)
-
-    def on_convert_cell_to_unicode_normalization_nfd_action(self,
-                                                            action: Gio.SimpleAction,
-                                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('unicode-normalization-nfd', on_column=False)
-
-    def on_convert_cell_to_unicode_normalization_nfkc_action(self,
-                                                             action: Gio.SimpleAction,
-                                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('unicode-normalization-nfkc', on_column=False)
-
-    def on_convert_cell_to_unicode_normalization_nfkd_action(self,
-                                                             action: Gio.SimpleAction,
-                                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('unicode-normalization-nfkd', on_column=False)
-
-    def on_convert_column_to_unicode_normalization_nfc_action(self,
-                                                              action: Gio.SimpleAction,
-                                                              *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('unicode-normalization-nfc', on_column=True)
-
-    def on_convert_column_to_unicode_normalization_nfd_action(self,
-                                                              action: Gio.SimpleAction,
-                                                              *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('unicode-normalization-nfd', on_column=True)
-
-    def on_convert_column_to_unicode_normalization_nfkc_action(self,
-                                                               action: Gio.SimpleAction,
-                                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('unicode-normalization-nfkc', on_column=True)
-
-    def on_convert_column_to_unicode_normalization_nfkd_action(self,
-                                                               action: Gio.SimpleAction,
-                                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('unicode-normalization-nfkd', on_column=True)
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(_('Transform Case'),
+                                      layout,
+                                      proceed_to_apply,
+                                      window,
+                                      on_column=False,
+                                      live_previewer=previewer)
+        dialog.present(window)
 
     def on_clear_contents_action(self,
                                  action: Gio.SimpleAction,
@@ -1545,9 +1657,9 @@ Options:
                                      action: Gio.SimpleAction,
                                      *args) -> None:
         window = self.get_active_window()
+        document_id = args[0].get_string()
 
         def close_selected_tabs() -> None:
-            document_id = args[0].get_string()
             tab_page = self._get_current_tab_page(window, document_id)
             window.tab_view.close_pages_before(tab_page)
 
@@ -1557,19 +1669,63 @@ Options:
                                       action: Gio.SimpleAction,
                                       *args) -> None:
         window = self.get_active_window()
+        document_id = args[0].get_string()
 
         def close_selected_tabs() -> None:
-            document_id = args[0].get_string()
             tab_page = self._get_current_tab_page(window, document_id)
             window.tab_view.close_pages_after(tab_page)
 
         self._show_close_tabs_confirmation(window, close_selected_tabs)
 
-    def on_convert_to(self, dtype: polars.DataType) -> None:
+    def on_change_type_to_action(self, dtype: polars.DataType) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
         document.convert_current_columns_dtype(dtype)
+
+    def on_convert_to_unicode_normalization_form_action(self,
+                                                        action: Gio.SimpleAction,
+                                                        *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        window = self.get_active_window()
+
+        def proceed_to_apply(args:      list,
+                             on_column: bool,
+                             **kwargs) -> None:
+            operator_name = args[0].lower().replace(' ', '-')
+            document.update_current_cells_from_operator(operator_name, [], on_column)
+            self._return_focus_back(document)
+
+        # TODO: need more examples but cannot render them as expected
+        # See https://unicode.org/reports/tr15/#Compatibility_Equivalence_Figure
+        def previewer(args: list) -> polars.DataFrame:
+            from .sheet_functions import build_operation
+            dataframe = polars.DataFrame({'before': ['x²/y₉',
+                                                     'ｶ',
+                                                     '︷',
+                                                     '㌀']})
+            operator_name = f'unicode-normalization-{args[0].lower()}'
+            expression = build_operation(polars.col('before'), operator_name)
+            return dataframe.with_columns(expression.alias('after'))
+
+        layout = [
+            (_('Convert To'), 'combo', [_('NFC'),
+                                        _('NFD'),
+                                        _('NFKC'),
+                                        _('NFKD')]),
+        ]
+
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(_('Unicode Normalization'),
+                                      layout,
+                                      proceed_to_apply,
+                                      window,
+                                      on_column=False,
+                                      live_previewer=previewer)
+        dialog.present(window)
 
     def on_copy_action(self,
                        action: Gio.SimpleAction,
@@ -1604,54 +1760,6 @@ Options:
         document.cut_from_current_selection(self.clipboard)
 
         return True
-
-    def on_decode_base64_cell_text_action(self,
-                                          action: Gio.SimpleAction,
-                                          *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-base64', on_column=False)
-
-    def on_decode_base64_column_text_action(self,
-                                            action: Gio.SimpleAction,
-                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-base64', on_column=True)
-
-    def on_decode_hexadecimal_cell_text_action(self,
-                                               action: Gio.SimpleAction,
-                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-hexadecimal', on_column=False)
-
-    def on_decode_hexadecimal_column_text_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-hexadecimal', on_column=True)
-
-    def on_decode_url_cell_text_action(self,
-                                       action: Gio.SimpleAction,
-                                       *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-url', on_column=False)
-
-    def on_decode_url_column_text_action(self,
-                                         action: Gio.SimpleAction,
-                                         *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('decode-url', on_column=True)
 
     def on_delete_column_action(self,
                                 action: Gio.SimpleAction,
@@ -1725,61 +1833,13 @@ Options:
             return
         document.duplicate_from_current_columns(left=False)
 
-    def on_encode_base64_cell_text_action(self,
-                                          action: Gio.SimpleAction,
-                                          *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-base64', on_column=False)
-
-    def on_encode_base64_column_text_action(self,
-                                            action: Gio.SimpleAction,
-                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-base64', on_column=True)
-
-    def on_encode_hexadecimal_cell_text_action(self,
-                                               action: Gio.SimpleAction,
-                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-hexadecimal', on_column=False)
-
-    def on_encode_hexadecimal_column_text_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-hexadecimal', on_column=True)
-
-    def on_encode_url_cell_text_action(self,
-                                       action: Gio.SimpleAction,
-                                       *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-url', on_column=False)
-
-    def on_encode_url_column_text_action(self,
-                                         action: Gio.SimpleAction,
-                                         *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('encode-url', on_column=True)
-
     def on_export_file_as_action(self,
                                  action: Gio.SimpleAction,
                                  *args) -> None:
         window = self.get_active_window()
         self.file_manager.export_as_file(window)
 
-    def on_file_cancel(self, source: GObject.Object) -> None:
+    def on_file_cancelled(self, source: GObject.Object) -> None:
         self._return_focus_back()
 
     def on_file_exported(self,
@@ -1915,273 +1975,107 @@ Options:
             return
         document.insert_blank_from_current_rows(above=False)
 
-    def on_keep_rows_only_including_selection(self,
-                                              action: Gio.SimpleAction,
-                                              *args) -> None:
+    def on_keep_rows_with_pattern_action(self,
+                                         use_regexp:    bool = False,
+                                         match_case:    bool = False,
+                                         use_selection: bool = False,
+                                         new_worksheet: bool = False,
+                                         inverse:       bool = False) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
-        document.filter_current_rows()
-
-    def on_keep_rows_only_including_selection_into_new_worksheet_action(self,
-                                                                        action: Gio.SimpleAction,
-                                                                        *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        filter_by = {'operator-name': 'current-selection'}
 
         window = self.get_active_window()
-        window.duplicate_sheet(document.document_id,
-                               materialize=True,
-                               filter_by=filter_by)
 
-    def on_keep_rows_only_including_case_insensitive_string_action(self,
-                                                                   action: Gio.SimpleAction,
-                                                                   *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
+        if use_selection:
+            if not new_worksheet:
+                document.filter_current_rows(inverse=inverse)
+                return
 
-        def proceed_to_keep_rows(string: str) -> None:
-            operator = 'contains'
-            expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=True)
-            expression = polars.any_horizontal(expression)
-            document.pending_filters = [self._construct_query_builder(operator, string, expression)]
-            document.filter_current_rows(multiple=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the string to keep only'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_rows_only_including_case_sensitive_string_action(self,
-                                                                 action: Gio.SimpleAction,
-                                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(string: str) -> None:
-            operator = 'contains'
-            expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=False)
-            expression = polars.any_horizontal(expression)
-            document.pending_filters = [self._construct_query_builder(operator, string, expression)]
-            document.filter_current_rows(multiple=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the string to keep only'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_rows_only_including_case_insensitive_string_into_new_worksheet_action_action(self,
-                                                                                             action: Gio.SimpleAction,
-                                                                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(string: str) -> None:
-            operator = 'contains'
-            expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=True)
-            expression = polars.any_horizontal(expression)
-            pending_filters = [self._construct_query_builder(operator, string, expression)]
-
-            filter_by = {'operator-name': 'query-builder',
-                         'operator-args': pending_filters}
-
-            window = self.get_active_window()
+            filter_by = {'operator-name': 'current-selection'}
             window.duplicate_sheet(document.document_id,
                                    materialize=True,
                                    filter_by=filter_by)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the string to keep only'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_rows_only_including_case_sensitive_string_into_new_worksheet_action_action(self,
-                                                                                           action: Gio.SimpleAction,
-                                                                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
             return
 
-        def proceed_to_keep_rows(string: str) -> None:
+        def proceed_to_apply(args:          list,
+                             use_regexp:    bool,
+                             new_worksheet: bool,
+                             **kwargs) -> None:
+            pattern = args[0]
+
             operator = 'contains'
-            expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=False)
+            if inverse:
+                operator = 'does not contain'
+
+            if use_regexp:
+                if not match_case:
+                    pattern = f'(?i){pattern}'
+                expression = polars.col(polars.String).str.contains(pattern)
+            else:
+                expression = polars.col(polars.String).str.contains_any([pattern], ascii_case_insensitive=not match_case)
             expression = polars.any_horizontal(expression)
-            pending_filters = [self._construct_query_builder(operator, string, expression)]
+            if inverse:
+                expression = expression.not_()
 
-            filter_by = {'operator-name': 'query-builder',
-                         'operator-args': pending_filters}
-
-            window = self.get_active_window()
-            window.duplicate_sheet(document.document_id,
-                                   materialize=True,
-                                   filter_by=filter_by)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the string to keep only'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_rows_only_matching_regex_case_insensitive_string_action(self,
-                                                                        action: Gio.SimpleAction,
-                                                                        *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(pattern: str) -> None:
-            operator = 'contains'
-            expression = polars.col(polars.String).str.contains(f'(?i){pattern}')
-            expression = polars.any_horizontal(expression)
-            document.pending_filters = [self._construct_query_builder(operator, pattern, expression)]
-            document.filter_current_rows(multiple=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to keep only'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_rows_only_matching_regex_case_sensitive_string_action(self,
-                                                                      action: Gio.SimpleAction,
-                                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(pattern: str) -> None:
-            operator = 'contains'
-            expression = polars.col(polars.String).str.contains(pattern)
-            expression = polars.any_horizontal(expression)
-            document.pending_filters = [self._construct_query_builder(operator, pattern, expression)]
-            document.filter_current_rows(multiple=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to keep only'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_rows_only_matching_regex_case_insensitive_string_into_new_worksheet_action_action(self,
-                                                                                                  action: Gio.SimpleAction,
-                                                                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(pattern: str) -> None:
-            operator = 'contains'
-            expression = polars.col(polars.String).str.contains(f'(?i){pattern}')
-            expression = polars.any_horizontal(expression)
             pending_filters = [self._construct_query_builder(operator, pattern, expression)]
 
-            filter_by = {'operator-name': 'query-builder',
-                         'operator-args': pending_filters}
+            if new_worksheet:
+                filter_by = {'operator-name': 'query-builder',
+                             'operator-args': pending_filters}
+                window.duplicate_sheet(document.document_id,
+                                       materialize=True,
+                                       filter_by=filter_by)
+            else:
+                document.pending_filters = pending_filters
+                document.filter_current_rows(multiple=True, inverse=inverse)
+                self._return_focus_back(document)
 
-            window = self.get_active_window()
-            window.duplicate_sheet(document.document_id,
-                                   materialize=True,
-                                   filter_by=filter_by)
+        title = _('Keep Rows Only...')
+        if inverse:
+            title = _('Remove Rows...')
 
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to keep only'),
-                                                            callback=proceed_to_keep_rows)
+        entry_label = _('Find Pattern')
 
-    def on_keep_rows_only_matching_regex_case_sensitive_string_into_new_worksheet_action_action(self,
-                                                                                                action: Gio.SimpleAction,
-                                                                                                *args) -> None:
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(title,
+                                      [(entry_label, 'entry')],
+                                      proceed_to_apply,
+                                      window,
+                                      match_case=match_case,
+                                      use_regexp=use_regexp,
+                                      new_worksheet=new_worksheet)
+        dialog.present(window)
+
+    def on_keep_rows_in_range_action(self,
+                                     strategy: str,
+                                     title: str) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
 
-        def proceed_to_keep_rows(pattern: str) -> None:
-            operator = 'contains'
-            expression = polars.col(polars.String).str.contains(pattern)
-            expression = polars.any_horizontal(expression)
-            pending_filters = [self._construct_query_builder(operator, pattern, expression)]
+        def proceed_to_apply(args: list, **kwargs) -> None:
+            if 'range' in strategy:
+                document.keep_n_rows(strategy, args[1], args[0])
+            else:
+                document.keep_n_rows(strategy, args[0])
+            self._return_focus_back(document)
 
-            filter_by = {'operator-name': 'query-builder',
-                         'operator-args': pending_filters}
-
-            window = self.get_active_window()
-            window.duplicate_sheet(document.document_id,
-                                   materialize=True,
-                                   filter_by=filter_by)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to keep only'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_first_rows_action(self,
-                                  action: Gio.SimpleAction,
-                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(no_rows: str) -> None:
-            if not no_rows.isnumeric():
-                return
-            no_rows = int(no_rows)
-            document.keep_n_rows('first', no_rows)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the number of rows to keep'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_last_rows_action(self,
-                                 action: Gio.SimpleAction,
-                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(no_rows: str) -> None:
-            if not no_rows.isnumeric():
-                return
-            no_rows = int(no_rows)
-            document.keep_n_rows('last', no_rows)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the number of rows to keep'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_keep_range_rows_action(self,
-                                  action: Gio.SimpleAction,
-                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
+        layout = [(_('Number of Rows'), 'spin')]
+        if 'range' in strategy:
+            layout = [
+                (_('Starting Row'), 'spin'),
+                (_('Number of Rows'), 'spin'),
+            ]
 
         window = self.get_active_window()
 
-        def proceed_to_keep_rows(no_rows: str, first_row: int) -> None:
-            if not no_rows.isnumeric():
-                return
-            no_rows = int(no_rows)
-            document.keep_n_rows('range', no_rows, first_row)
-
-        def ask_for_no_rows(first_row: str) -> None:
-            if not first_row.isnumeric():
-                return
-            first_row = int(first_row)
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the number of rows to keep'),
-                                                                callback=proceed_to_keep_rows,
-                                                                user_data=[first_row])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the first row to keep'),
-                                                            callback=ask_for_no_rows,
-                                                            more_prompt=True)
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(title,
+                                      layout,
+                                      proceed_to_apply,
+                                      window)
+        dialog.present(window)
 
     def on_move_tab_to_end_action(self,
                                   action: Gio.SimpleAction,
@@ -2293,166 +2187,6 @@ Options:
         window.sidebar_home_view.open_home_view()
         window.sidebar_home_view.open_sort_filter_sections()
 
-    def on_pad_end_cell_with_custom_string_action(self,
-                                                  action: Gio.SimpleAction,
-                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_end(fill_char: str, length: str) -> None:
-            fill_char = fill_char[0] if len(fill_char) else ' '
-            document.update_current_cells_from_operator('pad-end-custom', [length, fill_char], on_column=False)
-
-        def ask_for_fill_char(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the character used for padding the cells'),
-                                                                callback=proceed_to_pad_end,
-                                                                user_data=[length])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
-                                                            callback=ask_for_fill_char,
-                                                            more_prompt=True)
-
-    def on_pad_end_cell_with_whitespace_action(self,
-                                               action: Gio.SimpleAction,
-                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_end(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            document.update_current_cells_from_operator('pad-end-default', [length], on_column=False)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
-                                                            callback=proceed_to_pad_end)
-
-    def on_pad_end_column_with_custom_string_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_end(fill_char: str, length: str) -> None:
-            fill_char = fill_char[0] if len(fill_char) else ' '
-            document.update_current_cells_from_operator('pad-end-custom', [length, fill_char], on_column=True)
-
-        def ask_for_fill_char(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the character used for padding the columns'),
-                                                                callback=proceed_to_pad_end,
-                                                                user_data=[length])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
-                                                            callback=ask_for_fill_char,
-                                                            more_prompt=True)
-
-    def on_pad_end_column_with_whitespace_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_end(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            document.update_current_cells_from_operator('pad-end-default', [length], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
-                                                            callback=proceed_to_pad_end)
-
-    def on_pad_start_cell_with_custom_string_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_start(fill_char: str, length: str) -> None:
-            fill_char = fill_char[0] if len(fill_char) else ' '
-            document.update_current_cells_from_operator('pad-start-custom', [length, fill_char], on_column=False)
-
-        def ask_for_fill_char(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the character used for padding the cells'),
-                                                                callback=proceed_to_pad_start,
-                                                                user_data=[length])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
-                                                            callback=ask_for_fill_char,
-                                                            more_prompt=True)
-
-    def on_pad_start_cell_with_whitespace_action(self,
-                                                 action: Gio.SimpleAction,
-                                                 *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_start(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            document.update_current_cells_from_operator('pad-start-default', [length], on_column=False)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the cells'),
-                                                            callback=proceed_to_pad_start)
-
-    def on_pad_start_column_with_custom_string_action(self,
-                                                      action: Gio.SimpleAction,
-                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_start(fill_char: str, length: str) -> None:
-            fill_char = fill_char[0] if len(fill_char) else ' '
-            document.update_current_cells_from_operator('pad-start-custom', [length, fill_char], on_column=True)
-
-        def ask_for_fill_char(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the character used for padding the columns'),
-                                                                callback=proceed_to_pad_start,
-                                                                user_data=[length])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
-                                                            callback=ask_for_fill_char,
-                                                            more_prompt=True)
-
-    def on_pad_start_column_with_whitespace_action(self,
-                                                   action: Gio.SimpleAction,
-                                                   *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_pad_start(length: str) -> None:
-            length = int(length) if length.isnumeric() else 0
-            document.update_current_cells_from_operator('pad-start-default', [length], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the length of the padded string for the columns'),
-                                                            callback=proceed_to_pad_start)
-
     def on_paste_action(self,
                         action: Gio.SimpleAction,
                         *args) -> bool:
@@ -2478,22 +2212,6 @@ Options:
         self.clipboard.read_text_async(on_clipboard_text_received)
 
         return True
-
-    def on_pig_latinnify_cell_action(self,
-                                     action: Gio.SimpleAction,
-                                     *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('pig-latinnify', on_column=False)
-
-    def on_pig_latinnify_column_action(self,
-                                       action: Gio.SimpleAction,
-                                       *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('pig-latinnify', on_column=True)
 
     def on_pin_tab_action(self,
                           action: Gio.SimpleAction,
@@ -2528,72 +2246,6 @@ Options:
         if not isinstance(document, SheetDocument):
             return
         document.rechunk_table()
-
-    def on_remove_alternate_rows_action(self,
-                                        action: Gio.SimpleAction,
-                                        *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        window = self.get_active_window()
-
-        def proceed_to_remove_rows(no_rows: str, first_row: int) -> None:
-            if not no_rows.isnumeric():
-                return
-            no_rows = int(no_rows)
-            document.keep_n_rows('inverse-range', no_rows, first_row)
-
-        def ask_for_no_rows(first_row: str) -> None:
-            if not first_row.isnumeric():
-                return
-            first_row = int(first_row)
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the number of rows to remove'),
-                                                                callback=proceed_to_remove_rows,
-                                                                user_data=[first_row])
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the first row to remove'),
-                                                            callback=ask_for_no_rows,
-                                                            more_prompt=True)
-
-    def on_remove_first_rows_action(self,
-                                    action: Gio.SimpleAction,
-                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_rows(no_rows: str) -> None:
-            if not no_rows.isnumeric():
-                return
-            no_rows = int(no_rows)
-            document.keep_n_rows('inverse-first', no_rows)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the number of rows to remove'),
-                                                            callback=proceed_to_remove_rows)
-
-    def on_remove_last_rows_action(self,
-                                   action: Gio.SimpleAction,
-                                   *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_rows(no_rows: str) -> None:
-            if not no_rows.isnumeric():
-                return
-            no_rows = int(no_rows)
-            document.keep_n_rows('inverse-last', no_rows)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the number of rows to remove'),
-                                                            callback=proceed_to_remove_rows)
 
     def on_redo_action(self,
                        action: Gio.SimpleAction,
@@ -2637,460 +2289,104 @@ Options:
         tab_page = self._get_current_tab_page(window, document_id)
         window.rename_sheet(tab_page)
 
-    def on_remove_cell_new_lines_characters_action(self,
-                                                   action: Gio.SimpleAction,
-                                                   *args) -> None:
+    def on_remove_affixes_action(self,
+                                 action: Gio.SimpleAction,
+                                 *args) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
-        document.update_current_cells_from_operator('remove-new-lines', on_column=False)
-
-    def on_remove_cell_whitespace_characters_action(self,
-                                                    action: Gio.SimpleAction,
-                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('remove-whitespaces', on_column=False)
-
-    def on_remove_column_new_lines_characters_action(self,
-                                                     action: Gio.SimpleAction,
-                                                     *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('remove-new-lines', on_column=True)
-
-    def on_remove_column_whitespace_characters_action(self,
-                                                      action: Gio.SimpleAction,
-                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('remove-whitespaces', on_column=True)
-
-    def on_remove_prefix_from_cell_case_insensitive_action(self,
-                                                           action: Gio.SimpleAction,
-                                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_prefix(prefix: str) -> None:
-            document.update_current_cells_from_operator('remove-prefix-case-insensitive', [prefix], on_column=False)
 
         window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the prefix for the cells'),
-                                                            callback=proceed_to_remove_prefix)
 
-    def on_remove_prefix_from_cell_case_sensitive_action(self,
-                                                         action: Gio.SimpleAction,
-                                                         *args) -> None:
+        def proceed_to_apply(args:       list,
+                             match_case: bool,
+                             use_regexp: bool,
+                             on_column:  bool,
+                             **kwargs) -> None:
+            args.append(match_case)
+            args.append(use_regexp)
+            document.update_current_cells_from_operator('remove-affixes', args, on_column)
+            self._return_focus_back(document)
+
+        layout = [
+            (_('Prefix'), 'entry'),
+            (_('Suffix'), 'entry'),
+        ]
+
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(_('Remove Affixes'),
+                                      layout,
+                                      proceed_to_apply,
+                                      window,
+                                      match_case=False,
+                                      use_regexp=False,
+                                      on_column=False)
+        dialog.present(window)
+
+    def on_replace_value_action(self,
+                                match_case: bool = False,
+                                use_regexp: bool = False,
+                                on_column:  bool = False) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
-
-        def proceed_to_remove_prefix(prefix: str) -> None:
-            document.update_current_cells_from_operator('remove-prefix-case-sensitive', [prefix], on_column=False)
 
         window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the prefix for the cells'),
-                                                            callback=proceed_to_remove_prefix)
 
-    def on_remove_prefix_from_column_case_insensitive_action(self,
-                                                             action: Gio.SimpleAction,
-                                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_prefix(prefix: str) -> None:
-            document.update_current_cells_from_operator('remove-prefix-case-insensitive', [prefix], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the prefix for the columns'),
-                                                            callback=proceed_to_remove_prefix)
-
-    def on_remove_prefix_from_column_case_sensitive_action(self,
-                                                           action: Gio.SimpleAction,
-                                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_prefix(prefix: str) -> None:
-            document.update_current_cells_from_operator('remove-prefix-case-sensitive', [prefix], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the prefix for the columns'),
-                                                            callback=proceed_to_remove_prefix)
-
-    def on_remove_rows_including_selection(self,
-                                           action: Gio.SimpleAction,
-                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.filter_current_rows(inverse=True)
-
-    def on_remove_rows_including_selection_into_new_worksheet_action(self,
-                                                                     action: Gio.SimpleAction,
-                                                                     *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        filter_by = {'operator-name': 'inverse-selection'}
-
-        window = self.get_active_window()
-        window.duplicate_sheet(document.document_id,
-                               materialize=True,
-                               filter_by=filter_by)
-
-    def on_remove_rows_including_case_insensitive_string_action(self,
-                                                                action: Gio.SimpleAction,
-                                                                *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_rows(string: str) -> None:
-            operator = 'does not contain'
-            expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=True)
-            expression = polars.any_horizontal(expression).not_()
-            document.pending_filters = [self._construct_query_builder(operator, string, expression)]
-            document.filter_current_rows(multiple=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the string to remove'),
-                                                            callback=proceed_to_remove_rows)
-
-    def on_remove_rows_including_case_sensitive_string_action(self,
-                                                              action: Gio.SimpleAction,
-                                                              *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_rows(string: str) -> None:
-            operator = 'does not contain'
-            expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=False)
-            expression = polars.any_horizontal(expression).not_()
-            document.pending_filters = [self._construct_query_builder(operator, string, expression)]
-            document.filter_current_rows(multiple=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the string to remove'),
-                                                            callback=proceed_to_remove_rows)
-
-    def on_remove_rows_including_case_insensitive_string_into_new_worksheet_action_action(self,
-                                                                                          action: Gio.SimpleAction,
-                                                                                          *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_rows(string: str) -> None:
-            operator = 'does not contain'
-            expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=True)
-            expression = polars.any_horizontal(expression).not_()
-            pending_filters = [self._construct_query_builder(operator, string, expression)]
-
-            filter_by = {'operator-name': 'query-builder',
-                         'operator-args': pending_filters}
-
+        def proceed_to_apply(args:      list,
+                             on_column: bool,
+                             **kwargs) -> None:
             window = self.get_active_window()
-            window.duplicate_sheet(document.document_id,
-                                   materialize=True,
-                                   filter_by=filter_by)
+            sheet_document = self._get_current_active_document(window)
 
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the string to remove'),
-                                                            callback=proceed_to_remove_rows)
+            active = sheet_document.selection.current_active_range
+            if on_column:
+                from .sheet_selection import SheetCell
+                nactive = SheetCell(active.x,           active.y,
+                                    active.column,      active.row,
+                                    active.width,       active.height,
+                                    active.column_span, active.row_span,
+                                    active.metadata,
+                                    active.rtl,         active.btt)
+                nactive.row_span = -1 # select the entire column(s)
+            else:
+                nactive = active
 
-    def on_remove_rows_including_case_sensitive_string_into_new_worksheet_action_action(self,
-                                                                                        action: Gio.SimpleAction,
-                                                                                        *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
+            sheet_document.selection.current_search_range = nactive
+            sheet_document.find_replace_all_in_current_cells(args[0], # find pattern
+                                                             args[1], # replace value
+                                                             match_case=match_case,
+                                                             match_cell=False,
+                                                             within_selection=True,
+                                                             use_regexp=use_regexp)
 
-        def proceed_to_remove_rows(string: str) -> None:
-            operator = 'does not contain'
-            expression = polars.col(polars.String).str.contains_any([string], ascii_case_insensitive=False)
-            expression = polars.any_horizontal(expression).not_()
-            pending_filters = [self._construct_query_builder(operator, string, expression)]
+            sheet_document.selection.current_search_range = None
 
-            filter_by = {'operator-name': 'query-builder',
-                         'operator-args': pending_filters}
+            self._return_focus_back(document)
 
-            window = self.get_active_window()
-            window.duplicate_sheet(document.document_id,
-                                   materialize=True,
-                                   filter_by=filter_by)
+        title = _('Replace Text')
+        entry_label = _('Find')
 
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the string to remove'),
-                                                            callback=proceed_to_remove_rows)
+        if use_regexp:
+            title += _(' with Regex')
 
-    def on_remove_rows_matching_regex_case_insensitive_string_action(self,
-                                                                        action: Gio.SimpleAction,
-                                                                        *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
+        if match_case:
+            entry_label += _(' (Case Sensitive)')
+        else:
+            entry_label += _(' (Case Insensitive)')
 
-        def proceed_to_keep_rows(pattern: str) -> None:
-            operator = 'does not contain'
-            expression = polars.col(polars.String).str.contains(f'(?i){pattern}')
-            expression = polars.any_horizontal(expression).not_()
-            document.pending_filters = [self._construct_query_builder(operator, pattern, expression)]
-            document.filter_current_rows(multiple=True)
+        layout = [
+            (entry_label, 'entry'),
+            (_('Replace'), 'entry'),
+        ]
 
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to remove'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_remove_rows_matching_regex_case_sensitive_string_action(self,
-                                                                      action: Gio.SimpleAction,
-                                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(pattern: str) -> None:
-            operator = 'does not contain'
-            expression = polars.col(polars.String).str.contains(pattern)
-            expression = polars.any_horizontal(expression).not_()
-            document.pending_filters = [self._construct_query_builder(operator, pattern, expression)]
-            document.filter_current_rows(multiple=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to remove'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_remove_rows_matching_regex_case_insensitive_string_into_new_worksheet_action_action(self,
-                                                                                               action: Gio.SimpleAction,
-                                                                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(pattern: str) -> None:
-            operator = 'does not contain'
-            expression = polars.col(polars.String).str.contains(f'(?i){pattern}')
-            expression = polars.any_horizontal(expression).not_()
-            pending_filters = [self._construct_query_builder(operator, pattern, expression)]
-
-            filter_by = {'operator-name': 'query-builder',
-                         'operator-args': pending_filters}
-
-            window = self.get_active_window()
-            window.duplicate_sheet(document.document_id,
-                                   materialize=True,
-                                   filter_by=filter_by)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to remove'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_remove_rows_matching_regex_case_sensitive_string_into_new_worksheet_action_action(self,
-                                                                                             action: Gio.SimpleAction,
-                                                                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_keep_rows(pattern: str) -> None:
-            operator = 'does not contain'
-            expression = polars.col(polars.String).str.contains(pattern)
-            expression = polars.any_horizontal(expression).not_()
-            pending_filters = [self._construct_query_builder(operator, pattern, expression)]
-
-            filter_by = {'operator-name': 'query-builder',
-                         'operator-args': pending_filters}
-
-            window = self.get_active_window()
-            window.duplicate_sheet(document.document_id,
-                                   materialize=True,
-                                   filter_by=filter_by)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to remove'),
-                                                            callback=proceed_to_keep_rows)
-
-    def on_remove_suffix_from_cell_case_insensitive_action(self,
-                                                           action: Gio.SimpleAction,
-                                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_suffix(suffix: str) -> None:
-            document.update_current_cells_from_operator('remove-suffix-case-insensitive', [suffix], on_column=False)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the suffix for the cells'),
-                                                            callback=proceed_to_remove_suffix)
-
-    def on_remove_suffix_from_cell_case_sensitive_action(self,
-                                                         action: Gio.SimpleAction,
-                                                         *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_suffix(suffix: str) -> None:
-            document.update_current_cells_from_operator('remove-suffix-case-sensitive', [suffix], on_column=False)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the suffix for the cells'),
-                                                            callback=proceed_to_remove_suffix)
-
-    def on_remove_suffix_from_column_case_insensitive_action(self,
-                                                             action: Gio.SimpleAction,
-                                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_suffix(suffix: str) -> None:
-            document.update_current_cells_from_operator('remove-suffix-case-insensitive', [suffix], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the suffix for the columns'),
-                                                            callback=proceed_to_remove_suffix)
-
-    def on_remove_suffix_from_column_case_sensitive_action(self,
-                                                           action: Gio.SimpleAction,
-                                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_remove_suffix(suffix: str) -> None:
-            document.update_current_cells_from_operator('remove-suffix-case-sensitive', [suffix], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the suffix for the columns'),
-                                                            callback=proceed_to_remove_suffix)
-
-    def on_replace_cell_text_value_case_insensitive_action(self,
-                                                           action: Gio.SimpleAction,
-                                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        self._replace_text_value()
-
-    def on_replace_cell_text_value_case_insensitive_with_regex_action(self,
-                                                                      action: Gio.SimpleAction,
-                                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        self._replace_text_value(use_regexp=True)
-
-    def on_replace_cell_text_value_case_sensitive_action(self,
-                                                         action: Gio.SimpleAction,
-                                                         *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        self._replace_text_value(match_case=True)
-
-    def on_replace_cell_text_value_case_sensitive_with_regex_action(self,
-                                                                    action: Gio.SimpleAction,
-                                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        self._replace_text_value(match_case=True,
-                                 use_regexp=True)
-
-    def on_replace_cell_whitespace_with_a_single_space_action(self,
-                                                              action: Gio.SimpleAction,
-                                                              *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('replace-whitespace-with-a-single-space', on_column=False)
-
-    def on_replace_cell_whitespace_and_new_lines_with_a_single_space_action(self,
-                                                                            action: Gio.SimpleAction,
-                                                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('replace-whitespace-and-new-lines-with-a-single-space', on_column=False)
-
-    def on_replace_column_text_value_case_insensitive_action(self,
-                                                             action: Gio.SimpleAction,
-                                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        self._replace_text_value(column_wise=True)
-
-    def on_replace_column_text_value_case_insensitive_with_regex_action(self,
-                                                                        action: Gio.SimpleAction,
-                                                                        *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        self._replace_text_value(use_regexp=True,
-                                 column_wise=True)
-
-    def on_replace_column_text_value_case_sensitive_action(self,
-                                                           action: Gio.SimpleAction,
-                                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        self._replace_text_value(match_case=True,
-                                 column_wise=True)
-
-    def on_replace_column_text_value_case_sensitive_with_regex_action(self,
-                                                                      action: Gio.SimpleAction,
-                                                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        self._replace_text_value(match_case=True,
-                                 use_regexp=True,
-                                 column_wise=True)
-
-    def on_replace_column_whitespace_with_a_single_space_action(self,
-                                                                action: Gio.SimpleAction,
-                                                                *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_columns_from_operator('replace-whitespace-with-a-single-space', on_column=True)
-
-    def on_replace_column_whitespace_and_new_lines_with_a_single_space_action(self,
-                                                                              action: Gio.SimpleAction,
-                                                                              *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_columns_from_operator('replace-whitespace-and-new-lines-with-a-single-space', on_column=True)
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(title,
+                                      layout,
+                                      proceed_to_apply,
+                                      window,
+                                      on_column=on_column)
+        dialog.present(window)
 
     def on_reset_all_filters_action(self,
                                     action: Gio.SimpleAction,
@@ -3099,22 +2395,6 @@ Options:
         if not isinstance(document, SheetDocument):
             return
         document.reset_all_filters()
-
-    def on_reverse_cell_text_action(self,
-                                    action: Gio.SimpleAction,
-                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('reverse-text', on_column=False)
-
-    def on_reverse_column_text_action(self,
-                                      action: Gio.SimpleAction,
-                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('reverse-text', on_column=True)
 
     def on_save_file_action(self,
                             action: Gio.SimpleAction,
@@ -3127,22 +2407,6 @@ Options:
                                *args) -> None:
         window = self.get_active_window()
         self.file_manager.save_as_file(window)
-
-    def on_slugify_cells_action(self,
-                                action: Gio.SimpleAction,
-                                *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('slugify', on_column=False)
-
-    def on_slugify_columns_action(self,
-                                  action: Gio.SimpleAction,
-                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('slugify', on_column=True)
 
     def on_sort_by_ascending_action(self,
                                     action: Gio.SimpleAction,
@@ -3160,125 +2424,34 @@ Options:
             return
         document.sort_current_rows(descending=True)
 
-    def on_split_cells_by_comma_into_new_worksheet_action(self,
-                                                          action: Gio.SimpleAction,
-                                                          *args) -> None:
+    def on_split_by_characters_action(self,
+                                      splitter:  str = None,
+                                      on_column: bool = False) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
-        dataframe = document.create_table_from_operator('split-by-characters', [','], on_column=False)
-        self._create_new_tab(dataframe=dataframe)
-
-    def on_split_cells_by_characters_into_new_worksheet_action(self,
-                                                                  action: Gio.SimpleAction,
-                                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_split_by_characters(characters: str) -> None:
-            dataframe = document.create_table_from_operator('split-by-characters', [characters], on_column=False)
-            self._create_new_tab(dataframe=dataframe)
 
         window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter a set of characters to split the cells by'),
-                                                            callback=proceed_to_split_by_characters)
 
-    def on_split_cells_by_pipe_into_new_worksheet_action(self,
-                                                         action: Gio.SimpleAction,
-                                                         *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        dataframe = document.create_table_from_operator('split-by-characters', ['|'], on_column=False)
-        self._create_new_tab(dataframe=dataframe)
-
-    def on_split_cells_by_semicolon_into_new_worksheet_action(self,
-                                                              action: Gio.SimpleAction,
-                                                              *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        dataframe = document.create_table_from_operator('split-by-characters', [';'], on_column=False)
-        self._create_new_tab(dataframe=dataframe)
-
-    def on_split_cells_by_space_into_new_worksheet_action(self,
-                                                          action: Gio.SimpleAction,
-                                                          *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        dataframe = document.create_table_from_operator('split-by-characters', [' '], on_column=False)
-        self._create_new_tab(dataframe=dataframe)
-
-    def on_split_columns_by_comma_into_new_worksheet_action(self,
-                                                            action: Gio.SimpleAction,
-                                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        dataframe = document.create_table_from_operator('split-by-characters', [','], on_column=True)
-        self._create_new_tab(dataframe=dataframe)
-
-    def on_split_columns_by_characters_into_new_worksheet_action(self,
-                                                                    action: Gio.SimpleAction,
-                                                                    *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_split_by_characters(characters: str) -> None:
-            dataframe = document.create_table_from_operator('split-by-characters', [characters], on_column=True)
+        def proceed_to_apply(args:      list,
+                             on_column: bool,
+                             **kwargs) -> None:
+            dataframe = document.create_table_from_operator('split-by-characters',
+                                                            [args[0]],
+                                                            on_column=on_column)
             self._create_new_tab(dataframe=dataframe)
 
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter a set of characters to split the columns by'),
-                                                            callback=proceed_to_split_by_characters)
-
-    def on_split_columns_by_pipe_into_new_worksheet_action(self,
-                                                           action: Gio.SimpleAction,
-                                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
+        if splitter is not None:
+            proceed_to_apply(splitter, on_column)
             return
-        dataframe = document.create_table_from_operator('split-by-characters', ['|'], on_column=True)
-        self._create_new_tab(dataframe=dataframe)
 
-    def on_split_columns_by_semicolon_into_new_worksheet_action(self,
-                                                                action: Gio.SimpleAction,
-                                                                *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        dataframe = document.create_table_from_operator('split-by-characters', [';'], on_column=True)
-        self._create_new_tab(dataframe=dataframe)
-
-    def on_split_columns_by_space_into_new_worksheet_action(self,
-                                                            action: Gio.SimpleAction,
-                                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        dataframe = document.create_table_from_operator('split-by-characters', [' '], on_column=True)
-        self._create_new_tab(dataframe=dataframe)
-
-    def on_swap_cell_text_case_action(self,
-                                      action: Gio.SimpleAction,
-                                      *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('swap-text-case', on_column=False)
-
-    def on_swap_column_text_case_action(self,
-                                        action: Gio.SimpleAction,
-                                        *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('swap-text-case', on_column=True)
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(_('Split by Character Set to New Sheet'),
+                                      [('Character Set', 'entry')],
+                                      proceed_to_apply,
+                                      window,
+                                      on_column=on_column)
+        dialog.present(window)
 
     def on_toggle_connection_active(self,
                                     source:    GObject.Object,
@@ -3331,70 +2504,6 @@ Options:
         window = self.get_active_window()
         window.toggle_sidebar()
 
-    def on_trim_cell_whitespace_action(self,
-                                       action: Gio.SimpleAction,
-                                       *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('trim-whitespace', on_column=False)
-
-    def on_trim_cell_whitespace_and_remove_new_lines_action(self,
-                                                            action: Gio.SimpleAction,
-                                                            *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('trim-whitespace-and-remove-new-lines', on_column=False)
-
-    def on_trim_cell_start_whitespace_action(self,
-                                             action: Gio.SimpleAction,
-                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('trim-start-whitespace', on_column=False)
-
-    def on_trim_cell_end_whitespace_action(self,
-                                           action: Gio.SimpleAction,
-                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('trim-end-whitespace', on_column=False)
-
-    def on_trim_column_whitespace_action(self,
-                                         action: Gio.SimpleAction,
-                                         *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('trim-whitespace', on_column=True)
-
-    def on_trim_column_whitespace_and_remove_new_lines_action(self,
-                                                              action: Gio.SimpleAction,
-                                                              *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('trim-whitespace-and-remove-new-lines', on_column=True)
-
-    def on_trim_column_start_whitespace_action(self,
-                                               action: Gio.SimpleAction,
-                                               *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('trim-start-whitespace', on_column=True)
-
-    def on_trim_column_end_whitespace_action(self,
-                                             action: Gio.SimpleAction,
-                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-        document.update_current_cells_from_operator('trim-end-whitespace', on_column=True)
-
     def on_use_first_row_as_headers_action(self,
                                            action: Gio.SimpleAction,
                                            *args) -> None:
@@ -3410,82 +2519,6 @@ Options:
         if not isinstance(document, SheetDocument):
             return
         document.use_headers_as_first_row()
-
-    def on_wrap_cell_with_text_different_action(self,
-                                                action: Gio.SimpleAction,
-                                                *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        window = self.get_active_window()
-
-        def proceed_to_wrap_text(suffix: str, prefix: str) -> None:
-            document.update_current_cells_from_operator('wrap-with-text-different', [prefix, suffix], on_column=False)
-
-        def ask_for_suffix_text(search_pattern: str) -> None:
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the suffix for the cells'),
-                                                                callback=proceed_to_wrap_text,
-                                                                user_data=[search_pattern])
-
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the prefix for the cells'),
-                                                            callback=ask_for_suffix_text,
-                                                            more_prompt=True)
-
-    def on_wrap_cell_with_text_same_action(self,
-                                           action: Gio.SimpleAction,
-                                           *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_wrap_text(prefix: str) -> None:
-            document.update_current_cells_from_operator('wrap-with-text-same', [prefix], on_column=False)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the text to wrap the cells with'),
-                                                            callback=proceed_to_wrap_text)
-
-    def on_wrap_column_with_text_different_action(self,
-                                                  action: Gio.SimpleAction,
-                                                  *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        window = self.get_active_window()
-
-        def proceed_to_wrap_text(suffix: str, prefix: str) -> None:
-            document.update_current_cells_from_operator('wrap-with-text-different', [prefix, suffix], on_column=True)
-
-        def ask_for_suffix_text(prefix: str) -> None:
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the suffix for the columns'),
-                                                                callback=proceed_to_wrap_text,
-                                                                user_data=[prefix])
-
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the prefix for the columns'),
-                                                            callback=ask_for_suffix_text,
-                                                            more_prompt=True)
-
-    def on_wrap_column_with_text_same_action(self,
-                                             action: Gio.SimpleAction,
-                                             *args) -> None:
-        document = self._get_current_active_document()
-        if not isinstance(document, SheetDocument):
-            return
-
-        def proceed_to_wrap_text(prefix: str) -> None:
-            document.update_current_cells_from_operator('wrap-with-text-same', [prefix], on_column=True)
-
-        window = self.get_active_window()
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the text to wrap the columns with'),
-                                                            callback=proceed_to_wrap_text)
 
     def on_undo_action(self,
                        action: Gio.SimpleAction,
@@ -3699,50 +2732,6 @@ Options:
         active_connections = [connection['curl'] for connection in self.connection_list
                                                  if connection['connected']]
         return ';'.join(active_connections)
-
-    def _replace_text_value(self,
-                            match_case:  bool = False,
-                            use_regexp:  bool = False,
-                            column_wise: bool = False) -> None:
-        window = self.get_active_window()
-
-        def proceed_to_replace_value(replace_with: str, search_pattern: str) -> None:
-            window = self.get_active_window()
-            sheet_document = self._get_current_active_document(window)
-
-            active = sheet_document.selection.current_active_range
-            if column_wise:
-                from .sheet_selection import SheetCell
-                nactive = SheetCell(active.x, active.y,
-                                    active.column, active.row,
-                                    active.width, active.height,
-                                    active.column_span, active.row_span,
-                                    active.metadata,
-                                    active.rtl, active.btt)
-                nactive.row_span = -1 # select the entire column(s)
-            else:
-                nactive = active
-
-            sheet_document.selection.current_search_range = nactive
-            sheet_document.find_replace_all_in_current_cells(search_pattern,
-                                                             replace_with,
-                                                             match_case=match_case,
-                                                             match_cell=False,
-                                                             within_selection=True,
-                                                             use_regexp=use_regexp)
-
-            sheet_document.selection.current_search_range = None
-
-        def ask_for_replace_value(search_pattern: str) -> None:
-            window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                                prompt_text=_('Please enter the value to replace'),
-                                                                callback=proceed_to_replace_value,
-                                                                user_data=[search_pattern])
-
-        window.command_palette_overlay.open_command_overlay(as_prompt=True,
-                                                            prompt_text=_('Please enter the pattern to find'),
-                                                            callback=ask_for_replace_value,
-                                                            more_prompt=True)
 
     def _return_focus_back(self, document: Any = None) -> None:
         if document is None:

@@ -751,10 +751,10 @@ FROM indexed_self
             if isinstance(column_dtype, (polars.List, polars.Struct, polars.Object)):
                 continue # we don't support updating a list, struct, or object
 
-            expression = build_operation(polars.col(column_name), operator_name, operation_args)
-
             # Evaluate the expression
             try:
+                expression = build_operation(polars.col(column_name), operator_name, operation_args)
+
                 if isinstance(expression, polars.Expr):
                     # Update the entire column
                     if row_span < 0:
@@ -1179,6 +1179,9 @@ FROM indexed_self
                 expression |= afilter['expression']
 
         self.dfs = [self.dfs[0].filter(expression).select(column_names)]
+
+        self.bbs[0].column_span = self.dfs[0].width
+        self.bbs[0].row_span = self.dfs[0].height + 1
         self.bbs = [self.bbs[0]]
 
         return True

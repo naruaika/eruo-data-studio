@@ -16,6 +16,7 @@
     <file preprocess="xml-stripblanks">ui/search-replace-all-view.ui</file>
     <file preprocess="xml-stripblanks">ui/search-replace-overlay.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-header-menu.ui</file>
+    <file preprocess="xml-stripblanks">ui/sheet-operation-dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-notebook-view.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-rename-dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/sheet-view.ui</file>
@@ -37,6 +38,7 @@
     <!-- GNOME UI Icons -->
     <file preprocess="xml-stripblanks">arrow2-down-symbolic.svg</file>
     <file preprocess="xml-stripblanks">arrow2-up-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">arrow4-right-symbolic.svg</file>
     <file preprocess="xml-stripblanks">checkmark-symbolic.svg</file>
     <file preprocess="xml-stripblanks">document-edit-symbolic.svg</file>
     <file preprocess="xml-stripblanks">edit-copy-symbolic.svg</file>

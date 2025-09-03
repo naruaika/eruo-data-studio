@@ -98,7 +98,7 @@ class DatabaseAddConnectionDialog(Adw.Dialog):
 
                 case DatabaseAddConnectionSqliteView():
                     cname = view.name.get_text() or 'New Connection'
-                    database = view.database.get_subtitle() or '~/sample.db'
+                    database = view.database.get_text() or '~/sample.db'
                     cschema = {
                         'ctype' : 'SQLite',
                         'cname' : cname,

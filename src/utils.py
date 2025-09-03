@@ -258,10 +258,14 @@ def check_command_eligible(window: Gtk.Window, when_expression: str) -> bool:
     from .sheet_notebook import SheetNotebook
 
     document = window.get_current_active_document()
+
     if isinstance(document, SheetDocument):
         _globals['document'] = 'worksheet'
     if isinstance(document, SheetNotebook):
         _globals['document'] = 'notebook'
+
+    if isinstance(document, SheetDocument):
+        _globals['table_focus'] = document.current_dfi >= 0
 
     return eval(when_expression, _globals, {})
 

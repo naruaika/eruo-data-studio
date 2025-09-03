@@ -12,21 +12,19 @@
           </object>
         </child>
         <child>
-          <object class="AdwActionRow" id="database">
+          <object class="AdwEntryRow" id="database">
             <property name="title">Database</property>
-            <property name="subtitle">~/sample.db</property>
-            <property name="activatable">true</property>
-            <signal name="activated" handler="on_database_activated" swapped="no"/>
+            <property name="text">~/sample.db</property>
             <child>
-              <object class="GtkImage">
-                <property name="margin-start">8</property>
-                <property name="margin-end">8</property>
-                <property name="icon-name">go-next-symbolic</property>
+              <object class="GtkButton">
+                <property name="valign">center</property>
+                <property name="icon-name">folder-symbolic</property>
+                <signal name="clicked" handler="on_database_clicked" swapped="no"/>
+                <style>
+                  <class name="flat"/>
+                </style>
               </object>
             </child>
-            <style>
-              <class name="property"/>
-            </style>
           </object>
         </child>
       </object>

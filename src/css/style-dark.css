@@ -18,12 +18,11 @@
 }
 
 .sidebar-expander-row textview,
-.sidebar-list-view > row:selected {
-    background-color: rgb(68, 68, 71);
-}
-
+.sidebar-list-view > row:selected,
+.preview-column-view row:selected,
+.sidebar-expander-row row:selected,
 .command-overlay listview > row:selected {
-    background-color: rgb(78, 78, 81);
+    background-color: rgb(74, 74, 78);
 }
 
 .floating-sheet {

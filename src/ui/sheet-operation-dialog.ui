@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="SheetOperationDialog" parent="AdwDialog">
+    <property name="title">Operation</property>
+    <property name="can-close">true</property>
+    <property name="content-width">400</property>
+    <child>
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar"/>
+        </child>
+        <property name="content">
+          <object class="AdwPreferencesPage" id="preferences_page">
+            <child>
+              <object class="AdwPreferencesGroup" id="content_container"></object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="preview_container">
+                <property name="title">Simulation</property>
+                <property name="visible">false</property>
+                <child>
+                  <object class="AdwPreferencesRow">
+                    <property name="activatable">false</property>
+                    <child>
+                      <object class="GtkColumnView" id="preview_list_view">
+                        <property name="single-click-activate">true</property>
+                        <property name="height-request">150</property>
+                        <property name="reorderable">false</property>
+                        <property name="model">
+                          <object class="GtkSingleSelection">
+                            <property name="model">
+                              <object class="GListStore" id="preview_list_store"/>
+                            </property>
+                          </object>
+                        </property>
+                        <child>
+                          <object class="GtkColumnViewColumn">
+                            <property name="title">Before</property>
+                            <property name="expand">true</property>
+                            <property name="resizable">true</property>
+                            <property name="factory">
+                              <object class="GtkBuilderListItemFactory">
+                                <property name="bytes"><![CDATA[
+<interface>
+  <template class="GtkListItem">
+    <property name="child">
+      <object class="GtkLabel">
+        <property name="ellipsize">end</property>
+        <property name="halign">start</property>
+        <binding name="label">
+          <lookup name="before" type="PreviewListItem">
+            <lookup name="item">GtkListItem</lookup>
+          </lookup>
+        </binding>
+      </object>
+    </property>
+  </template>
+</interface>
+                                ]]></property>
+                              </object>
+                            </property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkColumnViewColumn">
+                            <property name="factory">
+                              <object class="GtkBuilderListItemFactory">
+                                <property name="bytes"><![CDATA[
+<interface>
+  <template class="GtkListItem">
+    <property name="child">
+      <object class="GtkImage">
+        <property name="icon-name">arrow4-right-symbolic</property>
+      </object>
+    </property>
+  </template>
+</interface>
+                                ]]></property>
+                              </object>
+                            </property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkColumnViewColumn">
+                            <property name="title">After</property>
+                            <property name="expand">true</property>
+                            <property name="resizable">true</property>
+                            <property name="factory">
+                              <object class="GtkBuilderListItemFactory">
+                                <property name="bytes"><![CDATA[
+<interface>
+  <template class="GtkListItem">
+    <property name="child">
+      <object class="GtkLabel">
+        <property name="ellipsize">end</property>
+        <property name="halign">start</property>
+        <binding name="label">
+          <lookup name="after" type="PreviewListItem">
+            <lookup name="item">GtkListItem</lookup>
+          </lookup>
+        </binding>
+      </object>
+    </property>
+  </template>
+</interface>
+                                ]]></property>
+                              </object>
+                            </property>
+                          </object>
+                        </child>
+                        <style>
+                          <class name="preview-column-view"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </property>
+        <child type="bottom">
+          <object class="GtkCenterBox">
+            <property name="orientation">horizontal</property>
+            <property name="margin-top">10</property>
+            <property name="margin-bottom">10</property>
+            <property name="margin-start">10</property>
+            <property name="margin-end">10</property>
+            <property name="end-widget">
+              <object class="GtkButton" id="apply_button">
+                <property name="label">Apply</property>
+                <signal name="clicked" handler="on_apply_button_clicked" swapped="no"/>
+                <style>
+                  <class name="suggested-action"/>
+                </style>
+              </object>
+            </property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </template>
+</interface>

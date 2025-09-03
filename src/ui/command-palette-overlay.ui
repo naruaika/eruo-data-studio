@@ -31,6 +31,7 @@
               <object class="GtkScrolledWindow" id="scrolled_window">
                 <property name="halign">fill</property>
                 <property name="hexpand">true</property>
+                <property name="margin-bottom">3</property>
                 <property name="max-content-width">650</property>
                 <property name="max-content-height">494</property>
                 <property name="propagate-natural-height">true</property>

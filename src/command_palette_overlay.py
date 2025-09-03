@@ -177,11 +177,15 @@ class CommandPaletteOverlay(Adw.Bin):
         list_item.label = label
         list_item.shortcut = shortcut
         list_item.separator = separator
+        list_item.bind_label = None
 
     def bind_factory(self,
                      list_item_factory: Gtk.SignalListItemFactory,
                      list_item:         Gtk.ListItem) -> None:
         item_data = list_item.get_item()
+
+        if list_item.bind_label is not None:
+            list_item.bind_label.unbind()
 
         if item_data.is_separator:
             list_item.set_focusable(False)
@@ -194,8 +198,8 @@ class CommandPaletteOverlay(Adw.Bin):
         list_item.label.set_label(item_data.label)
         list_item.shortcut.set_visible(False)
 
-        item_data.bind_property('label', list_item.label,
-                                'label', GObject.BindingFlags.SYNC_CREATE)
+        list_item.bind_label = item_data.bind_property('label', list_item.label,
+                                                       'label', GObject.BindingFlags.SYNC_CREATE)
 
         if len(item_data.shortcuts) > 0:
             shortcut_string = item_data.shortcuts[0]
@@ -213,6 +217,7 @@ class CommandPaletteOverlay(Adw.Bin):
         list_item.label = None
         list_item.shortcut = None
         list_item.separator = None
+        list_item.bind_label = None
 
     def on_command_entry_changed(self, entry: Gtk.Entry) -> None:
         if self.is_prompting:
@@ -284,19 +289,20 @@ class CommandPaletteOverlay(Adw.Bin):
             return
 
         selected_item = self.selection.get_selected_item()
-        action_name = selected_item.action_name
 
-        if len(self.recent_command_titles) == 0:
-            self.list_store.insert(0, self.list_separator)
-
-        # Add the selected item to the recently used commands
-        selected_item = CommandListItem(action_name,
+        # Clone the selected command list item
+        selected_item = CommandListItem(selected_item.action_name,
                                         selected_item.title,
                                         selected_item.shortcuts,
                                         selected_item.steal_focus,
                                         selected_item.will_prompt,
                                         selected_item.when_expression,
                                         is_recent_item=True)
+
+        # Add separator between recent and all command list. Separator only be added
+        # on the first command activation since the application launched.
+        if len(self.recent_command_titles) == 0:
+            self.list_store.insert(0, self.list_separator)
 
         if selected_item.title in self.recent_command_titles:
             list_item_index = self.recent_command_titles.index(selected_item.title)
@@ -310,7 +316,7 @@ class CommandPaletteOverlay(Adw.Bin):
             self.list_store.remove(self.MAX_RECENT_COMMANDS)
             self.recent_command_titles.pop()
 
-        self.window.get_application().activate_action(action_name, None)
+        self.window.get_application().activate_action(selected_item.action_name, None)
         self.close_command_overlay(selected_item.steal_focus, selected_item.will_prompt)
 
     def on_list_view_activated(self,
@@ -408,7 +414,8 @@ class CommandPaletteOverlay(Adw.Bin):
                         or utils.check_command_eligible(self.window, item.when_expression):
                     if item.is_recent_item:
                         self.n_eligible_recent_commands += 1
-                    if item.is_separator and self.n_eligible_recent_commands == 0:
+                    if item.is_separator \
+                            and self.n_eligible_recent_commands == 0:
                         continue
                     eligible_list_store.append(item)
             self.eligible_list_store = eligible_list_store

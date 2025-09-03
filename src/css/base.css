@@ -76,26 +76,6 @@
     margin-right: 24px;
 }
 
-/* POPOVER */
-
-popover .text-button {
-    padding: 4px 10px;
-}
-
-popover listview {
-    padding: 0;
-}
-popover listview row {
-    margin: 0;
-    padding: 2px 4px;
-    border-radius: 12px;
-}
-
-popover .separator.title {
-    padding-left: 12px;
-    padding-right: 12px;
-}
-
 /* SIDEBAR */
 
 .sidebar-expander-row,
@@ -246,6 +226,51 @@ popover .separator.title {
 
 .command-shortcut {
     border-radius: 4px;
+}
+
+/* POPOVER */
+
+popover listview row {
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+popover listview row {
+    border-radius: 12px;
+}
+
+.sidebar-expander-row popover listview {
+    padding: 6px 4px;
+}
+.sidebar-expander-row popover listview row {
+    margin: 0 2px;
+}
+
+.sheet-header-menu listview {
+    padding: 0;
+}
+.sheet-header-menu listview row {
+    padding: 1px 4px;
+    margin: 0;
+}
+
+.preview-column-view {
+    background-color: transparent;
+}
+
+.preview-column-view cell {
+    padding: 0 4px;
+}
+.preview-column-view row {
+    padding: 4px;
+}
+
+.preview-column-view row:selected {
+    border-radius: 12px;
+}
+
+.preview-column-view header button {
+    padding: 1px 8px;
+    border-radius: 12px;
 }
 
 /* CUSTOMS */

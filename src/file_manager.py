@@ -40,10 +40,10 @@ class FileManager(GObject.Object):
     __gtype_name__ = 'FileManager'
 
     __gsignals__ = {
-        'file-cancel'   : (GObject.SIGNAL_RUN_FIRST, None, ()),
-        'file-opened'   : (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
-        'file-saved'    : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
-        'file-exported' : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
+        'file-cancelled' : (GObject.SIGNAL_RUN_FIRST, None, ()),
+        'file-opened'    : (GObject.SIGNAL_RUN_FIRST, None, (str, bool)),
+        'file-saved'     : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
+        'file-exported'  : (GObject.SIGNAL_RUN_FIRST, None, (str,)),
     }
 
     def read_file(self,
@@ -476,7 +476,7 @@ class FileManager(GObject.Object):
                 callback()
                 return
 
-            GLib.idle_add(self.emit, 'file-cancel')
+            GLib.idle_add(self.emit, 'file-cancelled')
 
         alert_dialog.choose(window, None, on_alert_dialog_dismissed)
 

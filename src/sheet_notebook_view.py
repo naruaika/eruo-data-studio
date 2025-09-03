@@ -272,6 +272,7 @@ class SheetNotebookView(Gtk.Box):
 
                 if query == '':
                     status_text.set_visible(False)
+                    button.set_sensitive(True)
                     run_next_query(True)
                     return
 

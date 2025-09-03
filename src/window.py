@@ -548,12 +548,11 @@ class Window(Adw.ApplicationWindow):
             input_text = input_text[:-1]
             input_text = f'{input_text}:{input_text}'
 
-        # Basic check if the input is a valid cell name.
-        # Here we accept a wide range of cell name patterns and some
-        # non-standard ones that I think will be of use somehow, e.g.
-        # "A:1" (any letter:any number) to select the whole sheet.
-        # Well, it's not supposed to be useful, maybe I only wanted to
-        # be a bit playful or just being lazy :)
+        # Basic check if the input is a valid cell name. Here we accept
+        # a wide range of cell name patterns and some non-standard ones
+        # that I think will be of use somehow, e.g. "A:1" (letter:number)
+        # to select the whole sheet. Well, it's not supposed to be useful,
+        # maybe I only wanted to be a bit playful or just being lazy :)
         single_part_pattern = r"[A-Za-z]*\d*|[A-Za-z]*\d*"
         full_range_pattern = fr"{single_part_pattern}(?:[:]{single_part_pattern})?"
         if not re.fullmatch(full_range_pattern, input_text, re.IGNORECASE):
