@@ -1992,6 +1992,7 @@ Options:
             document.keep_duplicate_rows(columns, strategy)
             self._return_focus_back(document)
 
+        layout = []
         if not inverse:
             layout = [(
                 [
@@ -2001,9 +2002,6 @@ Options:
                 'combo',
                 ['Any', 'First', 'Last'],
             )]
-        else:
-            layout = []
-
         layout.append((
             [
                 _('Columns'),

@@ -77,52 +77,6 @@
               <attribute name="action">app.convert-to-datetime</attribute>
             </item>
           </section>
-          <section>
-            <item>
-              <attribute name="label" translatable="yes">To Integer _8</attribute>
-              <attribute name="action">app.convert-to-int8</attribute>
-            </item>
-            <item>
-              <attribute name="label" translatable="yes">To Integer _16</attribute>
-              <attribute name="action">app.convert-to-int16</attribute>
-            </item>
-            <item>
-              <attribute name="label" translatable="yes">To Integer _32</attribute>
-              <attribute name="action">app.convert-to-int32</attribute>
-            </item>
-            <item>
-              <attribute name="label" translatable="yes">To Integer _64</attribute>
-              <attribute name="action">app.convert-to-int64</attribute>
-            </item>
-          </section>
-          <section>
-            <item>
-              <attribute name="label" translatable="yes">To Unsigned Integer _8</attribute>
-              <attribute name="action">app.convert-to-uint8</attribute>
-            </item>
-            <item>
-              <attribute name="label" translatable="yes">To Unsigned Integer _16</attribute>
-              <attribute name="action">app.convert-to-uint16</attribute>
-            </item>
-            <item>
-              <attribute name="label" translatable="yes">To Unsigned Integer _32</attribute>
-              <attribute name="action">app.convert-to-uint32</attribute>
-            </item>
-            <item>
-              <attribute name="label" translatable="yes">To Unsigned Integer _64</attribute>
-              <attribute name="action">app.convert-to-uint64</attribute>
-            </item>
-          </section>
-          <section>
-            <item>
-              <attribute name="label" translatable="yes">To Float _32</attribute>
-              <attribute name="action">app.convert-to-float32</attribute>
-            </item>
-            <item>
-              <attribute name="label" translatable="yes">To Float _64</attribute>
-              <attribute name="action">app.convert-to-float64</attribute>
-            </item>
-          </section>
         </link>
       </item>
     </section>

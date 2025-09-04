@@ -266,30 +266,12 @@ class SheetCellMenu(Gtk.PopoverMenu):
         convert_transform_section = Gio.Menu.new()
         main_menu.append_section(None, convert_transform_section)
 
-        # TODO: wondering that we need to simplify this to fewer options as possible?
-
         convert_basic_section = Gio.Menu.new()
         convert_basic_section.append(_('To _Categorical'), 'app.convert-to-categorical')
         convert_basic_section.append(_('To _Whole Number'), 'app.convert-to-whole-number')
         convert_basic_section.append(_('To _Decimal Number'), 'app.convert-to-decimal')
         convert_basic_section.append(_('To _Text (String)'), 'app.convert-to-text')
         convert_basic_section.append(_('To _Boolean'), 'app.convert-to-boolean')
-
-        convert_int_section = Gio.Menu.new()
-        convert_int_section.append(_('To Integer _8'), 'app.convert-to-int8')
-        convert_int_section.append(_('To Integer _16'), 'app.convert-to-int16')
-        convert_int_section.append(_('To Integer _32'), 'app.convert-to-int32')
-        convert_int_section.append(_('To Integer _64'), 'app.convert-to-int64')
-
-        convert_uint_section = Gio.Menu.new()
-        convert_uint_section.append(_('To Unsigned Integer _8'), 'app.convert-to-uint8')
-        convert_uint_section.append(_('To Unsigned Integer _16'), 'app.convert-to-uint16')
-        convert_uint_section.append(_('To Unsigned Integer _32'), 'app.convert-to-uint32')
-        convert_uint_section.append(_('To Unsigned Integer _64'), 'app.convert-to-uint64')
-
-        convert_float_section = Gio.Menu.new()
-        convert_float_section.append(_('To Float _32'), 'app.convert-to-float32')
-        convert_float_section.append(_('To Float _64'), 'app.convert-to-float64')
 
         convert_date_time_menu = Gio.Menu.new()
         convert_date_time_menu.append(_('To _Date'), 'app.convert-to-date')
@@ -299,9 +281,6 @@ class SheetCellMenu(Gtk.PopoverMenu):
         convert_menu = Gio.Menu.new()
         convert_menu.append_section(None, convert_basic_section)
         convert_menu.append_section(None, convert_date_time_menu)
-        convert_menu.append_section(None, convert_int_section)
-        convert_menu.append_section(None, convert_uint_section)
-        convert_menu.append_section(None, convert_float_section)
 
         convert_menu_item = Gio.MenuItem.new(_('_Change Type'), None)
         convert_menu_item.set_submenu(convert_menu)
@@ -317,31 +296,19 @@ class SheetCellMenu(Gtk.PopoverMenu):
 
         transform_section_2 = Gio.Menu.new()
         transform_section_2.append(_('Pad with Character...'), f'app.pad-both-sides')
-        transform_section_2.append(_('Pad Left with Spaces...'), f'app.pad-start-{operand}')
-        transform_section_2.append(_('Pad Right with Spaces...'), f'app.pad-end-{operand}')
 
         transform_section_3 = Gio.Menu.new()
-        transform_section_3.append(_('Trim Leading Spaces'), f'app.trim-{operand}-start-whitespace')
-        transform_section_3.append(_('Trim Trailing Spaces'), f'app.trim-{operand}-end-whitespace')
         transform_section_3.append(_('Trim Leading & Trailing Spaces'), f'app.trim-{operand}-whitespace')
         transform_section_3.append(_('Trim Spaces & Remove Newlines'), f'app.trim-{operand}-whitespace-and-remove-new-lines')
 
         transform_section_4 = Gio.Menu.new()
         transform_section_4.append(_('Transform Case...'), f'app.change-case')
-        transform_section_4.append(_('Transform to Lowercase'), f'app.change-{operand}-case-to-lowercase')
-        transform_section_4.append(_('Transform to Uppercase'), f'app.change-{operand}-case-to-uppercase')
-        transform_section_4.append(_('Slugify Text'), f'app.slugify-{operand}')
 
         transform_section_5 = Gio.Menu.new()
-        transform_section_5.append(_('Unicode Normalization...'), f'app.convert-to-unicode-normalization')
-        transform_section_5.append(_('Decode URL'), f'app.decode-url-{operand}-text')
-        transform_section_5.append(_('Encode URL'), f'app.encode-url-{operand}-text')
-
-        transform_section_6 = Gio.Menu.new()
-        transform_section_6.append(_('Replace Spaces with Single Space'), f'app.replace-{operand}-whitespace-with-a-single-space')
-        transform_section_6.append(_('Replace Spaces & Newlines with Single Space'), f'app.replace-{operand}-whitespace-and-new-lines-with-a-single-space')
-        transform_section_6.append(_('Remove Newline Characters'), f'app.remove-{operand}-new-lines-characters')
-        transform_section_6.append(_('Remove Spaces Characters'), f'app.remove-{operand}-whitespace-characters')
+        transform_section_5.append(_('Replace Spaces with Single Space'), f'app.replace-{operand}-whitespace-with-a-single-space')
+        transform_section_5.append(_('Replace Spaces & Newlines with Single Space'), f'app.replace-{operand}-whitespace-and-new-lines-with-a-single-space')
+        transform_section_5.append(_('Remove Newline Characters'), f'app.remove-{operand}-new-lines-characters')
+        transform_section_5.append(_('Remove Spaces Characters'), f'app.remove-{operand}-whitespace-characters')
 
         transform_menu = Gio.Menu.new()
         transform_menu.append_section(None, transform_section_1)
@@ -349,7 +316,6 @@ class SheetCellMenu(Gtk.PopoverMenu):
         transform_menu.append_section(None, transform_section_3)
         transform_menu.append_section(None, transform_section_4)
         transform_menu.append_section(None, transform_section_5)
-        transform_menu.append_section(None, transform_section_6)
 
         transform_menu_item = Gio.MenuItem.new(_('_Transform'), None)
         transform_menu_item.set_submenu(transform_menu)
