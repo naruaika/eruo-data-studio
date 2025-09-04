@@ -226,7 +226,7 @@ class SheetData(GObject.Object):
         for col_name in dataframe.columns:
             if not col_name.startswith('$'):
                 continue
-            dataframe = dataframe.rename({col_name: col_name.lstrip('$')})
+            dataframe = dataframe.rename({col_name: col_name.replace('$', '')})
 
         # Replace the main dataframe
         if self.has_main_dataframe:
@@ -1291,7 +1291,7 @@ FROM indexed_self
                                   current_name: str,
                                   replace_with: str) -> str:
         # Remove leading '$' to prevent collision from internal column names
-        replace_with = replace_with.lstrip('$')
+        replace_with = replace_with.replace('$', '')
 
         def generate_column_name(column_name: str) -> str:
             cnumber = 1

@@ -374,10 +374,12 @@ class SheetCellMenu(Gtk.PopoverMenu):
             keep_only_section.append(_('Keep Top (First) Rows Only...'), 'app.keep-first-rows')
             keep_only_section.append(_('Keep Bottom (Last) Rows Only...'), 'app.keep-last-rows')
             keep_only_section.append(_('Keep Range of Rows Only...'), 'app.keep-range-rows')
+            keep_only_section.append(_('Keep Duplicate Rows Only...'), 'app.keep-duplicate-rows-only')
             main_menu.append_section(None, keep_only_section)
 
             remove_rows_section = Gio.Menu.new()
             remove_rows_section.append(_('Remove Top (First) Rows...'), 'app.remove-first-rows')
             remove_rows_section.append(_('Remove Bottom (Last) Rows...'), 'app.remove-last-rows')
             remove_rows_section.append(_('Remove Alternate Rows...'), 'app.remove-alternate-rows')
+            remove_rows_section.append(_('Remove Duplicate Rows...'), 'app.remove-duplicate-rows')
             main_menu.append_section(None, remove_rows_section)

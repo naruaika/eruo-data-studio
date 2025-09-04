@@ -19,6 +19,7 @@
 
 .sidebar-expander-row textview,
 .sidebar-list-view > row:selected,
+.sheet-ops-list-view row:selected,
 .preview-column-view row:selected,
 .sidebar-expander-row row:selected,
 .command-overlay listview > row:selected {

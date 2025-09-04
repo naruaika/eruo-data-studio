@@ -319,9 +319,9 @@ class Application(Adw.Application):
         self.create_action('insert-row-below',              _('Row: Insert Rows Below'),
                                                             self.on_insert_row_below_action,
                                                             when_expression="document == 'worksheet' and table_focus")
-#       self.create_action('keep-duplicate-rows-only',      _('Filter: Keep Duplicate Rows Only'),
-#                                                           lambda *args: None,
-#                                                           when_expression="document == 'worksheet' and table_focus")
+        self.create_action('keep-duplicate-rows-only',      _('Filter: Keep Duplicate Rows Only...'),
+                                                            lambda *args:  self.on_keep_duplicate_rows_action(),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('keep-rows-only-including-' \
                            'selection',                     _('Filter: Keep Rows Only Including Selection'),
                                                             lambda *args: self.on_keep_rows_with_pattern_action(use_regexp=False,
@@ -415,9 +415,9 @@ class Application(Adw.Application):
                                                             lambda *args: self.on_keep_rows_in_range_action('inverse-range',
                                                                                                             _('Remove Alternate Rows')),
                                                             when_expression="document == 'worksheet' and table_focus")
-#       self.create_action('remove-duplicate-rows',         _('Filter: Remove Duplicate Rows...'),
-#                                                           lambda *args: None,
-#                                                           when_expression="document == 'worksheet' and table_focus")
+        self.create_action('remove-duplicate-rows',         _('Filter: Remove Duplicate Rows...'),
+                                                            lambda *args: self.on_keep_duplicate_rows_action(inverse=True),
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('remove-first-rows',             _('Filter: Remove Top (First) Rows...'),
                                                             lambda *args: self.on_keep_rows_in_range_action('inverse-first',
                                                                                                             _('Remove First Rows')),
@@ -1563,15 +1563,15 @@ Options:
             dataframe = polars.DataFrame({'before': ['camelCase',
                                                      'CONSTANT_CASE',
                                                      'dot.case',
-                                                     'kebab case',
-                                                     'lower case',
+                                                     'kebab-case',
+                                                     'lowercase',
                                                      'PascalCase',
                                                      'snake_case',
                                                      'Sentence case',
                                                      'slug-ify',
                                                      'spoNGE cAse',
                                                      'Title Case',
-                                                     'UPPER CASE',
+                                                     'UPPERCASE',
                                                      'sWAP cASE']})
             operator_name = args[0].lower().replace(' ', '-')
             expression = build_operation(polars.col('before'), operator_name)
@@ -1974,6 +1974,55 @@ Options:
         if not isinstance(document, SheetDocument):
             return
         document.insert_blank_from_current_rows(above=False)
+
+    def on_keep_duplicate_rows_action(self, inverse: bool = False) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        window = self.get_active_window()
+
+        def proceed_to_apply(args: list, **kwargs) -> None:
+            if not inverse:
+                strategy = args[0].lower()
+                columns = args[1]
+            else:
+                strategy = 'none'
+                columns = args[0]
+            document.keep_duplicate_rows(columns, strategy)
+            self._return_focus_back(document)
+
+        if not inverse:
+            layout = [(
+                [
+                    _('Strategy'),
+                    _('Which of the duplicate rows to keep'),
+                ],
+                'combo',
+                ['Any', 'First', 'Last'],
+            )]
+        else:
+            layout = []
+
+        layout.append((
+            [
+                _('Columns'),
+                _('Select one or more columns that contain duplicates')
+            ],
+            'list-check',
+            document.data.dfs[document.current_dfi].columns,
+        ))
+
+        title = _('Keep Duplicate Rows Only...')
+        if inverse:
+            title = _('Remove Duplicate Rows...')
+
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(title,
+                                      layout,
+                                      proceed_to_apply,
+                                      window)
+        dialog.present(window)
 
     def on_keep_rows_with_pattern_action(self,
                                          use_regexp:    bool = False,

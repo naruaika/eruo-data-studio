@@ -253,24 +253,37 @@ popover listview row {
     margin: 0;
 }
 
+.sheet-ops-list-view,
 .preview-column-view {
     background-color: transparent;
 }
 
+.sheet-ops-list-view cell,
 .preview-column-view cell {
     padding: 0 4px;
 }
+.sheet-ops-list-view row,
 .preview-column-view row {
     padding: 4px;
 }
 
+.sheet-ops-list-view row:selected,
 .preview-column-view row:selected {
     border-radius: 12px;
 }
 
+.sheet-ops-list-view header button,
 .preview-column-view header button {
     padding: 1px 8px;
     border-radius: 12px;
+}
+
+.sheet-ops-list-view row {
+    padding: 1px 4px;
+}
+.sheet-ops-list-view check {
+    margin-right: 1px;
+    background-color: transparent;
 }
 
 /* CUSTOMS */

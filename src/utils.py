@@ -234,6 +234,8 @@ def generate_ulid():
 from typing import Any
 
 def is_iterable(obj: Any) -> bool:
+    if isinstance(obj, str):
+        return False
     try:
         iter(obj)
         return True

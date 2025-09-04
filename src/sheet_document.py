@@ -2547,10 +2547,10 @@ class SheetDocument(GObject.Object):
 
             return
 
-        # Discards all dataframes but the main one
+        # Discard all dataframes but the main one
         self.data.materialize_view(self.current_filters, visible_column_names)
 
-        # Reset these as they're no longer relevant
+        # Reset all sorts and filters
         self.current_sorts = []
         self.current_filters = []
 
@@ -2635,15 +2635,15 @@ class SheetDocument(GObject.Object):
 
         # Save snapshot
         if not globals.is_changing_state:
-            from .history_manager import KeepRowState
-            state = KeepRowState(self.data.dfs[0],
-                                 self.display.row_visibility_flags if len(self.display.row_visibility_flags)
-                                                                   else None,
-                                 self.display.row_heights if len(self.display.row_heights)
-                                                          else None,
-                                 strategy,
-                                 no_rows,
-                                 first_row)
+            from .history_manager import KeepNoRowState
+            state = KeepNoRowState(self.data.dfs[0],
+                                   self.display.row_visibility_flags if len(self.display.row_visibility_flags)
+                                                                     else None,
+                                   self.display.row_heights if len(self.display.row_heights)
+                                                            else None,
+                                   strategy,
+                                   no_rows,
+                                   first_row)
             globals.history.save(state)
 
         if strategy != 'inverse-range':
@@ -2652,7 +2652,7 @@ class SheetDocument(GObject.Object):
             self.data.dfs[0] = polars.concat([self.data.dfs[0][:end],
                                               self.data.dfs[0][start:]])
 
-        # Discards all dataframes but the main one
+        # Discard all dataframes but the main one
         self.data.dfs = [self.data.dfs[0]]
         self.data.bbs = [self.data.bbs[0]]
 
@@ -2689,6 +2689,57 @@ class SheetDocument(GObject.Object):
         self.view.main_canvas.queue_draw()
 
         self.emit('columns-changed', 0)
+
+    def keep_duplicate_rows(self,
+                            column_names: list[str],
+                            strategy:     str) -> None:
+        if not self.data.has_main_dataframe:
+            return
+
+        if len(column_names) == 0:
+            return
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import KeepDuplicateRowState
+            state = KeepDuplicateRowState(self.data.dfs[0],
+                                          self.display.row_visibility_flags if len(self.display.row_visibility_flags)
+                                                                            else None,
+                                          self.display.row_heights if len(self.display.row_heights)
+                                                                   else None,
+                                          column_names,
+                                          strategy)
+            globals.history.save(state)
+
+        # Discard all dataframes but the main one
+        self.data.dfs = [self.data.dfs[0].unique(column_names,
+                                                 keep=strategy,
+                                                 maintain_order=True)]
+        self.data.bbs = [self.data.bbs[0]]
+
+        # Reset all filters
+        # TODO: this may be unexpected behaviour from the user perspective,
+        #       but we have no control over the polars.DataFrame.unique().
+        self.current_filters = []
+
+        # Reset row visibility flags
+        self.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+        self.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+        self.data.bbs[0].row_span = self.data.dfs[0].height + 1
+
+        # Reset row heights
+        self.display.row_heights = polars.Series(dtype=polars.UInt32)
+        self.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+
+        # TODO: clear only for the related columns
+        self.data.clear_cell_data_unique_cache(0)
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        self.emit('filters-changed', 0)
 
     def find_in_current_cells(self,
                               text_value:       str,

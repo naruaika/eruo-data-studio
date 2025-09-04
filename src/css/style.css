@@ -25,7 +25,8 @@
 .command-overlay listview > row:selected {
     background-color: rgb(226, 226, 227);
 }
-.preview-column-view row:selected {
+.preview-column-view row:selected,
+.sheet-ops-list-view row:selected {
     background-color: rgb(235, 235, 235);
 }
 

@@ -1095,8 +1095,8 @@ class ConvertColumnDataTypeState(State):
 
 
 
-class KeepRowState(State):
-    __gtype_name__ = 'KeepRowState'
+class KeepNoRowState(State):
+    __gtype_name__ = 'KeepNoRowState'
 
     file_path: str
     vflags_path: str
@@ -1114,8 +1114,6 @@ class KeepRowState(State):
                  no_rows:   int,
                  first_row: int) -> None:
         super().__init__()
-
-        self.save_selection(restore_scroll=True)
 
         self.file_path = self.write_snapshot(content)
 
@@ -1162,12 +1160,73 @@ class KeepRowState(State):
 
     def redo(self) -> None:
         document = globals.history.document
+        document.keep_n_rows(self.strategy, self.no_rows, self.first_row)
 
-        self.restore_selection()
 
-        document.keep_n_rows(self.strategy,
-                             self.no_rows,
-                             self.first_row)
+
+class KeepDuplicateRowState(State):
+    __gtype_name__ = 'KeepDuplicateRowState'
+
+    file_path: str
+    vflags_path: str
+    rheights_path: str
+
+    column_names: list[str]
+    strategy: str
+
+    def __init__(self,
+                 content:      Any,
+                 vflags:       polars.Series,
+                 rheights:     polars.Series,
+                 column_names: list[str],
+                 strategy:     str) -> None:
+        super().__init__()
+
+        self.file_path = self.write_snapshot(content)
+
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags})) if vflags is not None \
+                                                                                     else None
+
+        self.rheights_path = self.write_snapshot(polars.DataFrame({'rheights': rheights})) if rheights is not None \
+                                                                                           else None
+
+        self.column_names = column_names
+        self.strategy = strategy
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        document.data.dfs[0] = polars.read_parquet(self.file_path)
+
+        # Update row visibility flags
+        if self.vflags_path is not None:
+            document.display.row_visibility_flags = polars.read_parquet(self.vflags_path).to_series()
+            document.display.row_visible_series = document.display.row_visibility_flags.arg_true()
+            document.data.bbs[0].row_span = len(document.display.row_visible_series)
+        else:
+            document.display.row_visibility_flags = polars.Series(dtype=polars.Boolean)
+            document.display.row_visible_series = polars.Series(dtype=polars.UInt32)
+            document.data.bbs[0].row_span = document.data.dfs[0].height + 1
+
+        # Update row heights
+        if self.rheights_path is not None:
+            document.display.row_heights = polars.read_parquet(self.rheights_path).to_series()
+            row_heights_visible_only = document.display.row_heights
+            if len(document.display.row_visibility_flags):
+                row_heights_visible_only = row_heights_visible_only.filter(document.display.row_visibility_flags)
+            document.display.cumulative_row_heights = polars.Series('crheights', row_heights_visible_only).cum_sum()
+        else:
+            document.display.row_heights = polars.Series(dtype=polars.UInt32)
+            document.display.cumulative_row_heights = polars.Series(dtype=polars.UInt32)
+
+        document.auto_adjust_selections_by_crud(0, 0, False)
+
+        # TODO: clear only for the related columns
+        document.data.clear_cell_data_unique_cache(0)
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.keep_duplicate_rows(self.column_names, self.strategy)
 
 
 
@@ -1294,7 +1353,6 @@ class ToggleColumnVisibilityState(State):
     def undo(self) -> None:
         document = globals.history.document
         document.toggle_column_visibility(self.column, not self.show)
-
         self.restore_selection()
 
     def redo(self) -> None:
@@ -1325,7 +1383,6 @@ class UpdateColumnWidthState(State):
     def undo(self) -> None:
         document = globals.history.document
         document.update_column_width(self.column, self.before)
-
         self.restore_selection()
 
     def redo(self) -> None:
