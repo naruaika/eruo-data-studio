@@ -187,12 +187,14 @@ class CommandPaletteOverlay(Adw.Bin):
         if list_item.bind_label is not None:
             list_item.bind_label.unbind()
 
-        if item_data.is_separator:
-            list_item.set_focusable(False)
-            list_item.set_selectable(False)
-            list_item.set_activatable(False)
-            list_item.content.set_visible(False)
-            list_item.separator.set_visible(True)
+        is_separator = item_data.is_separator
+        list_item.set_focusable(not is_separator)
+        list_item.set_selectable(not is_separator)
+        list_item.set_activatable(not is_separator)
+        list_item.content.set_visible(not is_separator)
+        list_item.separator.set_visible(is_separator)
+
+        if is_separator:
             return
 
         list_item.label.set_label(item_data.label)

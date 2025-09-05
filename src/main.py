@@ -299,6 +299,9 @@ class Application(Adw.Application):
         self.create_action('duplicate-to-right',            _('Column: Duplicate Columns to Right'),
                                                             self.on_duplicate_to_right_action,
                                                             when_expression="document == 'worksheet' and table_focus")
+        self.create_action('group-rows-by',                 _('Group Rows By...'),
+                                                            self.on_group_rows_by_action,
+                                                            when_expression="document == 'worksheet' and table_focus")
         self.create_action('go-to-cell',                    _('View: Go to Cell...'),
                                                             self.on_go_to_cell_action,
                                                             shortcuts=['<control>g'],
@@ -786,55 +789,55 @@ class Application(Adw.Application):
                                                             lambda *args: self.on_apply_operation_action('unicode-normalization-nfkd',
                                                                                                          on_column=True),
                                                             when_expression="document == 'worksheet' and table_focus")
-        self.create_action('decode-base64-cell-text',       _('Cell: Decode Base64 Text'),
+        self.create_action('decode-base64-cell-text',       _('Cell: Decode Base64'),
                                                             lambda *args: self.on_apply_operation_action('decode-base64',
                                                                                                          on_column=False),
                                                             when_expression="document == 'worksheet' and table_focus")
-        self.create_action('decode-base64-column-text',     _('Column: Decode Base64 Text'),
+        self.create_action('decode-base64-column-text',     _('Column: Decode Base64'),
                                                             lambda *args: self.on_apply_operation_action('decode-base64',
                                                                                                          on_column=False),
                                                             when_expression="document == 'worksheet' and table_focus")
         self.create_action('decode-hexadecimal-' \
-                           'cell-text',                     _('Cell: Decode Hexadecimal Text'),
+                           'cell-text',                     _('Cell: Decode Hexadecimal'),
                                                             lambda *args: self.on_apply_operation_action('decode-hexadecimal',
                                                                                                          on_column=False),
                                                             when_expression="document == 'worksheet' and table_focus")
         self.create_action('decode-hexadecimal-' \
-                           'column-text',                   _('Column: Decode Hexadecimal Text'),
+                           'column-text',                   _('Column: Decode Hexadecimal'),
                                                             lambda *args: self.on_apply_operation_action('decode-hexadecimal',
                                                                                                          on_column=False),
                                                             when_expression="document == 'worksheet' and table_focus")
-        self.create_action('decode-url-cell-text',          _('Cell: Decode URL Text'),
+        self.create_action('decode-url-cell-text',          _('Cell: Decode URL'),
                                                             lambda *args: self.on_apply_operation_action('decode-url',
                                                                                                          on_column=False),
                                                             when_expression="document == 'worksheet' and table_focus")
-        self.create_action('decode-url-column-text',        _('Column: Decode URL Text'),
+        self.create_action('decode-url-column-text',        _('Column: Decode URL'),
                                                             lambda *args: self.on_apply_operation_action('decode-url',
                                                                                                          on_column=False),
                                                             when_expression="document == 'worksheet' and table_focus")
-        self.create_action('encode-base64-cell-text',       _('Cell: Encode Base64 Text'),
+        self.create_action('encode-base64-cell-text',       _('Cell: Encode Base64'),
                                                             lambda *args: self.on_apply_operation_action('encode-base64',
                                                                                                          on_column=True),
                                                             when_expression="document == 'worksheet' and table_focus")
-        self.create_action('encode-base64-column-text',     _('Column: Encode Base64 Text'),
+        self.create_action('encode-base64-column-text',     _('Column: Encode Base64'),
                                                             lambda *args: self.on_apply_operation_action('encode-base64',
                                                                                                          on_column=True),
                                                             when_expression="document == 'worksheet' and table_focus")
         self.create_action('encode-hexadecimal-' \
-                           'cell-text',                     _('Cell: Encode Hexadecimal Text'),
+                           'cell-text',                     _('Cell: Encode Hexadecimal'),
                                                             lambda *args: self.on_apply_operation_action('encode-hexadecimal',
                                                                                                          on_column=True),
                                                             when_expression="document == 'worksheet' and table_focus")
         self.create_action('encode-hexadecimal-' \
-                           'column-text',                   _('Column: Encode Hexadecimal Text'),
+                           'column-text',                   _('Column: Encode Hexadecimal'),
                                                             lambda *args: self.on_apply_operation_action('encode-hexadecimal',
                                                                                                          on_column=True),
                                                             when_expression="document == 'worksheet' and table_focus")
-        self.create_action('encode-url-cell-text',          _('Cell: Encode URL Text'),
+        self.create_action('encode-url-cell-text',          _('Cell: Encode URL'),
                                                             lambda *args: self.on_apply_operation_action('encode-url',
                                                                                                          on_column=True),
                                                             when_expression="document == 'worksheet' and table_focus")
-        self.create_action('encode-url-column-text',        _('Column: Encode URL Text'),
+        self.create_action('encode-url-column-text',        _('Column: Encode URL'),
                                                             lambda *args: self.on_apply_operation_action('encode-url',
                                                                                                          on_column=True),
                                                             when_expression="document == 'worksheet' and table_focus")
@@ -1920,6 +1923,52 @@ Options:
         window.formula_bar_toggle_button.set_active(True)
         window.multiline_formula_bar.grab_focus()
 
+    def on_group_rows_by_action(self,
+                                action: Gio.SimpleAction,
+                                *args) -> None:
+        document = self._get_current_active_document()
+        if not isinstance(document, SheetDocument):
+            return
+
+        window = self.get_active_window()
+
+        def proceed_to_apply(args: list, **kwargs) -> None:
+            document.aggregate_rows(args[0], args[1:])
+            self._return_focus_back(document)
+
+        fields = document.data.dfs[document.current_dfi].columns
+        layout = [
+            (
+                [
+                    _('Columns'),
+                    _('Select one or more columns to group by')
+                ],
+                'list-check',
+                fields,
+            ),
+            (
+                _('New Column'),
+                'list-entry',
+                [
+                    ('dropdown', [_('SUM'),
+                                  _('COUNT'),
+                                  _('MEDIAN'),
+                                  _('MEAN'),
+                                  _('MAX'),
+                                  _('MIN')]),
+                    ('dropdown', fields),
+                ],
+            ),
+        ]
+
+        # TODO: add the ability to create a new sheet
+        from .sheet_operation_dialog import SheetOperationDialog
+        dialog = SheetOperationDialog(_('Group Rows By...'),
+                                      layout,
+                                      proceed_to_apply,
+                                      window)
+        dialog.present(window)
+
     def on_go_to_cell_action(self,
                              action: Gio.SimpleAction,
                              *args) -> None:
@@ -2082,7 +2131,7 @@ Options:
         if inverse:
             title = _('Remove Rows...')
 
-        entry_label = _('Find Pattern')
+        entry_label = _('Find')
 
         from .sheet_operation_dialog import SheetOperationDialog
         dialog = SheetOperationDialog(title,
@@ -2096,7 +2145,7 @@ Options:
 
     def on_keep_rows_in_range_action(self,
                                      strategy: str,
-                                     title: str) -> None:
+                                     title:    str) -> None:
         document = self._get_current_active_document()
         if not isinstance(document, SheetDocument):
             return
@@ -2117,6 +2166,7 @@ Options:
 
         window = self.get_active_window()
 
+        # TODO: add the ability to create a new sheet
         from .sheet_operation_dialog import SheetOperationDialog
         dialog = SheetOperationDialog(title,
                                       layout,
@@ -2734,6 +2784,9 @@ Options:
 
         if not skip_setup:
             window.setup_new_document(file, dataframe)
+
+        if debug_mode > 0:
+            window.add_css_class('devel')
 
         return window
 

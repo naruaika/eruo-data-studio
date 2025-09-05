@@ -38,7 +38,7 @@
                           <object class="GtkButton" id="connection_list_status_add_button">
                             <property name="margin-end">1</property>
                             <property name="icon-name">list-add-symbolic</property>
-                            <property name="tooltip-text">Add connection</property>
+                            <property name="tooltip-text">Add Connection</property>
                             <signal name="clicked" handler="on_add_connection_button_clicked" swapped="no"/>
                             <style>
                               <class name="flat"/>
@@ -80,7 +80,7 @@
                             <child>
                               <object class="GtkButton">
                                 <property name="icon-name">list-add-symbolic</property>
-                                <property name="tooltip-text">Add connection</property>
+                                <property name="tooltip-text">Add Connection</property>
                                 <signal name="clicked" handler="on_add_connection_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>
@@ -166,7 +166,7 @@
                           <object class="GtkButton" id="sort_list_status_add_button">
                             <property name="margin-end">1</property>
                             <property name="icon-name">list-add-symbolic</property>
-                            <property name="tooltip-text">Add sort</property>
+                            <property name="tooltip-text">Add Sort</property>
                             <signal name="clicked" handler="on_add_sort_button_clicked" swapped="no"/>
                             <style>
                               <class name="flat"/>
@@ -207,7 +207,7 @@
                             <child>
                               <object class="GtkButton">
                                 <property name="icon-name">list-add-symbolic</property>
-                                <property name="tooltip-text">Add sort</property>
+                                <property name="tooltip-text">Add Sort</property>
                                 <signal name="clicked" handler="on_add_sort_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>
@@ -241,7 +241,7 @@
                               <object class="GtkButton">
                                 <property name="margin-start">3</property>
                                 <property name="icon-name">user-trash-symbolic</property>
-                                <property name="tooltip-text">Delete all</property>
+                                <property name="tooltip-text">Delete All</property>
                                 <signal name="clicked" handler="on_delete_all_sort_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>
@@ -286,7 +286,7 @@
                           <object class="GtkButton" id="filter_list_status_add_button">
                             <property name="margin-end">1</property>
                             <property name="icon-name">list-add-symbolic</property>
-                            <property name="tooltip-text">Add filter</property>
+                            <property name="tooltip-text">Add Filter</property>
                             <signal name="clicked" handler="on_add_filter_button_clicked" swapped="no"/>
                             <style>
                               <class name="flat"/>
@@ -328,7 +328,7 @@
                               <object class="GtkButton">
                                 <property name="valign">start</property>
                                 <property name="icon-name">list-add-symbolic</property>
-                                <property name="tooltip-text">Add filter</property>
+                                <property name="tooltip-text">Add Filter</property>
                                 <signal name="clicked" handler="on_add_filter_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>
@@ -362,7 +362,7 @@
                               <object class="GtkButton">
                                 <property name="margin-start">3</property>
                                 <property name="icon-name">user-trash-symbolic</property>
-                                <property name="tooltip-text">Delete all</property>
+                                <property name="tooltip-text">Delete All</property>
                                 <signal name="clicked" handler="on_delete_all_filter_button_clicked" swapped="no"/>
                                 <style>
                                   <class name="row-button"/>

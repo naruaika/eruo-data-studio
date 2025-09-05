@@ -1230,6 +1230,72 @@ class KeepDuplicateRowState(State):
 
 
 
+class AggregateRowState(State):
+    __gtype_name__ = 'AggregateRowState'
+
+    file_path: str
+    vflags_path: str
+    cwidths_path: str
+
+    column_names: list[str]
+    aggregations: str
+
+    def __init__(self,
+                 content:      Any,
+                 vflags:       polars.Series,
+                 cwidths:      polars.Series,
+                 column_names: list[str],
+                 aggregations:     str) -> None:
+        super().__init__()
+
+        self.file_path = self.write_snapshot(content)
+
+        self.vflags_path = self.write_snapshot(polars.DataFrame({'vflags': vflags})) if vflags is not None \
+                                                                                     else None
+
+        self.cwidths_path = self.write_snapshot(polars.DataFrame({'cwidths': cwidths})) if cwidths is not None \
+                                                                                        else None
+
+        self.column_names = column_names
+        self.aggregations = aggregations
+
+    def undo(self) -> None:
+        document = globals.history.document
+
+        document.data.dfs[0] = polars.read_parquet(self.file_path)
+
+        # Update column visibility flags
+        if self.vflags_path is not None:
+            document.display.column_visibility_flags = polars.read_parquet(self.vflags_path).to_series()
+            document.display.column_visible_series = document.display.column_visibility_flags.arg_true()
+            document.data.bbs[0].column_span = len(document.display.column_visible_series)
+        else:
+            document.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
+            document.display.column_visible_series = polars.Series(dtype=polars.UInt32)
+            document.data.bbs[0].column_span = document.data.dfs[0].width
+
+        # Update column widths
+        if self.cwidths_path is not None:
+            document.display.column_widths = polars.read_parquet(self.cwidths_path).to_series()
+            column_widths_visible_only = document.display.column_widths
+            if len(document.display.column_visibility_flags):
+                column_widths_visible_only = column_widths_visible_only.filter(document.display.column_visibility_flags)
+            document.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
+        else:
+            document.display.column_widths = polars.Series(dtype=polars.UInt32)
+            document.display.cumulative_column_widths = polars.Series(dtype=polars.UInt32)
+
+        document.auto_adjust_selections_by_crud(0, 0, False)
+
+        # TODO: clear only for the related columns
+        document.data.clear_cell_data_unique_cache(0)
+
+    def redo(self) -> None:
+        document = globals.history.document
+        document.aggregate_rows(self.column_names, self.aggregations)
+
+
+
 class FindReplaceDataState(State):
     __gtype_name__ = 'FindReplaceDataState'
 

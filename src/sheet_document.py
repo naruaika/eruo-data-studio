@@ -1924,6 +1924,7 @@ class SheetDocument(GObject.Object):
 
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0 if not left else column_span, 0, False)
+            self.auto_adjust_scrollbars_by_scroll()
             self.repopulate_auto_filter_widgets()
 
             # TODO: clear only for the related columns
@@ -2062,6 +2063,7 @@ class SheetDocument(GObject.Object):
 
             self.cancel_cutcopy_operation()
             self.auto_adjust_selections_by_crud(0, 0, True)
+            self.auto_adjust_scrollbars_by_scroll()
             self.repopulate_auto_filter_widgets()
 
             # TODO: clear only for the related columns
@@ -2124,7 +2126,9 @@ class SheetDocument(GObject.Object):
             self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
         self.auto_adjust_selections_by_crud(0, 0, True)
+        self.auto_adjust_scrollbars_by_scroll()
         self.repopulate_auto_filter_widgets()
+
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
@@ -2172,7 +2176,9 @@ class SheetDocument(GObject.Object):
             self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.auto_adjust_scrollbars_by_scroll()
         self.repopulate_auto_filter_widgets()
+
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
@@ -2200,7 +2206,9 @@ class SheetDocument(GObject.Object):
             self.display.cumulative_column_widths = polars.Series('ccwidths', column_widths_visible_only).cum_sum()
 
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.auto_adjust_scrollbars_by_scroll()
         self.repopulate_auto_filter_widgets()
+
         self.renderer.render_caches = {}
         self.view.main_canvas.queue_draw()
 
@@ -2538,6 +2546,7 @@ class SheetDocument(GObject.Object):
             self.data.dfs = []
 
             self.auto_adjust_selections_by_crud(0, 0, False)
+            self.auto_adjust_scrollbars_by_scroll()
             self.repopulate_auto_filter_widgets()
 
             self.renderer.render_caches = {}
@@ -2573,6 +2582,7 @@ class SheetDocument(GObject.Object):
                 self.display.cumulative_row_heights = polars.Series('crheights', self.display.row_heights).cum_sum()
 
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.auto_adjust_scrollbars_by_scroll()
         self.repopulate_auto_filter_widgets()
 
         # TODO: clear only for the related columns
@@ -2740,6 +2750,68 @@ class SheetDocument(GObject.Object):
         self.view.main_canvas.queue_draw()
 
         self.emit('filters-changed', 0)
+
+    def aggregate_rows(self,
+                       column_names: list[str],
+                       aggregations: list[list[str, str, str]]) -> None:
+        if not self.data.has_main_dataframe:
+            return
+
+        if len(column_names) == 0:
+            return
+
+        # Save snapshot
+        if not globals.is_changing_state:
+            from .history_manager import AggregateRowState
+            state = AggregateRowState(self.data.dfs[0],
+                                      self.display.column_visibility_flags if len(self.display.column_visibility_flags)
+                                                                           else None,
+                                      self.display.column_widths if len(self.display.column_widths)
+                                                                 else None,
+                                      column_names,
+                                      aggregations)
+            globals.history.save(state)
+
+        expressions = []
+        for new_col, agg_func, target_col in aggregations:
+            agg_func = agg_func.lower()
+            expr = polars.col(target_col)
+            func = getattr(expr, agg_func, None)
+            if func and callable(func):
+                expr = func()
+            expr = expr.alias(new_col)
+            expressions.append(expr)
+
+        # Discard all dataframes but the main one
+        self.data.dfs = [self.data.dfs[0].group_by(column_names)
+                                         .agg(*expressions)]
+        self.data.bbs = [self.data.bbs[0]]
+
+        # Reset all filters
+        # TODO: this may be unexpected behaviour from the user perspective,
+        #       but we have no control over the polars.DataFrame.unique().
+        self.current_filters = []
+
+        # Reset column visibility flags
+        self.display.column_visibility_flags = polars.Series(dtype=polars.Boolean)
+        self.display.column_visible_series = polars.Series(dtype=polars.UInt32)
+        self.data.bbs[0].column_span = self.data.dfs[0].width
+
+        # Reset column widths
+        self.display.column_widths = polars.Series(dtype=polars.UInt32)
+        self.display.cumulative_column_widths = polars.Series(dtype=polars.UInt32)
+
+        self.auto_adjust_selections_by_crud(0, 0, False)
+        self.auto_adjust_scrollbars_by_scroll()
+        self.repopulate_auto_filter_widgets()
+
+        # TODO: clear only for the related columns
+        self.data.clear_cell_data_unique_cache(0)
+
+        self.renderer.render_caches = {}
+        self.view.main_canvas.queue_draw()
+
+        self.emit('columns-changed', 0)
 
     def find_in_current_cells(self,
                               text_value:       str,
@@ -3057,6 +3129,7 @@ class SheetDocument(GObject.Object):
 
         self.cancel_cutcopy_operation()
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.auto_adjust_scrollbars_by_scroll()
         self.repopulate_auto_filter_widgets()
 
         self.renderer.render_caches = {}
@@ -3126,6 +3199,7 @@ class SheetDocument(GObject.Object):
                 srange.height = end_y - y
 
         self.auto_adjust_selections_by_crud(0, 0, False)
+        self.auto_adjust_scrollbars_by_scroll()
         self.repopulate_column_resizer_widgets()
         self.repopulate_auto_filter_widgets()
 

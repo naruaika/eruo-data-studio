@@ -5,7 +5,8 @@
   <template class="SheetOperationDialog" parent="AdwDialog">
     <property name="title">Operation</property>
     <property name="can-close">true</property>
-    <property name="content-width">400</property>
+    <property name="width-request">400</property>
+    <property name="follows-content-size">true</property>
     <child>
       <object class="AdwToolbarView">
         <child type="top">
@@ -17,6 +18,9 @@
               <object class="AdwPreferencesGroup" id="content_container"></object>
             </child>
             <child>
+              <object class="AdwPreferencesGroup" id="options_container"></object>
+            </child>
+            <child>
               <object class="AdwPreferencesGroup" id="preview_container">
                 <property name="title">Live Examples</property>
                 <property name="visible">false</property>
@@ -26,7 +30,6 @@
                     <child>
                       <object class="GtkColumnView" id="preview_list_view">
                         <property name="single-click-activate">true</property>
-                        <property name="height-request">150</property>
                         <property name="reorderable">false</property>
                         <property name="model">
                           <object class="GtkSingleSelection">
@@ -38,7 +41,6 @@
                         <child>
                           <object class="GtkColumnViewColumn">
                             <property name="title">Before</property>
-                            <property name="expand">true</property>
                             <property name="resizable">true</property>
                             <property name="factory">
                               <object class="GtkBuilderListItemFactory">
@@ -65,7 +67,6 @@
                         </child>
                         <child>
                           <object class="GtkColumnViewColumn">
-                            <property name="expand">false</property>
                             <property name="factory">
                               <object class="GtkBuilderListItemFactory">
                                 <property name="bytes"><![CDATA[

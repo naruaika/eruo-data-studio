@@ -23,6 +23,7 @@
 
 from gi.repository import Adw, GLib, GObject, Gtk, Pango
 import threading
+import json
 
 from . import utils
 from .window import Window
@@ -57,6 +58,7 @@ class SheetOperationDialog(Adw.Dialog):
 
     preferences_page = Gtk.Template.Child()
     content_container = Gtk.Template.Child()
+    options_container = Gtk.Template.Child()
 
     preview_container = Gtk.Template.Child()
     preview_list_view = Gtk.Template.Child()
@@ -85,52 +87,67 @@ class SheetOperationDialog(Adw.Dialog):
 
         self.operation_args = []
 
-        n_main_widgets = 0
+        n_content = 0
+        n_options = 0
 
         for item in layout:
             operation_arg = SheetOperationArg()
             self.operation_args.append(operation_arg)
 
             title, dtype = item[0], item[1]
+            description = None
+            contents = []
+
             if utils.is_iterable(title):
                 title, description = item[0][0], item[0][1]
-            else:
-                description = None
             if len(item) > 2:
-                options = item[2]
+                contents = item[2]
 
             match dtype:
                 case 'entry':
-                    self.create_entry_row(title, description, operation_arg)
-                    n_main_widgets += 1
+                    self.create_entry_row(title, operation_arg)
+                    n_content += 1
                 case 'spin':
                     self.create_spin_row(title, description, operation_arg)
-                    n_main_widgets += 1
+                    n_content += 1
                 case 'switch':
                     self.create_switch_row(title, description, operation_arg)
-                    n_main_widgets += 1
+                    n_content += 1
                 case 'combo':
-                    self.create_combo_row(title, description, options, operation_arg)
-                    n_main_widgets += 1
+                    self.create_combo_row(title, description, contents, operation_arg)
+                    n_content += 1
                 case 'list-check':
-                    self.create_list_check(title, description, options, operation_arg)
+                    self.create_list_check(title, description, contents, operation_arg)
+                    n_content += 1
+                case 'list-entry':
+                    self.create_list_entry(title, contents, operation_arg)
+                    # this widget needs a separate AdwPreferencesGroup
 
         if 'match_case' in self.kwargs:
             self.create_match_case_switch()
+            n_options += 1
         if 'use_regexp' in self.kwargs:
             self.create_use_regexp_switch()
+            n_options += 1
         if 'on_column' in self.kwargs:
             self.create_on_column_switch()
+            n_options += 1
         if 'new_worksheet' in self.kwargs:
             self.create_new_worksheet_switch()
+            n_options += 1
         if 'live_previewer' in self.kwargs:
             self.preview_container.set_visible(True)
             self.live_preview(use_thread=False) # update on startup
 
-        if n_main_widgets == 0:
+        # Remove or re-position to the end
+        if n_content == 0:
             self.content_container.unparent()
-        if 'live_previewer' not in self.kwargs:
-            self.preview_container.unparent()
+        self.preferences_page.remove(self.options_container)
+        self.preferences_page.remove(self.preview_container)
+        if n_options > 0:
+            self.preferences_page.add(self.options_container)
+        if 'live_previewer' in self.kwargs:
+            self.preferences_page.add(self.preview_container)
 
     def do_closed(self) -> None:
         application = self.window.get_application()
@@ -152,10 +169,10 @@ class SheetOperationDialog(Adw.Dialog):
         self.callback(self.get_callback_args(), **self.kwargs)
 
     def create_combo_row(self,
-                         title:   str,
+                         title:       str,
                          description: str,
-                         options: list[str],
-                         oarg:    SheetOperationArg) -> None:
+                         options:     list[str],
+                         ops_arg:     SheetOperationArg) -> None:
         combo = Adw.ComboRow()
         combo.set_title(title)
         if description is not None:
@@ -164,118 +181,173 @@ class SheetOperationDialog(Adw.Dialog):
         for option in options:
             combo_model.append(option)
         combo.set_model(combo_model)
-        combo.bind_property('selected-item', oarg,
+        combo.bind_property('selected-item', ops_arg,
                             'value', GObject.BindingFlags.SYNC_CREATE,
                             transform_to=lambda _, val: val.get_string())
         combo.connect('notify::selected-item', self.on_input_changed)
         self.content_container.add(combo)
 
     def create_entry_row(self,
-                         title: str,
-                         description: str,
-                         oarg:  SheetOperationArg) -> None:
+                         title:   str,
+                         ops_arg: SheetOperationArg) -> None:
         entry = Adw.EntryRow()
         entry.set_title(title)
-        if description is not None:
-            entry.set_subtitle(description)
-        entry.bind_property('text', oarg,
+        entry.bind_property('text', ops_arg,
                             'value', GObject.BindingFlags.SYNC_CREATE)
         entry.connect('entry-activated', self.on_input_activated)
         entry.connect('notify::text', self.on_input_changed)
         self.content_container.add(entry)
 
+    def create_list_entry(self,
+                          title:      str,
+                          contents:   list,
+                          ops_arg:    SheetOperationArg,
+                          group:      Adw.PreferencesGroup = None,
+                          add_button: Adw.ButtonRow = None) -> None:
+        # Initialize the operation arguments with an empty string
+        # where each argument correspond to a child input widget.
+        ops_arg.value = json.dumps([''] * (1 + len(contents)))
+
+        def on_entry_changed(widget: Gtk.Widget,
+                             pspec:  GObject.ParamSpec) -> None:
+            arg = ops_arg.value
+            args = json.loads(arg) if arg else []
+            args[0] = widget.get_text()
+            ops_arg.value = json.dumps(args)
+            self.on_input_changed(widget, pspec)
+
+        if create_new_group := group is None:
+            group = Adw.PreferencesGroup()
+            self.preferences_page.add(group)
+
+        entry = Adw.EntryRow()
+        entry.set_title(title)
+        entry.add_css_class('list-entry-item')
+        entry.connect('notify::text', on_entry_changed)
+        group.add(entry)
+
+        box = entry.get_first_child()
+        box.set_orientation(Gtk.Orientation.VERTICAL)
+        box.set_margin_top(6)
+        box.set_margin_bottom(6)
+        box.set_spacing(10)
+
+        suffix = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        suffix.set_spacing(6)
+        suffix.set_homogeneous(True)
+        suffix.set_visible(len(contents) > 0)
+        entry.add_suffix(suffix)
+
+        chindex = 1 # the first index (or zero) is already taken
+                    # by the entry widget, so we start from one.
+        for dtype, options in contents:
+            match dtype:
+                case 'dropdown':
+                    self.create_suffix_dropdown(options, suffix, chindex, ops_arg)
+            chindex += 1
+
+        def on_add_button_clicked(button: Gtk.Button) -> None:
+            new_ops_arg = SheetOperationArg()
+            self.operation_args.append(new_ops_arg)
+            self.create_list_entry(title, contents, new_ops_arg, group, button)
+
+        def on_delete_button_clicked(button: Gtk.Button) -> None:
+            group.remove(entry)
+            ops_index = self.operation_args.index(ops_arg)
+            del self.operation_args[ops_index]
+
+        delete_button = Gtk.Button()
+        delete_button.set_valign(Gtk.Align.CENTER)
+        delete_button.set_icon_name('user-trash-symbolic')
+        delete_button.add_css_class('flat')
+        delete_button.connect('clicked', on_delete_button_clicked)
+        entry.add_suffix(delete_button)
+
+        if create_new_group:
+            add_button = Adw.ButtonRow()
+            add_button.set_title(_('Add') + ' ' + title)
+            add_button.set_start_icon_name('list-add-symbolic')
+            add_button.connect('activated', on_add_button_clicked)
+            group.add(add_button)
+        else:
+            # Re-position to the end
+            group.remove(add_button)
+            group.add(add_button)
+
+        ops_arg.type = 'strv'
+
     def create_list_check(self,
                           title:       str,
                           description: str,
                           options:     list[str],
-                          oarg:        SheetOperationArg) -> None:
+                          ops_arg:     SheetOperationArg) -> None:
 
-        def setup_factory(list_item_factory: Gtk.SignalListItemFactory,
-                          list_item:         Gtk.ListItem) -> None:
-            check_button = Gtk.CheckButton()
-            list_item.set_child(check_button)
-
-            label = Gtk.Label(halign=Gtk.Align.START,
-                              hexpand=True,
-                              ellipsize=Pango.EllipsizeMode.END)
-            check_button.set_child(label)
-
-            list_item.check_button = check_button
-            list_item.label = label
-            list_item.bind_toggled = None
-
-        def bind_factory(list_item_factory: Gtk.SignalListItemFactory,
-                         list_item:         Gtk.ListItem) -> None:
-            item_data = list_item.get_item()
-
-            def on_toggled(button:    Gtk.Button,
-                           item_data: Gtk.StringObject) -> None:
-                if oarg.value == '':
-                    selected_columns = []
-                else:
-                    selected_columns = oarg.value.split('$')
-                target_column = item_data.get_string()
-                if button.get_active():
-                    selected_columns.append(target_column)
-                else:
-                    selected_columns.remove(target_column)
-                oarg.value = '$'.join(selected_columns)
-
-            if list_item.bind_toggled is not None:
-                list_item.check_button.disconnect(list_item.bind_toggled)
-
-            label = item_data.get_string()
-            list_item.label.set_label(label)
-
-            if len(options) <= 10: # TODO: find optimal behaviour
-                list_item.check_button.set_active(True)
-
-            list_item.bind_toggled = list_item.check_button.connect('toggled',
-                                                                    on_toggled,
-                                                                    item_data)
-
-        def teardown_factory(list_item_factory: Gtk.SignalListItemFactory,
-                             list_item:         Gtk.ListItem) -> None:
-            list_item.label = None
-            list_item.check_button = None
-            list_item.bind_toggled = None
-
-        group = Adw.PreferencesGroup()
-        group.set_title(title)
-        if description is not None:
-            group.set_description(description)
+        def on_check_toggled(button: Gtk.CheckButton,
+                             value:  str) -> None:
+            args = json.loads(ops_arg.value) \
+                   if ops_arg.value else []
+            args.append(value) if button.get_active() \
+                               else args.remove(value)
+            ops_arg.value = json.dumps(args)
 
         row = Adw.PreferencesRow()
         row.set_activatable(False)
-        group.add(row)
 
-        list_view = Gtk.ListView()
-        list_view.set_single_click_activate(True)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        row.set_child(box)
+
+        box.get_parent().set_activatable(False)
+
+        subbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        subbox.set_margin_top(6)
+        subbox.set_margin_bottom(6)
+        subbox.set_margin_start(10)
+        subbox.set_margin_end(10)
+        subbox.add_css_class('title')
+        box.append(subbox)
+
+        label_title = Gtk.Label()
+        label_title.set_halign(Gtk.Align.START)
+        label_title.set_ellipsize(Pango.EllipsizeMode.END)
+        label_title.add_css_class('title')
+        label_title.set_label(title)
+        subbox.append(label_title)
+
+        if description is not None:
+            label_description = Gtk.Label()
+            label_description.set_halign(Gtk.Align.START)
+            label_description.set_wrap_mode(Gtk.WrapMode.WORD)
+            label_description.add_css_class('subtitle')
+            label_description.set_label(description)
+            subbox.append(label_description)
+
+        list_view = Gtk.FlowBox()
+        list_view.set_selection_mode(Gtk.SelectionMode.NONE)
+        list_view.set_min_children_per_line(2)
+        list_view.set_homogeneous(True)
         list_view.add_css_class('sheet-ops-list-view')
-        row.set_child(list_view)
+        box.append(list_view)
 
-        factory = Gtk.SignalListItemFactory()
-        factory.connect('setup', setup_factory)
-        factory.connect('bind', bind_factory)
-        factory.connect('teardown', teardown_factory)
-        list_view.set_factory(factory)
-
-        selection = Gtk.SingleSelection()
-        list_view.set_model(selection)
-
-        string_list = Gtk.StringList()
         for option in options:
-            string_list.append(option)
-        selection.set_model(string_list)
+            label = Gtk.Label()
+            label.set_halign(Gtk.Align.START)
+            label.set_valign(Gtk.Align.CENTER)
+            label.set_hexpand(True)
+            label.set_ellipsize(Pango.EllipsizeMode.END)
+            label.set_label(option)
+            check_button = Gtk.CheckButton()
+            check_button.set_child(label)
+            check_button.connect('toggled', on_check_toggled, option)
+            list_view.append(check_button)
 
-        self.preferences_page.add(group)
+        self.content_container.add(row)
 
-        oarg.type = 'strv'
+        ops_arg.type = 'strv'
 
     def create_spin_row(self,
-                        title: str,
+                        title:       str,
                         description: str,
-                        oarg:  SheetOperationArg) -> None:
+                        ops_arg:     SheetOperationArg) -> None:
         spin = Adw.SpinRow()
         spin.set_title(title)
         if description is not None:
@@ -283,46 +355,138 @@ class SheetOperationDialog(Adw.Dialog):
         spin.set_range(0, 1_000_000_000)
         spin.get_adjustment().set_page_increment(5)
         spin.get_adjustment().set_step_increment(1)
-        spin.bind_property('text', oarg,
+        spin.bind_property('text', ops_arg,
                            'value', GObject.BindingFlags.SYNC_CREATE)
         spin.connect('notify::value', self.on_input_changed)
         self.content_container.add(spin)
-        oarg.type = 'int'
+        ops_arg.type = 'int'
 
     def create_switch_row(self,
-                          title: str,
+                          title:       str,
                           description: str,
-                          oarg:  SheetOperationArg) -> None:
+                          ops_arg:     SheetOperationArg) -> None:
         switch = Adw.SwitchRow()
         switch.set_title(title)
         if description is not None:
             switch.set_subtitle(description)
-        switch.bind_property('active', oarg,
+        switch.bind_property('active', ops_arg,
                              'value', GObject.BindingFlags.SYNC_CREATE)
         switch.connect('notify::active', self.on_input_changed)
         self.content_container.add(switch)
-        oarg.type = 'bool'
+        ops_arg.type = 'bool'
+
+    def create_suffix_dropdown(self,
+                               options: list,
+                               parent:  Gtk.Widget,
+                               chindex: int,
+                               ops_arg: SheetOperationArg) -> None:
+        dropdown = Gtk.DropDown.new()
+        dropdown.set_hexpand(True)
+        dropdown.set_valign(Gtk.Align.CENTER)
+
+        def setup_factory_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                   list_item:         Gtk.ListItem) -> None:
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.set_hexpand(True)
+            list_item.set_child(box)
+
+            label = Gtk.Label()
+            box.append(label)
+
+            image = Gtk.Image()
+            image.set_from_icon_name('object-select-symbolic')
+            image.set_opacity(0)
+            box.append(image)
+
+            list_item.label = label
+            list_item.image = image
+            list_item.bind_item = None
+
+        def bind_factory_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                  list_item:         Gtk.ListItem) -> None:
+            item_data = list_item.get_item()
+            label = item_data.get_string()
+
+            def on_list_item_selected(*args) -> None:
+                is_selected = list_item.get_selected()
+                list_item.image.set_opacity(is_selected)
+                if not is_selected:
+                    return
+                arg = ops_arg.value
+                args = json.loads(arg) if arg else []
+                args[chindex] = label
+                ops_arg.value = json.dumps(args)
+                self.on_input_changed()
+
+            list_item.label.set_label(label)
+
+            if list_item.bind_item is not None:
+                list_item.disconnect(list_item.bind_item)
+
+            list_item.bind_item = dropdown.connect('notify::selected-item', on_list_item_selected)
+            on_list_item_selected()
+
+        def teardown_factory_dropdown(list_item_factory: Gtk.SignalListItemFactory,
+                                      list_item:         Gtk.ListItem) -> None:
+            list_item.label = None
+            list_item.image = None
+            list_item.bind_item = None
+
+        dropdown_model = Gtk.StringList()
+        for option in options:
+            dropdown_model.append(option)
+        dropdown.set_model(dropdown_model)
+
+        dropdown_list_factory = Gtk.SignalListItemFactory()
+        dropdown_list_factory.connect('setup', setup_factory_dropdown)
+        dropdown_list_factory.connect('bind', bind_factory_dropdown)
+        dropdown_list_factory.connect('teardown', teardown_factory_dropdown)
+        dropdown.set_list_factory(dropdown_list_factory)
+
+        dropdown_factory = Gtk.BuilderListItemFactory.new_from_bytes(None, GLib.Bytes.new(bytes(
+"""
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <template class="GtkListItem">
+    <property name="child">
+      <object class="GtkLabel">
+        <property name="halign">start</property>
+        <property name="hexpand">true</property>
+        <property name="ellipsize">end</property>
+        <binding name="label">
+          <lookup name="string" type="GtkStringObject">
+            <lookup name="item">GtkListItem</lookup>
+          </lookup>
+        </binding>
+      </object>
+    </property>
+  </template>
+</interface>
+""", 'utf-8')))
+        dropdown.set_factory(dropdown_factory)
+
+        parent.append(dropdown)
 
     def create_match_case_switch(self):
         self.match_case = Adw.SwitchRow()
         self.match_case.set_active(self.kwargs['match_case'])
         self.match_case.set_title('Case Sensitive (Match Case)')
         self.match_case.set_subtitle('Distinguish between uppercase and lowercase')
-        self.content_container.add(self.match_case)
+        self.options_container.add(self.match_case)
 
     def create_new_worksheet_switch(self):
         self.new_worksheet = Adw.SwitchRow()
         self.new_worksheet.set_active(self.kwargs['new_worksheet'])
         self.new_worksheet.set_title('Create a New Worksheet')
         self.new_worksheet.set_subtitle('Send the result into a new worksheet')
-        self.content_container.add(self.new_worksheet)
+        self.options_container.add(self.new_worksheet)
 
     def create_on_column_switch(self):
         self.on_column = Adw.SwitchRow()
         self.on_column.set_active(self.kwargs['on_column'])
         self.on_column.set_title('Apply on Entire Rows')
         self.on_column.set_subtitle('Disable to apply on selection only')
-        self.content_container.add(self.on_column)
+        self.options_container.add(self.on_column)
 
     def create_use_regexp_switch(self):
         self.use_regexp = Adw.SwitchRow()
@@ -330,11 +494,9 @@ class SheetOperationDialog(Adw.Dialog):
         self.use_regexp.set_title('Use Regular Expression')
         self.use_regexp.set_subtitle('Learn more about <a href="https://regexlearn.com/">'
                                      'Regular Expression</a>')
-        self.content_container.add(self.use_regexp)
+        self.options_container.add(self.use_regexp)
 
-    def on_input_changed(self,
-                         widget: Gtk.Widget,
-                         pspec:  GObject.ParamSpec) -> None:
+    def on_input_changed(self, *args) -> None:
         self.live_preview()
 
     def on_input_activated(self, widget: Gtk.Widget) -> None:
@@ -355,14 +517,13 @@ class SheetOperationDialog(Adw.Dialog):
                                             dataframe[row_index, 'after'])
                 list_items_to_add.append(list_item)
 
+            GLib.idle_add(self.preview_list_store.remove_all)
             GLib.idle_add(self.preview_list_store.splice, 0, 0, list_items_to_add)
-
-        self.preview_list_store.remove_all()
 
         if not use_thread:
             update_search_list()
-        else:
-            threading.Thread(target=update_search_list, daemon=True).start()
+            return
+        threading.Thread(target=update_search_list, daemon=True).start()
 
     def get_callback_args(self) -> list:
         args = []
@@ -376,10 +537,7 @@ class SheetOperationDialog(Adw.Dialog):
             if operation_arg.type == 'bool':
                 arg = utils.cast_to_boolean(arg)
             if operation_arg.type == 'strv':
-                if arg == '':
-                    arg = []
-                else:
-                    arg = arg.split('$')
+                arg = json.loads(arg) if arg else []
 
             args.append(arg)
 

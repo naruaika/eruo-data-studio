@@ -49,6 +49,7 @@ class SheetCellMenu(Gtk.PopoverMenu):
         if dfi >= 0:
             self.create_filter_sort_section(main_menu, ctype)
             self.create_convert_transform_section(main_menu, ctype)
+            self.create_groupby_pivot_section(main_menu, ctype)
             self.create_insert_duplicate_delete_section(main_menu,
                                                         start_column, start_row,
                                                         end_column,   end_row,
@@ -320,6 +321,16 @@ class SheetCellMenu(Gtk.PopoverMenu):
         transform_menu_item = Gio.MenuItem.new(_('_Transform'), None)
         transform_menu_item.set_submenu(transform_menu)
         convert_transform_section.append_item(transform_menu_item)
+
+    def create_groupby_pivot_section(self,
+                                     main_menu: Gio.Menu,
+                                     ctype:     SheetCell) -> None:
+        if ctype not in [SheetTopLocatorCell]:
+            return
+
+        groupby_pivot_section = Gio.Menu.new()
+        groupby_pivot_section.append(_('Group By...'), 'app.group-rows-by')
+        main_menu.append_section(None, groupby_pivot_section)
 
     def create_table_section(self,
                              main_menu: Gio.Menu,

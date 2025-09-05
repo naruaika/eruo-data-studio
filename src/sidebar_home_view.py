@@ -590,7 +590,7 @@ class SidebarHomeView(Adw.Bin):
 
         copy_button = Gtk.Button()
         copy_button.set_icon_name('edit-copy-symbolic')
-        copy_button.set_tooltip_text('Copy Connection Name')
+        copy_button.set_tooltip_text('Copy Name')
         copy_button.add_css_class('flat')
         container.append(copy_button)
 
@@ -968,13 +968,13 @@ class SidebarHomeView(Adw.Bin):
                           list_item:         Gtk.ListItem) -> None:
 
         def on_field_selected(dropdown: Gtk.DropDown,
-                              pspec: GObject.ParamSpec,
+                              pspec:    GObject.ParamSpec,
                               item_data: SortListItem) -> None:
             item_data.cindex = dropdown.get_selected_item().cindex
             item_data.cname = dropdown.get_selected_item().cname
 
-        def on_order_selected(dropdown: Gtk.DropDown,
-                              pspec: GObject.ParamSpec,
+        def on_order_selected(dropdown:  Gtk.DropDown,
+                              pspec:     GObject.ParamSpec,
                               item_data: SortListItem) -> None:
             item_data.order = dropdown.get_selected_item().get_string()
 
@@ -1512,12 +1512,13 @@ class SidebarHomeView(Adw.Bin):
         def bind_factory_field_dropdown(list_item_factory: Gtk.SignalListItemFactory,
                                         list_item:         Gtk.ListItem) -> None:
             item_data = list_item.get_item()
-            list_item.label.set_label(item_data.cname)
+
+            label = item_data.cname
+            list_item.label.set_label(label)
 
             def on_list_item_selected(*_) -> None:
-                list_item.image.set_opacity(0)
-                if list_item.get_selected():
-                    list_item.image.set_opacity(1)
+                is_selected = list_item.get_selected()
+                list_item.image.set_opacity(is_selected)
 
             field_dropdown.connect('notify::selected-item', on_list_item_selected)
             on_list_item_selected()
@@ -1592,9 +1593,8 @@ class SidebarHomeView(Adw.Bin):
             list_item.label.set_label(item_data.get_string())
 
             def on_list_item_selected(*_) -> None:
-                list_item.image.set_opacity(0)
-                if list_item.get_selected():
-                    list_item.image.set_opacity(1)
+                is_selected = list_item.get_selected()
+                list_item.image.set_opacity(is_selected)
 
             order_dropdown.connect('notify::selected-item', on_list_item_selected)
             on_list_item_selected()
@@ -1663,7 +1663,9 @@ class SidebarHomeView(Adw.Bin):
         def bind_factory_basic_filter_dropdown(list_item_factory: Gtk.SignalListItemFactory,
                                                list_item:         Gtk.ListItem) -> None:
             item_data = list_item.get_item()
-            list_item.label.set_label(item_data.get_string())
+
+            label = item_data.get_string()
+            list_item.label.set_label(label)
 
             def on_list_item_selected(*_) -> None:
                 list_item.image.set_opacity(0)
@@ -1743,7 +1745,7 @@ class SidebarHomeView(Adw.Bin):
     def create_delete_button(self) -> Gtk.Button:
         delete_button = Gtk.Button()
         delete_button.set_icon_name('user-trash-symbolic')
-        delete_button.set_tooltip_text('Delete item')
+        delete_button.set_tooltip_text('Delete Item')
         delete_button.add_css_class('flat')
         return delete_button
 

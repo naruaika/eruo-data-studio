@@ -360,9 +360,9 @@ class SheetColumnResizer(SheetWidget):
         x = self.handler_x
         y = self.get_ry()
 
-        background_color = (0.0, 0.0, 0.0)
+        background_color = (0.75, 0.75, 0.75)
         if prefers_dark:
-            background_color = (1.0, 1.0, 1.0)
+            background_color = (0.25, 0.25, 0.25)
 
         context.set_source_rgb(*background_color)
 
@@ -373,9 +373,9 @@ class SheetColumnResizer(SheetWidget):
                           self.height)
         context.fill()
 
-        stroke_color = (1.0, 1.0, 1.0)
+        stroke_color = (0.0, 0.0, 0.0)
         if prefers_dark:
-            stroke_color = (0.0, 0.0, 0.0)
+            stroke_color = (1.0, 1.0, 1.0)
 
         context.set_source_rgb(*stroke_color)
         context.set_hairline(True)

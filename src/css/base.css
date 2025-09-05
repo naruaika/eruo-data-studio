@@ -253,6 +253,9 @@ popover listview row {
     margin: 0;
 }
 
+.sheet-ops-list-view {
+    padding: 4px;
+}
 .sheet-ops-list-view,
 .preview-column-view {
     background-color: transparent;
@@ -266,7 +269,6 @@ popover listview row {
 .preview-column-view row {
     padding: 4px;
 }
-
 .sheet-ops-list-view row:selected,
 .preview-column-view row:selected {
     border-radius: 12px;
@@ -284,6 +286,12 @@ popover listview row {
 .sheet-ops-list-view check {
     margin-right: 1px;
     background-color: transparent;
+}
+
+.list-entry-item .editable-area,
+.list-entry-item .suffixes {
+    padding-right: 0;
+    margin-right: 0;
 }
 
 /* CUSTOMS */
